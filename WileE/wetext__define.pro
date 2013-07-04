@@ -1,0 +1,1 @@
+/Users/argall/Documents/Work/Programs/WileEGraphics/wetext__define.pro

@@ -1,0 +1,4 @@
+exclude_mrwindow.txt
+startup_mrwindow.pro
+create_symlinks_mrwindow.bash
+ReadMe_MrWindow/

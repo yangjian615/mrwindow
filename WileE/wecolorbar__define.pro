@@ -1,0 +1,1 @@
+/Users/argall/Documents/Work/Programs/WileEGraphics/wecolorbar__define.pro

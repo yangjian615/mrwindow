@@ -1,0 +1,13 @@
+\BOOKMARK [1][-]{section.1}{Copyright}{}% 1
+\BOOKMARK [1][-]{section.2}{Getting Started}{}% 2
+\BOOKMARK [1][-]{section.3}{Thorough Example}{}% 3
+\BOOKMARK [2][-]{subsection.3.1}{Creating an empty MrWindow}{section.3}% 4
+\BOOKMARK [2][-]{subsection.3.2}{Plot a Sine Wave}{section.3}% 5
+\BOOKMARK [2][-]{subsection.3.3}{Add Another Plot}{section.3}% 6
+\BOOKMARK [2][-]{subsection.3.4}{Changing Plot Properties}{section.3}% 7
+\BOOKMARK [2][-]{subsection.3.5}{Bind Axes}{section.3}% 8
+\BOOKMARK [2][-]{subsection.3.6}{Add an Image to any Location}{section.3}% 9
+\BOOKMARK [2][-]{subsection.3.7}{Alter Layout}{section.3}% 10
+\BOOKMARK [2][-]{subsection.3.8}{Add Colorbar}{section.3}% 11
+\BOOKMARK [2][-]{subsection.3.9}{Color Zoom}{section.3}% 12
+\BOOKMARK [2][-]{subsection.3.10}{Add Any Plottable Object}{section.3}% 13
