@@ -119,6 +119,7 @@
 ;                           simultaneously. Fixed. - MRA
 ;       07/04/2013  -   Forgot to pass keyword to the BUILD method so windows were not
 ;                           being made the proper size. Fixed. - MRA
+;       07/05/2013  -   Added the CREATEGUI keyword. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -236,9 +237,10 @@ pro MrWindow::Draw
     ;Create an empty plot if none exists
     if nPlots eq 0 then cgErase
 
-    ;Call all of the superclass draw methods.
+    ;Plot and Image both erase the plotting area. Make sure only the first "draw" does.
     if n_elements(*self.plotObjects) eq 0 then noerase=0 else noerase=1
 
+    ;Call all of the superclass draw methods.
     self -> MrAbstractPlot::Draw
     self -> MrAbstractImage::Draw, NOERASE=noerase
     self -> MrAbstractColorbar::Draw
@@ -1233,21 +1235,28 @@ end
 ; :Params:
 ;       PARENT:             in, optional, type=int
 ;                           The widget ID of a parent widget in which to place the draw
-;                               window.
+;                               window. If not provided, the draw window will be placed
+;                               in a MrWindow widget unless `CREATEGUI`=0.
 ;
 ; :Keywords:
 ;       CMODE:              in, optional, type=int, default=0
 ;                           The default cursor mode in which to start
+;       CREATEGUI:          in, optional, type=boolean, default=1
+;                           If set, graphics will be drawn in either a MrWindow widget
+;                               or in the widget specified by `PARENT`. If not set, graphics
+;                               will be diplayed in a normal IDL graphics window. Setting
+;                               this keyword to 0 also sets `REALIZE`=0 and `BUILD`=0
 ;       BUILD:              in, optional, type=Boolean, default=1
 ;                           Build the GUI. This gives the option to construct the GUI
 ;                               without having to realize it yet.
 ;       LMODE:              in, optional, type=int, default=4 (Box Zoom)
 ;                           The zoom mode associated with the left mouse button.
 ;       REALIZE:            in, optional, type=boolean, default=1
-;                           If set and `PARENT` is not given, then the GUI will be realized
-;                               imediately after it is built. If not set, the GUI will be
-;                               built but not realized. Realization causes a call to the
-;                               Draw method via "Notify_Realize". This sets `BUILD`=1
+;                           If set and `PARENT` is not given, then the MrWindow widget will
+;                               be realized imediately after it is built. If not set, the
+;                               GUI will be built but not realized. Realization causes a
+;                               call to the Draw method via "Notify_Realize". Setting this
+;                               also sets `BUILD`=1.
 ;       RMODE:              in, optional, type=int, default=8 (Pan)
 ;                           The zoom mode associated with the right mouse button.
 ;       SAVEDIR:            in, optional, type=string, default=current
@@ -1283,6 +1292,7 @@ function MrWindow::init, parent, $
 ;MrWindow Keywords
 ARROWS = arrows, $
 CMODE = cmode, $
+CREATEGUI = createGUI, $
 BUILD = build, $
 LMODE = lmode, $
 PLOTOBJECTS = plotObjects, $
@@ -1321,6 +1331,13 @@ _REF_EXTRA = extra
     setDefaultValue, savedir, current
     setDefaultvalue, xsize, 600
     setDefaultValue, ysize, 340
+    setDefaultValue, createGUI, 1, /BOOLEAN
+    
+    ;If not creating a GUI, then do not build or realize.
+    if createGUI eq 0 then begin
+        realize = 0
+        build = 0
+    endif
     
     ;Zoom Factor
     case n_elements(zoomfactor) of
@@ -1361,25 +1378,50 @@ _REF_EXTRA = extra
     self -> AddText, text
 
 ;---------------------------------------------------------------------
-;Create a GUI ////////////////////////////////////////////////////////
+;Display Window //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
-	;Create a GUI?
-	if n_elements(parent) eq 0 then begin ;and self.gui then begin
-        ;Create a pixmap window. This has to be done before the GUI is realized
-        ;because the NOTIFY_REALIZE method calls the DRAW method, which reequires a
-        ;pixmap window.
-        self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
+	;Was a parent widget provided?
+	if n_elements(parent) eq 0 then begin
+
+    ;---------------------------------------------------------------------
+    ;IDL Window //////////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
 	    
-	    ;Realize the widget? Build it?
-	    if keyword_set(realize) $
-	        then self -> realizeGUI, /BUILD, XSIZE=xsize, YSIZE=ysize $
-	        else if keyword_set(build) then self -> buildGUI, XSIZE=xsize, YSIZE=ysize
+	    ;Is a GUI being build or realized? If not...
+	    if keyword_set(createGUI) then begin
+	    
+	        ;If not, create a normal window
+            self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, /PIXMAP)
+            self.win = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, TITLE='MrWindow')
+
+    ;---------------------------------------------------------------------
+    ;MrWindow GUI ////////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+
+        ;If so, build the GUI
+        endif else begin	
+	
+            ;Create a pixmap window. This has to be done before the GUI is realized
+            ;because the NOTIFY_REALIZE method calls the DRAW method, which reequires a
+            ;pixmap window.
+            self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
+        
+            ;Realize the widget? Build it?
+            if keyword_set(realize) $
+                then self -> realizeGUI, /BUILD, XSIZE=xsize, YSIZE=ysize $
+                else if keyword_set(build) then self -> buildGUI, XSIZE=xsize, YSIZE=ysize
+	    
+	    endelse
+
+    ;---------------------------------------------------------------------
+    ;External GUI ////////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
 
     ;If a parent was provided, just add the draw widget. We have to know when the 
     ;widget is realized so that we can get the Window ID in which to draw the plots.
     ;Realization needs its own event handler because the UVALUE is for other events
-	endif else if n_elements(parent) ne 0 then begin
+	endif else begin
 	    self.tlb = parent
         
         ;create a pixmap window
@@ -1390,7 +1432,7 @@ _REF_EXTRA = extra
                                   NOTIFY_REALIZE='MrWindow_Notify_Realize', $
                                   EVENT_PRO='MrWindow_Events', $
                                   UVALUE={object: self, method: 'Draw_Events'})
-	endif
+	endelse
 
     return, 1
 end
