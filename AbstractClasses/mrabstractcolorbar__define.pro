@@ -141,7 +141,7 @@ WIDTHS = widths
     
     ;Replace.
     if keyword_set(replace) then begin
-        self -> ReplaceColorbars, cbObject, index, DESTROY=destroy, DRAW=draw
+        self -> ReplaceColorbars, cbObjects, index, DESTROY=destroy, DRAW=draw
         return
     endif
     
@@ -159,7 +159,7 @@ WIDTHS = widths
 ;---------------------------------------------------------------------
     
     ;If nothing was given to add, then return
-    if n_elements(cbObject) eq 0 then begin
+    if n_elements(cbObjects) eq 0 then begin
         if ptr_valid(self.colorbars) eq 0 then self.colorbars = ptr_new(/ALLOCATE_HEAP)
         if ptr_valid(self.cblocations) eq 0 then self.cblocations = ptr_new(/ALLOCATE_HEAP)
         if ptr_valid(self.cboffsets) eq 0 then self.cboffsets = ptr_new(/ALLOCATE_HEAP)
@@ -182,7 +182,7 @@ WIDTHS = widths
     ;Add the object
     if ptr_valid(self.colorbars) $
         then *self.colorbars = [*self.colorbars, cbObject] $
-        else self.colorbars = ptr_new(cbObject)
+        else self.colorbars = ptr_new(cbObjects)
     
     ;Add the location
     if ptr_valid(self.cblocations) $
@@ -251,7 +251,7 @@ WIDTH = width
     SetDefaultValue, location, 'RIGHT'
     SetDefaultValue, offset, 3
     SetDefaultValue, width, 5
-    
+
     ;Calculate the position of the colorbar
     case strupcase(location) of
         'RIGHT': cbPosition = [position[2] + offset*xchsize, $
@@ -395,14 +395,14 @@ _REF_EXTRA = extra
 
     ;Default to putting the color bar to the right of the plot.
     if n_elements(position) eq 0 then location = 'RIGHT'
-    CASE StrUpCase(location) OF
+    case strupcase(location) of
         "": ;Default
         'RIGHT': vertical = 1
         'LEFT': vertical = 1
         'TOP': vertical = 0
         'BOTTOM': vertical = 0
-        ELSE: Message, 'LOCATION is not a valid location.'
-    ENDCASE
+        else: message, 'LOCATION is not a valid location.'
+    endcase
 
     ;Create the color bar
     theColorBar = obj_new('weColorBar', VERTICAL=vertical, _STRICT_EXTRA=extra)

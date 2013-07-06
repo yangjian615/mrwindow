@@ -347,7 +347,8 @@ ZAXIS = zaxis
             
             ;See if OBJECT2 is bound to anything.
             while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_x -> Get_Node(i)
+
+                thisBinding = self.bind_x -> Get_Value(i)
                 iBound = where(thisBinding eq object2, count)
                 
                 ;If it is
@@ -368,7 +369,7 @@ ZAXIS = zaxis
             ;time, see if OBJECT1 is bound to anything.
             i = 0
             while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_x -> get_node(i)
+                thisBinding = self.bind_x -> Get_Value(i)
                 iBound = where(thisBinding eq object1, count)
                 
                 ;If it is, bind OBJECT2 to the group.
@@ -404,7 +405,7 @@ ZAXIS = zaxis
             i = 0
             
             while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_y -> Get_Node(i)
+                thisBinding = self.bind_y -> Get_Value(i)
                 iBound = where(thisBinding eq object2, count)
                 
                 if count ne 0 then begin
@@ -419,7 +420,7 @@ ZAXIS = zaxis
             
             i = 0
             while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_y -> get_node(i)
+                thisBinding = self.bind_y -> Get_Value(i)
                 iBound = where(thisBinding eq object1, count)
                 
                 if count ne 0 then begin
@@ -450,7 +451,7 @@ ZAXIS = zaxis
             i = 0
             
             while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_z -> Get_Node(i)
+                thisBinding = self.bind_z -> Get_Value(i)
                 iBound = where(thisBinding eq object2, count)
                 
                 if count ne 0 then begin
@@ -465,7 +466,7 @@ ZAXIS = zaxis
             
             i = 0
             while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_z -> get_node(i)
+                thisBinding = self.bind_z -> Get_Value(i)
                 iBound = where(thisBinding eq object1, count)
                 
                 if count ne 0 then begin
@@ -496,7 +497,7 @@ ZAXIS = zaxis
             i = 0
             
             while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_c -> Get_Node(i)
+                thisBinding = self.bind_c -> Get_Value(i)
                 iBound = where(thisBinding eq object2, count)
                 
                 if count ne 0 then begin
@@ -511,7 +512,7 @@ ZAXIS = zaxis
             
             i = 0
             while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_c -> get_node(i)
+                thisBinding = self.bind_c -> Get_Value(i)
                 iBound = where(thisBinding eq object1, count)
                 
                 if count ne 0 then begin

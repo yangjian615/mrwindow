@@ -7,7 +7,7 @@ dest_Utilities=$dest_MrWindow/utilities                      #Utilities
 dest_WileE=$dest_MrWindow/WileE                              #Wile E. Graphics
 
 #Source directories
-src_CDF=/Users/argall/Documents/Work/Programs/CDFReader     #Coyote Graphics
+src_CDF=/Users/argall/Documents/Work/Programs/cdf-reader    #CDF Reader
 src_Lib=/Users/argall/Documents/Work/Programs/MyLibraryIDL  #My Personal Library
 src_WileE=/Users/argall/Documents/Work/Programs/WileEGraphics       #Wile E. Graphics
 src_Array=$src_Lib/array_utils                              #Array Utilities
@@ -22,6 +22,7 @@ src_Type=$src_Lib/type_utils                                #Type Utilities
 #Sources: CDF Reader
 CDFFiles[0]=$src_CDF/cdf_info__define.pro
 CDFFiles[1]=$src_CDF/cdf_read__define.pro
+CDFFiles[2]=$src_CDF/cdf_read.pro
 
 CDFUtils[0]=$src_Time/convert_time.pro
 CDFUtils[1]=$src_Time/datetime_to_epoch.pro

@@ -117,6 +117,8 @@
 ;       06/20/2013  -   Pixmap was not being copied for cross-hairs. Needed to check for
 ;                           bit 2, not EQ 2, as multiple cursor events can take place
 ;                           simultaneously. Fixed. - MRA
+;       07/04/2013  -   Forgot to pass keyword to the BUILD method so windows were not
+;                           being made the proper size. Fixed. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -144,8 +146,8 @@ YSIZE = ysize
     endif
     
     ;Default window size
-    if n_elements(xsize) eq 0 then xsize = 600
-    if n_elements(ysize) eq 0 then ysize = 340
+    if n_elements(xsize) eq 0 then if self.xsize eq 0 then xsize = 600 else xsize = self.xsize
+    if n_elements(ysize) eq 0 then if self.ysize eq 0 then ysize = 600 else ysize = self.ysize
     self.xsize = xsize
     self.ysize = ysize
     
@@ -542,7 +544,7 @@ end
 ;                           
 ;-
 pro MrWindow::GetProperty, index, $
-AMODE = amode, $
+CMODE = cmode, $
 LMODE = lmode, $
 RMODE = rmode, $
 SAVEDIR = save_dir, $
@@ -619,7 +621,7 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     
     ;Get Properties
-    if arg_present(amode)      and n_elements(self.amode)      ne 0 then amode = self.amode
+    if arg_present(cmode)      and n_elements(self.cmode)      ne 0 then cmode = self.cmode
     if arg_present(lmode)      and n_elements(self.lmode)      ne 0 then lmode = self.lmode
     if arg_present(rmode)      and n_elements(self.rmode)      ne 0 then rmode = self.rmode
     if arg_present(savedir)    and n_elements(self.savedir)    ne 0 then savedir = self.savedir
@@ -630,7 +632,7 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ;SUPERCLASS PROPERTIES ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if n_extra gt 0 then begin
+    if n_elements(extra) gt 0 then begin
 
     ;---------------------------------------------------------------------
     ;SAVEAS PROPERTIES ///////////////////////////////////////////////////
@@ -639,7 +641,7 @@ _REF_EXTRA = extra
                          'IM_TRANSPARENT', 'IM_WIDTH', 'PDF_UNIX_CONVERT_CMD', 'PDF_PATH', $
                          'PS_CHARSIZE', 'PS_DECOMPOSED', 'PS_DELETE', 'PS_ENCAPSULATED', $
                          'PS_FONT', 'PS_METRIC', 'PS_QUIET', 'PS_SCALE_FACTOR', 'PS_TT_FONT'], $
-                         extra, iSaveAs, N_MATCHES=nmathces, NONMEMBER_INDS=iExtra, /FOLD_CASE)
+                         extra, iSaveAs, N_MATCHES=nmatches, NONMEMBER_INDS=iExtra, /FOLD_CASE)
         
         if nmatches gt 0 then self -> MrAbstractSaveAs::GetProperty, _STRICT_EXTRA=extra[iSaveAs]
         
@@ -799,15 +801,13 @@ end
 ; :Keywords:
 ;       BUILD:          in, optional, type=Boolean, default=1
 ;                       Build the GUI before realizing it.
-;       XSIZE:          in, optional, type=boolean, default=600
-;                       If `BUILD` is set, then this is the width of the draw widget.
-;       YSIZE:          in, optional, type=boolean, default=340
-;                       If `BUILD` is set, then this is the height of the draw widget.
+;       _REF_EXTRA:     in, optional, type=any
+;                       Any keyword accepted by the BUILD method is also excepted for
+;                           keyword inheritance.
 ;-
 pro MrWindow::realizeGUI, $
 BUILD = build, $
-XSIZE = xsize, $
-YSIZE = ysize
+_REF_EXTRA = extra
     compile_opt idl2
     
     ;Error handling
@@ -822,7 +822,7 @@ YSIZE = ysize
     setDefaultValue, build, 1, /BOOLEAN
     
     ;Build the GUI
-    if keyword_set(build) then self -> buildGUI
+    if keyword_set(build) then self -> buildGUI, _STRICT_EXTRA=extra
     
     ;Make sure a GUI has been built.
     if self.tlb eq 0 then message, 'GUI must be built first.'
@@ -1303,7 +1303,7 @@ _REF_EXTRA = extra
         void = error_message()
         return, 0
     endif
-                                    
+
     if self -> MrPlotManager::init(_EXTRA=extra) eq 0 then return, 0
     if self -> MrAbstractSaveAs::init() eq 0 then return, 0
 

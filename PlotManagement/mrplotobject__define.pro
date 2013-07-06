@@ -62,6 +62,8 @@
 ;       06/28/2013  -   Added the DIMENSION keyword. Removed the AXES and COLORBARS
 ;                           properties because the former was not being used and the
 ;                           latter interfered with the COLOR keyword. - MRA
+;       07/04/2013  -   Added the COLOR keyword so that each column or row in DIMENSION
+;                           can be plotted in a different color. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -499,6 +501,9 @@ end
 ;                               as individual vectors in the same set of axes.
 ;
 ; :Keywords:
+;       COLOR:              in, optional, type=string/strarr, default='opposite'
+;                           Color of the line plots. If `DIMENSION` is used, there must
+;                               be one color per component.
 ;       DIMENSION:          in, optional, type=int, default=0
 ;                           The dimension over which to plot. As an example, say `Y` is
 ;                               an N1xN2 array and settind DIMENSION=2. Then, N1 plots
@@ -556,6 +561,7 @@ LEGENDS = legends, $
 OPLOTS = oplots, $
 
 ;Graphics Keywords
+COLOR = color, $
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
 NSUM = nsum, $
@@ -588,7 +594,7 @@ _REF_EXTRA = extra
     ;defaults from taking effect. The EXTRA structure has precedence over
     ;the keywords, so if AXISCOLOR, COLOR, or CHARSIZE are supplied by the user,
     ;the ones shown in the call will be ignored.
-    status = self -> weGraphicsKeywords::INIT(AXISCOLOR='black', COLOR='black', CHARSIZE=1.0, $
+    status = self -> weGraphicsKeywords::INIT(AXISCOLOR='black', CHARSIZE=1.0, $
                                               _STRICT_EXTRA=extra)
     if status eq 0 then return, 0
 
@@ -617,6 +623,7 @@ _REF_EXTRA = extra
     if n_elements(dep) eq 1 then dep = [dep]
     
     ;Make the dimension being plotted the leading dimension
+    if dimension eq 0 then nDefaults = 1 else nDefaults = dims[dimension-1]
     if dimension eq 1 then begin
         dep = transpose(dep)
         dimension = 2
@@ -625,7 +632,6 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ;Keywords ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    IF dimension EQ 0 THEN nDefaults = 1 ELSE nDefaults = dims[dimension-1]
     
     ;Allocate heap for the variables
     self.indep = ptr_new(/ALLOCATE_HEAP)
@@ -652,10 +658,16 @@ _REF_EXTRA = extra
     if n_elements(yrange) eq 0 then yrange = [min(dep, max=maxdep), maxdep]*1.05
     self.init_xrange = xrange
     self.init_yrange = yrange
+    
+    ;Pick a set of default colors so not everything is the same color.
+    default_colors = ['opposite', 'Blue', 'Forest_Green', 'Red', 'Magenta', 'Orange']
+    if nDefaults eq 1 then d_color = default_colors[0] else d_color = default_colors[1:nDefaults]
+    setDefaultValue, color, d_color
 
     ;Set the object properties
     self -> setProperty, INDEP = indep, $
                          DEP = dep, $
+                         COLOR = color, $
                          DIMENSION = dimension, $
                          LABEL = label, $
                          MAX_VALUE = max_value, $
@@ -681,7 +693,7 @@ _REF_EXTRA = extra
 
     ;Draw?
     if keyword_set(draw) then self -> draw
-    
+
     return, 1
 end
 

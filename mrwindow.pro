@@ -90,6 +90,8 @@
 ; :History:
 ;	Modification History::
 ;       06/29/2013  -   Written by Matthew Argall
+;       07/05/2013  -   Was accidentally calling MrWindow::Init with _REF_EXTRA instead
+;                           of _EXTRA. Fixed.
 ;-
 function MrWindow, parent, $
 ARROWS = arrows, $
@@ -129,7 +131,7 @@ _REF_EXTRA = extra
                                     XSIZE = xsize, $
                                     YSIZE = ysize, $
                                     ZOOMFACTOR = zoomfactor, $
-                                    _REF_EXTRA = extra)
+                                    _EXTRA = extra)
                                     
     return, oMrWindow
 end

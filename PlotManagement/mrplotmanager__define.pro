@@ -288,7 +288,7 @@ WIDTHS = widths
     
     ;Add the location
     if ptr_valid(self.cbreflocs) $
-        then *self.cbreflocs = [*self.cbreflocs, refLocations] $
+        then *self.cbreflocs = [[*self.cbreflocs], [refLocations]] $
         else self.cbreflocs = ptr_new(refLocations)
     
     ;Add the widths
@@ -415,7 +415,7 @@ REPLACE = replace
     
     ;Destroy and replace old object, then return
     if keyword_set(replace) then begin
-        self -> ReplacePlots, imageObjects, location, $
+        self -> ReplaceImages, imageObjects, location, $
                               DESTROY=destroy, DRAW=draw, $
                               LIST_INDEX=list_index, PLOT_INDEX=plot_index
         return
@@ -610,7 +610,7 @@ WIDTH = width
         void = error_message()
         return, !Null
     endif
-    
+
     ;Does the plot exist?
     exists = self -> plotExists(location, index, $
                                 PLOT_INDEX=plot_index, LIST_INDEX=list_index, $
@@ -1349,9 +1349,10 @@ _REF_EXTRA = extra
     nCB = n_elements(*self.colorbars)
     for i = 0, nCB - 1 do begin
         position = self -> calcColorBarPosition((*self.cbreflocs)[*,i], $
-                                                CBLOCATION=(*self.cblocations)[*,i], $
+                                                CBLOCATION=(*self.cblocations)[i], $
                                                 OFFSET=(*self.cboffsets)[i], $
                                                 WIDTH=(*self.cbwidths)[i])
+        if position eq !Null then continue
         
         (*self.colorbars)[i] -> SetProperty, POSITION=position
     endfor

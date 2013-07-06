@@ -1252,7 +1252,7 @@ YGAP = ygap
         void = error_message()
         return, 0
     endif
-    
+
     ;Set default values
     setDefaultValue, calculate, 1, /BOOLEAN
     setDefaultValue, layout, [0, 0]
