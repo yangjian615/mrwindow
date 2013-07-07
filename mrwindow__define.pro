@@ -865,7 +865,7 @@ pro MrWindow::Resize_Events, event
     
     ;Recalculate the normalized positions based on the new window size.
     ;Draw the plot to the new size
-    self -> SetPositions
+    self -> SetProperty
     self -> Draw
 end
 

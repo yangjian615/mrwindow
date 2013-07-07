@@ -322,7 +322,7 @@ _REF_EXTRA = extra
     if arg_present(YLOG)      and n_elements(*self.YLOG)      ne 0 then ylog = *self.ylog
     if arg_present(POLAR)     and n_elements(*self.POLAR)     ne 0 then polar = *self.polar
     if arg_present(YNOZERO)   and n_elements(*self.YNOZERO)   ne 0 then ynozero = *self.ynozero
-    
+
     ;Get all of the remaining keywords from weGraphicsKeywords
     if n_elements(EXTRA) ne 0 $
         then self -> weGraphicsKeywords::GetProperty, _STRICT_EXTRA=extra

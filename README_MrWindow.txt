@@ -146,7 +146,7 @@ The first step is to let IDL know where MrWindow is. There are several options.
 
     x = findgen(101)/100
     y = x^2
-    myPlot = obj_new('MrPlotObject', x, y, TITLE='y = x^2', XTITLE=x, YTITLE='y')
+    myPlot = obj_new('MrPlotObject', x, y, TITLE='y = x^2', XTITLE=x, YTITLE='y', DRAW=0)
     myWindow -> addPlots, myPlot, /DRAW
     
     

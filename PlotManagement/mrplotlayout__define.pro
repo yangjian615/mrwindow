@@ -188,7 +188,7 @@ pro MrPlotLayout::AddPositions, location, position
         
         ;If no position was provided, get the position associated with LOCATION
         if n_elements(position) eq 0 then $
-            position = (*self.plot_positions)[*, location[0]-1, location[1]-1]
+            position = (*self.layout_positions)[*, location[0]-1, location[1]-1]
             
         ;Do not attempt to fill holes, i.e. preserve layout due to added location.
         adjust_layout = 0
@@ -727,7 +727,7 @@ LAYOUT = layout
     
     ;Calculate the new positions if requested.
     if keyword_set(update_layout) $
-        then self -> calcPositions $
+        then self -> SetProperty, LAYOUT=layout $
         else self.layout = layout_init
 end
 

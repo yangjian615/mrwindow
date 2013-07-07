@@ -141,7 +141,7 @@ POSITION = position
             thisPosition = position[*,i]
             theObjects[i] -> SetProperty, POSITION=thisPosition
         endelse
-stop
+
         ;Locations being added are defined. Locations being created are initially undefined.
         if nLocs gt 0 then thisLocation = location[*,i] else void = temporary(thisLocation)
 
@@ -791,23 +791,14 @@ _REF_EXTRA = extra
     endif
     
     setDefaultValue, draw, 1, /BOOLEAN
-    
-;---------------------------------------------------------------------
-;Determine Plot Locations ////////////////////////////////////////////
-;---------------------------------------------------------------------
-    
-    ;If no position was given, find a spot for the plot. Do not adjust
-    ;the layout yet because no plot has been added.
-    if n_elements(position) eq 0 $
-        then self -> GetPositions, location, POSITION=position $
-        else self -> GetPositions, location, POSITION=position, /FIXED
-    
+        
 ;---------------------------------------------------------------------
 ;Create the Image Object /////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
     theImage = obj_new('MrImageObject', image, x, y, DRAW=0, $
                         POSITION=position, _EXTRA=extra)
+    if obj_valid(theImage) eq 0 then return
 
 ;---------------------------------------------------------------------
 ;Add the Object and Display It ///////////////////////////////////////
@@ -875,16 +866,6 @@ _REF_EXTRA = extra
     endif
     
     setDefaultValue, draw, 1, /BOOLEAN
-    
-;---------------------------------------------------------------------
-;Determine Plot Locations ////////////////////////////////////////////
-;---------------------------------------------------------------------
-    
-    ;If no position was given, find a spot for the plot. Do not adjust
-    ;the layout yet because no plot has been added.
-    if n_elements(position) eq 0 $
-        then self -> GetPositions, location, POSITION=position $
-        else self -> GetPositions, location, POSITION=position, /FIXED
     
 ;---------------------------------------------------------------------
 ;Create the Plot Objects /////////////////////////////////////////////
