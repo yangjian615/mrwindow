@@ -1034,7 +1034,7 @@ _REF_EXTRA = extra
     ;---------------------------------------------------------------------
     ;LAYOUT PROPERTIES ///////////////////////////////////////////////////
     ;---------------------------------------------------------------------
-        self -> SetPositions, _STRICT_EXTRA=extra[iExtra]
+        if n_elements(iExtra) ne 0 then self -> MrPlotLayout::SetProperty, _STRICT_EXTRA=extra[iExtra]
     endif
 
     if keyword_set(draw) then self -> draw
@@ -1389,11 +1389,11 @@ _REF_EXTRA = extra
     ;---------------------------------------------------------------------
 	    
 	    ;Is a GUI being build or realized? If not...
-	    if keyword_set(createGUI) then begin
+	    if keyword_set(createGUI) eq 0 then begin
 	    
 	        ;If not, create a normal window
             self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, /PIXMAP)
-            self.win = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, TITLE='MrWindow')
+            self.winID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, TITLE='MrWindow')
 
     ;---------------------------------------------------------------------
     ;MrWindow GUI ////////////////////////////////////////////////////////
