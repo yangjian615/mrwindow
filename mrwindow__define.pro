@@ -179,6 +179,9 @@ YSIZE = ysize
 
     ;Create the Cursor Menu
     self -> Create_Cursor_Menu, menuID
+    
+    ;Create the Analysis Menu
+    self -> Create_Analysis_Menu, menuID
 
     ;Create the Arrow and Text Menus
     annotateID = widget_button(menuID, VALUE='Annotate', /MENU)
@@ -317,10 +320,15 @@ pro MrWindow::Draw_Events, event
 ;---------------------------------------------------------------------
 ;Button Press Events /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+
     if event.type eq 0 then begin
         ;Cursor Events
         if ((self.cmode and 8) gt 0) then self -> Focus, event      ;Focus
         if ((self.cmode and 1) gt 0) then self -> Get_Point, event  ;Get Point
+        
+        ;Analysis Events
+        if ((self.amode[0] and 1) gt 0) then self -> Get_Data_Point, event ;Get Data Value
+        if ((self.amode[0] and 2) gt 0) then self -> Get_Interval, event   ;Get Interval, Average
         
         ;Arrow Events
         if self.arrowmode[0] eq 1 then self -> Place_Arrow, event     ;Place arrow
@@ -345,6 +353,10 @@ pro MrWindow::Draw_Events, event
 ;Button Release Events ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if event.type eq 1 then begin
+        ;Analysis Mode -- must be active
+        if self.amode[1] eq 1 then begin
+            if ((self.amode[0] and 2) gt 0) then self -> Get_Interval, event   ;Get Interval, Average        
+        endif
         
         ;Arrow Events -- must be active
         if self.arrowmode[1] eq 1 then begin ;Button Up turns motion events off.
@@ -378,8 +390,15 @@ pro MrWindow::Draw_Events, event
            ;Arrow events must be active AND set                             
            ( self.arrowmode[1] eq 1 && ( self.arrowmode[0] eq 1 || $      ;Place arrow
                                          self.arrowmode[0] eq 2 || $      ;Move arrow
-                                         self.arrowmode[0] eq 4 ) ) $     ;Stretch/Rotate arrow
+                                         self.arrowmode[0] eq 4 ) ) || $  ;Stretch/Rotate arrow
+                                         
+           ( self.amode[1] eq 1 && ( ((self.amode[0] and 2) gt 0) ) ) $   ;Get Interval, Average
             then self -> copyPixmap
+            
+        ;Analysis Mode -- must be active
+        if self.amode[1] eq 1 then begin
+            if ((self.amode[0] and 2) gt 0) then self -> Get_Interval, event   ;Get Interval, Average        
+        endif
 
         ;Zoom Events
         if self.zmode eq 4 then self -> Box_Zoom, event     
@@ -722,7 +741,8 @@ OFF = off
         ;Turn button events off only if nothing else needs them. Cursor modes are the
         ;only type of modes that can have multiple bits set at the same time.
         if (self.zmode eq 0) and (self.arrowmode[0] eq 0) and $        ;Zoom, Arrow
-           (self.textmode)[0] eq 0  and ((self.cmode and 1) eq 0) $    ;Text, Get Points
+           (self.textmode)[0] eq 0 and ((self.cmode and 1) eq 0) and $ ;Text, Get Points
+           (self.amode)[0] eq 0 $                                      ;Analysis
             then widget_control, self.drawID, DRAW_BUTTON_EVENTS=0
     endif
 end
@@ -770,9 +790,10 @@ OFF = off
         ;Turn motion events off only if nothing else needs them.
         ;CMODE can be in multiple modes, so check bits.
         ;ARROWMODE, TEXTMODE, and ZMODE can be in only one mode at a time.
-        if (self.zmode eq 0) or (self.arrowmode[0] eq 0) and $          ;Zoom, Arrow
-           (self.textmode[0] eq 0) and $                                ;Text
-           ((self.cmode and 2) eq 0) and ((self.cmode and 4) eq 0) $    ;Cross Hairs, Show [X,Y]
+        if (self.zmode eq 0) or (self.arrowmode[0] eq 0) and $              ;Zoom, Arrow
+           (self.textmode[0] eq 0) and $                                    ;Text
+           ((self.cmode and 2) eq 0) and ((self.cmode and 4) eq 0) and $    ;Cross Hairs, Show [X,Y]
+           (self.amode[1] eq 0) $
         then begin
             widget_control, self.drawID, DRAW_MOTION_EVENTS=0
             widget_control, self.drawID, /CLEAR_EVENTS
@@ -1058,8 +1079,13 @@ pro MrWindow::Turn_Everything_Off
     
     ;Get the widget IDs of the "None" buttons
     AnnNoneID = widget_info(self.tlb, FIND_BY_UNAME='AnnNone')
+    ANoneID = widget_info(self.tlb, FIND_BY_UNAME='ANone')
     CNoneID = widget_info(self.tlb, FIND_BY_UNAME='CNone')
     ZNoneID = widget_info(self.tlb, FIND_BY_UNAME='ZNone')
+    
+    ;Create an event and send it
+    mockEvent = {id: ANoneID, top: self.tlb, handler: ANoneID}
+    widget_control, SEND_EVENT=mockEvent
     
     ;Create an event and send it
     mockEvent = {id: AnnNoneID, top: self.tlb, handler: AnnNoneID}
@@ -1449,6 +1475,7 @@ pro MrWindow__define, class
     compile_opt idl2
     
     class = { MrWindow, $
+              inherits MrAbstractAnalysis, $    ;Analysis events and menu
               inherits MrAbstractArrow, $       ;Arrow events and menu
               inherits MrAbstractCDF, $         ;Plotting data from CDF files
               inherits MrAbstractCursor, $      ;Cursor events and menu

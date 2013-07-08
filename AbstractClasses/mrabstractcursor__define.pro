@@ -103,7 +103,8 @@
 ; :History:
 ;	Modification History::
 ;       05/17/2013  -   Written by Matthew Argall
-;       05/27/2013  -   Added the Focus method.
+;       06/27/2013  -   Added the Focus method.
+;       07/07/2013  -   All buttons are individually implementable. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -111,9 +112,29 @@
 ;
 ; :Params:
 ;       PARENT:             in, required, type=integer
-;                           The widget ID of the parent widget for the new SaveAs Menu.
+;                           The widget ID of the parent widget.
+;
+; :Keywords:
+;       MENU:               in, optional, type=boolean, default=1
+;                           If set, all buttons will be placed under a "Cursor" submenu.
+;       CROSS_HAIRS:        in, optional, type=boolean, default=1
+;                           Create the "Cross Hairs" button.
+;       FOCUS:              in, optional, type=boolean, default=1
+;                           Create the "Focus" button.
+;       GET_POINT:          in, optional, type=boolean, default=1
+;                           Create the "Get Point" button.
+;       SHOW_XY:            in, optional, type=boolean, default=1
+;                           Create the "Show [X,Y]" button.
+;       NONE:               in, optional, type=boolean, default=1
+;                           Create the "None" button.
 ;-
-pro MrAbstractCursor::Create_Cursor_Menu, parent
+pro MrAbstractCursor::Create_Cursor_Menu, parent, $
+MENU = menu, $
+CROSS_HAIRS = cross_hairs, $
+FOCUS = focus, $
+GET_POINT = get_point, $
+SHOW_XY = show_xy, $
+NONE = none
     compile_opt idl2
     
     ;Error handling
@@ -124,13 +145,24 @@ pro MrAbstractCursor::Create_Cursor_Menu, parent
         return
     endif
     
+    setDefaultValue, menu, 1, /BOOLEAN
+    setDefaultValue, cross_hairs, 1, /BOOLEAN
+    setDefaultValue, focus, 1, /BOOLEAN
+    setDefaultValue, get_point, 1, /BOOLEAN
+    setDefaultValue, show_xy, 1, /BOOLEAN
+    setDefaultValue, none, 1, /BOOLEAN
+    
     ;Create the Menu
-    cursorID = widget_button(parent, VALUE='Cursor', /MENU)
-    button = widget_button(cursorID, VALUE='Cross Hairs', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
-    button = widget_button(cursorID, VALUE='Focus', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
-    button = widget_button(cursorID, VALUE='Get Point', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
-    button = widget_button(cursorID, VALUE='Show [x,y]', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
-    button = widget_button(cursorID, VALUE='None', UNAME='CNone', UVALUE={object: self, method: 'Cursor_Menu_Events'})
+    if keyword_set(menu) $
+        then cursorID = widget_button(parent, VALUE='Cursor', /MENU) $
+        else cursorID = parent
+    
+    
+    button = widget_button(cursorID, VALUE='Cross Hairs', UNAME='CROSS_HAIRS', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
+    button = widget_button(cursorID, VALUE='Focus', UNAME='FOCUS', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
+    button = widget_button(cursorID, VALUE='Get Point', UNAME='GET_POINT', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
+    button = widget_button(cursorID, VALUE='Show [x,y]', UNAME='SHOW_XY', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
+    button = widget_button(cursorID, VALUE='None', UNAME='CNONE', UVALUE={object: self, method: 'Cursor_Menu_Events'})
 end
 
 
