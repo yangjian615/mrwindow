@@ -521,6 +521,9 @@ pro MrAbstractAnalysis::Get_Interval, event
             ;Order the clicks as [min, max]. Convert to data
             x = [self.x0 < event.x, self.x0 > event.x]
             y = [self.y0 < event.y, self.y0 > event.y]
+            
+            ;the interval must not be of 0 length (Use Get_Point for that).
+            if self.x0 eq event.x && self.y0 eq event.y then return
 
             ;Convert from device to data coordinates
             xy = convert_coord(x, y, /DEVICE, /TO_DATA)
@@ -664,11 +667,11 @@ pro MrAbstractAnalysis::MVAB, xrange, yrange
         dimension = where(dims eq 3, count) + 1
         if count eq 0 then message, 'Data must be 3xN to perform MVAB.'
     endif
-    
-    ;perform MVA
+
+    ;perform MVA -- Transpose to ensure 3xN
     case dimension of
-        1: eigvecs = mva(indep[iRange[0]:iRange[1]], dep[*,iRange[0]:iRange[1]], EIGVALS=eigvals)
-        2: eigvecs = mva(indep[iRange[0]:iRange[1]], transpose(dep[iRange[0]:iRange[1],*]), EIGVALS=eigvals)
+        1: eigvecs = mva(indep[iRange[0]:iRange[1]], transpose(dep[iRange[0]:iRange[1],*]), EIGVALS=eigvals)
+        2: eigvecs = mva(indep[iRange[0]:iRange[1]], dep[*,iRange[0]:iRange[1]], EIGVALS=eigvals)
         else: message, 'Data must be a 3xN or Nx3 array.'
     endcase
         
@@ -696,7 +699,9 @@ pro MrAbstractAnalysis::MVAB, xrange, yrange
            '           [', eigvecs[0,2], ', ', eigvecs[1,2], ', ', eigvecs[2,2], ']]'
     
     ;reset the draw widget's user value
-    self.tmatrix = eigvecs
+    if ptr_valid(self.tmatrix) $
+        then *self.tmatrix = eigvecs $
+        else self.tmatrix = ptr_new(eigvecs)
 end
 
 
@@ -796,6 +801,84 @@ OFF = off
             widget_control, self.drawID, /CLEAR_EVENTS
         endif
     endif
+end
+
+
+;+
+;   Calculate the deHoffmann-Teller Velocity over a given interval.
+;
+;   Instructions::
+;       1. Make sure "Focus" is selected from the "Cursor" menu.
+;       2. Select "vHT" from the "Analysis" menu.
+;       3. Select an interval of velocity data for which vHT is to be calculated.
+;           a. Click + Hold/Drag + Release
+;       4. Do the same with magnetic field data.
+;           a. The intervals do not need to be the same. The first interval is the one
+;               used. The second interval is merely to know in which plot the magnetic
+;               field data is stored.
+;
+; :Params:
+;       XRANGE:             in, required, type=numeric
+;                           A range of coordinate on the abscissa for which the minimum
+;                               variance coordinate system is to be found.
+;       YRANGE:             in, required, type=numeric
+;                           A range of coordinate on the ordinate for which the minimum
+;                               variance coordinate system is to be found.
+;-
+pro MrAbstractAnalysis::Rotate, location, rotmat, $
+PLOT_INDEX = plot_index, $
+LIST_INDEX = list_index
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = error_message()
+        return
+    endif
+    
+;---------------------------------------------------------------------
+;Check Inputs ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Use the selected plot
+    if n_elements(location) eq 0 then begin
+        index = self.ifocus
+        
+    ;Check if the location exists
+    endif else begin
+        exists = self -> plotExists(location, index, $
+                                    PLOT_INDEX=plot_index, LIST_INDEX=list_index, $
+                                    /TO_LIST_INDEX)
+        if exists eq 0 then message, 'No plot exists at LOCATION. Returning.'
+    endelse
+    
+    ;Get the rotation matrix
+    if n_elements(rotmat) eq 0 then begin
+        if ptr_valid(self.tmatrix) $
+            then rotmat = *self.tmatrix $
+            else message, 'A rotation matrix must be provided.'
+    endif
+    
+    setDefaultValue, plot_index, 0, /BOOLEAN
+    setDefaultValue, list_index, 0, /BOOLEAN
+    setDefaultVAlue, new, 0, /BOOLEAN
+    
+    
+;---------------------------------------------------------------------
+;Rotate the Data /////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    theObject = (*self.allObjects)[index]
+    theObject -> GetProperty, DEP=dep
+    
+    dep = rotate_vector(rotmat, dep)
+    dMin = min(dep, max=dMax)
+    theObject -> SetProperty, DEP=dep, YRANGE=[dMin, dMax]
+    
+    self -> Draw
 end
 
 
@@ -922,7 +1005,8 @@ end
 ;   Clean up after the object is destroy
 ;-
 pro MrAbstractAnalysis::cleanup
-    ;Nothing to clean up.
+    ptr_free, self.intervals
+    ptr_free, self.tmatrix
 end
 
 
@@ -959,6 +1043,6 @@ pro MrAbstractAnalysis__define, class
     class = {MrAbstractAnalysis, $
              amode: intarr(3), $            ;[text mode, active, npts]
              intervals: ptr_new(), $        ;[sInterval, eInterval, iRef]
-             tmatrix: fltarr(3,3) $         ;Coordinate transformation matrix
+             tmatrix: ptr_new() $           ;Coordinate transformation matrix
             }
 end

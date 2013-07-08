@@ -250,6 +250,9 @@ pro MrWindow::Draw
     self -> MrAbstractArrow::Draw
     self -> MrAbstractText::Draw
     
+    ;Reset the focus.
+    Self -> Focus
+    
     ;Copy plot from the pixmap
     if (!d.flags and 256) ne 0 then begin
         wset, self.winID
@@ -1242,6 +1245,7 @@ pro MrWindow::cleanup
     endif
     
     ;Cleanup inherited properties.
+    self -> MrAbstractAnalysis::Cleanup
     self -> MrAbstractArrow::Cleanup
     self -> MrAbstractCursor::Cleanup
     self -> MrAbstractText::Cleanup

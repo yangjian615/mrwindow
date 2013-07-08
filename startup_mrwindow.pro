@@ -1,1 +1,0 @@
-!path = !path + ':' + expand_path('+/Users/argall/Documents/Work/Programs/MrWindow/')

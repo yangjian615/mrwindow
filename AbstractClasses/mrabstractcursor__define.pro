@@ -348,8 +348,9 @@ end
 ;   Event handler for Focus events. Find the closest plot to the clicked point.
 ;
 ; :Params:
-;   EVENT:              in, required, type=structure
-;                       The event returned by the windows manager.
+;   EVENT:              in, optional, type=structure
+;                       The event returned by the windows manager. If not given, the
+;                           plot indicated by SELF.IFOCUS will become the object of focus.
 ;-
 pro MrAbstractCursor::Focus, event
     compile_opt idl2
@@ -361,52 +362,59 @@ pro MrAbstractCursor::Focus, event
         void = error_message()
         return
     endif
-
-    ;Only listen to left button presses and only if the Focus bit is set
-    if event.type ne 0 || event.press ne 1 || ((self.cmode and 8) eq 0) then return
+        
+;---------------------------------------------------------------------
+;Event? //////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     
-;---------------------------------------------------------------------
-;Only One Option /////////////////////////////////////////////////////
-;---------------------------------------------------------------------
+    if size(event, /TYPE) eq 8 then begin
 
-    if self.nplots eq 1 then begin
-        ifocus = 0
+        ;Only listen to left button presses and only if the Focus bit is set
+        if event.type ne 0 || event.press ne 1 || ((self.cmode and 8) eq 0) then return
+    
+    ;---------------------------------------------------------------------
+    ;Only One Option /////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+
+        if self.nplots eq 1 then begin
+            ifocus = 0
         
-;---------------------------------------------------------------------
-;Find Clostest Plot //////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    endif else begin
-        ;Convert clicked points to normal coordinates
-        xy = convert_coord(event.x, event.y, /DEVICE, /TO_NORMAL)
+    ;---------------------------------------------------------------------
+    ;Find Clostest Plot //////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        endif else begin
+            ;Convert clicked points to normal coordinates
+            xy = convert_coord(event.x, event.y, /DEVICE, /TO_NORMAL)
 
-        ;Get the location of the center of each plot
-        plot_centers = fltarr(2, n_elements(*self.plot_positions)/4)
-        plot_centers[0,*] = ( (*self.plot_positions)[2,*] - (*self.plot_positions)[0,*] ) / 2.0 + $
-                            (*self.plot_positions)[0,*]
-        plot_centers[1,*] = ( (*self.plot_positions)[3,*] - (*self.plot_positions)[1,*] ) / 2.0 + $
-                            (*self.plot_positions)[1,*]
+            ;Get the location of the center of each plot
+            plot_centers = fltarr(2, n_elements(*self.plot_positions)/4)
+            plot_centers[0,*] = ( (*self.plot_positions)[2,*] - (*self.plot_positions)[0,*] ) / 2.0 + $
+                                (*self.plot_positions)[0,*]
+            plot_centers[1,*] = ( (*self.plot_positions)[3,*] - (*self.plot_positions)[1,*] ) / 2.0 + $
+                                (*self.plot_positions)[1,*]
         
-        ;Find the distance from the plot centers to the clicked point.
-        distance = sqrt( (plot_centers[0,*] - xy[0])^2 + $
-                         (plot_centers[1,*] - xy[1])^2 )
+            ;Find the distance from the plot centers to the clicked point.
+            distance = sqrt( (plot_centers[0,*] - xy[0])^2 + $
+                             (plot_centers[1,*] - xy[1])^2 )
 
-        ;Get the index of the plot closest to the clicked point.
-        void = min(distance, ifocus)
-    endelse
+            ;Get the index of the plot closest to the clicked point.
+            void = min(distance, ifocus)
+        endelse
+        
+        self.ifocus = ifocus
+    endif
 
 ;---------------------------------------------------------------------
 ;Set Focus ///////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    
+
     ;Set the system variables and synchronize the modes.
-    theObj = (*self.allObjects)[ifocus]
+    theObj = (*self.allObjects)[self.ifocus]
 
     theObj -> getProperty, X_SYSVAR=x_sysvar, Y_SYSVAR=y_sysvar, P_SYSVAR=p_sysvar
     !X = x_sysvar
     !Y = y_sysvar
     !P = p_sysvar
-
-    self.ifocus = ifocus
 end
 
 
@@ -552,7 +560,7 @@ pro MrAbstractCursor::Show_XY, event
         catch, /cancel
         return
     endif
-    
+
     ;Convert the cursor position from device to data coordinates
     datac = convert_coord(event.x, event.y, /DEVICE, /TO_DATA)
     

@@ -51,12 +51,16 @@
 .comp ./utilities/color_trip.pro
 .comp ./utilities/epoch_to_ssm.pro
 .comp ./utilities/file_extension.pro
+.comp ./utilities/ht_velocity.pro
 .comp ./utilities/image_plots.pro
 .comp ./utilities/ismember.pro
 .comp ./utilities/load_color.pro
 .comp ./utilities/mrgetwindow.pro
 .comp ./utilities/mrplotlayout.pro
+.comp ./utilities/mva.pro
 .comp ./utilities/pwd.pro
+.comp ./utilities/rotate_vector.pro
+.comp ./utilities/ssm_to_hms.pro
 .comp ./utilities/text_gui.pro
 .comp ./utilities/time_labels.pro
 .comp ./utilities/twod_to_oned_index.pro
