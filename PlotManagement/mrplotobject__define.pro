@@ -582,9 +582,9 @@ _REF_EXTRA = extra
         void = error_message()
         return, 0
     endif
-    
+
     dims = size(x, /DIMENSIONS)
-    setDefaultValue, dimension, 0, /BOOLEAN
+    setDefaultValue, dimension, 0
     setDefaultValue, draw, 1, /BOOLEAN
     setDefaultValue, gui, 1, /BOOLEAN
     setDefaultValue, xsize, 600
@@ -621,14 +621,17 @@ _REF_EXTRA = extra
     ;Make sure arrays were given, not scalars
     if n_elements(indep) eq 1 then indep = [indep]
     if n_elements(dep) eq 1 then dep = [dep]
-    
-    ;Make the dimension being plotted the leading dimension
-    if dimension eq 0 then nDefaults = 1 else nDefaults = dims[dimension-1]
-    if dimension eq 1 then begin
-        dep = transpose(dep)
-        dimension = 2
-    endif
-    
+
+    ;The dimension not being plotted.
+    case dimension of
+        0: xdim = 0
+        1: xdim = 2
+        2: xdim = 1
+    endcase
+        
+    ;Number of defaults to use.
+    if xdim eq 0 then nDefaults = 1 else nDefaults = dims[xdim-1]
+
 ;---------------------------------------------------------------------
 ;Keywords ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -658,7 +661,7 @@ _REF_EXTRA = extra
     if n_elements(yrange) eq 0 then yrange = [min(dep, max=maxdep), maxdep]*1.05
     self.init_xrange = xrange
     self.init_yrange = yrange
-    
+
     ;Pick a set of default colors so not everything is the same color.
     default_colors = ['opposite', 'Blue', 'Forest_Green', 'Red', 'Magenta', 'Orange']
     if nDefaults eq 1 then d_color = default_colors[0] else d_color = default_colors[1:nDefaults]

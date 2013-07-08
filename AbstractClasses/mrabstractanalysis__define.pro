@@ -37,17 +37,14 @@
 ;
 ;   SETUP::
 ;       Subclass must have the following properties::
-;           pixID:              Window ID of the pixmap window
-;           statusID:           The widget ID of a widget label in which to
-;                               display the cursor's location on the screen.
+;           ifocus:             Index into "allObjects" of the plot on which the analysis
+;                               is to be performed.
 ;           allObjects:         An array containing the object references of each plot
 ;                               drawn in the window.
-;           positions:          A 4xN array containing the plot positions, in normalized
-;                               coordinates, of each plot drawn in the window.
 ;
-;       Subclass must have the following methods::
-;           copyPixmap:         Method for copying the pixmap (pixID) to the display (winID)
-;           Draw_Events:        Event handling method for the draw widget.
+;       Plotted objects must have the following properties:
+;           indep:              Independent data.
+;           dep:                Dependent data.
 ;
 ;       Set the draw widget UValue and Event Procedure::
 ;           UVALUE = {object: self, method: 'Draw_Events'}
@@ -59,7 +56,7 @@
 ;
 ;   ANALYZING::
 ;       - Button and/or Motion events must be turned on for the draw widget.
-;       - CMODE must be set to any combination of valid cursor bits (see below).
+;       - AMODE must be set to a valid analysis bit (see below).
 ;       - To turn on/off button or motion events::
 ;           * Use On_Off_Button_Events and On_Off_Motion_Events to turn on and off
 ;             button and motion events, respectively. See those methods for rules governing
@@ -67,25 +64,31 @@
 ;
 ;   ANALYSIS MENU::
 ;       1) Create a top level base containing a menu bar and a draw widget.
-;           a) For the Show_XY method to work, a widget label with ID statusID must
-;               be present as well.
-;       2) Pass the menu bar's widget ID to the Create_Cursor_Menu.
-;       3) Event handling for the menu is done internally by the Cursor_Menu_Events method.
+;       2) Pass the menu bar's widget ID to the Create_Analysis_Menu method.
+;       3) Event handling for the menu is done internally by the Analysis_Menu_Events method.
 ;       4) Draw widget event handling must be configured as described above.
 ;
 ;   Cursor Options::
-;       Get Data Point
-;       Get Interval
-;       Average
-;       MVAB
-;       None
+;       Get Data Point  -   A button click returns the [x,y] data coordinates. INDEP and
+;                           DEP are then searched for the closest match and the result
+;                           is printed to the display.
+;       Get Interval    -   Button-down, drag, button-up sequence returns two data points
+;                           that are printed to the display (e.g. two "Get Data Point")
+;       Average         -   Compute the average within "Get Interval".
+;       MVAB            -   Select an interval of magnetic field data over which a
+;                           minimum variance analysis will be performed.
+;       VHT             -   Select an interval of ion velocity data and another of
+;                           magnetic field data. The deHoffmann-Teller velocity will then
+;                           be computed.
+;       None            -   Deselect and turn off Analysis menu buttons.
 ;
 ;   Cursor Bits::
-;       0   -   None
-;       1   -   Get Value
-;       2   -   Get Interval
-;       4+2 -   Average
-;       8+2 -   MVAB
+;       0       -   None
+;       1       -   Get Value
+;       2       -   Get Interval
+;       4+2     -   Average
+;       8+2     -   MVAB
+;       16+2    -   vHT
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -130,11 +133,9 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
     isSet = ~isSet
 
     ;Get the button's siblings and uncheck them all
-    if isSet eq 0 then begin
-        parent = widget_info(event.id, /PARENT)
-        kids = widget_info(parent, /ALL_CHILDREN)
-        for i = 0, n_elements(kids) - 1 do widget_control, kids[i], SET_BUTTON=0
-    endif
+    parent = widget_info(event.id, /PARENT)
+    kids = widget_info(parent, /ALL_CHILDREN)
+    for i = 0, n_elements(kids) - 1 do widget_control, kids[i], SET_BUTTON=0
     
     case strupcase(analysis_type) of
         'NONE': begin
@@ -142,6 +143,7 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
             self.amode = [0, 0, 0]
             self -> On_Off_Button_Events, /OFF
             self -> On_Off_Motion_Events, /OFF
+            ptr_free, self.intervals
             return
         endcase
         
@@ -184,6 +186,16 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
                 self -> On_Off_Button_Events, /OFF
             endelse
         endcase
+        
+        'VHT': begin
+            if isSet then begin
+                self.amode = [16 + 2, 0, 0]
+                self -> On_Off_Button_Events, /ON
+            endif else begin
+                self.amode = [0, 0, 0]
+                self -> On_Off_Button_Events, /OFF
+            endelse
+        endcase
                 
         else: message, 'Button "' + analysis_type + '" unknown.'
     endcase
@@ -195,15 +207,15 @@ end
 
 
 ;+
-;   The average value in a given interval.
+;   Print the average value in a given interval.
 ;
 ; :Params:
-;       X:                  in, required, type=numeric
-;                           Coordinate on the abscissa for which the nearest data point is
-;                               to be found.
-;       Y:                  in, required, type=numeric
-;                           Coordinate on the ordinate for which the nearest data point is
-;                               to be found.
+;       XRANGE:             in, required, type=numeric
+;                           A range of coordinate on the abscissa for which the average
+;                               is to be found
+;       YRANGE:             in, required, type=numeric
+;                           A range of coordinate on the ordinate for which the average
+;                               is to be found.
 ;
 ; :Returns:
 ;       XY_DATA:            The closest data values to `X` and `Y`.
@@ -215,28 +227,29 @@ pro MrAbstractAnalysis::Average, xrange, yrange
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Error_Handler
         void = error_message()
         return
     endif
     
     ;Get the data interval
-    !Null = self -> Data_Range(xrange, yrange, INDEX=index)
+    !Null = self -> Data_Range(xrange, IRANGE=iRange)
 
     ;Retrieve the data and the dimension over which to take the mean
     (*self.allObjects)[self.ifocus] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
     if n_elements(dimension) eq 0 then dimension = 0
     
-    x_avg = mean(indep[index[0]:index[1]])
-    
+    x_avg = mean(indep[iRange[0]:iRange[1]])
     case dimension of
-        0: y_avg = mean(dep[index[0]:index[1]])
-        1: y_avg = mean(dep[index[0]:index[1], *])
-        2: y_avg = mean(dep[*, index[0]:index[1]])
-        else: message, 'Undetermined number of dimensions. Cannot take average.'
+        0: y_avg = mean(dep[iRange[0]:iRange[1]])
+        1: y_avg = mean(dep[iRange[0]:iRange[1],*], DIMENSION=dimension)
+        2: y_avg = mean(dep[*,iRange[0]:iRange[1]], DIMENSION=dimension)
     endcase
-    
+
     ;Print the results
-    print, FORMAT='(%"Average = [%f, %f]")', x_avg, y_avg
+    x_avg = string(x_avg, FORMAT='(f0.4)')
+    y_avg = '[' + strjoin(string(y_avg, FORMAT='(f0.4)'), ', ') + ']'
+    print, FORMAT='(%"x_avg = %s    y_avg = %s")', x_avg, y_avg
 end
 
 
@@ -266,6 +279,7 @@ AVERAGE = average, $
 GET_INTERVAL = get_interval, $
 MENU = menu, $
 MVAB = mvab, $
+VHT = vHT, $
 NONE = none
     compile_opt idl2
     
@@ -282,6 +296,7 @@ NONE = none
     setDefaultValue, get_interval, 1, /BOOLEAN
     setDefaultValue, average, 1, /BOOLEAN
     setDefaultValue, mvab, 1, /BOOLEAN
+    setDefaultValue, vHT, 1, /BOOLEAN
     setDefaultValue, none, 1, /BOOLEAN
     
     ;Create the Menu
@@ -294,6 +309,7 @@ NONE = none
     if keyword_set(get_interval) then button = widget_button(cursorID, VALUE='Get Interval', UNAME='GET_INTERVAL', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(average) then button = widget_button(cursorID, VALUE='Average', UNAME='AVERAGE', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(mvab) then button = widget_button(cursorID, VALUE='MVAB', UNAME='MVAB', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
+    if keyword_set(vHT) then button = widget_button(cursorID, VALUE='vHT', UNAME='VHT', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(none) then button = widget_button(cursorID, VALUE='None', UNAME='ANONE', UVALUE={object: self, method: 'Analysis_Menu_Events'})
 end
 
@@ -317,10 +333,13 @@ end
 ;
 ; :Returns:
 ;       XY_DATA:            The range of data corresponding to the coordinates `XRANGE`
-;                               and `YRANGE`. It is ordered [x0, y0, x1, y1].
+;                               and `YRANGE`. It is ordered [[x0, y0, x1, y1], $
+;                                                            [x0, y0, x1, y1]],
+;                               where the different rows represent different components
+;                               of the non-plotted dimension.
 ;-
-function MrAbstractAnalysis::Data_Range, xrange, yrange, $
-INDEX = index
+function MrAbstractAnalysis::Data_Range, xrange, $
+IRANGE = iRange
     compile_opt idl2
     
     ;Error handling
@@ -341,12 +360,19 @@ INDEX = index
 
     ;Store them
     x_data = indep[[sIndex, eIndex]]
-    y_data = dep[[sIndex, eIndex]]
+    
+    case dimension of
+        0: y_data = reform(dep[[sIndex, eIndex]])           ;incase it is a column
+        1: y_data = dep[[sIndex, eIndex],*]
+        2: y_data = transpose(dep[*,[sIndex, eIndex]])
+    endcase
+    
+    n = n_elements(y_data)/2
     
     ;Arrange them
-    xy_data = [x_data[0], y_data[0], x_data[1], y_data[1]]
-    index = [sIndex, eIndex]
-    
+    xy_data = [replicate(x_data[0], 1, n), y_data[0,*], replicate(x_data[1], 1, n), y_data[1,*]]
+    iRange = [sIndex, eIndex]
+
     return, xy_data
 end
 
@@ -365,6 +391,7 @@ pro MrAbstractAnalysis::Draw_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Error_Handler
         void = error_message()
         return
     endif
@@ -399,7 +426,7 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractAnalysis::Error_Handler, event
+pro MrAbstractAnalysis::Error_Handler
     compile_opt idl2
     
     ;Error handling
@@ -409,12 +436,13 @@ pro MrAbstractAnalysis::Error_Handler, event
         void = error_message()
         return
     endif
-    
+
     self.amode = [0,0,0]
     self -> On_Off_Button_Events, /OFF
     self -> On_Off_Motion_Events, /OFf
     self.x0 = -1
     self.y0 = -1
+    ptr_free, self.intervals
 end
 
 
@@ -501,8 +529,9 @@ pro MrAbstractAnalysis::Get_Interval, event
             
             ;Forward results to proper analysis method
             if self.amode[0] eq 2 then self -> Interval, xrange, yrange
-            if ((self.amode[0] and 4) gt 0) then self -> Average, xrange, yrange
-            if ((self.amode[0] and 8) gt 0) then self -> MVAB, xrange, yrange
+            if ((self.amode[0] and  4) gt 0) then self -> Average, xrange, yrange
+            if ((self.amode[0] and  8) gt 0) then self -> MVAB, xrange, yrange
+            if ((self.amode[0] and 16) gt 0) then self -> vHT, xrange, yrange
             
             ;reset initial click
             self.x0 = -1
@@ -513,18 +542,15 @@ end
 
 
 ;+
-;   The average value in a given interval.
+;   Print the endpoints of interval within the data set.
 ;
 ; :Params:
-;       X:                  in, required, type=numeric
-;                           Coordinate on the abscissa for which the nearest data point is
-;                               to be found.
-;       Y:                  in, required, type=numeric
-;                           Coordinate on the ordinate for which the nearest data point is
-;                               to be found.
-;
-; :Returns:
-;       XY_DATA:            The closest data values to `X` and `Y`.
+;       XRANGE:             in, required, type=numeric
+;                           A range of coordinate on the abscissa for which the data
+;                               interval is to be printed.
+;       YRANGE:             in, required, type=numeric
+;                           A range of coordinate on the ordinate for which the data
+;                               interval is to be printed.
 ;-
 pro MrAbstractAnalysis::Interval, xrange, yrange
     compile_opt idl2
@@ -533,17 +559,32 @@ pro MrAbstractAnalysis::Interval, xrange, yrange
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Error_Handler
         void = error_message()
         return
     endif
     
     ;Get the data range.
-    xy_data = self -> Data_Range(xrange, yrange)
+    xy_data = self -> Data_Range(xrange, IRANGE=iRange)
     
+    n = n_elements(xy_data[0,*])
+
+    ;Make strings of the results
+    x0 = string(xy_data[0,0], FORMAT='(f0.4)')
+    x1 = string(xy_data[2,0], FORMAT='(f0.4)')
+    
+    ;Bracket data if there is more than one component
+    if n eq 1 then begin
+        y0 = string(xy_data[1,*], FORMAT='(f0.4)')
+        y1 = string(xy_data[3,*], FORMAT='(f0.4)')
+    endif else begin
+        y0 = '[' + strjoin(string(xy_data[1,*], FORMAT='(f0.4)'), ', ') + ']'
+        y1 = '[' + strjoin(string(xy_data[3,*], FORMAT='(f0.4)'), ', ') + ']'
+    endelse
+
     ;Print the results
-    print, '            -x-       -y-'
-    print, FORMAT='(%"Start = [%f, %f]")', xy_data[0:1]
-    print, FORMAT='(%"End   = [%f, %f]")', xy_data[2:3]
+    print, FORMAT='(%"x0 = %s    y0 = %s")', x0, y0
+    print, FORMAT='(%"x1 = %s    y1 = %s")', x1, y1
 end
 
 
@@ -561,6 +602,7 @@ pro MrAbstractAnalysis::Get_Data_Point, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Error_Handler
         void = error_message()
         return
     endif
@@ -570,16 +612,22 @@ pro MrAbstractAnalysis::Get_Data_Point, event
 
     ;Convert the clicked point to data coordinates and print the location
     coords = convert_coord(event.x, event.y, /DEVICE, /TO_DATA)
+        
+    ;Only care about button presses
+    xy_data = self -> Data_Range([coords[0], coords[0]])
     
-    ;Retrieve the data and the dimension over which to take the mean
-    (*self.allObjects)[self.ifocus] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
-    if n_elements(dimension) eq 0 then dimension = 0
-    
-    ;Find the closest data point
-    !Null = min(abs(indep - coords[0]), index)
+    n = n_elements(xy_data[0,*])
 
-    ;Print the closest data point.
-    print, FORMAT='(%"Data Value: [%f, %f]")', indep[index], dep[index]
+    ;Make strings of the results
+    x_pt = string(xy_data[0,0], FORMAT='(f0.4)')
+    
+    ;Bracket data if there is more than one component
+    if n eq 1 $
+        then y_pt = string(xy_data[1,*], FORMAT='(f0.4)') $
+        else y_pt = '[' + strjoin(string(xy_data[1,*], FORMAT='(f0.4)'), ', ') + ']'
+
+    ;Print the results
+    print, FORMAT='(%"x = %s   y = %s")', x_pt, y_pt
 end
 
 
@@ -587,15 +635,12 @@ end
 ;   The average value in a given interval.
 ;
 ; :Params:
-;       X:                  in, required, type=numeric
-;                           Coordinate on the abscissa for which the nearest data point is
-;                               to be found.
-;       Y:                  in, required, type=numeric
-;                           Coordinate on the ordinate for which the nearest data point is
-;                               to be found.
-;
-; :Returns:
-;       XY_DATA:            The closest data values to `X` and `Y`.
+;       XRANGE:             in, required, type=numeric
+;                           A range of coordinate on the abscissa for which the minimum
+;                               variance coordinate system is to be found.
+;       YRANGE:             in, required, type=numeric
+;                           A range of coordinate on the ordinate for which the minimum
+;                               variance coordinate system is to be found.
 ;-
 pro MrAbstractAnalysis::MVAB, xrange, yrange
     compile_opt idl2
@@ -604,12 +649,13 @@ pro MrAbstractAnalysis::MVAB, xrange, yrange
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Error_Handler
         void = error_message()
         return
     endif
     
     ;Get the data interval
-    xy_data = self -> Data_Range(xrange, yrange, INDEX=index)
+    xy_data = self -> Data_Range(xrange, IRANGE=iRange)
 
     ;Retrieve the data and the dimension over which to take the mean
     (*self.allObjects)[self.ifocus] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
@@ -621,8 +667,8 @@ pro MrAbstractAnalysis::MVAB, xrange, yrange
     
     ;perform MVA
     case dimension of
-        1: eigvecs = mva(indep[index[0]:index[1]], dep[*,index[0]:index[1]], EIGVALS=eigvals)
-        2: eigvecs = mva(indep[index[0]:index[1]], transpose(dep[index[0]:index[1],*]), EIGVALS=eigvals)
+        1: eigvecs = mva(indep[iRange[0]:iRange[1]], dep[*,iRange[0]:iRange[1]], EIGVALS=eigvals)
+        2: eigvecs = mva(indep[iRange[0]:iRange[1]], transpose(dep[iRange[0]:iRange[1],*]), EIGVALS=eigvals)
         else: message, 'Data must be a 3xN or Nx3 array.'
     endcase
         
@@ -754,6 +800,125 @@ end
 
 
 ;+
+;   Calculate the deHoffmann-Teller Velocity over a given interval.
+;
+;   Instructions::
+;       1. Make sure "Focus" is selected from the "Cursor" menu.
+;       2. Select "vHT" from the "Analysis" menu.
+;       3. Select an interval of velocity data for which vHT is to be calculated.
+;           a. Click + Hold/Drag + Release
+;       4. Do the same with magnetic field data.
+;           a. The intervals do not need to be the same. The first interval is the one
+;               used. The second interval is merely to know in which plot the magnetic
+;               field data is stored.
+;
+; :Params:
+;       XRANGE:             in, required, type=numeric
+;                           A range of coordinate on the abscissa for which the minimum
+;                               variance coordinate system is to be found.
+;       YRANGE:             in, required, type=numeric
+;                           A range of coordinate on the ordinate for which the minimum
+;                               variance coordinate system is to be found.
+;-
+pro MrAbstractAnalysis::vHT, xrange, yrange
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = error_message()
+        return
+    endif
+    
+;---------------------------------------------------------------------
+;Process the Interval ////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Store the first interval.
+    if self.amode[2] lt 1 then begin
+        xy_data = self -> Data_Range(xrange, iRange=vIndex)
+
+        self.amode[2] += 1
+        self.intervals = ptr_new([vIndex, self.ifocus])      ;[sInterval, eInterval, iRef]
+        return
+    endif
+    
+;---------------------------------------------------------------------
+;Get the Data ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Retrieve the data and the dimension over which to take the mean
+    (*self.allObjects)[(*self.intervals)[2]] -> GetProperty, INDEP=t_v, DEP=v, DIMENSION=v_dim
+    (*self.allObjects)[self.ifocus] -> GetProperty, INDEP=t_B, DEP=B, DIMENSION=B_dim
+    
+    ;Get the index range for magnetic field data.
+    iRange = (*self.intervals)[0:1]
+    xrange = t_v[iRange]
+    xy_data = self -> Data_Range(xrange, IRANGE=bIndex)
+
+;---------------------------------------------------------------------
+;Check Dimensions ////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Pick the dimension over which v_HT will be found
+    if n_elements(v_dim) eq 0 then begin
+        dims = size(v, /DIMENSIONS)
+        v_dim = where(dims ne 3, count) + 1
+        if count eq 1 then message, 'Velocity data must be 3xN to calculate $v_{HT}$.'
+    endif
+    
+    ;Pick the dimension over which v_HT will be found
+    if n_elements(B_dim) eq 0 then begin
+        dims = size(B, /DIMENSIONS)
+        B_dim = where(dims ne 3, count) + 1
+        if count ne 1 then message, 'Magnetic field data must be 3xN to calculate $v_{HT}$.'
+    endif
+    
+;---------------------------------------------------------------------
+;Select Data Interval ////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    t_B = t_B[bIndex[0]:bIndex[1]]
+    t_v = t_v[iRange[0]:iRange[1]]
+
+    ;Select the subarray of velocity data
+    case v_dim of
+        1: v = transpose(v[iRange[0]:iRange[1],*])
+        2: v = v[*,iRange[0]:iRange[1]]
+        else: message, 'Data must be a 3xN or Nx3 array.'
+    endcase
+    
+    ;Select the subarray of magnetic field data
+    case B_dim of
+        1: B = transpose(B[bIndex[0]:bIndex[1],*])
+        2: B = B[*,bIndex[0]:bIndex[1]]
+        else: message, 'Data must be a 3xN or Nx3 array.'
+    endcase
+    
+;---------------------------------------------------------------------
+;Calculate deHoffmann-Teller Velocity ////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Interpolate the data.
+    MrInterp_TS, B, v, t_B, t_v, B_interp, v_interp, /NO_COPY
+    
+    ;Calculate the deHoffmann-Teller velocity.
+    v_ht = ht_velocity(v_interp, B_interp)
+    
+    ;print the results to the command window for easy Copy + Paste
+    print, 'x', 'y', 'z', format='(13x, 2(a1, 11x), a1)'
+    print, 'v_ht =', transpose(v_ht), format='(a6, 3(2x, f10.4))'
+    print, format='(a0, 3(f10.4, a0))', $
+           'v_ht = [', v_ht[0], ', ', v_ht[1], ', ', v_ht[2], ']'
+    
+    ;Reset
+    self.amode[2] = 0
+    ptr_free, self.intervals
+end
+
+
+;+
 ;   Clean up after the object is destroy
 ;-
 pro MrAbstractAnalysis::cleanup
@@ -793,6 +958,7 @@ pro MrAbstractAnalysis__define, class
     
     class = {MrAbstractAnalysis, $
              amode: intarr(3), $            ;[text mode, active, npts]
+             intervals: ptr_new(), $        ;[sInterval, eInterval, iRef]
              tmatrix: fltarr(3,3) $         ;Coordinate transformation matrix
             }
 end

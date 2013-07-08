@@ -465,6 +465,7 @@ pro MrWindow::Error_Handler, event
         return
     endif
     
+    self -> MrAbstractAnalysis::Error_Handler
     self -> Turn_Everything_Off
 end
 

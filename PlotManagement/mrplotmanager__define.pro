@@ -873,6 +873,7 @@ _REF_EXTRA = extra
 
     thePlot = obj_new('MrPlotObject', x, y, DRAW=0, $
                        POSITION=position, _EXTRA=extra)
+    if obj_valid(thePlot) eq 0 then return
 
 ;---------------------------------------------------------------------
 ;Add the Object and Display It ///////////////////////////////////////
