@@ -120,6 +120,9 @@
 ;       07/04/2013  -   Forgot to pass keyword to the BUILD method so windows were not
 ;                           being made the proper size. Fixed. - MRA
 ;       07/05/2013  -   Added the CREATEGUI keyword. - MRA
+;       07/09/2013  -   Implemented the MrAbstractAnalysis class. A re-Focus was needed
+;                           after plotting is done in the Draw method. - MRA
+;       07/10/2013  -   3D spectrograms can now be plotted from CDF files. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -251,7 +254,7 @@ pro MrWindow::Draw
     self -> MrAbstractText::Draw
     
     ;Reset the focus.
-    Self -> Focus
+    if self.nplots gt 0 then self -> Focus
     
     ;Copy plot from the pixmap
     if (!d.flags and 256) ne 0 then begin
@@ -494,17 +497,38 @@ pro MrWindow::File_Menu_Events, event
     
     ;Get the name of the button that was pressed
     widget_control, event.id, GET_VALUE=button_name
-    
-    ;Which button was it?
+
+;---------------------------------------------------------------------
+;Which Menu Button? //////////////////////////////////////////////////
+;---------------------------------------------------------------------
     case strupcase(button_name) of
+
+    ;---------------------------------------------------------------------
+    ;OPEN CDF ////////////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
         'OPEN CDF': begin
+            ;Create the plot from the data
             thePlot = self -> Plot_CDF(GROUP_LEADER=self.tlb, $
                                        DISPLAY_TYPE=display_type, $
-                                       DISPLAY_DIM=display_dim)
+                                       OCOLORBAR=theColorbar)
             if obj_valid(thePlot) eq 0 then return
             
+            ;Add it to the proper lists.
             case strupcase(display_type) of
                 'TIME_SERIES': self -> AddPlots, thePlot, /DRAW
+                '3D_SPECTROGRAM': begin
+                    ;Add the image and get its position
+                    self -> AddImages, thePlot, /DRAW
+                    thePlot -> GetProperty, POSITION=position
+                    
+                    ;Make sure there is enough room for a colorbar.
+                    if self.xmargin[1] lt 15 then self -> SetProperty, XMARGIN=[self.xmargin[0],15]
+
+                    ;Add the colorbar and bind it to the image.
+                    self -> AddColorbars, theColorbar, position, LOCATION='RIGHT'
+                    self -> Bind, thePlot, theColorbar, /CAXIS
+                    self -> Draw
+                endcase
                 else: message, 'Display type "' + display_type + '" not recognized.'
             endcase
         endcase
@@ -1137,6 +1161,7 @@ pro MrWindow::Wheel_Zoom, event
         'IMAGE': begin
             if self.wmode eq 1 then self -> MrAbstractZoom::Wheel_Zoom_XY, event
             if self.wmode eq 2 then self -> MrAbstractZoom::Wheel_Zoom_Color, event
+            if self.wmode eq 4 then self -> MrAbstractZoom::Wheel_Zoom_Page, event
         endcase
         
         else: ;do nothing

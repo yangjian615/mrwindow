@@ -113,6 +113,7 @@
 ;                           working. Now, the layout is not adjusted when /ADD is set. - MRA
 ;       07/07/2013  -   Separated the SetPositions method into the Add, Remove, Replace,
 ;                           and Clear methods. Added the whichLayout method. - MRA
+;       07/09/2013  -   Reduced the default YGAP size to 6. - MRA
 ;                           
 ;-
 ;*****************************************************************************************
@@ -1360,7 +1361,7 @@ end
 ;                           axes and the edge of the plotting window
 ;       XGAP:           in, optional, type=float, default=14
 ;                       The horizontal gap between plots in character widths (!D.y_ch_size)
-;       YGAP:           in, optional, type=float, default=7
+;       YGAP:           in, optional, type=float, default=6
 ;                       The vertical gap between plots in character heights (!D.y_ch_size)
 ;-
 function MrPlotLayout::init, $
@@ -1387,7 +1388,7 @@ YGAP = ygap
     setDefaultValue, xmargin, [10, 3]
     setDefaultValue, ymargin, [4, 2]
     setDefaultValue, xgap, 14
-    setDefaultValue, ygap, 7
+    setDefaultValue, ygap, 6
     
     ;Set object Properties
     self.layout = layout

@@ -126,6 +126,7 @@
 ;                           inherits MrAbstractZoom. Incorporated bindings into the zoom
 ;                           options. Renamed Wheel_Zoom to Wheel_XY_Zoom and added
 ;                           Wheel_Color_Zoom. - MRA
+;       07/10/2013  -   Added the Wheel_Zoom_Page method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -773,6 +774,7 @@ pro MrAbstractZoom::Create_Zoom_Menu, parent
     wheelID = widget_button(zoomID, VALUE='Wheel Zoom', /MENU)
     button = widget_button(wheelID, VALUE='Wheel Zoom: XY', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
     button = widget_button(wheelID, VALUE='Wheel Zoom: Color', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
+    button = widget_button(wheelID, VALUE='Wheel Zoom: Page', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
     
     ;Back to main Zoom menu
     button = widget_button(zoomID, VALUE='UnZoom', UVALUE={object: self, method: 'UnZoom'})
@@ -860,6 +862,7 @@ pro MrAbstractZoom::Draw_Events, event
     if event.type eq 7 then begin
         if self.wmode eq 1 then self -> Wheel_Zoom_XY, event
         if self.wmode eq 2 then self -> Wheel_Zoom_Color, event
+        if self.wmode eq 4 then self -> Wheel_Zoom_Page, event
     endif
 end
 
@@ -1542,6 +1545,50 @@ end
 
 
 ;+
+;   Roll the mouse button forward or backward "Page" through the image data. This is
+;   possible only if the image has more than 2 dimensions.
+;
+; :Params:
+;       EVENT:              in, required, type=structure
+;                           An event structure returned by the windows manager.
+;-
+pro MrAbstractZoom::Wheel_Zoom_Page, event
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    ;Get the current x- and y-range
+    theObj = (*self.allObjects)[self.ifocus]
+    theObj -> getProperty, IMAGE=image, IDISPLAY=iDisplay
+
+    ;Make sure the image has more than 2 dimensions
+    ndims = n_elements(image)
+    if ndims lt 3 then return
+    
+    ;How many pages are there?
+    nPages = n_elements(image[0,0,*])
+    
+    ;Change pages. Stop at beginning and at the end
+    iDisplay += event.clicks
+    if iDisplay lt 0 then iDisplay = 0
+    if iDisplay ge nPages then iDisplay = nPages - 1
+    
+    ;Set the page being displayed
+    theObj -> SetProperty, IDISPLAY=iDisplay
+    self -> Apply_Bindings, theObj, /CAXIS
+
+    ;Redraw
+    self -> draw
+end
+
+
+;+
 ;   Zoom in the X or Y direction, depending on the zoom mode. The first click sets
 ;   the minimum of the new range while the second click sets the minimum updates the
 ;   display to reflect the new range.
@@ -1680,6 +1727,7 @@ pro MrAbstractZoom::Zoom_Menu_Events, event
         'PAN': self.lmode = 8
         'WHEEL ZOOM: XY': self.wmode = 1
         'WHEEL ZOOM: COLOR': self.wmode = 2
+        'WHEEL ZOOM: PAGE': self.wmode = 4
         else: message, 'Button "' + analysis_type + '" unknown.'
     endcase
     

@@ -119,8 +119,10 @@ WIDTHS = widths
 ;---------------------------------------------------------------------
     
     nCB = n_elements(cbObjects)
-    nrp = n_elements(refPositions)
-    if nrp/4 ne nCB && nrp ne 0 then $
+    nRP n_elements(refPositions)
+    if nRP gt 0 then nRP = n_elements(refPositions[0,*])
+
+    if nRP ne nCB && nRP ne 0 then $
         message, 'The # of REFPOSITIONS must match the # of CBOBJECTS.'
     
     SetDefaultValue, destroy, 1, /BOOLEAN

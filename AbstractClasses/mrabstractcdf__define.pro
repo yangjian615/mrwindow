@@ -258,6 +258,9 @@ end
 ;       INDEX:                  in, optional, type=int
 ;                               The index of the CDF object from which to read data. If
 ;                                   not provided, a new CDF file will be opened.
+;       OCOLORBAR:              out, optional, type=object
+;                               If the data associated with `VARIABLE` is an image, then
+;                                   this keyword will return a colorbar to go along with it.
 ;       VARIABLE:               in, out, optional, type=string
 ;                               The name of the variable whose data is to be plotted. If
 ;                                   not provided, a dialog box will appear from which one
@@ -269,6 +272,7 @@ DISPLAY_DIM = display_dim, $
 FILENAME = filename, $
 GROUP_LEADER = group_leader, $
 INDEX = index, $
+OCOLORBAR = oColorbar, $
 VARIABLE = variable
     compile_opt idl2
     
@@ -279,6 +283,7 @@ VARIABLE = variable
         
         if n_elements(struct) eq 0 then undefine, struct
         if obj_valid(displayObj) then obj_destroy, displayObj
+        if obj_valid(oColorbar) then obj_destroy, oColorbar
         
         void = error_message()
         return, obj_new()
@@ -312,11 +317,13 @@ VARIABLE = variable
 
     ;Open the cdf and create a structure for plotting.
     thePlot = cdfObject -> CDF_Read::Plot_CDF(VARIABLE=variable, GROUP_LEADER=group_leader, $
-                                              DISPLAY_TYPE=display_type, DISPLAY_DIM=diplay_dim)
+                                              DISPLAY_TYPE=display_type, DISPLAY_DIM=diplay_dim, $
+                                              OCOLORBAR=oColorbar)
     
-    if obj_valid(thePlot) eq 0 $
-        then return, obj_new() $
-        else return, thePlot
+    if obj_valid(thePlot) eq 0 then begin
+        if obj_valid(oColorbar) then obj_destroy, oColorbar
+        return, obj_new()
+    endif else return, thePlot
 end
 
 

@@ -846,7 +846,7 @@ LIST_INDEX = list_index
     ;Use the selected plot
     if n_elements(location) eq 0 then begin
         index = self.ifocus
-        
+
     ;Check if the location exists
     endif else begin
         exists = self -> plotExists(location, index, $

@@ -57,6 +57,9 @@
 ;                           Removed all gui-window related keywords. Do not inherit
 ;                           MrPlotLayout or MrDrawWindow. Renamed IMRANGE to RANGE to be
 ;                           consistent across the various different types of objects. - MRA
+;       07/10/2013  -   Added the iDisplay property to handle >2D image data. Disinherit
+;                           MrAbstractAxes, MrAbstractColorbar, MrAbstractLegend. Change
+;                           the IMAXES keyword back to AXES. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -77,10 +80,6 @@ pro MrImageObject::Draw
     
     ;Now draw the plot to the pixmap
     self -> doPlot
-    self -> MrAbstractColorBar::Draw
-    self -> MrAbstractLegend::Draw
-    self -> MrAbstractOverPlot::Draw
-    self -> MrAbstractAxis::Draw
 
     ;Save the system variables
     self.x_sysvar = !X
@@ -121,7 +120,7 @@ pro MrImageObject::doPlot
     imDims = size(*self.image, /DIMENSIONS)
     if (*self.xrange)[0] lt (*self.indep)[0] then (*self.xrange)[0] = (*self.indep)[0]
     if (*self.xrange)[1] gt (*self.indep)[imDims[0]-1] then (*self.xrange)[1] = (*self.indep)[imDims[0]-1]
-    
+
     if (*self.yrange)[0] lt (*self.dep)[0] then (*self.yrange)[0] = (*self.dep)[0]
     if (*self.yrange)[1] gt (*self.dep)[imDims[1]-1] then (*self.yrange)[1] = (*self.dep)[imDims[1]-1]
 
@@ -139,18 +138,18 @@ pro MrImageObject::doPlot
 ;Display Image ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
-   image_plots, (*self.image)[ixrange[0]:ixrange[1], iyrange[0]:iyrange[1]], $
+   image_plots, (*self.image)[ixrange[0]:ixrange[1], iyrange[0]:iyrange[1], self.iDisplay], $
                 *self.indep, *self.dep, $
                 
                 ;IMAGE_PLOTS Keywords
-                AXES = *self.imaxes, $
-                BOTTOM = *self.bottom, $
+                AXES = *self.axes, $
                 CTINDEX = *self.ctindex, $
-                IMRANGE = *self.range, $
-                MISSING_VALUE = *self.missing_value, $
-                MISSING_COLOR = *self.missing_color, $
                 NAN = *self.nan, $
                 SCALE = *self.scale, $
+                BOTTOM = *self.bottom, $
+                RANGE = *self.range, $
+                MISSING_VALUE = *self.missing_value, $
+                MISSING_COLOR = *self.missing_color, $
                 TOP = *self.top, $
                 
                 ;Graphics Keywords
@@ -238,16 +237,9 @@ end
 ;   The purpose of this method is to retrieve object properties
 ;
 ; :Keywords:
-;       ADDCOLORBAR:        out, optional, type=boolean
-;                           Add a color bar to the right of the image.
-;       AXES:               in, optional, type=object
-;                           A weAxis object or an array of weAxis objects to be added to
-;                               the plot.
 ;       BOTTOM:             out, optional, type=byte
 ;                           If `SCALE` is set, then this is the minimum value of the
 ;                               scaled image.
-;       COLORBARS:          out, optional, type=object/obj_arr()
-;                           weColorBar objects to be added to the plot.
 ;       CTINDEX:            out, optional, type=int
 ;                           The color table index of a color table to be loaded.
 ;       DEP:                out, optional, type=any
@@ -256,9 +248,12 @@ end
 ;       INDEP:              out, optional, type=any
 ;                           The position (as specified by the TV procedure) of the image
 ;                               or the data associated with the independent variable.
+;       IDISPLAY:           in, optional, type=boolean, default=0
+;                           The index at which a 2D cut is to be taken. Applicable only
+;                               for > 2D image data.
 ;       IMAGE:              out, optional, type=any
 ;                           The image to be displayed.
-;       IMAXES:             out, optional, type=boolean
+;       AXES:               out, optional, type=boolean
 ;                           Draw a set of axes around the image.
 ;       INIT_XRANGE:        out, optional, type=fltarr(2)
 ;                           The initial state of the XRANGE keyword. This is used to reset
@@ -266,10 +261,6 @@ end
 ;       INIT_YRANGE:        out, optional, type=fltarr(2)
 ;                           The initial state of the YRANGE keyword. This is used to reset
 ;                               the zoom to its original state.
-;       LEGENDS:            out, optional, type=object/obj_arr
-;                           cgLegendItem objects to be added to the plot.
-;       OPLOTS:             out, optional, type=obj/obj_arr
-;                           A single or array of cgOverPlot objects
 ;       MAX_VALUE:          out, optional, type=float
 ;                           The maximum value plotted. Any values larger than this are
 ;                               treated as missing.
@@ -324,12 +315,9 @@ X_POS = x_pos, $
 Y_POS = y_pos, $
 
 ;MrImageObject Keywords
-AXES = axes, $
-COLORBARS = colorbars, $
+IDISPLAY = iDisplay, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
-LEGENDS = legends, $
-OPLOTS = oplots, $
 TV = tv, $
 P_SYSVAR = p_sysvar, $
 X_SYSVAR = x_sysvar, $
@@ -339,7 +327,7 @@ Y_SYSVAR = y_sysvar, $
 ADDCOLORBAR = addcolorbar, $
 BOTTOM = bottom, $
 CTINDEX = ctindex, $
-IMAXES = imaxes, $
+AXES = axes, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
 NAN = nan, $
@@ -371,27 +359,12 @@ _REF_EXTRA = extra
     if arg_present(INDEP) and n_elements(*self.INDEP) ne 0 then indep = *self.indep
 
     ;MrImageObject Properties
-    if arg_present(oplots) then if ptr_valid(self.oplots) $
-        then oplots = *self.oplots $
-        else oplots = obj_new()
-        
-    if arg_present(legends) then if ptr_valid(self.legends) $
-        then legends = *self.legends $
-        else legends = obj_new()
-        
-    if arg_present(colorbars) then if ptr_valid(self.colorbars) $
-        then colorbars = *self.colorbars $
-        else colorbars = obj_new()
-        
-    if arg_present(axes) then if ptr_valid(self.axes) $
-        then axes = *self.axes $
-        else axes = obj_new()
-    
-    if arg_present(INIT_XRANGE) and n_elements(self.init_xrange) ne 0 then init_xrange = self.init_xrange
-    if arg_present(INIT_YRANGE) and n_elements(self.init_yrange) ne 0 then init_yrange = self.init_yrange
-    if arg_present(p_sysvar)    and n_elements(self.p_sysvar)    ne 0 then p_sysvar = self.p_sysvar
-    if arg_present(x_sysvar)    and n_elements(self.x_sysvar)    ne 0 then x_sysvar = self.x_sysvar
-    if arg_present(y_sysvar)    and n_elements(self.y_sysvar)    ne 0 then y_sysvar = self.y_sysvar
+    if arg_present(iDisplay)    then iDisplay = self.iDisplay
+    if arg_present(INIT_XRANGE) then init_xrange = self.init_xrange
+    if arg_present(INIT_YRANGE) then init_yrange = self.init_yrange
+    if arg_present(p_sysvar)    then p_sysvar = self.p_sysvar
+    if arg_present(x_sysvar)    then x_sysvar = self.x_sysvar
+    if arg_present(y_sysvar)    then y_sysvar = self.y_sysvar
     
     ;Graphics Properties
     if arg_present(MAX_VALUE) and n_elements(*self.MAX_VALUE) ne 0 then max_value = *self.max_value
@@ -400,7 +373,7 @@ _REF_EXTRA = extra
     if arg_present(YLOG)      and n_elements(*self.YLOG)      ne 0 then ylog = *self.ylog
 
     ;IMAGE_PLOTS.PRO Properties
-    if arg_present(AXES)        and n_elements(*self.AXES)  ne 0 then axes = *self.axes
+    if arg_present(AXES)        and n_elements(*self.AXES)        ne 0 then axes = *self.axes
     if arg_present(BOTTOM)      and n_elements(*self.BOTTOM)      ne 0 then bottom = *self.bottom
     if arg_present(CTINDEX)     and n_elements(*self.CTINDEX)     ne 0 then ctindex = *self.ctindex
     if arg_present(RANGE)       and n_elements(*self.RANGE)       ne 0 then range = *self.range
@@ -423,13 +396,9 @@ end
 ;   The purpose of this method is to set object properties. 
 ;
 ; :Keywords:
-;       AXES:               in, optional, type=object
-;                           A weAxis or an array of weAxis objects to be drawn on the plot.
 ;       BOTTOM:             in, optional, type=byte
 ;                           If `SCALE` is set, then this is the minimum value of the
 ;                               scaled image.
-;       COLORBARS:          in, optional, type=object/obj_arr()
-;                           weColorBar objects to be added to the plot.
 ;       CTINDEX:            in, optional, type=int
 ;                           The color table index of a color table to be loaded.
 ;       DEP:                in, optional, type=any
@@ -440,7 +409,10 @@ end
 ;                               or the data associated with the independent variable.
 ;       IMAGE:              in, optional, type=any
 ;                           The image to be displayed.
-;       IMAXES:             in, optional, type=boolean
+;       IDISPLAY:           in, optional, type=boolean, default=0
+;                           The index at which a 2D cut is to be taken. Applicable only
+;                               for > 2D image data.
+;       AXES:               in, optional, type=boolean
 ;                           Draw a set of axes around the image.
 ;       INIT_XRANGE:        in, optional, type=fltarr(2)
 ;                           The initial state of the XRANGE keyword. This is used to reset
@@ -448,8 +420,6 @@ end
 ;       INIT_YRANGE:        in, optional, type=fltarr(2)
 ;                           The initial state of the YRANGE keyword. This is used to reset
 ;                               the zoom to its original state.
-;       OPLOTS:             in, optional, type=obj/obj_arr
-;                           A single or array of cgOverPlot objects
 ;       MAX_VALUE:          in, optional, type=float
 ;                           The maximum value plotted. Any values larger than this are
 ;                               treated as missing.
@@ -506,11 +476,9 @@ X_POS = x_pos, $
 Y_POS = y_pos, $
 
 ;MrImageObject Keywords
-AXES = axes, $
-COLORBARS = colorbars, $
+IDISPLAY = iDisplay, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
-OPLOTS = oplots, $
 TV = tv, $
 P_SYSVAR = p_sysvar, $
 X_SYSVAR = x_sysvar, $
@@ -519,7 +487,7 @@ Y_SYSVAR = y_sysvar, $
 ;IMAGE_PLOTS Keywords
 BOTTOM = bottom, $
 CTINDEX = ctindex, $
-IMAXES = imaxes, $
+AXES = axes, $
 RANGE = range, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
@@ -551,12 +519,9 @@ _REF_EXTRA = extra
     if n_elements(image) ne 0 then *self.image = image
 
     ;MrImageObject Keywords
-    if n_elements(axes)        ne 0 then self -> AddAxes, axes, /CLEAR
-    if n_elements(COLORBARS)   ne 0 then self -> AddColorBars, colorbars, /CLEAR
+    if n_elements(iDisplay)    ne 0 then self.iDisplay = iDisplay
     if n_elements(INIT_XRANGE) ne 0 then self.init_xrange = init_xrange
     if n_elements(INIT_YRANGE) ne 0 then self.init_yrange = init_yrange
-    if n_elements(LEGENDS)     ne 0 then self -> AddLegends, legends, /CLEAR
-    if n_elements(OPLOTS)      ne 0 then self -> AddOverplots, oplots, /CLEAR
     if n_elements(P_SYSVAR)    ne 0 then self.p_sysvar = p_sysvar
     if n_elements(X_SYSVAR)    ne 0 then self.x_sysvar = x_sysvar
     if n_elements(Y_SYSVAR)    ne 0 then self.y_sysvar = y_sysvar
@@ -565,7 +530,7 @@ _REF_EXTRA = extra
     ;IMAGE_PLOTS.PRO Properties
     if n_elements(BOTTOM)       ne 0 then *self.bottom = bottom
     if n_elements(CTINDEX)      ne 0 then *self.ctindex = ctindex
-    if n_elements(IMAXES)       ne 0 then *self.imaxes = keyword_set(imaxes)
+    if n_elements(AXES)         ne 0 then *self.axes = keyword_set(axes)
     if n_elements(RANGE)        ne 0 then *self.range = range
     if n_elements(MISSING_VALUE) ne 0 then *self.missing_value = missing_value
     if n_elements(MISSING_COLOR) ne 0 then *self.missing_color = missing_color
@@ -584,68 +549,6 @@ _REF_EXTRA = extra
         
     if keyword_set(draw) then self -> Draw
 end
-
-
-;+
-;   Return to initial, unzoomed x- and y-ranges
-;-
-pro MrImageObject::UnZoom, event
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return
-    endif
-    
-    ;Set the x- and y-range
-    *self.xrange = self.init_xrange
-    *self.yrange = self.init_yrange
-    *self.imrange = self.init_imrange
-    
-    ;Redraw
-    self -> Draw
-end
-
-
-;+
-;   Roll the mouse button forward or backward to zoom in or out by the zoom factor.
-;   Only zoomfactor[0] is used.
-;
-; :Params:
-;       EVENT:              in, required, type=structure
-;                           An event structure returned by the windows manager.
-;-
-pro MrImageObject::Wheel_Zoom, event
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return
-    endif
-    
-    ;Zooming in and out is determined by the sign of events.clicks.
-    ;   events.clicks < 0 if the scroll wheel is moved forward -- zoom in
-    ;   events.clicks > 0 if the scroll wheel is moved backward -- zoom out
-    ;Make sure imrange[0] < imrange[1]
-    delta_im = abs((*self.imrange)[1] - (*self.imrange)[0]) * self.zoomfactor[0] * event.clicks
-    (*self.imrange)[0] = (*self.imrange)[0] + delta_im
-    (*self.imrange)[1] = (*self.imrange)[1] - delta_im
-    if (*self.imrange)[0] gt (*self.imrange)[1] then (*self.imrange)[0] = (*self.imrange)[1] - delta_im
-    
-    ;The the range of the colorbar, too.
-    if n_elements(*self.colorbars) ne 0 then $
-        (*self.colorbars)[0] -> SetProperty, RANGE=*self.imrange
-
-    ;Redraw the plot
-    self -> Draw
-end
-
 
 
 ;+
@@ -681,12 +584,6 @@ pro MrImageObject::cleanup
     ptr_free, self.top
     ptr_free, self.xlog
     ptr_free, self.ylog
-    
-    ;Cleanup the keywords
-    self -> weGraphicsKeywords::CLEANUP
-    self -> MrAbstractColorbar::cleanup
-    self -> MrAbstractOverPlot::cleanup
-    self -> MrAbstractLegend::cleanup
 end
 
 
@@ -710,24 +607,21 @@ end
 ;                               of IMAGE.
 ;
 ; :Keywords:
-;       AXES:               in, optional, type=object
-;                           A weAxis object or an array of weAxis objects to be drawn on
-;                           the plot.
 ;       BOTTOM:             in, optional, type=byte, default=0
 ;                           If `SCALE` is set, then this is the minimum value of the
 ;                               scaled image.
-;       COLORBARS:          in, optional, type=object/obj_arr()
-;                           weColorBar objects to be added to the plot.
 ;       CTINDEX:            in, optional, type=int
 ;                           The color table index of a color table to be loaded.
 ;       DRAW:               in, optional, type=boolean, default=1
 ;                           If set, the data will be drawn to the plot. DRAW=1 always if
 ;                               `GUI`=1.
-;       GUI:                in, optional, type=boolean, default=1
-;                           If `PARENT` is not provided, then one can choose to draw the
-;                               plot in the zoomable GUI (GUI=1) or to the standard
-;                               display window (GUI=0).
-;       IMAXES:             in, optional, type=boolean, default=0
+;       IDISPLAY:           in, optional, type=boolean, default=0
+;                           Normally, `IMAGE` is assumed to be 2D with the dimensions 
+;                               ordered as [x,y]. If `IMAGE` is >2D, data dimensions are
+;                               assumed to be ordered [x,y,A,B,C,...] and `IDISPLAY` is
+;                               the index within the dimensions [A,B,C,...] at which the
+;                               2D image will be displayed.
+;       AXES:               in, optional, type=boolean, default=0
 ;                           Draw a set of axes around the image.
 ;       MIN_VALUE:          in, optional, type=float
 ;                           The minimum value plotted. Any values smaller than this are
@@ -768,7 +662,7 @@ end
 ;       YRANGE:             in, optional, type=fltarr(2), default=[min(`Y`)\, max(`Y`)]*1.05
 ;                           The y-axis range over which the data will be displayed.
 ;       _REF_EXTRA:         in, optional, type=any
-;                           Any keyword accepted by IDL's Plot procedure or MrImageObject
+;                           Any keyword accepted by IDL's Plot procedure or image_plots.pro
 ;
 ; :Uses:
 ;   Uses the following external programs::
@@ -801,17 +695,13 @@ end
 ;-
 function MrImageObject::init, image, x, y, $
 ;MrImageObject Keywords
-AXES = axes, $
-COLORBARS = colorbars, $
 DRAW = draw, $
-GUI = gui, $
+IDISPLAY = idisplay, $
 KEEP_ASPECT = keep_aspect, $
-LEGENDS = legends, $
-OVERPLOTS = overplots, $
 TV = tv, $
       
 ;IMAGE_PLOTS Keywords
-IMAXES = imaxes, $
+AXES = axes, $
 BOTTOM = bottom, $
 CTINDEX = ctindex, $
 RANGE = range, $
@@ -843,6 +733,7 @@ _REF_EXTRA = extra
     setDefaultValue, gui, 1, /BOOLEAN
     setDefaultValue, tv, 0, /BOOLEAN
     setDefaultValue, draw, 1, /BOOLEAN
+    setDefaultValue, iDisplay, 0
     setDefaultValue, xsize, 600
     setDefaultValue, ysize, 340
     
@@ -939,7 +830,7 @@ _REF_EXTRA = extra
     self.dep = ptr_new(/ALLOCATE_HEAP)
     self.bottom = ptr_new(/ALLOCATE_HEAP)
     self.ctindex = ptr_new(/ALLOCATE_HEAP)
-    self.imaxes = ptr_new(/ALLOCATE_HEAP)
+    self.axes = ptr_new(/ALLOCATE_HEAP)
     self.range = ptr_new(/ALLOCATE_HEAP)
     self.min_value = ptr_new(/ALLOCATE_HEAP)
     self.missing_value = ptr_new(/ALLOCATE_HEAP)
@@ -955,12 +846,6 @@ _REF_EXTRA = extra
     self.ylog = ptr_new(/ALLOCATE_HEAP)
     self.yrange = ptr_new(/ALLOCATE_HEAP)
     
-    ;Add overplots, legends, and colorbars. This serves as an ::INIT method.
-    self -> addOverPlots, overplots
-    self -> addLegends, legends
-    self -> addColorBars, colorbars
-    self -> addAxes, axes
-    
     ;Image range
     SetDefaultValue, range, [min(image, max=imMax), imMax]
 
@@ -968,16 +853,17 @@ _REF_EXTRA = extra
     self -> SetProperty, IMAGE = image, $
                          DEP = dep, $
                          INDEP = indep, $
-                         IMAXES = imaxes, $
+                         AXES = axes, $
                          BOTTOM = bottom, $
                          CTINDEX = ctindex, $
-                         RANGE = range, $
+                         IDISPLAY = iDisplay, $
                          MAX_VALUE = max_value, $
                          MIN_VALUE = min_value, $
                          MISSING_VALUE = missing_value, $
                          MISSING_COLOR = missing_color, $
                          NAN = nan, $
                          POSITION = position, $
+                         RANGE = range, $
                          SCALE = scale, $
                          TOP = top, $
                          TV = tv, $
@@ -1012,10 +898,6 @@ pro MrImageObject__define
     compile_opt idl2
     
     define = {MrImageObject, $
-              inherits MrAbstractAxis, $
-              inherits MrAbstractColorBar, $
-              inherits MrAbstractLegend, $
-              inherits MrAbstractOverPlot, $
               inherits weGraphicsKeywords, $
               
               ;Data
@@ -1027,6 +909,7 @@ pro MrImageObject__define
               tv: 0, $                          ;indicate that a TV position was given
               
               ;MrImageObject Properties
+              idisplay: 0, $                    ;Index to display (>3D images)
               init_range: dblarr(2), $          ;Initial image range
               init_xrange: dblarr(2), $         ;Initial x-range
               init_yrange: dblarr(2), $         ;Initial y-range
@@ -1035,9 +918,9 @@ pro MrImageObject__define
               p_sysvar: !P, $                   ;Save the P system variable
               
               ;IMAGE_PLOTS Keywords
+              axes: ptr_new(), $                ;Draw axes around the image?
               bottom: ptr_new(), $              ;If scaled, minimum scaled value
               ctindex: ptr_new(), $             ;Color index to load
-              imaxes: ptr_new(), $              ;Draw axes around the image?
               range: ptr_new(), $               ;Range at which the color table saturates
               missing_value: ptr_new(), $       ;Value to be treated as missing
               missing_color: ptr_new(), $       ;Color of missing value
