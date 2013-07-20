@@ -254,7 +254,6 @@ pro MrPlotLayout::ApplyPositions
 end
 
 
-
 ;+
 ;   Adjust the layout of the plots by moving plots to fill in gaps and then
 ;   removing any empty columns or rows.
@@ -534,6 +533,7 @@ pro MrPlotLayout::GetProperty, $
 ASPECT = aspect, $
 LAYOUT = layout, $
 LOCATION = location, $
+NPLOTS = nplots, $
 THISLOCATION = thisLocation, $
 XMARGIN = xmargin, $
 XGAP = xgap, $
@@ -552,6 +552,7 @@ YGAP = ygap
     ;Get Properties
     if arg_present(aspect) and n_elements(*self.aspect) ne 0 then aspect = *self.aspect
     if arg_present(layout)   then layout = self.layout
+    if arg_present(nplots)   then nplots = self.nplots
     if arg_present(xgap)     then xgap = self.xgap
     if arg_present(xmargin)  then xmargin = self.xmargin
     if arg_present(ygap)     then ygap = self.ygap

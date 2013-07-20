@@ -147,7 +147,7 @@ REPLACE = replace
     ;Clear all overplots first?
     if keyword_set(clear) then begin
         if ptr_valid(self.oplots) then begin
-            for i = 0, n_elements(self.oplots) - 1 do obj_destroy, (*self.oplots)[i]
+            for i = 0, n_elements(*self.oplots) - 1 do obj_destroy, (*self.oplots)[i]
         endif
         ptr_free, self.oplots
     endif

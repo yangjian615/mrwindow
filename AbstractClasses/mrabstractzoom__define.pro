@@ -63,11 +63,11 @@
 ;           init_yrange:        The initial y-range (for unzooming)
 ;
 ;       Set the draw widget UValue and Event Procedure::
-;           UVALUE = {object: self, method: 'Draw_Events'}
-;           EVENT_PRO = 'your_event_handling_procedure_goes_here'
+;           Widget_Control, wDrawID, SET_UVALUE = {object: self, method: 'Draw_Events'}, $
+;                                    SET_EVENT_PRO = 'your_event_handling_procedure_goes_here'
 ;
 ;       In the procedure specified by EVENT_PRO, use the Call_Method procedure::
-;           Widget_Control, self.drawID, GET_UVALUE=event_handler
+;           Widget_Control, wDrawID, GET_UVALUE=event_handler
 ;           Call_Method, event_handler.method, event_handler.object, event
 ;
 ;   ZOOMING::
@@ -127,6 +127,7 @@
 ;                           options. Renamed Wheel_Zoom to Wheel_XY_Zoom and added
 ;                           Wheel_Color_Zoom. - MRA
 ;       07/10/2013  -   Added the Wheel_Zoom_Page method. - MRA
+;       07/14/2013  -   Added the Bindem method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -333,15 +334,16 @@ ZAXIS = zaxis
 ;---------------------------------------------------------------------
     if keyword_set(xaxis) then begin
     
-        ;If the pointer is not valid, make a pointer to a pointer array that links
-        ;OBJECT1 to OBJECT2.
+        ;If no bindings are present, create a linked list
         if obj_valid(self.bind_x) eq 0 then begin
             self.bind_x = obj_new('linkedlist', [object1, object2])
             
-        ;If the pointer is valid
+        ;If bindings are present...
         endif else begin
             
-            ;See how many different bindings there are.
+            ;See how many different bindings there are. Objects that are bound together
+            ;are stored in an object array within a single element of the linked list.
+            ;Different sets of bindings are stored in different nodes of the linked list.
             nBindings = self.bind_x -> Get_Count()
             count = 0
             i = 0
@@ -528,6 +530,60 @@ ZAXIS = zaxis
         
         self -> Consolidate_Bindings, /CAXIS
     endif
+end
+
+
+;+
+;   Bind the axes of two or more objects together.
+;
+; :Params:
+;       theObjArr:          in, required, type=objarr
+;                           An array of 2 or more objects whose axes are to bound together.
+;
+; :Keywords:
+;       ALL:                in, optional, type=boolean, default=0
+;                           Bind all axes.
+;       CAXIS:              in, optional, type=boolean, default=0
+;                           Bind the color axis.
+;       XAXIS:              in, optional, type=boolean, default=0
+;                           Bind the xaxis.
+;       YAXIS:              in, optional, type=boolean, default=0
+;                           Bind the yaxis.
+;       ZAXIS:              in, optional, type=boolean, default=0
+;                           Bind the zaxis.
+;-
+pro MrAbstractZoom::BindEm, theObjArr, $
+ALL=all, $
+CAXIS = caxis, $
+XAXIS = xaxis, $
+YAXIS = yaxis, $
+ZAXIS = zaxis
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Make sure there are two or more objects.
+    nObjs = n_elements(theObjArr)
+    if nObjs lt 2 then message, 'theObjArr must consist of two or more objects.'
+    
+    ;If ALL is set, then bind all axes.
+    if keyword_set(all) then begin
+        caxis = 1
+        xaxis = 1
+        yaxis = 1
+        zaxis = 1
+    endif
+
+    ;Bind the axes.
+    for i = 1, nObjs - 1 do $
+        self -> Bind, theObjArr[0], theObjArr[i], ALL=all, CAXIS=caxes, $
+                      XAXIS=xaxis, YAXIS=yaxis, ZAXIS=zaxis
 end
 
 

@@ -123,6 +123,11 @@
 ;       07/09/2013  -   Implemented the MrAbstractAnalysis class. A re-Focus was needed
 ;                           after plotting is done in the Draw method. - MRA
 ;       07/10/2013  -   3D spectrograms can now be plotted from CDF files. - MRA
+;       07/20/2013  -   The height of the menu and status bars are now taken into account
+;                           when resizing the widget base. This allows the plot layout to
+;                           be determined more accurately in the sense that the margins
+;                           are now the proper size. This entailed adding the menuID
+;                           property to the class definition. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -159,6 +164,7 @@ YSIZE = ysize
     self.tlb = widget_base(title='MrWindow', /COLUMN, /TLB_SIZE_EVENTS, $
                            UVALUE={object: self, method: 'Resize_Events'}, $
                            MBAR=menuID, XOFFSET=100, YOFFSET=0, UNAME='tlb')
+    self.menuID = menuID
 
     ;Make the file menu.
     fileID = widget_button(menuID, VALUE='File', /MENU, EVENT_PRO=butto)
@@ -903,18 +909,26 @@ pro MrWindow::Resize_Events, event
         return
     endif
     
+    ;Get the geometry of the menu and status bars.
+    gMenu = widget_info(self.menuID, /GEOMETRY)
+    gStatus = widget_info(self.statusID, /GEOMETRY)
+    
+    ;Subtract the height of the menu and status bars from the size of the top level base
+    xNew = event.x
+    yNew = event.y - gMenu.ysize - 2*gMenu.margin - gStatus.ysize - gStatus.margin
+    
     ;Delete the pixmap, then create a new pixmap window at the new size
     wdelete, self.pixID
-    self.pixID = MrGetWindow(XSIZE=event.x, YSIZE=event.y, /FREE, /PIXMAP)
+    self.pixID = MrGetWindow(XSIZE=xNew, YSIZE=yNew, /FREE, /PIXMAP)
     
     ;Set the new size of the draw widget
-    widget_control, self.drawID, DRAW_XSIZE=event.x, DRAW_YSIZE=event.y
-    self.xsize = event.x
-    self.ysize = event.y
+    widget_control, self.drawID, DRAW_XSIZE=xNew, DRAW_YSIZE=yNew
+    self.xsize = xNew
+    self.ysize = yNew
     
     ;Recalculate the normalized positions based on the new window size.
     ;Draw the plot to the new size
-    self -> SetProperty
+    self -> MrPlotLayout::SetProperty
     self -> Draw
 end
 
@@ -951,7 +965,7 @@ end
 ;       ARROW:              in, optional, type=boolean, default=0
 ;                           If set, then `INDEX` will be taken to refer to an arrow
 ;                               object. Use with the `INDEX` keyword.
-;       COLORBAR:           in, optional, type=boolean, default=0
+;       CB:                 in, optional, type=boolean, default=0
 ;                           If set, then `INDEX` will be taken to refer to a colorbar
 ;                               object. Use with the `INDEX` keyword.
 ;       IMAGE:              in, optional, type=boolean, default=0
@@ -980,7 +994,7 @@ YSIZE = ysize, $
 ZOOMFACTOR = zoomfactor, $
 
 ARROW = arrow, $
-COLORBAR = colorbar, $
+CB = cb, $
 IMAGE = image, $
 PLOT = plot, $
 TEXT = text, $
@@ -1003,13 +1017,13 @@ _REF_EXTRA = extra
     ;Get properties of a particular object?
     if n_params() eq 1 then begin
         arrow = keyword_set(arrow)
-        colorbar = keyword_set(colorbar)
+        cb = keyword_set(cb)
         image = keyword_set(image)
         plot = keyword_set(plot)
         text = keyword_set(text)
         
         ;Make sure only one keyword is set.
-        if (image + plot + colorbar + arrow + text) ne 1 then $
+        if (image + plot + cb + arrow + text) ne 1 then $
             message, 'Can "Set" properties from exactly one type of object at a time.'
     
         ;ARROWS
@@ -1017,7 +1031,7 @@ _REF_EXTRA = extra
             (*self.arrowObjects)[index] -> SetProperty, _EXTRA=extra
         
         ;COLORBARS
-        endif else if colorbar then begin
+        endif else if cb then begin
             (*self.colorbars)[index] -> SetProperty, _EXTRA=extra
         
         ;IMAGES
@@ -1517,6 +1531,7 @@ pro MrWindow__define, class
               tlb: 0, $                         ;Widget ID of the top level base
               drawID: 0, $                      ;Widget ID of the draw widget
               pixID: 0, $                       ;Window ID of the pixmap
+              menuID: 0, $                      ;Widget ID of the menu bar
               statusID: 0, $                    ;Widget ID of the status bar
               winID: 0, $                       ;Window ID of the draw window
               x0: 0, $                          ;First clicked x-coordinate, for zooming

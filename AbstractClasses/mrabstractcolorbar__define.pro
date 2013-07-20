@@ -119,7 +119,7 @@ WIDTHS = widths
 ;---------------------------------------------------------------------
     
     nCB = n_elements(cbObjects)
-    nRP n_elements(refPositions)
+    nRP = n_elements(refPositions)
     if nRP gt 0 then nRP = n_elements(refPositions[0,*])
 
     if nRP ne nCB && nRP ne 0 then $

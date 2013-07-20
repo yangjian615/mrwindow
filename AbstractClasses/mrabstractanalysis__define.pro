@@ -104,6 +104,9 @@
 ; :History:
 ;	Modification History::
 ;       07/07/2013  -   Written by Matthew Argall
+;       07/11/2013  -   Average, Data_Range, and MVA methods are now callable from the
+;                           command-line, and are not just widget event handlers. - MRA
+;       07/15/2013  -   Set the NaN flag when taking the MEAN. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -210,17 +213,27 @@ end
 ;   Print the average value in a given interval.
 ;
 ; :Params:
-;       XRANGE:             in, required, type=numeric
-;                           A range of coordinate on the abscissa for which the average
-;                               is to be found
-;       YRANGE:             in, required, type=numeric
-;                           A range of coordinate on the ordinate for which the average
-;                               is to be found.
+;       XRANGE:             in, required, type=fltarr(3,3)
+;                           The data range along the abscissa axis over which the average
+;                               is to be taken.
+;       LOCATION:           in, optional, type=intarr(2)
+;                           The [col, row] location of the plot whose data is to be averaged.
+;                               If not provided, the currently selected plot will be
+;                               rotated (i.e. the one indexed by self.ifocus).
 ;
-; :Returns:
-;       XY_DATA:            The closest data values to `X` and `Y`.
+; :Keywords:
+;       LIST_INDEX              in, optional, type=boolean, default=0
+;                               If set, then `LOCATION` is actually the index within at
+;                                   which the plot is stored.
+;       PLOT_INDEX:             in, optional, type=int, default=0
+;                               If set, then `LOCATION` is actually the 1D plot index of
+;                                   the plot. The upper-left-most plot has a plot index of
+;                                   1, and the plot index increases as you go down the
+;                                   column, then across the row.
 ;-
-pro MrAbstractAnalysis::Average, xrange, yrange
+pro MrAbstractAnalysis::Average, xrange, location, $
+LIST_INDEX = list_index, $
+PLOT_INDEX = plot_index
     compile_opt idl2
     
     ;Error handling
@@ -232,24 +245,59 @@ pro MrAbstractAnalysis::Average, xrange, yrange
         return
     endif
     
+;---------------------------------------------------------------------
+;Check Inputs ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Defaults
+    list_index = keyword_set(list_index)
+    plot_index = keyword_set(plot_index)
+
+    ;Use the selected plot
+    if n_elements(location) eq 0 then begin
+        index = self.ifocus
+
+    ;Check if the given location exists
+    endif else begin
+        exists = self -> plotExists(location, index, $
+                                    PLOT_INDEX=plot_index, LIST_INDEX=list_index, $
+                                    /TO_LIST_INDEX)
+        if exists eq 0 then message, 'No plot exists at LOCATION. Returning.'
+    endelse
+    
+;---------------------------------------------------------------------
+;Get Data and Compute Average ////////////////////////////////////////
+;---------------------------------------------------------------------
+    
     ;Get the data interval
-    !Null = self -> Data_Range(xrange, IRANGE=iRange)
+    !Null = self -> Data_Range(xrange, index, IRANGE=iRange)
 
     ;Retrieve the data and the dimension over which to take the mean
-    (*self.allObjects)[self.ifocus] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
+    (*self.allObjects)[index] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
     if n_elements(dimension) eq 0 then dimension = 0
-    
-    x_avg = mean(indep[iRange[0]:iRange[1]])
-    case dimension of
-        0: y_avg = mean(dep[iRange[0]:iRange[1]])
-        1: y_avg = mean(dep[iRange[0]:iRange[1],*], DIMENSION=dimension)
-        2: y_avg = mean(dep[*,iRange[0]:iRange[1]], DIMENSION=dimension)
-    endcase
+    if dimension eq 2 && iRange[1] - iRange[0] + 1 eq 1 then dimension = 0
 
-    ;Print the results
+    ;Compute the average.
+    x_avg = mean(indep[iRange[0]:iRange[1]], /NAN)
+    case dimension of
+        0: y_avg = mean(dep[iRange[0]:iRange[1]], /NAN)
+        1: y_avg = mean(dep[iRange[0]:iRange[1],*], DIMENSION=dimension, /NAN)
+        2: y_avg = mean(dep[*,iRange[0]:iRange[1]], DIMENSION=dimension, /NAN)
+    endcase
+    
+;---------------------------------------------------------------------
+;Print Results ///////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;XRange are the data coordinates of the clicked points.
+    ;[x0, x1] are the actual data values over which the average is taken
+    ;Xavg and Yavg are the x- and y-averages over the interval [x0,x1].
+
     x_avg = string(x_avg, FORMAT='(f0.4)')
     y_avg = '[' + strjoin(string(y_avg, FORMAT='(f0.4)'), ', ') + ']'
-    print, FORMAT='(%"x_avg = %s    y_avg = %s")', x_avg, y_avg
+    print, FORMAT='(%"X Range  = [%0.4f, %0.4f]")', xrange
+    print, FORMAT='(%"[x0, x1] = [%0.4f, %0.4f]")', indep[iRange]
+    print, FORMAT='(%"  Xavg   = %s")', x_avg
+    print, FORMAT='(%"  Yavg   = %s")', y_avg
 end
 
 
@@ -321,12 +369,12 @@ end
 ;       XRANGE:             in, required, type=numeric
 ;                           A range of coordinate on the abscissa for which the data
 ;                               interval is to be returned
-;       YRANGE:             in, required, type=numeric
-;                           A range of coordinate on the ordinate for which the data
-;                               interval is to be returned
+;       INDEX:              in, optional, type=int, default=self.ifocus
+;                           The index of the plot for which the data range is to be
+;                               determined.
 ;
 ; :Keywords:
-;       INDEX:              out, optional, type=int
+;       IRANGE:             out, optional, type=int
 ;                           Index value within the data array at which to find `XY_DATA`.
 ;                               it is ordered [sIndex, eIndex], where "s" and "e" denote
 ;                               the start and end of the data interval, respectively.
@@ -338,7 +386,7 @@ end
 ;                               where the different rows represent different components
 ;                               of the non-plotted dimension.
 ;-
-function MrAbstractAnalysis::Data_Range, xrange, $
+function MrAbstractAnalysis::Data_Range, xrange, index, $
 IRANGE = iRange
     compile_opt idl2
     
@@ -350,8 +398,10 @@ IRANGE = iRange
         return, !Null
     endif
     
+    setDefaultValue, index, self.ifocus
+    
     ;Retrieve the data and the dimension over which to take the mean
-    (*self.allObjects)[self.ifocus] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
+    (*self.allObjects)[index] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
     if n_elements(dimension) eq 0 then dimension = 0
     
     ;Find the closest data point
@@ -532,8 +582,8 @@ pro MrAbstractAnalysis::Get_Interval, event
             
             ;Forward results to proper analysis method
             if self.amode[0] eq 2 then self -> Interval, xrange, yrange
-            if ((self.amode[0] and  4) gt 0) then self -> Average, xrange, yrange
-            if ((self.amode[0] and  8) gt 0) then self -> MVAB, xrange, yrange
+            if ((self.amode[0] and  4) gt 0) then self -> Average, xrange
+            if ((self.amode[0] and  8) gt 0) then self -> MVAB, xrange
             if ((self.amode[0] and 16) gt 0) then self -> vHT, xrange, yrange
             
             ;reset initial click
@@ -638,14 +688,25 @@ end
 ;   The average value in a given interval.
 ;
 ; :Params:
-;       XRANGE:             in, required, type=numeric
-;                           A range of coordinate on the abscissa for which the minimum
-;                               variance coordinate system is to be found.
-;       YRANGE:             in, required, type=numeric
-;                           A range of coordinate on the ordinate for which the minimum
-;                               variance coordinate system is to be found.
+;       XRANGE:             in, required, type=fltarr(3,3)
+;                           The data range along the abscissa axis over which the average
+;                               is to be taken.
+;       LOCATION:           in, optional, type=intarr(2)
+;                           The [col, row] location of the plot whose data is to be averaged.
+;                               If not provided, the currently selected plot will be
+;                               rotated (i.e. the one indexed by self.ifocus).
+;
+; :Keywords:
+;       LIST_INDEX              in, optional, type=boolean, default=0
+;                               If set, then `LOCATION` is actually the index within at
+;                                   which the plot is stored.
+;       PLOT_INDEX:             in, optional, type=int, default=0
+;                               If set, then `LOCATION` is actually the 1D plot index of
+;                                   the plot. The upper-left-most plot has a plot index of
+;                                   1, and the plot index increases as you go down the
+;                                   column, then across the row.
 ;-
-pro MrAbstractAnalysis::MVAB, xrange, yrange
+pro MrAbstractAnalysis::MVAB, xrange, location
     compile_opt idl2
     
     ;Error handling
@@ -657,11 +718,35 @@ pro MrAbstractAnalysis::MVAB, xrange, yrange
         return
     endif
     
+;---------------------------------------------------------------------
+;Check Inputs ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Defaults
+    list_index = keyword_set(list_index)
+    plot_index = keyword_set(plot_index)
+
+    ;Use the selected plot
+    if n_elements(location) eq 0 then begin
+        index = self.ifocus
+
+    ;Check if the given location exists
+    endif else begin
+        exists = self -> plotExists(location, index, $
+                                    PLOT_INDEX=plot_index, LIST_INDEX=list_index, $
+                                    /TO_LIST_INDEX)
+        if exists eq 0 then message, 'No plot exists at LOCATION. Returning.'
+    endelse
+    
+;---------------------------------------------------------------------
+;Get Data and Perform MVAB ///////////////////////////////////////////
+;---------------------------------------------------------------------
+    
     ;Get the data interval
     xy_data = self -> Data_Range(xrange, IRANGE=iRange)
 
     ;Retrieve the data and the dimension over which to take the mean
-    (*self.allObjects)[self.ifocus] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
+    (*self.allObjects)[index] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
     if n_elements(dimension) eq 0 then begin
         dims = size(dep, /DIMENSIONS)
         dimension = where(dims eq 3, count) + 1
@@ -674,6 +759,10 @@ pro MrAbstractAnalysis::MVAB, xrange, yrange
         2: eigvecs = mva(indep[iRange[0]:iRange[1]], dep[*,iRange[0]:iRange[1]], EIGVALS=eigvals)
         else: message, 'Data must be a 3xN or Nx3 array.'
     endcase
+    
+;---------------------------------------------------------------------
+;Print the Results ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
         
     ;print the results of MVAB to the command window
     nlm = ['N', 'M', 'L']
@@ -805,27 +894,27 @@ end
 
 
 ;+
-;   Calculate the deHoffmann-Teller Velocity over a given interval.
-;
-;   Instructions::
-;       1. Make sure "Focus" is selected from the "Cursor" menu.
-;       2. Select "vHT" from the "Analysis" menu.
-;       3. Select an interval of velocity data for which vHT is to be calculated.
-;           a. Click + Hold/Drag + Release
-;       4. Do the same with magnetic field data.
-;           a. The intervals do not need to be the same. The first interval is the one
-;               used. The second interval is merely to know in which plot the magnetic
-;               field data is stored.
+;   Rotate 3-component time series data.
 ;
 ; :Params:
-;       XRANGE:             in, required, type=numeric
-;                           A range of coordinate on the abscissa for which the minimum
-;                               variance coordinate system is to be found.
-;       YRANGE:             in, required, type=numeric
-;                           A range of coordinate on the ordinate for which the minimum
-;                               variance coordinate system is to be found.
+;       ROTMAT:             in, required, type=fltarr(3,3)
+;                           A rotation matrix used in rotating the data found at `LOCATION`.
+;       LOCATION:           in, optional, type=intarr(2)
+;                           The [col, row] location of the plot whose data is to be rotated.
+;                               If not provided, the currently selected plot will be
+;                               rotated (i.e. the one indexed by self.ifocus).
+;
+; :Keywords:
+;       LIST_INDEX              in, optional, type=boolean, default=0
+;                               If set, then `LOCATION` is actually the index within at
+;                                   which the plot is stored.
+;       PLOT_INDEX:             in, optional, type=int, default=0
+;                               If set, then `LOCATION` is actually the 1D plot index of
+;                                   the plot. The upper-left-most plot has a plot index of
+;                                   1, and the plot index increases as you go down the
+;                                   column, then across the row.
 ;-
-pro MrAbstractAnalysis::Rotate, location, rotmat, $
+pro MrAbstractAnalysis::Rotate, rotmat, location, $
 PLOT_INDEX = plot_index, $
 LIST_INDEX = list_index
     compile_opt idl2
@@ -842,6 +931,12 @@ LIST_INDEX = list_index
 ;---------------------------------------------------------------------
 ;Check Inputs ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+    
+    setDefaultValue, plot_index, 0, /BOOLEAN
+    setDefaultValue, list_index, 0, /BOOLEAN
+
+    if n_params() eq 1 then $
+        if n_elements(rotmat) eq 2 then location = rotmat
 
     ;Use the selected plot
     if n_elements(location) eq 0 then begin
@@ -856,15 +951,11 @@ LIST_INDEX = list_index
     endelse
     
     ;Get the rotation matrix
-    if n_elements(rotmat) eq 0 then begin
+    if n_elements(rotmat) ne 9 then begin
         if ptr_valid(self.tmatrix) $
             then rotmat = *self.tmatrix $
             else message, 'A rotation matrix must be provided.'
     endif
-    
-    setDefaultValue, plot_index, 0, /BOOLEAN
-    setDefaultValue, list_index, 0, /BOOLEAN
-    setDefaultVAlue, new, 0, /BOOLEAN
     
     
 ;---------------------------------------------------------------------
