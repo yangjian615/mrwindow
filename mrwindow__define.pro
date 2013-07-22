@@ -127,7 +127,16 @@
 ;                           when resizing the widget base. This allows the plot layout to
 ;                           be determined more accurately in the sense that the margins
 ;                           are now the proper size. This entailed adding the menuID
-;                           property to the class definition. - MRA
+;                           property to the class definition. Renamed the Resize_Events to
+;                           TLB_Resize_Events, added the ResizeDrawWidget method. - MRA
+;       07/21/2013  -   Added the WMODE and DISPLAY keywords. Previously, when BUILD=0 or
+;                           and the MrAbstractSaveAs::Output method was called, an error
+;                           REALIZE=0 would occur because self.winID would be an invalid
+;                           window ID. Furthermore, to do a screen capture, something had
+;                           to have first been drawn in a window. This could not happen
+;                           without first realizing the window... Recalculate the plot
+;                           positions if DRAW is set in the SetProperty method. Before,
+;                           the plot bled off the window. - MRA.
 ;-
 ;*****************************************************************************************
 ;+
@@ -162,7 +171,7 @@ YSIZE = ysize
     
     ;Make a top-level base with a menu bar
     self.tlb = widget_base(title='MrWindow', /COLUMN, /TLB_SIZE_EVENTS, $
-                           UVALUE={object: self, method: 'Resize_Events'}, $
+                           UVALUE={object: self, method: 'TLB_Resize_Events'}, $
                            MBAR=menuID, XOFFSET=100, YOFFSET=0, UNAME='tlb')
     self.menuID = menuID
 
@@ -724,6 +733,9 @@ pro MrWindow::Notify_Realize
         return
     endif
     
+    ;If a temporary pixmap window was being used, delete it.
+    if WindowAvailable(self.winID) then wDelete, self.winID
+    
     ;Get the window ID of the draw widget
     widget_control, self.drawID, GET_VALUE=winID
     self.winID = winID
@@ -878,6 +890,12 @@ _REF_EXTRA = extra
     ;Default to building the GUI
     setDefaultValue, build, 1, /BOOLEAN
     
+    ;Switch display modes, if necessary.
+    if self.display eq 0 then begin
+        self.display = 1
+        wDelete, self.winID
+    endif
+    
     ;Build the GUI
     if keyword_set(build) then self -> buildGUI, _STRICT_EXTRA=extra
     
@@ -895,10 +913,16 @@ end
 ;   This method resizes the draw window and redraws the plot to the adjusted size.
 ;
 ; :Params:
-;       EVENT:              in, required, type=structure
-;                           An event structure returned by the windows manager.
+;       XSIZE:              in, required, type=long
+;                           The width of the draw window in pixels
+;       YSIZE:              in, required, type=long
+;                           The height of the draw window in pixels
+;
+; :Keywords:
+;       DRAW:               in, optional, type=boolean, default=0
 ;-
-pro MrWindow::Resize_Events, event
+pro MrWindow::ResizeDrawWidget, xsize, ysize, $
+DRAW = draw
     compile_opt idl2
     
     ;Error handling
@@ -908,28 +932,58 @@ pro MrWindow::Resize_Events, event
         void = error_message()
         return
     endif
+
+;---------------------------------------------------------------------
+;Check Windows ///////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     
-    ;Get the geometry of the menu and status bars.
-    gMenu = widget_info(self.menuID, /GEOMETRY)
-    gStatus = widget_info(self.statusID, /GEOMETRY)
+    ;Check to see if a window is available to be resized. This may not be true if the
+    ;widget has not been realized yet.
+    drawIsValid = widget_info(self.drawID, /VALID_ID)
+    winIsAvailable = WindowAvailable(self.winID)
     
-    ;Subtract the height of the menu and status bars from the size of the top level base
-    xNew = event.x
-    yNew = event.y - gMenu.ysize - 2*gMenu.margin - gStatus.ysize - gStatus.margin
+    ;Make sure the widget has been built first
+    if drawIsValid eq 0 && winIsAvailable eq 0 $
+        then message, 'No window exists yet. Cannot resize. (Realize the widget first).'
+
+;---------------------------------------------------------------------
+;Pixmap //////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     
     ;Delete the pixmap, then create a new pixmap window at the new size
     wdelete, self.pixID
-    self.pixID = MrGetWindow(XSIZE=xNew, YSIZE=yNew, /FREE, /PIXMAP)
+    self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, /PIXMAP)
+
+;---------------------------------------------------------------------
+;Draw Widget /////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     
-    ;Set the new size of the draw widget
-    widget_control, self.drawID, DRAW_XSIZE=xNew, DRAW_YSIZE=yNew
-    self.xsize = xNew
-    self.ysize = yNew
+    ;Resize the draw widget
+    if drawIsValid then begin
+        widget_control, self.drawID, DRAW_XSIZE=xsize, DRAW_YSIZE=ysize
+
+;---------------------------------------------------------------------
+;IDL Window/Pixmap ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
     
+    ;Resize normal windows.
+    endif else if winIsAvailable then begin
+        wDelete, self.winID
+        
+        if self.display then pixmap = 0 else pixmap = 1
+        self.winID = MrGetWindow(TITLE='MrWindow', XSIZE=xsize, YSIZE=ysize, /FREE, PIXMAP=pixmap)
+    endif
+    
+    ;Update the object properties
+    self.xsize = xsize
+    self.ysize = ysize
+
     ;Recalculate the normalized positions based on the new window size.
     ;Draw the plot to the new size
-    self -> MrPlotLayout::SetProperty
-    self -> Draw
+    if keyword_set(draw) then begin
+        self -> MrPlotLayout::SetProperty
+        self -> Draw
+    endif
 end
 
 
@@ -1059,8 +1113,8 @@ _REF_EXTRA = extra
     
     ;Set Properties
     if n_elements(amode)      ne 0 then self.amode = amode
-    if n_elements(xsize)      ne 0 then self.xsize = xsize
-    if n_elements(ysize)      ne 0 then self.xsize = ysize
+    if n_elements(xsize)      ne 0 then self -> ResizeDrawWidget, xsize, self.ysize
+    if n_elements(ysize)      ne 0 then self -> ResizeDrawWidget, self.xsize, ysize
     if n_elements(savedir)    ne 0 then self.savedir = savedir
     if n_elements(zoomfactor) ne 0 then self.zoomfactor = zoomfactor
     
@@ -1100,7 +1154,54 @@ _REF_EXTRA = extra
         if n_elements(iExtra) ne 0 then self -> MrPlotLayout::SetProperty, _STRICT_EXTRA=extra[iExtra]
     endif
 
-    if keyword_set(draw) then self -> draw
+    ;Recalculate the plot positions in case the layout has changed.
+    if keyword_set(draw) then begin
+        self -> MrPlotLayout::SetProperty
+        self -> draw
+    endif
+end
+
+  
+;+
+;   This method resizes the top level base, then updates the contents of the draw widget
+;   to be proportioned appropriately.
+;
+; :Params:
+;       EVENT:              in, required, type=structure
+;                           An event structure returned by the windows manager.
+;-
+pro MrWindow::TLB_Resize_Events, event
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Get the geometry of the menu and status bars.
+    gMenu = widget_info(self.menuID, /GEOMETRY)
+    gStatus = widget_info(self.statusID, /GEOMETRY)
+    
+    ;Subtract the height of the menu and status bars from the size of the top level base
+    xNew = event.x
+    yNew = event.y - gMenu.ysize - 2*gMenu.margin - gStatus.ysize - gStatus.margin
+    
+    ;Delete the pixmap, then create a new pixmap window at the new size
+    wdelete, self.pixID
+    self.pixID = MrGetWindow(XSIZE=xNew, YSIZE=yNew, /FREE, /PIXMAP)
+    
+    ;Set the new size of the draw widget
+    widget_control, self.drawID, DRAW_XSIZE=xNew, DRAW_YSIZE=yNew
+    self.xsize = xNew
+    self.ysize = yNew
+    
+    ;Recalculate the normalized positions based on the new window size.
+    ;Draw the plot to the new size
+    self -> MrPlotLayout::SetProperty
+    self -> Draw
 end
 
 
@@ -1252,20 +1353,7 @@ end
 ;   Clean up after the widget is destroyed.
 ;-
 pro MrWindow_Cleanup, tlb
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return
-    endif
-    
-    ;Destroy the widget, but do not destroy the object. That way the object can continue
-    ;to be used and the widget re-realized. Options are available to destroy the object.
-    widget_control, tlb, /DESTROY
-    
+    ;Do nothing. Cleanup is done when the object is destroyed.
 end
 
 
@@ -1292,6 +1380,10 @@ pro MrWindow::cleanup
     self -> MrAbstractZoom::Cleanup
     self -> MrPlotManager::Cleanup
     
+    ;Delete the windows.
+    wDelete, self.winID
+    wDelete, self.pixID
+    
     ;If a widget is still active, destroy it
     if widget_info(self.tlb, /VALID_ID) then widget_control, self.tlb, /DESTROY
 end
@@ -1309,6 +1401,9 @@ end
 ;                               in a MrWindow widget unless `CREATEGUI`=0.
 ;
 ; :Keywords:
+;       BUILD:              in, optional, type=Boolean, default=1
+;                           Build the GUI. This gives the option to construct the GUI
+;                               without having to realize it yet.
 ;       CMODE:              in, optional, type=int, default=0
 ;                           The default cursor mode in which to start
 ;       CREATEGUI:          in, optional, type=boolean, default=1
@@ -1316,9 +1411,13 @@ end
 ;                               or in the widget specified by `PARENT`. If not set, graphics
 ;                               will be diplayed in a normal IDL graphics window. Setting
 ;                               this keyword to 0 also sets `REALIZE`=0 and `BUILD`=0
-;       BUILD:              in, optional, type=Boolean, default=1
-;                           Build the GUI. This gives the option to construct the GUI
-;                               without having to realize it yet.
+;       DISPLAY:            in, optional, type=boolean, default=1
+;                           If set, graphics produced by the Draw method will be created
+;                               in a visible display window. If not set (i.e. =0),
+;                               graphics will be output to an invisible pixmap window. The
+;                               latter will aslo automatically set CreateGUI=0. This is
+;                               useful, say, if you want to save an image without having
+;                               it be displayed first.
 ;       LMODE:              in, optional, type=int, default=4 (Box Zoom)
 ;                           The zoom mode associated with the left mouse button.
 ;       REALIZE:            in, optional, type=boolean, default=1
@@ -1336,6 +1435,8 @@ end
 ;       TEXT:               in, optional, type=object
 ;                           A weText object or an array of weText objects to be added
 ;                               to the draw window.
+;       WMODE:              in, optional, type=int, default=8 (Pan)
+;                           The zoom mode associated with the mouse wheel.
 ;       XSIZE:              in, optional, type=long, default=512
 ;                           The width of the draw window in pixels
 ;       YSIZE:              in, optional, type=long, default=512
@@ -1363,6 +1464,7 @@ function MrWindow::init, parent, $
 ARROWS = arrows, $
 CMODE = cmode, $
 CREATEGUI = createGUI, $
+DISPLAY = display, $
 BUILD = build, $
 LMODE = lmode, $
 PLOTOBJECTS = plotObjects, $
@@ -1370,6 +1472,7 @@ REALIZE = realize, $
 RMODE = rmode, $
 SAVEDIR = savedir, $
 TEXT = text, $
+WMODE = wmode, $
 XSIZE = xsize, $
 YSIZE = ysize, $
 ZOOMFACTOR = zoomfactor, $
@@ -1393,6 +1496,7 @@ _REF_EXTRA = extra
     cd, CURRENT=current
     
     ;Default window size
+    setDefaultValue, wmode, 0               ;None
     setDefaultValue, cmode, 0               ;None
     setDefaultValue, build, 1, /BOOLEAN
     setDefaultValue, lmode, 0               ;None
@@ -1402,6 +1506,10 @@ _REF_EXTRA = extra
     setDefaultvalue, xsize, 600
     setDefaultValue, ysize, 340
     setDefaultValue, createGUI, 1, /BOOLEAN
+    setDefaultValue, display, 1, /BOOLEAN
+    
+    ;If nothing is to be displayed, do not create the GUI.
+    if display eq 0 then createGUI = 0
     
     ;If not creating a GUI, then do not build or realize.
     if createGUI eq 0 then begin
@@ -1430,9 +1538,11 @@ _REF_EXTRA = extra
     endif
     
     ;Set object properties.
+    self.display = display
     self.cmode = cmode
     self.lmode = lmode
     self.rmode = rmode
+    self.wmode = wmode
     self.savedir = savedir
     self.xsize = xsize
     self.ysize = ysize
@@ -1451,19 +1561,21 @@ _REF_EXTRA = extra
 ;Display Window //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
-	;Was a parent widget provided?
+	;Was a parent widget provided? If not...
 	if n_elements(parent) eq 0 then begin
 
     ;---------------------------------------------------------------------
     ;IDL Window //////////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
 	    
-	    ;Is a GUI being build or realized? If not...
+	    ;Is a GUI being built or realized? If not...
 	    if keyword_set(createGUI) eq 0 then begin
 	    
-	        ;If not, create a normal window
+	        ;Create a normal window. Make it a pixmap if DISPLAY=0
+	        if display eq 1 then pixmap = 0 else pixmap = 1
             self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, /PIXMAP)
-            self.winID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, TITLE='MrWindow')
+            self.winID = MrGetWindow(TITLE='MrWindow', XSIZE=xsize, YSIZE=ysize, $
+                                     /FREE, PIXMAP=pixmap)
 
     ;---------------------------------------------------------------------
     ;MrWindow GUI ////////////////////////////////////////////////////////
@@ -1477,10 +1589,23 @@ _REF_EXTRA = extra
             ;pixmap window.
             self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
         
-            ;Realize the widget? Build it?
-            if keyword_set(realize) $
-                then self -> realizeGUI, /BUILD, XSIZE=xsize, YSIZE=ysize $
-                else if keyword_set(build) then self -> buildGUI, XSIZE=xsize, YSIZE=ysize
+            ;Realize the widget?
+            if keyword_set(realize) then begin
+                self -> realizeGUI, /BUILD, XSIZE=xsize, YSIZE=ysize
+                
+            ;Build the widget?
+            ;Without realizing the widget, no window will be created. Thus, the Draw method
+            ;will have nothing to draw to and the SaveAs options will have nothing to read
+            ;from. As a fix, create a temporary pixmap window (it will be deleted when the
+            ;widget is realized and the Notify_Realize method is called).
+            endif else if keyword_set(build) then begin
+                self.winID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
+                self -> buildGUI, XSIZE=xsize, YSIZE=ysize
+                
+            ;Neither Build nor Realize. See previous comment.
+            endif else begin
+                self.winID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
+            endelse
 	    
 	    endelse
 
@@ -1529,6 +1654,7 @@ pro MrWindow__define, class
               inherits MrPlotManager, $         ;Manage plot layout
               
               tlb: 0, $                         ;Widget ID of the top level base
+              display: 0, $                     ;Display the graphics?
               drawID: 0, $                      ;Widget ID of the draw widget
               pixID: 0, $                       ;Window ID of the pixmap
               menuID: 0, $                      ;Widget ID of the menu bar

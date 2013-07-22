@@ -69,7 +69,11 @@
 ;
 ; :History:
 ;	Modification History::
-;       05/17/2013  -   Written by Matthew Argall
+;       05/17/2013  -   Written by Matthew Argall. Many methods were adapted from
+;                           cgCmdWindow__Define, from the Coyote Graphics library.
+;       05/20/2013  -   In the AutoRasterFile method, if winID is not currently open, 
+;                           then do not use WSet to make the window current. This prevents
+;                           a new, blank window from being created. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -165,7 +169,7 @@ PRO MrAbstractSaveAs::AutoRasterFile, filetype, filename
     
     ; Make this window the current graphics windows.
     currentWindow = !D.Window
-    WSet, self.winID
+    if WindowAvailable(self.winID) then WSet, self.winID
 
     IF N_Elements(filetype) EQ 0 then filetype = 'PNG'
     IF N_Elements(filename) EQ 0 THEN filename = 'cgwindow.' + StrLowCase(filetype)
@@ -198,7 +202,7 @@ PRO MrAbstractSaveAs::AutoRasterFile, filetype, filename
                 TT_FONT=self.ps_tt_font
                            
            ; Draw the graphics.
-           self -> ExecuteCommands
+           self -> Draw
            
            ; Close the file and make a PDF file.
            PS_End
@@ -243,7 +247,7 @@ PRO MrAbstractSaveAs::AutoRasterFile, filetype, filename
            ENDIF
            
            ; Draw the graphics.
-           self -> ExecuteCommands
+           self -> Draw
 
            ; Close the file and convert to proper file type.
             CASE filetype OF
@@ -547,7 +551,7 @@ PRO MrAbstractSaveAs::Output, filename
     
     ; Need a filename?
     IF N_Elements(filename) EQ 0 THEN filename = 'idl.ps'
-    
+
     ; The type of file is determined by the filename extension.
     rootname = cgRootName(filename, DIRECTORY=dir, EXTENSION=ext)
     CASE StrUpCase(ext) OF

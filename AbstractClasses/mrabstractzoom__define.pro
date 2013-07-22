@@ -296,6 +296,10 @@ end
 ; :Keywords:
 ;       ALL:                in, optional, type=boolean, default=0
 ;                           Bind all axes.
+;       APPLY:              in, optional, type=boolean, default=1
+;                           If set, once the bindings are created, they will be applied so
+;                               that the axis ranges match. The ranges of `OBJECT2` will
+;                               be update to match those of `OBJECT1`.
 ;       CAXIS:              in, optional, type=boolean, default=0
 ;                           Bind the color axis.
 ;       XAXIS:              in, optional, type=boolean, default=0
@@ -307,6 +311,7 @@ end
 ;-
 pro MrAbstractZoom::Bind, object1, object2, $
 ALL=all, $
+APPLY = apply, $
 CAXIS = caxis, $
 XAXIS = xaxis, $
 YAXIS = yaxis, $
@@ -320,6 +325,11 @@ ZAXIS = zaxis
         void = error_message()
         return
     endif
+    
+    ;Apply bindings?
+    if n_elements(apply) eq 0 $
+        then apply = 1 $
+        else apply = keyword_set(apply)
     
     ;If ALL is set, then bind all axes.
     if keyword_set(all) then begin
@@ -530,6 +540,10 @@ ZAXIS = zaxis
         
         self -> Consolidate_Bindings, /CAXIS
     endif
+    
+    ;Apply Bindings?
+    if apply eq 1 then self -> Apply_Bindings, object1, ALL=all, CAXIS=caxis, $
+                                               XAXIS=xaxis, YAXIS=yaxis, ZAXIS=zaxis
 end
 
 
@@ -543,6 +557,10 @@ end
 ; :Keywords:
 ;       ALL:                in, optional, type=boolean, default=0
 ;                           Bind all axes.
+;       APPLY:              in, optional, type=boolean, default=1
+;                           If set, once the bindings are created, they will be applied so
+;                               that the axis ranges match. The ranges of each object will
+;                               be update to match those of `theObjArr`[0].
 ;       CAXIS:              in, optional, type=boolean, default=0
 ;                           Bind the color axis.
 ;       XAXIS:              in, optional, type=boolean, default=0
@@ -554,6 +572,7 @@ end
 ;-
 pro MrAbstractZoom::BindEm, theObjArr, $
 ALL=all, $
+APPLY = apply, $
 CAXIS = caxis, $
 XAXIS = xaxis, $
 YAXIS = yaxis, $
@@ -572,6 +591,11 @@ ZAXIS = zaxis
     nObjs = n_elements(theObjArr)
     if nObjs lt 2 then message, 'theObjArr must consist of two or more objects.'
     
+    ;Apply bindings?
+    if n_elements(apply) eq 0 $
+        then apply = 1 $
+        else apply = keyword_set(apply)
+    
     ;If ALL is set, then bind all axes.
     if keyword_set(all) then begin
         caxis = 1
@@ -582,8 +606,12 @@ ZAXIS = zaxis
 
     ;Bind the axes.
     for i = 1, nObjs - 1 do $
-        self -> Bind, theObjArr[0], theObjArr[i], ALL=all, CAXIS=caxes, $
+        self -> Bind, theObjArr[0], theObjArr[i], ALL=all, APPLY=0, CAXIS=caxes, $
                       XAXIS=xaxis, YAXIS=yaxis, ZAXIS=zaxis
+                      
+    ;Apply the bindings
+    if apply eq 1 then self -> Apply_Bindings, theObjArr[0], ALL=all, CAXIS=caxis, $
+                                               XAXIS=xaxis, YAXIS=yaxis, ZAXIS=zaxis
 end
 
 
