@@ -7,7 +7,9 @@ II.     Getting Started
 III.    Display choices
 IV.     Window Creation
 V.      Build & Realize
-VI.     Example
+VI.     Resizing the Draw/Display Window
+VII.    On Saving
+VIII.   Example
 
 
 ;--------------------------------
@@ -161,8 +163,44 @@ This is especially important if you create an IDL save file containing the objec
 restored, one can call the RealizeGUI method to display the plot again.
 
 
+;------------------------------------------
+; VI. RESIZING THE DRAW/DISPLAY WINDOW \\\\
+;------------------------------------------
+
+By default, positions are taken to be in normal coordinates. This means that all positions
+are a porportion of the total display size. If the size of the display changes, the
+positions no longer represent the initially intended position. For example, 3% of a
+500 pixel^2 display is less than 3% of a 750 pixel^2 display. As such, whenever the window
+is resized, two things need to happen: 1) Positions are recalculated; 2) The new positions
+are applied to each plot. The first can be done with the MrPlotLayout::CalcPositions method
+while the second through the MrPlotLayout::ApplyPositions method. Note that both of these
+are called automatically whenever the MrPlotLayout::SetProperty method is called.
+
+This should be done for you automatically, but if you notice plots bleeding off the
+display area or an unusual amount of white space, this could be the source of your problem.
+
+
 ;--------------------------------
-; VI. EXAMPLES \\\\\\\\\\\\\\\\\\
+; VII. ON SAVING \\\\\\\\\\\\\\\\
+;--------------------------------
+
+The basic save options ('JPEG', 'GIF', 'PNG', 'TIFF') are basicallly like a screen shot.
+This means that a graphics window must be open (see Sections III & IV), and, if graphics
+are to be saved, then the Draw method must be called at least once. The screen shot uses
+the TVRD procedure to read color information off the display. "Raster Image File" options
+under the cgSaveAs menu work in a similar fashion.
+
+PDFs, PostScripts, and Raster Image via ImageMagik options involve creating an
+(intermediate) postscript file first and do not require a window to be open. Instead, they
+change to a postscript device and call the Draw method. PostScript files are then converted
+to raster images via ImageMagik or to PDFs via ps2pdf.
+
+The MrAbstractSaveAs::Output method will check if ImageMagik is installed on your computer.
+If it is, raster images will be created via ImageMagik as described above. If not, a the
+screen capture method will be used.
+
+;--------------------------------
+; VIII. EXAMPLES \\\\\\\\\\\\\\\\
 ;--------------------------------
 
 ;

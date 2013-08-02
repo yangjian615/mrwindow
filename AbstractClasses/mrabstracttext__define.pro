@@ -570,7 +570,7 @@ end
 
 
 ;+
-;   Create a weAxis object to be overplotted onto the graph.
+;   Create a weText object to be overplotted onto the graph.
 ;
 ; :Params:
 ;       XLOC:               in, optional, type=depends
@@ -621,7 +621,7 @@ _REF_EXTRA = extra
     theText = obj_new('weText', xloc, yloc, text, PLACE=place, WIDTH=width, OUTLOC=outloc, $
                       _STRICT_EXTRA=extra)
 
-    ;Add the overplot to the array of overplots
+    ;Add the text to the array of text objects
     self -> AddText, theText
     
     ;Re-Draw
@@ -864,7 +864,8 @@ PRO MrAbstractText::whichText
     
     ;Print the color bar indices and titles
     FOR j = 0, N_Elements(*self.text) - 1 DO BEGIN
-        (*self.text)[j] -> GetProperty, TEXT=text
+        (*self.text)[j] -> GetProperty, STRING=text
+        if n_elements(text) eq 0 then text = '""'
         index = String(j, FORMAT='(i3)')
 
         Print, '    Index: ' + index + '    Text: ' + text

@@ -105,6 +105,7 @@
 ;       05/17/2013  -   Written by Matthew Argall
 ;       06/27/2013  -   Added the Focus method.
 ;       07/07/2013  -   All buttons are individually implementable. - MRA
+;       07/31/2013  -   A list index can now be given to the focus method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -348,9 +349,11 @@ end
 ;   Event handler for Focus events. Find the closest plot to the clicked point.
 ;
 ; :Params:
-;   EVENT:              in, optional, type=structure
+;   EVENT:              in, optional, type=structure/int
 ;                       The event returned by the windows manager. If not given, the
 ;                           plot indicated by SELF.IFOCUS will become the object of focus.
+;                           If EVENT is an integer, then it is the index value of the plot
+;                           on which to focus.
 ;-
 pro MrAbstractCursor::Focus, event
     compile_opt idl2
@@ -366,8 +369,9 @@ pro MrAbstractCursor::Focus, event
 ;---------------------------------------------------------------------
 ;Event? //////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+    event_type = size(event, /TYPE)
     
-    if size(event, /TYPE) eq 8 then begin
+    if event_type eq 8 then begin
 
         ;Only listen to left button presses and only if the Focus bit is set
         if event.type ne 0 || event.press ne 1 || ((self.cmode and 8) eq 0) then return
@@ -402,6 +406,15 @@ pro MrAbstractCursor::Focus, event
         endelse
         
         self.ifocus = ifocus
+        
+;---------------------------------------------------------------------
+;Plot Index Given? ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    endif else if event_type ne 0 then begin
+        
+        self.ifocus = event
+        
     endif
 
 ;---------------------------------------------------------------------

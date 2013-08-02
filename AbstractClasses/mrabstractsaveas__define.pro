@@ -173,7 +173,7 @@ PRO MrAbstractSaveAs::AutoRasterFile, filetype, filename
 
     IF N_Elements(filetype) EQ 0 then filetype = 'PNG'
     IF N_Elements(filename) EQ 0 THEN filename = 'cgwindow.' + StrLowCase(filetype)
-    IF StrUpCase(filetype) EQ 'PDF' THEN rastertype = -1 ELSE rastertype = self.im_raster
+    IF StrUpCase(filetype) EQ 'PDF' THEN rastertype = -1 ELSE rastertype = 0 ;self.im_raster
     
     ; Strip the extension off the filename.
     outname = cgRootName(filename, DIRECTORY=dirName)

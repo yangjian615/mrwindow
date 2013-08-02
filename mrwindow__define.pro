@@ -653,27 +653,27 @@ _REF_EXTRA = extra
         ;ARROWS
         if arrow then begin
             if arg_present(oref) then oref = (*self.arrowObjects)[index]
-            (*self.arrowObjects)[index] -> GetProperty, _EXTRA=extra
+            if n_elements(extra) gt 0 then (*self.arrowObjects)[index] -> GetProperty, _EXTRA=extra
         
         ;COLORBARS
         endif else if colorbar then begin
             if arg_present(oref) then oref = (*self.colorbars)[index]
-            (*self.colorbars)[index] -> GetProperty, _EXTRA=extra
+            if n_elements(extra) gt 0 then (*self.colorbars)[index] -> GetProperty, _EXTRA=extra
         
         ;IMAGES
         endif else if image then begin
             if arg_present(oref) then oref = (*self.imageObjects)[index]
-            (*self.imageObjects)[index] -> GetProperty, _EXTRA=extra
+            if n_elements(extra) gt 0 then (*self.imageObjects)[index] -> GetProperty, _EXTRA=extra
         
         ;PLOTS
         endif else if plot then begin
             if arg_present(oref) then oref = (*self.plotObjects)[index]
-            (*self.plotObjects)[index] -> GetProperty, _EXTRA=extra
+            if n_elements(extra) gt 0 then (*self.plotObjects)[index] -> GetProperty, _EXTRA=extra
         
         ;TEXT
         endif else if text then begin
-            if arg_present(oref) then oref = (*self.textObjects)[index]
-            (*self.textObjects)[index] -> GetProperty, _EXTRA=extra
+            if arg_present(oref) then oref = (*self.text)[index]
+            if n_elements(extra) gt 0 then (*self.text)[index] -> GetProperty, _EXTRA=extra
             
         endif
     
@@ -979,11 +979,10 @@ DRAW = draw
     self.ysize = ysize
 
     ;Recalculate the normalized positions based on the new window size.
+    self -> MrPlotLayout::SetProperty
+    
     ;Draw the plot to the new size
-    if keyword_set(draw) then begin
-        self -> MrPlotLayout::SetProperty
-        self -> Draw
-    endif
+    if keyword_set(draw) then self -> Draw
 end
 
 
@@ -1155,10 +1154,7 @@ _REF_EXTRA = extra
     endif
 
     ;Recalculate the plot positions in case the layout has changed.
-    if keyword_set(draw) then begin
-        self -> MrPlotLayout::SetProperty
-        self -> draw
-    endif
+    if keyword_set(draw) then self -> draw
 end
 
   

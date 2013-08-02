@@ -244,6 +244,8 @@ WIDTH = width
         void = error_message()
         return, fltarr(4)
     endif
+    
+    if location eq '' then return, fltarr(4)
 
     ;x- and y-character sizes in normal coordinates
     xchsize = double(!d.x_ch_size) / double(!d.x_size)

@@ -60,8 +60,67 @@
 ;       07/10/2013  -   Added the iDisplay property to handle >2D image data. Disinherit
 ;                           MrAbstractAxes, MrAbstractColorbar, MrAbstractLegend. Change
 ;                           the IMAXES keyword back to AXES. - MRA
+;       08/01/2013  -   Added the ConvertCoord method. - MRA
 ;-
 ;*****************************************************************************************
+;+
+;   Convert between data, normal, and device coordinates.
+;
+; :Params:
+;       X:                      in, required, type=numeric scalar/array
+;                               X components of the input coordinates. If only one argument
+;                                   is specified, then X[0,*] represents the X-coordinates,
+;                                   X[1,*] represents the Y-coordinates, and X[2,*]
+;                                   represents the Z-coordinates (if present).
+;       Y:                      in, optional, type=numeric scalar/array
+;                               Y components of the input coordinates.
+;       Z:                      in, optional, type=numeric scalar/array
+;                               Z components of the input coordinates.
+;
+; :Keywords:
+;       _REF_EXTRA:             in, optional, type=any
+;                               Any keyword accepted by IDL's Convert_Coord function is
+;                                   also accepted for keyword inheritance.
+;-
+function MrImageObject::ConvertCoord, x, y, z, $
+_REF_EXTRA=extra
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, -1
+    endif
+    
+    ;Get the current P, X, Y system variables
+    P_current = !P
+    X_current = !X
+    Y_current = !Y
+    
+    ;Load the syetem variable states as they relate to this plot
+    !P = self.p_sysvar
+    !X = self.x_sysvar
+    !Y = self.y_sysvar
+    
+    ;Convert coordinates
+    case n_params() of
+        1: coords = convert_coord(x, _STRICT_EXTRA=extra)
+        2: coords = convert_coord(x, y, _STRICT_EXTRA=extra)
+        3: coords = convert_coord(x, y, z, _STRICT_EXTRA=extra)
+        else: message, 'Incorrect number of parameters.'
+    endcase
+    
+    ;Reset the system variables
+    !P = P_current
+    !X = X_current
+    !Y = Y_current
+    
+    return, coords
+end
+
+
 ;+
 ;   The purpose of this method is to draw the plot in the draw window. The plot is
 ;   first buffered into the pixmap for smoother opteration (by allowing motion events

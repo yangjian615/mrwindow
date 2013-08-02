@@ -49,6 +49,7 @@
 
 ;Utilities
 .comp ./utilities/color_trip.pro
+.comp ./utilities/dot_product.pro
 .comp ./utilities/epoch_to_ssm.pro
 .comp ./utilities/file_extension.pro
 .comp ./utilities/ht_velocity.pro
@@ -63,4 +64,5 @@
 .comp ./utilities/ssm_to_hms.pro
 .comp ./utilities/text_gui.pro
 .comp ./utilities/time_labels.pro
+.comp ./utilities/time_select.pro
 .comp ./utilities/twod_to_oned_index.pro

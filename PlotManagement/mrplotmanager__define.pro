@@ -242,7 +242,8 @@ WIDTHS = widths
     remove = keyword_set(remove)
     replace = keyword_set(replace)
     
-    if nrl ne 0 then begin
+    if nCB ne 0 then begin
+        SetDefaultValue, refLocations, rebin(fltarr(4), 4, nCB)
         SetDefaultValue, locations, replicate('', nCB)
         SetDefaultValue, offsets, replicate(3, nCB)
         SetDefaultValue, widths, replicate(5, nCB)
@@ -1324,16 +1325,16 @@ pro MrPlotManager::ApplyPositions
         (*self.allObjects)[i] -> SetProperty, POSITION=(*self.plot_positions)[*,i]
     
     ;Update colorbar positions
-    nCB = n_elements(*self.colorbars)
-    for i = 0, nCB - 1 do begin
-        position = self -> calcColorBarPosition((*self.cbreflocs)[*,i], $
-                                                CBLOCATION=(*self.cblocations)[i], $
-                                                OFFSET=(*self.cboffsets)[i], $
-                                                WIDTH=(*self.cbwidths)[i])
-        if position eq !Null then continue
-        
-        (*self.colorbars)[i] -> SetProperty, POSITION=position
-    endfor
+;    nCB = n_elements(*self.colorbars)
+;    for i = 0, nCB - 1 do begin
+;        position = self -> calcColorBarPosition((*self.cbreflocs)[*,i], $
+;                                                CBLOCATION=(*self.cblocations)[i], $
+;                                                OFFSET=(*self.cboffsets)[i], $
+;                                                WIDTH=(*self.cbwidths)[i])
+;        if position eq !Null then continue
+;        
+;        (*self.colorbars)[i] -> SetProperty, POSITION=position
+;    endfor
 end
 
 
