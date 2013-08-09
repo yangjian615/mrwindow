@@ -397,7 +397,6 @@ REPLACE = replace
 
     ;Defaults
     SetDefaultValue, destroy, 1, /BOOLEAN
-    SetDefaultValue, location, [1,1]
     clear = keyword_set(clear)
     draw = keyword_set(draw)
     list_index = keyword_set(list_index)

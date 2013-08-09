@@ -61,6 +61,7 @@
 ;                           MrAbstractAxes, MrAbstractColorbar, MrAbstractLegend. Change
 ;                           the IMAXES keyword back to AXES. - MRA
 ;       08/01/2013  -   Added the ConvertCoord method. - MRA
+;       08/03/2013  -   Added the PALETTE property. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -180,8 +181,8 @@ pro MrImageObject::doPlot
     if (*self.xrange)[0] lt (*self.indep)[0] then (*self.xrange)[0] = (*self.indep)[0]
     if (*self.xrange)[1] gt (*self.indep)[imDims[0]-1] then (*self.xrange)[1] = (*self.indep)[imDims[0]-1]
 
-    if (*self.yrange)[0] lt (*self.dep)[0] then (*self.yrange)[0] = (*self.dep)[0]
-    if (*self.yrange)[1] gt (*self.dep)[imDims[1]-1] then (*self.yrange)[1] = (*self.dep)[imDims[1]-1]
+;    if (*self.yrange)[0] lt (*self.dep)[0] then (*self.yrange)[0] = (*self.dep)[0]
+;    if (*self.yrange)[1] gt (*self.dep)[imDims[1]-1] then (*self.yrange)[1] = (*self.dep)[imDims[1]-1]
 
 ;---------------------------------------------------------------------
 ;Image Zoom //////////////////////////////////////////////////////////
@@ -190,8 +191,9 @@ pro MrImageObject::doPlot
     ixrange = value_locate(*self.indep, *self.xrange)
     if (*self.indep)[ixrange[0]] ne (*self.xrange)[0] then ixrange[0] += 1
     
-    iyrange = value_locate(*self.dep, *self.yrange)
-    if (*self.indep)[iyrange[0]] ne (*self.yrange)[0] then iyrange[0] += 1
+;    iyrange = value_locate(*self.dep, *self.yrange)
+;    if (*self.indep)[iyrange[0]] ne (*self.yrange)[0] then iyrange[0] += 1
+    iyrange=[0,-1]
 
 ;---------------------------------------------------------------------
 ;Display Image ///////////////////////////////////////////////////////
@@ -209,6 +211,7 @@ pro MrImageObject::doPlot
                 RANGE = *self.range, $
                 MISSING_VALUE = *self.missing_value, $
                 MISSING_COLOR = *self.missing_color, $
+                PALETTE = *self.palette, $
                 TOP = *self.top, $
                 
                 ;Graphics Keywords
@@ -334,6 +337,9 @@ end
 ;       NAN:                out, optional, type=boolean
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
+;       PALETTE:            out, optional, type=bytarr(3,256)
+;                           An [r,g,b] Color table to be loaded before the image is displayed.
+;                               This takes precedence over `CTINDEX`.
 ;       P_SYSVAR:           out, optional, type=structure
 ;                           The !P system variable state associated with this plot.
 ;       RANGE:              out, optional, type=fltarr(2)
@@ -390,6 +396,7 @@ AXES = axes, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
 NAN = nan, $
+PALETTE = palette, $
 RANGE = range, $
 SCALE = scale, $
 TOP = top, $
@@ -438,6 +445,7 @@ _REF_EXTRA = extra
     if arg_present(RANGE)       and n_elements(*self.RANGE)       ne 0 then range = *self.range
     if arg_present(MISSING_VALUE) and n_elements(*self.MISSING_VALUE) ne 0 then missing_value = *self.missing_value
     if arg_present(MISSING_COLOR) and n_elements(*self.MISSING_COLOR) ne 0 then missing_color = *self.missing_color
+    if arg_present(PALETTE)     and n_elements(*self.palette)     ne 0 then palette = *self.palette
     if arg_present(NAN)         and n_elements(*self.NAN)         ne 0 then nan = *self.nan
     if arg_present(SCALE)       and n_elements(*self.SCALE)       ne 0 then scale = *self.scale
     if arg_present(TOP)         and n_elements(*self.TOP)         ne 0 then top = *self.top
@@ -493,6 +501,8 @@ end
 ;       NAN:                in, optional, type=boolean
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
+;       PALETTE:            in, optional, type=bytarr(3,256)
+;                           Color table to be loaded before the image is displayed.
 ;       P_SYSVAR:           in, optional, type=structure
 ;                           The !P system variable state associated with this plot.
 ;       RANGE:              in, optional, type=fltarr(2)
@@ -551,6 +561,7 @@ RANGE = range, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
 NAN = nan, $
+PALETTE = palette, $
 SCALE = scale, $
 TOP = top, $
 
@@ -594,6 +605,7 @@ _REF_EXTRA = extra
     if n_elements(MISSING_VALUE) ne 0 then *self.missing_value = missing_value
     if n_elements(MISSING_COLOR) ne 0 then *self.missing_color = missing_color
     if n_elements(NAN)          ne 0 then *self.nan = keyword_set(nan)
+    if n_elements(PALETTE)      ne 0 then *self.palette = palette
     if n_elements(SCALE)        ne 0 then *self.scale = keyword_set(scale)
     if n_elements(TOP)          ne 0 then *self.top = top
     
@@ -639,6 +651,7 @@ pro MrImageObject::cleanup
     ptr_free, self.min_value
     ptr_free, self.missing_color
     ptr_free, self.missing_value
+    ptr_free, self.palette
     ptr_free, self.scale
     ptr_free, self.top
     ptr_free, self.xlog
@@ -696,6 +709,8 @@ end
 ;       NAN:                in, optional, type=boolean, default=0
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
+;       PALETTE:            in, optional, type=bytarr(3,256)
+;                           Color table to be loaded before the image is displayed.
 ;       POSITION:           in, optional, type=fltarr(4)
 ;                           A vector of the form [x0, y0, x1, y1], where [x0,y0] and [x1,y1]
 ;                               specify the position of the lower-left and upper-right
@@ -767,6 +782,7 @@ RANGE = range, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
 NAN = nan, $
+PALETTE = palette, $
 SCALE = scale, $
 TOP = top, $
 
@@ -896,6 +912,7 @@ _REF_EXTRA = extra
     self.missing_color = ptr_new(/ALLOCATE_HEAP)
     self.max_value = ptr_new(/ALLOCATE_HEAP)
     self.nan = ptr_new(/ALLOCATE_HEAP)
+    self.palette = ptr_new(/ALLOCATE_HEAP)
     self.scale = ptr_new(/ALLOCATE_HEAP)
     self.top = ptr_new(/ALLOCATE_HEAP)
     
@@ -921,6 +938,7 @@ _REF_EXTRA = extra
                          MISSING_VALUE = missing_value, $
                          MISSING_COLOR = missing_color, $
                          NAN = nan, $
+                         PALETTE = palette, $
                          POSITION = position, $
                          RANGE = range, $
                          SCALE = scale, $
@@ -984,6 +1002,7 @@ pro MrImageObject__define
               missing_value: ptr_new(), $       ;Value to be treated as missing
               missing_color: ptr_new(), $       ;Color of missing value
               nan: ptr_new(), $                 ;Search for NaN's when scaling?
+              palette: ptr_new(), $             ;Color table to be loaded
               scale: ptr_new(), $               ;Byte-scale the image
               top: ptr_new(), $                 ;If scaled, maximum scaled value
               
