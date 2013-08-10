@@ -140,6 +140,7 @@ pro MrImageObject::Draw
     
     ;Now draw the plot to the pixmap
     self -> doPlot
+    for i = 0, n_elements(*self.colorbars) - 1 do (*self.colorbars)[i] -> Draw
 
     ;Save the system variables
     self.x_sysvar = !X
@@ -380,6 +381,7 @@ X_POS = x_pos, $
 Y_POS = y_pos, $
 
 ;MrImageObject Keywords
+COLORBARS = colorbars, $
 IDISPLAY = iDisplay, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
@@ -425,6 +427,7 @@ _REF_EXTRA = extra
     if arg_present(INDEP) and n_elements(*self.INDEP) ne 0 then indep = *self.indep
 
     ;MrImageObject Properties
+    if arg_present(colorbars) and n_elements(*self.colorbars) gt 0 then colorbars = *self.colorbars
     if arg_present(iDisplay)    then iDisplay = self.iDisplay
     if arg_present(INIT_XRANGE) then init_xrange = self.init_xrange
     if arg_present(INIT_YRANGE) then init_yrange = self.init_yrange
@@ -538,6 +541,7 @@ pro MrImageObject::SetProperty, $
 DRAW = draw, $
 
 ;Data keywords
+COLORBARS = colorbars, $
 DEP = dep, $
 IMAGE = image, $
 INDEP = indep, $
@@ -614,6 +618,23 @@ _REF_EXTRA = extra
     if n_elements(MIN_VALUE) ne 0 then *self.min_value = min_value
     if n_elements(XLOG)      ne 0 then *self.xlog = keyword_set(xlog)
     if n_elements(YLOG)      ne 0 then *self.ylog = keyword_set(ylog)
+    
+    ;Colorbars
+    if n_elements(colorbars) ne 0 then begin
+        ;Remove the old colorbars
+        for i = 0, n_elements(*self.colorbars) - 1 do begin
+            obj_destroy, (*self.colorbars)[i]
+        endfor
+        ptr_free, self.colorbars
+        self.colorbars = ptr_new(/ALLOCATE_HEAP)
+        
+        ;Add the new colorbars
+        for i = 0, n_elements(colorbars) - 1 do begin
+            if obj_valid(colorbars[i]) then $
+                if i eq 0 then *self.colorbars = colorbars[i] $
+                          else *self.colorbars = [*self.colorbars, colorbars[i]]
+        endfor
+    endif
 
     ;weGraphicsKeywords Properties
     if n_elements(EXTRA) ne 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra
@@ -656,6 +677,7 @@ pro MrImageObject::cleanup
     ptr_free, self.top
     ptr_free, self.xlog
     ptr_free, self.ylog
+    for i = 0, n_elements(*self.colorbars) - 1 do obj_destroy, (*self.colorbars)[i]
 end
 
 
@@ -769,6 +791,7 @@ end
 ;-
 function MrImageObject::init, image, x, y, $
 ;MrImageObject Keywords
+COLORBARS = colorbars, $
 DRAW = draw, $
 IDISPLAY = idisplay, $
 KEEP_ASPECT = keep_aspect, $
@@ -905,6 +928,7 @@ _REF_EXTRA = extra
     self.dep = ptr_new(/ALLOCATE_HEAP)
     self.bottom = ptr_new(/ALLOCATE_HEAP)
     self.ctindex = ptr_new(/ALLOCATE_HEAP)
+    self.colorbars = ptr_new(/ALLOCATE_HEAP)
     self.axes = ptr_new(/ALLOCATE_HEAP)
     self.range = ptr_new(/ALLOCATE_HEAP)
     self.min_value = ptr_new(/ALLOCATE_HEAP)
@@ -931,6 +955,7 @@ _REF_EXTRA = extra
                          INDEP = indep, $
                          AXES = axes, $
                          BOTTOM = bottom, $
+                         COLORBARS = colorbars, $
                          CTINDEX = ctindex, $
                          IDISPLAY = iDisplay, $
                          MAX_VALUE = max_value, $
@@ -990,6 +1015,7 @@ pro MrImageObject__define
               init_range: dblarr(2), $          ;Initial image range
               init_xrange: dblarr(2), $         ;Initial x-range
               init_yrange: dblarr(2), $         ;Initial y-range
+              colorbars: ptr_new(), $           ;Colorbar objects
               x_sysvar: !X, $                   ;Save the X system variable
               y_sysvar: !Y, $                   ;Save the Y system variable
               p_sysvar: !P, $                   ;Save the P system variable
