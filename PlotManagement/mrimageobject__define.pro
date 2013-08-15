@@ -62,6 +62,10 @@
 ;                           the IMAXES keyword back to AXES. - MRA
 ;       08/01/2013  -   Added the ConvertCoord method. - MRA
 ;       08/03/2013  -   Added the PALETTE property. - MRA
+;       08/12/2013  -   Added the LOG property. - MRA
+;       08/13/2013  -   Removed the LOG property because it causes a discrpency between
+;                           the image data and the data being plotted. This causes the
+;                           automatic zooming to go awry. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -205,10 +209,10 @@ pro MrImageObject::doPlot
                 
                 ;IMAGE_PLOTS Keywords
                 AXES = *self.axes, $
+                BOTTOM = *self.bottom, $
                 CTINDEX = *self.ctindex, $
                 NAN = *self.nan, $
                 SCALE = *self.scale, $
-                BOTTOM = *self.bottom, $
                 RANGE = *self.range, $
                 MISSING_VALUE = *self.missing_value, $
                 MISSING_COLOR = *self.missing_color, $
@@ -391,10 +395,9 @@ X_SYSVAR = x_sysvar, $
 Y_SYSVAR = y_sysvar, $
 
 ;IMAGE_PLOTS Keywords
-ADDCOLORBAR = addcolorbar, $
+AXES = axes, $
 BOTTOM = bottom, $
 CTINDEX = ctindex, $
-AXES = axes, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
 NAN = nan, $
@@ -428,12 +431,12 @@ _REF_EXTRA = extra
 
     ;MrImageObject Properties
     if arg_present(colorbars) and n_elements(*self.colorbars) gt 0 then colorbars = *self.colorbars
-    if arg_present(iDisplay)    then iDisplay = self.iDisplay
+    if arg_present(iDisplay)    then iDisplay    = self.iDisplay
     if arg_present(INIT_XRANGE) then init_xrange = self.init_xrange
     if arg_present(INIT_YRANGE) then init_yrange = self.init_yrange
-    if arg_present(p_sysvar)    then p_sysvar = self.p_sysvar
-    if arg_present(x_sysvar)    then x_sysvar = self.x_sysvar
-    if arg_present(y_sysvar)    then y_sysvar = self.y_sysvar
+    if arg_present(p_sysvar)    then p_sysvar    = self.p_sysvar
+    if arg_present(x_sysvar)    then x_sysvar    = self.x_sysvar
+    if arg_present(y_sysvar)    then y_sysvar    = self.y_sysvar
     
     ;Graphics Properties
     if arg_present(MAX_VALUE) and n_elements(*self.MAX_VALUE) ne 0 then max_value = *self.max_value
@@ -558,14 +561,14 @@ X_SYSVAR = x_sysvar, $
 Y_SYSVAR = y_sysvar, $
       
 ;IMAGE_PLOTS Keywords
+AXES = axes, $
 BOTTOM = bottom, $
 CTINDEX = ctindex, $
-AXES = axes, $
-RANGE = range, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
 NAN = nan, $
 PALETTE = palette, $
+RANGE = range, $
 SCALE = scale, $
 TOP = top, $
 
@@ -602,14 +605,14 @@ _REF_EXTRA = extra
     if n_elements(TV)          ne 0 then self.tv = keyword_set(tv)
 
     ;IMAGE_PLOTS.PRO Properties
+    if n_elements(AXES)         ne 0 then *self.axes = keyword_set(axes)
     if n_elements(BOTTOM)       ne 0 then *self.bottom = bottom
     if n_elements(CTINDEX)      ne 0 then *self.ctindex = ctindex
-    if n_elements(AXES)         ne 0 then *self.axes = keyword_set(axes)
-    if n_elements(RANGE)        ne 0 then *self.range = range
     if n_elements(MISSING_VALUE) ne 0 then *self.missing_value = missing_value
     if n_elements(MISSING_COLOR) ne 0 then *self.missing_color = missing_color
     if n_elements(NAN)          ne 0 then *self.nan = keyword_set(nan)
     if n_elements(PALETTE)      ne 0 then *self.palette = palette
+    if n_elements(RANGE)        ne 0 then *self.range = range
     if n_elements(SCALE)        ne 0 then *self.scale = keyword_set(scale)
     if n_elements(TOP)          ne 0 then *self.top = top
     
@@ -701,6 +704,8 @@ end
 ;                               of IMAGE.
 ;
 ; :Keywords:
+;       AXES:               in, optional, type=boolean, default=0
+;                           Draw a set of axes around the image.
 ;       BOTTOM:             in, optional, type=byte, default=0
 ;                           If `SCALE` is set, then this is the minimum value of the
 ;                               scaled image.
@@ -715,8 +720,6 @@ end
 ;                               assumed to be ordered [x,y,A,B,C,...] and `IDISPLAY` is
 ;                               the index within the dimensions [A,B,C,...] at which the
 ;                               2D image will be displayed.
-;       AXES:               in, optional, type=boolean, default=0
-;                           Draw a set of axes around the image.
 ;       MIN_VALUE:          in, optional, type=float
 ;                           The minimum value plotted. Any values smaller than this are
 ;                               treated as missing.
@@ -801,11 +804,11 @@ TV = tv, $
 AXES = axes, $
 BOTTOM = bottom, $
 CTINDEX = ctindex, $
-RANGE = range, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
 NAN = nan, $
 PALETTE = palette, $
+RANGE = range, $
 SCALE = scale, $
 TOP = top, $
 
@@ -926,17 +929,17 @@ _REF_EXTRA = extra
     self.image = ptr_new(/ALLOCATE_HEAP)
     self.indep = ptr_new(/ALLOCATE_HEAP)
     self.dep = ptr_new(/ALLOCATE_HEAP)
+    self.axes = ptr_new(/ALLOCATE_HEAP)
     self.bottom = ptr_new(/ALLOCATE_HEAP)
     self.ctindex = ptr_new(/ALLOCATE_HEAP)
     self.colorbars = ptr_new(/ALLOCATE_HEAP)
-    self.axes = ptr_new(/ALLOCATE_HEAP)
-    self.range = ptr_new(/ALLOCATE_HEAP)
     self.min_value = ptr_new(/ALLOCATE_HEAP)
     self.missing_value = ptr_new(/ALLOCATE_HEAP)
     self.missing_color = ptr_new(/ALLOCATE_HEAP)
     self.max_value = ptr_new(/ALLOCATE_HEAP)
     self.nan = ptr_new(/ALLOCATE_HEAP)
     self.palette = ptr_new(/ALLOCATE_HEAP)
+    self.range = ptr_new(/ALLOCATE_HEAP)
     self.scale = ptr_new(/ALLOCATE_HEAP)
     self.top = ptr_new(/ALLOCATE_HEAP)
     
@@ -1024,11 +1027,11 @@ pro MrImageObject__define
               axes: ptr_new(), $                ;Draw axes around the image?
               bottom: ptr_new(), $              ;If scaled, minimum scaled value
               ctindex: ptr_new(), $             ;Color index to load
-              range: ptr_new(), $               ;Range at which the color table saturates
               missing_value: ptr_new(), $       ;Value to be treated as missing
               missing_color: ptr_new(), $       ;Color of missing value
               nan: ptr_new(), $                 ;Search for NaN's when scaling?
               palette: ptr_new(), $             ;Color table to be loaded
+              range: ptr_new(), $               ;Range at which the color table saturates
               scale: ptr_new(), $               ;Byte-scale the image
               top: ptr_new(), $                 ;If scaled, maximum scaled value
               

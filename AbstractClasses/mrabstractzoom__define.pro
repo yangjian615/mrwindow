@@ -693,7 +693,7 @@ pro MrAbstractZoom::Box_Zoom, event
             
             ;Only update ranges and draw if points are different
             if self.x0 ne event.x || self.y0 ne event.y then begin
-                theObj = (*self.plotObjects)[self.ifocus]
+                theObj = (*self.allObjects)[self.ifocus]
                 theObj -> setProperty, XRANGE=xrange, YRANGE=yrange
                 self -> Apply_Bindings, theObj, /xaxis, /yaxis
                 self -> Draw
@@ -1120,7 +1120,7 @@ pro MrAbstractZoom::Pan, event
             delta_y = xy[1,1] - xy[1,0]
             
             ;Get the current x- and y-range
-            theObj = (*self.plotObjects)[self.ifocus]
+            theObj = (*self.allObjects)[self.ifocus]
             theObj -> GetProperty, XRANGE=xrange, YRANGE=yrange
             
             ;A drag to the right will have delta_x < 0. Subtracting will then add the
@@ -1145,7 +1145,7 @@ pro MrAbstractZoom::Pan, event
             self.y0 = -1
             
             ;Apply bindings. Need a Draw to update the bindings.
-            self -> Apply_Bindings, (*self.plotObjects)[self.ifocus], /XAXIS, /YAXIS
+            self -> Apply_Bindings, (*self.allObjects)[self.ifocus], /XAXIS, /YAXIS
             self -> Draw
         endcase
     endcase
@@ -1692,7 +1692,7 @@ pro MrAbstractZoom::XY_Zoom, event
         void = error_message()
         return
     endif
-    
+
     ;Only listen to button presses
     if event.type ne 0 then return
     case event.press of
@@ -1727,7 +1727,7 @@ pro MrAbstractZoom::XY_Zoom, event
     case self.zmode of
         1: begin
             if self.x0 ne event.x then begin
-                theObj = (*self.plotObjects)[self.ifocus]
+                theObj = (*self.allObjects)[self.ifocus]
                 theObj -> SetProperty, XRANGE=xrange
                 self -> Apply_Bindings, theObj, /XAXIS
             endif
@@ -1735,7 +1735,7 @@ pro MrAbstractZoom::XY_Zoom, event
         
         2: begin
             if self.y0 ne event.y then begin
-                theObj = (*self.plotObjects)[self.ifocus]
+                theObj = (*self.allObjects)[self.ifocus]
                 theObj -> SetProperty, YRANGE=yrange
                 self -> Apply_Bindings, theObj, /YAXIS
             endif
