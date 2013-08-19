@@ -1277,7 +1277,6 @@ pro MrWindow::Wheel_Zoom, event
         
         else: ;do nothing
     endcase
-
 end
 
 
