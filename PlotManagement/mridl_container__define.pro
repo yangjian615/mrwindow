@@ -83,12 +83,13 @@ POSITION = Index
     if keyword_set(clear) then self -> Remove, /ALL
     
     ;Add the objects
-    self -> Add, Objects, POSITION=Index
+    self -> IDL_Container::Add, Objects, POSITION=Index
 end
 
 
 ;+
-;   The purpose of this method is to set object properties. 
+;   The purpose of this method is to provide a means of relacing objects in an
+;   IDL Container. 
 ;
 ; :Params:
 ;       OLD:            in, required, type=int/object
@@ -171,7 +172,7 @@ pro MrIDL_Container::cleanup
     endif
     
     ;Cleanup superclasses
-    self -> MrIDL_Container::Cleanup
+    self -> IDL_Container::Cleanup
 end
 
 

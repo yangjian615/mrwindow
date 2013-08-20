@@ -35,6 +35,36 @@
 ;+
 ;   The purpose of this method is to create an object out of the cgContour routine.
 ;
+; :Example:
+;   Reproduce the "Filled Contour Plot" example in the 
+;   `Coyote Graphics Gallery <http://www.idlcoyote.com/gallery/>`::
+;
+;       data = cgDemoData(26)
+;       minValue = Floor(Min(data))
+;       maxValue = Ceil(Max(data))
+;       nLevels = 10
+;       xtitle = 'X Axis'
+;       ytitle = 'Y Axis'
+;       position =   [0.125, 0.125, 0.9, 0.800]
+;       cbposition = [0.125, 0.865, 0.9, 0.895]
+;       cbTitle = 'Data Value'
+;       cgLoadCT, 33, NColors=nlevels, Bottom=1, CLIP=[30,255]
+;       contourLevels = cgConLevels(data, NLevels=10, MinValue=minValue)
+;
+;       filledCon = obj_new('MrContour', data, /FILL, LEVELS=contourLevels, $
+;                           C_COLORS=bindgen(nlevels)+1B, /OUTLINE, POSITION=position, $
+;                           XTITLE=xtitle, YTITLE=ytitle, DRAW=0)
+;                       
+;       conCB = obj_new('weColorbar', NColors=nlevels, Bottom=1, Position=cbposition, $
+;                       Range=[MinValue, MaxValue], Divisions=nlevels, /Discrete, $
+;                       Title=cbTitle, TLocation='Top')
+;   
+;       filledCon -> Add, conCB
+;       filledCon -> Draw
+;       
+;       obj_destroy, filledCon
+;       obj_destroy, conCB
+;
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
@@ -48,7 +78,7 @@
 ;
 ; :History:
 ;   Modification History::
-;       08/19/2013  -   Written by Matthew Argall
+;       08/20/2013  -   Written by Matthew Argall
 ;-
 ;*****************************************************************************************
 ;+
@@ -114,7 +144,10 @@ end
 ;   first buffered into the pixmap for smoother opteration (by allowing motion events
 ;   to copy from the pixmap instead of redrawing the plot, the image does not flicker).
 ;-
-pro MrContour::Draw
+pro MrContour::Draw, $
+OLEVELS=oLevels, $
+PATH_INFO=path_info, $
+PATH_XY=path_xy
     compile_opt idl2
     
     ;Error handling
@@ -125,8 +158,18 @@ pro MrContour::Draw
         return
     endif
 
+    GetOLevels = Arg_Present(oLevels)
+    GetPath_Info = Arg_Present(path_info)
+    GetPath_XY = Arg_Present(path_xy)
+
     ;Now draw the plot to the pixmap
-    self -> doPlot
+    if GetPath_Info || GetPath_XY then begin
+        self -> doPlot, OLEVELS=oLevels, $
+                        PATH_INFO=path_info, $
+                        PATH_XY=path_xy
+    endif else begin
+        self -> doPlot, OLEVELS=oLevels
+    endelse
     
     ;Save the system variables
     self.x_sysvar = !X
@@ -143,7 +186,11 @@ end
 ;   The purpose of this method is to do the actual plotting. Basically, having this here
 ;   merely to saves space in the Draw method.
 ;-
-pro MrContour::doPlot
+pro MrContour::doPlot, $
+OLEVELS=oLevels, $
+PATH_INFO=path_info, $
+PATH_XY=path_xy
+
     compile_opt idl2
     
     ;Error handling
@@ -154,11 +201,165 @@ pro MrContour::doPlot
         return
     endif
 
-    ;Draw the plot.
-    cgContour, *self.data, *self.xcoords, *self.ycoords, $
+    GetPath_Info = Arg_Present(path_info)
+    GetPath_XY = Arg_Present(path_xy)
+
+;-----------------------------------------------------
+;Draw the Contour Plot \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
+    ;
+    ; PATH_INFO and PATH_XY both suppress output. If neither are desired, call
+    ; cgContour without them.
+    ;
+
+    if GetPath_Info eq 0 && GetPath_XY eq 0 then begin
+        cgContour, *self.c_data, *self.xcoords, *self.ycoords, $
+                
+                   ;cgContour Keywords
+                   ASPECT           = *self.aspect, $
+                   LABEL            =  self.label, $
+                   LAYOUT           = *self.layout, $
+                   MAP_OBJECT       =  self.map_object, $
+                   OLEVELS          =       oLevels, $
+                   ONIMAGE          =  self.onImage, $
+                   OUTCOLOR         = *self.outcolor, $
+                   OUTFILENAME      =  self.outfilename, $
+                   OUTLINE          =  self.outline, $
+                   OUTPUT           =  self.output, $
+                   OVERPLOT         =  self.overplot, $
+                   PALETTE          = *self.palette, $
+                   TRADITIONAL      =  self.traditional, $
     
-               ;Contour/cgContour Keywords
+                   ;Contour Keywords
+                   C_ANNOTATION     = *self.c_annotation, $
+                   C_CHARSIZE       = *self.c_charsize, $
+                   C_CHARTHICK      = *self.c_charthick, $
+                   C_COLORS         = *self.c_colors, $
+                   C_LABELS         = *self.c_labels, $
+                   C_LINESTYLE      = *self.c_linestyle, $
+                   C_ORIENTATION    = *self.c_orientation, $
+                   C_SPACING        = *self.c_spacing, $
+                   C_THICK          = *self.c_thick, $
+                   CELL_FILL        = *self.cell_fill, $
+                   CLOSED           = *self.closed, $
+                   DOWNHILL         = *self.downhill, $
+                   FILL             = *self.fill, $
+                   FOLLOW           = *self.follow, $
+                   IRREGULAR        = *self.irregular, $
+                   ISOTROPIC        = *self.isotropic, $
+                   LEVELS           = *self.levels, $
+                   NLEVELS          = *self.nlevels, $
+                   MAX_VALUE        = *self.max_value, $
+                   MIN_VALUE        = *self.min_value, $
+                   MISSINGVALUE     = *self.missingvalue, $
+                   PATH_DATA_COORDS = *self.path_data_coords, $
+                   PATH_DOUBLE      = *self.path_double, $
+                   PATH_FILENAME    = *self.path_filename, $
+                   RESOLUTION       = *self.resolution, $
+                   TRIANGULATION    = *self.triangulation, $
+                   XLOG      = *self.xlog, $
+                   YLOG      = *self.ylog, $
+              
+                   ;weGraphicsKeywords
+                   AXISCOLOR     = *self.axiscolor, $
+                   BACKGROUND    = *self.background, $
+                   CHARSIZE      = *self.charsize, $
+                   CHARTHICK     = *self.charthick, $
+                   CLIP          = *self.clip, $
+                   COLOR         = *self.color, $
+                   DATA          = *self.data, $
+                   DEVICE        = *self.device, $
+                   NORMAL        = *self.normal, $
+                   FONT          = *self.font, $
+                   NOCLIP        = *self.noclip, $
+                   NODATA        = *self.nodata, $
+                   NOERASE       = *self.noerase, $
+                   POSITION      = *self.position, $
+;                   PSYM          = *self.psym, $
+                   SUBTITLE      = *self.subtitle, $
+;                   SYMSIZE       = *self.symsize, $
+                   T3D           = *self.t3d, $
+                   THICK         = *self.thick, $
+                   TICKLEN       = *self.ticklen, $
+                   TITLE         = *self.title, $
+                   XCHARSIZE     = *self.xcharsize, $
+                   XGRIDSTYLE    = *self.xgridstyle, $
+                   XMINOR        = *self.xminor, $
+                   XRANGE        = *self.xrange, $
+                   XSTYLE        = *self.xstyle, $
+                   XTHICK        = *self.xthick, $
+                   XTICK_GET     = *self.xtick_get, $
+                   XTICKFORMAT   = *self.xtickformat, $
+                   XTICKINTERVAL = *self.xtickinterval, $
+                   XTICKLAYOUT   = *self.xticklayout, $
+                   XTICKLEN      = *self.xticklen, $
+                   XTICKNAME     = *self.xtickname, $
+                   XTICKS        = *self.xticks, $
+                   XTICKUNITS    = *self.xtickunits, $
+                   XTICKV        = *self.xtickv, $
+                   XTITLE        = *self.xtitle, $
+                   YCHARSIZE     = *self.ycharsize, $
+                   YGRIDSTYLE    = *self.ygridstyle, $
+                   YMINOR        = *self.yminor, $
+                   YRANGE        = *self.yrange, $
+                   YSTYLE        = *self.ystyle, $
+                   YTHICK        = *self.ythick, $
+                   YTICK_GET     = *self.ytick_get, $
+                   YTICKFORMAT   = *self.ytickformat;, $
+    ;               YTICKINTERVAL = *self.ytickinterval, $
+    ;               YTICKLAYOUT   = *self.yticklayout, $
+    ;               YTICKLEN      = *self.yticklen, $
+    ;               YTICKNAME     = *self.ytickname, $
+    ;               YTICKS        = *self.yticks, $
+    ;               YTICKUNITS    = *self.ytickunits, $
+    ;               YTICKV        = *self.ytickv, $
+    ;               YTITLE        = *self.ytitle, $
+    ;               ZCHARSIZE     = *self.zcharsize, $
+    ;               ZGRIDSTYLE    = *self.zgridstyle, $
+    ;               ZMARGIN       = *self.zmargin, $
+    ;               ZMINOR        = *self.zminor, $
+    ;               ZRANGE        = *self.zrange, $
+    ;               ZSTYLE        = *self.zstyle, $
+    ;               ZTHICK        = *self.zthick, $
+    ;               ZTICK_GET     = *self.ztick_get, $
+    ;               ZTICKFORMAT   = *self.ztickformat, $
+    ;               ZTICKINTERVAL = *self.ztickinterval, $
+    ;               ZTICKLAYOUT   = *self.zticklayout, $
+    ;               ZTICKLEN      = *self.zticklen, $
+    ;               ZTICKNAME     = *self.ztickname, $
+    ;               ZTICKS        = *self.zticks, $
+    ;               ZTICKUNITS    = *self.ztickunits, $
+    ;               ZTICKV        = *self.ztickv, $
+    ;               ZTITLE        = *self.ztitle, $
+    ;               ZVALUE        = *self.zvalue
+    
+        ;Collect the contour information
+        if n_elements(oLevels) gt 0 then *self.oLevels = oLevels
+        return
+    endif
+
+;-----------------------------------------------------
+;PATH_INFO and PATH_XY Suppress Output \\\\\\\\\\\\\\\
+;-----------------------------------------------------
+
+    cgContour, *self.c_data, *self.xcoords, *self.ycoords, $
+            
+               ;cgContour Keywords
                ASPECT           = *self.aspect, $
+               LABEL            =  self.label, $
+               LAYOUT           = *self.layout, $
+               MAP_OBJECT       =  self.map_object, $
+               OLEVELS          =       oLevels, $
+               ONIMAGE          =  self.onImage, $
+               OUTCOLOR         = *self.outcolor, $
+               OUTFILENAME      =  self.outfilename, $
+               OUTLINE          =  self.outline, $
+               OUTPUT           =  self.output, $
+               OVERPLOT         =  self.overplot, $
+               PALETTE          = *self.palette, $
+               TRADITIONAL      =  self.traditional, $
+
+               ;Contour Keywords
                C_ANNOTATION     = *self.c_annotation, $
                C_CHARSIZE       = *self.c_charsize, $
                C_CHARTHICK      = *self.c_charthick, $
@@ -175,37 +376,21 @@ pro MrContour::doPlot
                FOLLOW           = *self.follow, $
                IRREGULAR        = *self.irregular, $
                ISOTROPIC        = *self.isotropic, $
-               LABEL            =  self.label, $
-               LAYOUT           = *self.layout, $
                LEVELS           = *self.levels, $
                NLEVELS          = *self.nlevels, $
-               MAP_OBJECT       = *self.map_object, $
                MAX_VALUE        = *self.max_value, $
                MIN_VALUE        = *self.min_value, $
                MISSINGVALUE     = *self.missingvalue, $
-               OLEVELS          = *self.olevels, $
-               ONIMAGE          =  self.onImage, $
-               OUTCOLOR         = *self.outcolor, $
-               OUTFILENAME      =  self.outfilename, $
-               OUTLINE          =  self.outline, $
-               OUTPUT           =  self.output, $
-               OVERPLOT         =  self.overplot, $
-               PALETTE          = *self.palette, $
                PATH_DATA_COORDS = *self.path_data_coords, $
                PATH_DOUBLE      = *self.path_double, $
                PATH_FILENAME    = *self.path_filename, $
-               PATH_INFO        = *self.path_info, $
-               PATH_XY          = *self.path_xy, $
                RESOLUTION       = *self.resolution, $
-               TRADITIONAL      =  self.traditional, $
                TRIANGULATION    = *self.triangulation, $
-
-               ;Graphics Keywords
-               MAX_VALUE = *self.max_value, $
-               MIN_VALUE = *self.min_value, $
+               PATH_INFO        =       path_info, $
+               PATH_XY          =       path_xy, $
                XLOG      = *self.xlog, $
                YLOG      = *self.ylog, $
-              
+          
                ;weGraphicsKeywords
                AXISCOLOR     = *self.axiscolor, $
                BACKGROUND    = *self.background, $
@@ -221,9 +406,9 @@ pro MrContour::doPlot
                NODATA        = *self.nodata, $
                NOERASE       = *self.noerase, $
                POSITION      = *self.position, $
-               PSYM          = *self.psym, $
+;               PSYM          = *self.psym, $
                SUBTITLE      = *self.subtitle, $
-               SYMSIZE       = *self.symsize, $
+;               SYMSIZE       = *self.symsize, $
                T3D           = *self.t3d, $
                THICK         = *self.thick, $
                TICKLEN       = *self.ticklen, $
@@ -251,33 +436,38 @@ pro MrContour::doPlot
                YSTYLE        = *self.ystyle, $
                YTHICK        = *self.ythick, $
                YTICK_GET     = *self.ytick_get, $
-               YTICKFORMAT   = *self.ytickformat, $
-               YTICKINTERVAL = *self.ytickinterval, $
-               YTICKLAYOUT   = *self.yticklayout, $
-               YTICKLEN      = *self.yticklen, $
-               YTICKNAME     = *self.ytickname, $
-               YTICKS        = *self.yticks, $
-               YTICKUNITS    = *self.ytickunits, $
-               YTICKV        = *self.ytickv, $
-               YTITLE        = *self.ytitle, $
-               ZCHARSIZE     = *self.zcharsize, $
-               ZGRIDSTYLE    = *self.zgridstyle, $
-               ZMARGIN       = *self.zmargin, $
-               ZMINOR        = *self.zminor, $
-               ZRANGE        = *self.zrange, $
-               ZSTYLE        = *self.zstyle, $
-               ZTHICK        = *self.zthick, $
-               ZTICK_GET     = *self.ztick_get, $
-               ZTICKFORMAT   = *self.ztickformat, $
-               ZTICKINTERVAL = *self.ztickinterval, $
-               ZTICKLAYOUT   = *self.zticklayout, $
-               ZTICKLEN      = *self.zticklen, $
-               ZTICKNAME     = *self.ztickname, $
-               ZTICKS        = *self.zticks, $
-               ZTICKUNITS    = *self.ztickunits, $
-               ZTICKV        = *self.ztickv, $
-               ZTITLE        = *self.ztitle, $
-               ZVALUE        = *self.zvalue
+               YTICKFORMAT   = *self.ytickformat;, $
+;               YTICKINTERVAL = *self.ytickinterval, $
+;               YTICKLAYOUT   = *self.yticklayout, $
+;               YTICKLEN      = *self.yticklen, $
+;               YTICKNAME     = *self.ytickname, $
+;               YTICKS        = *self.yticks, $
+;               YTICKUNITS    = *self.ytickunits, $
+;               YTICKV        = *self.ytickv, $
+;               YTITLE        = *self.ytitle, $
+;               ZCHARSIZE     = *self.zcharsize, $
+;               ZGRIDSTYLE    = *self.zgridstyle, $
+;               ZMARGIN       = *self.zmargin, $
+;               ZMINOR        = *self.zminor, $
+;               ZRANGE        = *self.zrange, $
+;               ZSTYLE        = *self.zstyle, $
+;               ZTHICK        = *self.zthick, $
+;               ZTICK_GET     = *self.ztick_get, $
+;               ZTICKFORMAT   = *self.ztickformat, $
+;               ZTICKINTERVAL = *self.ztickinterval, $
+;               ZTICKLAYOUT   = *self.zticklayout, $
+;               ZTICKLEN      = *self.zticklen, $
+;               ZTICKNAME     = *self.ztickname, $
+;               ZTICKS        = *self.zticks, $
+;               ZTICKUNITS    = *self.ztickunits, $
+;               ZTICKV        = *self.ztickv, $
+;               ZTITLE        = *self.ztitle, $
+;               ZVALUE        = *self.zvalue
+    
+    if n_elements(oLevels)   gt 0 then *self.oLevels = oLevels
+    if n_elements(path_info) gt 0 then *self.path_info = path_info
+    if n_elements(path_xy)   gt 0 then *self.path_xy = path_xy
+
 end
 
 
@@ -330,7 +520,7 @@ end
 ;   The purpose of this method is to set object properties. 
 ;
 ; :Keywords:
-;       DATA:           out, optional, type=any
+;       C_DATA:         out, optional, type=any
 ;                       A one- or two-dimensional array containing the values that make 
 ;                           up the contour surface.
 ;       X:              out, optional, type=any
@@ -505,7 +695,7 @@ end
 ;                           is allowed in the program.
 ;-
 pro MrContour::GetProperty, $
-DATA=data, $
+C_DATA=c_data, $
 XCOORDS=xcoords, $
 YCOORDS=ycoords, $
 ASPECT=aspect, $
@@ -553,6 +743,8 @@ PATH_XY=path_xy, $
 RESOLUTION=resolution, $
 TRADITIONAL=traditional, $
 TRIANGULATION=triangulation, $
+XLOG=xlog, $
+YLOG=ylog, $
 _REF_EXTRA=extra
     compile_opt strictarr
     
@@ -565,11 +757,12 @@ _REF_EXTRA=extra
     endif
 
     ;Get Object Properties
-    if arg_present(data)          ne 0 then data          = *self.data
+    if arg_present(c_data)        ne 0 then c_data        = *self.c_data
     if arg_present(xcoords)       ne 0 then xcoords       = *self.xcoords
     if arg_present(ycoords)       ne 0 then ycoords       = *self.ycoords
     if arg_present(aspect)        ne 0 then aspect        = *self.aspect
     if arg_present(axiscolor)     ne 0 then axiscolor     = *self.axiscolor
+    if arg_present(axescolor)     ne 0 then axescolor     = *self.axiscolor
     if arg_present(background)    ne 0 then background    = *self.background
     if arg_present(c_annotation)  ne 0 then c_annotation  = *self.c_annotation
     if arg_present(c_charsize)    ne 0 then c_charsize    = *self.c_charsize
@@ -611,6 +804,8 @@ _REF_EXTRA=extra
     if arg_present(palette)       ne 0 then palette       = *self.palette
     if arg_present(resolution)    ne 0 then resolution    = *self.resolution
     if arg_present(traditional)   ne 0 then traditional   =  self.traditional
+    if arg_present(xlog)          ne 0 then xlog          =  self.xlog
+    if arg_present(ylog)          ne 0 then ylog          =  self.ylog
     if arg_present(path_data_coords)   ne 0 then path_data_coords = *self.path_data_coords
 
     ;Objects
@@ -627,7 +822,7 @@ end
 ;   The purpose of this method is to set object properties. 
 ;
 ; :Keywords:
-;       DATA:           in, optional, type=any
+;       C_DATA:         in, optional, type=any
 ;                       A one- or two-dimensional array containing the values that make 
 ;                           up the contour surface.
 ;       X:              in, optional, type=any
@@ -791,13 +986,13 @@ end
 ;                           is allowed in the program.
 ;-
 pro MrContour::SetProperty, $
-DATA=data, $
+C_DATA=c_data, $
 XCOORDS=xcoords, $
 YCOORDS=ycoords, $
 ASPECT=aspect, $
 AXISCOLOR=axiscolor, $
 AXESCOLOR=axescolor, $
-BACKGROUND=sbackground, $
+BACKGROUND=background, $
 C_ANNOTATION=c_annotation, $
 C_CHARSIZE=c_charsize, $
 C_CHARTHICK=c_charthick, $
@@ -836,6 +1031,8 @@ PATH_FILENAME=path_filename, $
 RESOLUTION=resolution, $
 TRADITIONAL=traditional, $
 TRIANGULATION=triangulation, $
+XLOG=xlog, $
+YLOG=ylog, $
 _REF_EXTRA=extra
     compile_opt strictarr
     
@@ -846,9 +1043,12 @@ _REF_EXTRA=extra
         void = error_message()
         return
     endif
+    
+    ;Bad spellers...
+    if n_elements(axesColor) ne 0 && n_elements(axisColor) eq 0 then axisColor = axesColor
 
     ;Set Object Properties
-    if n_elements(data)          ne 0 then *self.data = data
+    if n_elements(c_data)        ne 0 then *self.c_data = c_data
     if n_elements(xcoords)       ne 0 then *self.xcoords = xcoords
     if n_elements(ycoords)       ne 0 then *self.ycoords = ycoords
     if n_elements(aspect)        ne 0 then *self.aspect = aspect
@@ -891,6 +1091,8 @@ _REF_EXTRA=extra
     if n_elements(palette)       ne 0 then *self.palette = palette
     if n_elements(resolution)    ne 0 then *self.resolution = resolution
     if n_elements(traditional)   ne 0 then  self.traditional = traditional
+    if n_elements(xlog)          ne 0 then  self.xlog = xlog
+    if n_elements(ylog)          ne 0 then  self.ylog = ylog
     if n_elements(path_data_coords)   ne 0 then *self.path_data_coords = path_data_coords
 
     ;Objects
@@ -919,15 +1121,15 @@ pro MrContour::cleanup
     endif              
     
     ;Free pointers
-    ptr_free, self.data
+    ptr_free, self.c_data
     ptr_free, self.xcoords
     ptr_free, self.ycoords
     ptr_free, self.aspect
     ptr_free, self.axiscolor
-    ptr_free, self.axescolor
     ptr_free, self.background
     ptr_free, self.c_annotation
     ptr_free, self.c_charsize
+    ptr_free, self.c_charthick
     ptr_free, self.c_colors
     ptr_free, self.c_labels
     ptr_free, self.c_linestyle
@@ -956,6 +1158,8 @@ pro MrContour::cleanup
     ptr_free, self.path_xy
     ptr_free, self.resolution
     ptr_free, self.triangulation
+    ptr_free, self.xlog
+    ptr_free, self.ylog
     
     ;Destroy objects
     obj_destroy, self.map_object
@@ -1154,10 +1358,7 @@ end
 ;                           is allowed in the program.
 ;-
 FUNCTION MrContour::Init, data, x, y, $
-ASPECT=aspect, $
-AXISCOLOR=axiscolor, $
-AXESCOLOR=axescolor, $
-BACKGROUND=sbackground, $
+;CONTOUR KEYWORDS
 C_ANNOTATION=c_annotation, $
 C_CHARSIZE=c_charsize, $
 C_CHARTHICK=c_charthick, $
@@ -1170,18 +1371,35 @@ C_THICK=c_thick, $
 CELL_FILL=cell_fill, $
 CLOSED=closed, $
 COLOR=color, $
+DRAW=draw, $
 DOWNHILL=downhill, $
 FILL=fill, $
 FOLLOW=follow, $
 IRREGULAR=irregular, $
 ISOTROPIC=isotropic, $
-LABEL=label, $
-LAYOUT=layout, $
 LEVELS=levels, $
-NLEVELS=nlevels, $
-MAP_OBJECT=map_object, $
 MAX_VALUE=max_value, $
 MIN_VALUE=min_value, $
+NLEVELS=nlevels, $
+OVERPLOT=overplot, $
+PATH_DATA_COORDS=path_data_coords, $
+PATH_DOUBLE=path_double, $
+PATH_FILENAME=path_filename, $
+PATH_INFO=path_info, $
+PATH_XY=path_xy, $
+RESOLUTION=resolution, $
+TRIANGULATION=triangulation, $
+XLOG=xlog, $
+YLOG=ylog, $
+
+;cgContour Keywords
+ASPECT=aspect, $
+AXISCOLOR=axiscolor, $
+AXESCOLOR=axescolor, $
+BACKGROUND=sbackground, $
+LABEL=label, $
+LAYOUT=layout, $
+MAP_OBJECT=map_object, $
 MISSINGVALUE=missingvalue, $
 OLEVELS=olevels, $
 ONIMAGE=onImage, $
@@ -1189,16 +1407,8 @@ OUTCOLOR=outcolor, $
 OUTFILENAME=outfilename, $
 OUTLINE=outline, $
 OUTPUT=output, $
-OVERPLOT=overplot, $
 PALETTE=palette, $
-PATH_DATA_COORDS=path_data_coords, $
-PATH_DOUBLE=path_double, $
-PATH_FILENAME=path_filename, $
-PATH_INFO=path_info, $
-PATH_XY=path_xy, $
-RESOLUTION=resolution, $
 TRADITIONAL=traditional, $
-TRIANGULATION=triangulation, $
 _REF_EXTRA=extra
     
     Compile_Opt idl2
@@ -1214,7 +1424,15 @@ _REF_EXTRA=extra
     if self -> MrIDL_Container::Init() eq 0 then return, 0
     if self -> weGraphicsKeywords::Init(_STRICT_EXTRA=extra) eq 0 then return, 0
     
+    ;Provision for bad spellers
+    if n_elements(axisColor) eq 0 and n_elements(axesColor) ne 0 then axisColor = axesColor
+
+    ;Output path information (suppresses drawing of contours)
+    GetPath_Info = Arg_Present(path_info)
+    GetPath_XY = Arg_Present(path_xy)
+    
     ;Defaults
+    SetDefaultValue, draw, 1, /BOOLEAN
     SetDefaultValue, label, 1, /BOOLEAN
     SetDefaultValue, onImage, 0B, /BOOLEAN
     SetDefaultValue, outfilename, ''
@@ -1223,86 +1441,114 @@ _REF_EXTRA=extra
     SetDefaultValue, overplot, 0B, /BOOLEAN
     SetDefaultValue, traditional, 0B, /BOOLEAN
     
-    ;Allocate Memory
-    data = Ptr_New(/ALLOCATE_HEAP)
-    xcoords = Ptr_New(/ALLOCATE_HEAP)
-    ycoords = Ptr_New(/ALLOCATE_HEAP)
-    aspect = Ptr_New(/ALLOCATE_HEAP)
-    axiscolor = Ptr_New(/ALLOCATE_HEAP)
-    axescolor = Ptr_New(/ALLOCATE_HEAP)
-    background = Ptr_New(/ALLOCATE_HEAP)
-    c_annotation = Ptr_New(/ALLOCATE_HEAP)
-    c_charsize = Ptr_New(/ALLOCATE_HEAP)
-    c_colors = Ptr_New(/ALLOCATE_HEAP)
-    c_labels = Ptr_New(/ALLOCATE_HEAP)
-    c_linestyle = Ptr_New(/ALLOCATE_HEAP)
-    c_orientation = Ptr_New(/ALLOCATE_HEAP)
-    c_spacing = Ptr_New(/ALLOCATE_HEAP)
-    c_thick = Ptr_New(/ALLOCATE_HEAP)
-    cell_fill = Ptr_New(/ALLOCATE_HEAP)
-    closed = Ptr_New(/ALLOCATE_HEAP)
-    downhill = Ptr_New(/ALLOCATE_HEAP)
-    fill = Ptr_New(/ALLOCATE_HEAP)
-    follow = Ptr_New(/ALLOCATE_HEAP)
-    irregular = Ptr_New(/ALLOCATE_HEAP)
-    isotropic = Ptr_New(/ALLOCATE_HEAP)
-    layout = Ptr_New(/ALLOCATE_HEAP)
-    levels = Ptr_New(/ALLOCATE_HEAP)
-    nlevels = Ptr_New(/ALLOCATE_HEAP)
-    map_object = Obj_New()
-    max_value = Ptr_New(/ALLOCATE_HEAP)
-    min_value = Ptr_New(/ALLOCATE_HEAP)
-    missingvalue = Ptr_New(/ALLOCATE_HEAP)
-    olevels = Ptr_New(/ALLOCATE_HEAP)
-    outcolor = Ptr_New(/ALLOCATE_HEAP)
-    palette = Ptr_New(/ALLOCATE_HEAP)
-    path_data_coords = Ptr_New(/ALLOCATE_HEAP)
-    path_double = Ptr_New(/ALLOCATE_HEAP)
-    path_filename = Ptr_New(/ALLOCATE_HEAP)
-    path_info = Ptr_New(/ALLOCATE_HEAP)
-    path_xy = Ptr_New(/ALLOCATE_HEAP)
-    resolution = Ptr_New(/ALLOCATE_HEAP)
-    triangulation = Ptr_New(/ALLOCATE_HEAP)
+    ;Validate Pointers
+    self.c_data           = Ptr_New(/ALLOCATE_HEAP)
+    self.xcoords          = Ptr_New(/ALLOCATE_HEAP)
+    self.ycoords          = Ptr_New(/ALLOCATE_HEAP)
+    self.aspect           = Ptr_New(/ALLOCATE_HEAP)
+    self.axiscolor        = Ptr_New(/ALLOCATE_HEAP)
+    self.background       = Ptr_New(/ALLOCATE_HEAP)
+    self.c_annotation     = Ptr_New(/ALLOCATE_HEAP)
+    self.c_charsize       = Ptr_New(/ALLOCATE_HEAP)
+    self.c_charthick      = Ptr_New(/ALLOCATE_HEAP)
+    self.c_colors         = Ptr_New(/ALLOCATE_HEAP)
+    self.c_labels         = Ptr_New(/ALLOCATE_HEAP)
+    self.c_linestyle      = Ptr_New(/ALLOCATE_HEAP)
+    self.c_orientation    = Ptr_New(/ALLOCATE_HEAP)
+    self.c_spacing        = Ptr_New(/ALLOCATE_HEAP)
+    self.c_thick          = Ptr_New(/ALLOCATE_HEAP)
+    self.cell_fill        = Ptr_New(/ALLOCATE_HEAP)
+    self.closed           = Ptr_New(/ALLOCATE_HEAP)
+    self.downhill         = Ptr_New(/ALLOCATE_HEAP)
+    self.fill             = Ptr_New(/ALLOCATE_HEAP)
+    self.follow           = Ptr_New(/ALLOCATE_HEAP)
+    self.irregular        = Ptr_New(/ALLOCATE_HEAP)
+    self.isotropic        = Ptr_New(/ALLOCATE_HEAP)
+    self.layout           = Ptr_New(/ALLOCATE_HEAP)
+    self.levels           = Ptr_New(/ALLOCATE_HEAP)
+    self.nlevels          = Ptr_New(/ALLOCATE_HEAP)
+    self.max_value        = Ptr_New(/ALLOCATE_HEAP)
+    self.min_value        = Ptr_New(/ALLOCATE_HEAP)
+    self.missingvalue     = Ptr_New(/ALLOCATE_HEAP)
+    self.olevels          = Ptr_New(/ALLOCATE_HEAP)
+    self.outcolor         = Ptr_New(/ALLOCATE_HEAP)
+    self.palette          = Ptr_New(/ALLOCATE_HEAP)
+    self.path_data_coords = Ptr_New(/ALLOCATE_HEAP)
+    self.path_double      = Ptr_New(/ALLOCATE_HEAP)
+    self.path_filename    = Ptr_New(/ALLOCATE_HEAP)
+    self.path_info        = Ptr_New(/ALLOCATE_HEAP)
+    self.path_xy          = Ptr_New(/ALLOCATE_HEAP)
+    self.resolution       = Ptr_New(/ALLOCATE_HEAP)
+    self.triangulation    = Ptr_New(/ALLOCATE_HEAP)
+    self.xlog             = Ptr_New(/ALLOCATE_HEAP)
+    self.ylog             = Ptr_New(/ALLOCATE_HEAP)
+    
+    ;Initialize Objects
+    self.map_object       = Obj_New()
     
     ;Set the object properties
-    self -> SetProperty, DATA=data, $
+    self -> SetProperty, C_DATA=data, $
                          XCOORDS=x, $
                          YCOORDS=y, $
+                         
+                         ;cgContour Keywords
                          ASPECT=aspect, $
                          AXISCOLOR=axiscolor, $
                          AXESCOLOR=axescolor, $
-                         BACKGROUND=sbackground, $
-                         C_ANNOTATION=c_annotation, $
-                         C_CHARSIZE=c_charsize, $
-                         C_COLORS=c_colors, $
-                         C_LABELS=c_labels, $
-                         C_ORIENTATION=c_orientation, $
-                         C_SPACING=c_spacing, $
-                         CELL_FILL=cell_fill, $
-                         COLOR=scolor, $
-                         FILL=fill, $
-                         IRREGULAR=irregular, $
+                         BACKGROUND=background, $
+                         COLOR=color, $
                          LABEL=label, $
                          LAYOUT=layout, $
-                         LEVELS=levels, $
-                         NLEVELS=nlevels, $
                          MAP_OBJECT=map_object, $
-                         MISSINGVALUE=missingvalue, $
-                         OLEVELS=olevels, $
                          ONIMAGE=onImage, $
                          OUTCOLOR=outcolor, $
                          OUTFILENAME=outfilename, $
                          OUTLINE=outline, $
                          OUTPUT=output, $
                          OVERPLOT=overplot, $
+                         MISSINGVALUE=missingvalue, $
                          PALETTE=palette, $
+                         TRADITIONAL=traditional, $
+                         
+                         ;Contour Keywords
+                         C_ANNOTATION=c_annotation, $
+                         C_CHARSIZE=c_charsize, $
+                         C_CHARTHICK=c_charthick, $
+                         C_COLORS=c_colors, $
+                         C_LABELS=c_labels, $
+                         C_LINESTYLE=c_linestyle, $
+                         C_ORIENTATION=c_orientation, $
+                         C_SPACING=c_spacing, $
+                         C_THICK=c_thick, $
+                         CELL_FILL=cell_fill, $
+                         CLOSED=closed, $
+                         DOWNHILL=downhill, $
+                         FILL=fill, $
+                         FOLLOW=follow, $
+                         IRREGULAR=irregular, $
+                         ISOTROPIC=isotropic, $
+                         LEVELS=levels, $
+                         NLEVELS=nlevels, $
+                         MAX_VALUE=max_value, $
+                         MIN_VALUE=min_value, $
+                         PATH_DATA_COORDS=path_data_coords, $
+                         PATH_DOUBLE=path_double, $
+                         PATH_FILENAME=path_filename, $
                          RESOLUTION=resolution, $
-                         TITLE=title, $
-                         TRADITIONAL=traditional
-    
+                         TRIANGULATION=triangulation, $
+                         XLOG=xlog, $
+                         YLOG=ylog
 
     ;Draw?
-    if keyword_set(draw) then self -> draw
+    if keyword_set(draw) then begin
+        if GetPath_Info || GetPath_XY then begin
+            self -> draw, OLEVELS=oLevels, $
+                          PATH_INFO=path_info, $
+                          PATH_XY=path_xy
+        endif else begin
+            self -> draw, OLEVELS=oLevels
+        endelse
+    endif
 
     return, 1
 end
@@ -1317,13 +1563,14 @@ end
 ;-
 pro MrContour__define, class
     compile_opt idl2
+    on_error, 2
     
     class = { MrContour, $
               inherits weGraphicsKeywords, $
               inherits MrIDL_Container, $
               
               ;Data properties
-              data: Ptr_New(), $
+              c_data: Ptr_New(), $
               xcoords: Ptr_New(), $
               ycoords: Ptr_New(), $
               
@@ -1332,13 +1579,25 @@ pro MrContour__define, class
               x_sysvar: !X, $
               y_sysvar: !Y, $
               
-              ;Contour & cgContour Properties
+              ;cgContour Properties
               aspect: Ptr_New(), $
-              axiscolor: Ptr_New(), $
-              axescolor: Ptr_New(), $
-              background: Ptr_New(), $
+              label: 0, $
+              layout: Ptr_New(), $
+              map_object: obj_new(), $
+              missingvalue: Ptr_New(), $
+              olevels: Ptr_New(), $
+              onImage: 0B, $
+              outcolor: Ptr_New(), $
+              outfilename: '', $
+              outline: 0B, $
+              output: '', $
+              palette: Ptr_New(), $
+              traditional: 0B, $
+              
+              ;Contour Properties
               c_annotation: Ptr_New(), $
               c_charsize: Ptr_New(), $
+              c_charthick: Ptr_New(), $
               c_colors: Ptr_New(), $
               c_labels: Ptr_New(), $
               c_linestyle: Ptr_New(), $
@@ -1352,29 +1611,19 @@ pro MrContour__define, class
               follow: Ptr_New(), $
               irregular: Ptr_New(), $
               isotropic: Ptr_New(), $
-              label: 0, $
-              layout: Ptr_New(), $
               levels: Ptr_New(), $
               nlevels: Ptr_New(), $
-              map_object: obj_new(), $
               max_value: Ptr_New(), $
               min_value: Ptr_New(), $
-              missingvalue: Ptr_New(), $
-              olevels: Ptr_New(), $
-              onImage: 0B, $
-              outcolor: Ptr_New(), $
-              outfilename: '', $
-              outline: 0B, $
-              output: '', $
               overplot: 0B, $
-              palette: Ptr_New(), $
               path_data_coords: Ptr_New(), $
               path_double: Ptr_New(), $
               path_filename: Ptr_New(), $
               path_info: Ptr_New(), $
               path_xy: Ptr_New(), $
               resolution: Ptr_New(), $
-              traditional: 0B, $
-              triangulation: Ptr_New() $
+              triangulation: Ptr_New(), $
+              xlog: Ptr_New(), $
+              ylog: Ptr_New() $
             }
 end
