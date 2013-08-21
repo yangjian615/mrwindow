@@ -91,8 +91,8 @@
 ;       05/05/2013  -   Added the CALCULATE keyword so that the positions can be updated
 ;                           with the layout. - MRA
 ;       05/17/2013  -   Extracted layout management methods from MrPlot__define and put
-;                           them here: the AdjustLayout, FindLayoutHoles, GetMaxLocation,
-;                           Make_Location, plotExists, setPositions, shiftPlots, and 
+;                           them here: the FillHoles, FindLayoutHoles, GetPlotIndexAvailability,
+;                           Make_Location, PlotExists, setPositions, shiftPlots, and 
 ;                           renumber methods. - MRA
 ;       05/18/2013  -   Major rewrite of the SetPositions method. - MRA
 ;       05/20/2013  -   Added keywords REMOVE and CLEAR to the SetPositions method. Lots
@@ -109,17 +109,62 @@
 ;                           positions and locations are added/removed. Lastly, locations
 ;                           and positions are added to the plot_locations and PLOT_POSITIONS
 ;                           properties before the layout is updated, in the SetPositions
-;                           method. As such, a call to the AdjustLayout method was not
+;                           method. As such, a call to the FillHoles method was not
 ;                           working. Now, the layout is not adjusted when /ADD is set. - MRA
 ;       07/07/2013  -   Separated the SetPositions method into the Add, Remove, Replace,
 ;                           and Clear methods. Added the whichLayout method. - MRA
 ;       07/09/2013  -   Reduced the default YGAP size to 6. - MRA
 ;       08/19/2013  -   Renamed AddPositions to AddToLayout, ApplyPositions to UpdateLayout, 
 ;                           CalcPositions to CalcLayoutPositions, ClearPositions to
-;                           ClearLayout, 
+;                           ClearLayout. - MRA
+;       08/20/2013  -   Changed Plot_Locations to posIsTaken and Plot_Positions to 
+;                           Fixed_Positions in the class defninition. Removed the
+;                           UpdateLayout method. Renamed ReNumber to RePosition. Added
+;                           the AddRows and AddCols methods. Make sure positions are
+;                           re-positioned in SetProperty if the layout changes. - MRA
+;       08/21/2013  -   Renamed GetMaxLocation to GetPlotIndexAvailability and repurposed
+;                           it to return the plot indices and number of un/available
+;                           positions. RePosition can now accept individual indices. Added
+;                           the ConvertLocation method. Print a grid of 1's and 0's
+;                           indicating if a spot is available or unavailable. Added
+;                           POSITION keyword to Make_Location. Renamed RemovePositions to
+;                           RemoveFromLayout. Combined AddCols and AddRows into the
+;                           ExpandLayout method.
 ;                           
 ;-
 ;*****************************************************************************************
+;+
+;   The purpose of this method is to add rows to the layout.
+;
+; :Params:
+;       NCOLS:          in, optional, type=integer, default=1
+;                       Add this number of rows to the layout.
+;       NROWS:          in, optional, type=integer, default=1
+;                       Add this number of rows to the layout.
+;-
+pro MrPlotLayout::ExpandLayout, nCols, nRows
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    if n_elements(nCols) eq 2 then nRows = nCols[1]
+
+    ;Default to adding one row
+    SetDefaultValue, nCols, 1
+    SetDefaultValue, nRows, 1
+    if nRows eq 0 && nCols[0] eq 0 then return
+
+    ;Resposition all of the existing plots        
+    self -> SetProperty, LAYOUT=self.layout+[nCols[0], nRows]
+end
+
+
 ;+
 ;   The purpose of this method is to add new positions and locations to the plotting
 ;   grid. This simulates adding an actual plot to the display.
@@ -165,19 +210,19 @@ pro MrPlotLayout::AddToLayout, location, position
         return
     endif
 
+    fixed = 0
 ;---------------------------------------------------------------------
 ;Get a Location? /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
     ;If no location was provided
     if n_elements(location) eq 0 then begin
-        ;Determine if we need a fixed or auto-updating position
-        if n_elements(position) eq 0 $
-            then fixed = 0 $
-            else fixed = 1
+        ;Determine if we need a fixed position
+        if n_elements(position) gt 0 then fixed = 1
 
-        ;Get a position and location (layout will be set later).
-        self -> GetPositions, location, LAYOUT=layout, POSITION=position, FIXED=fixed
+        ;Get a position and location
+        self -> GetPositions, location, LAYOUT=layout, POSITION=position, $
+                                        FIXED=fixed, /UPDATE_LAYOUT
 
 ;---------------------------------------------------------------------
 ;Get a Position? /////////////////////////////////////////////////////
@@ -188,124 +233,28 @@ pro MrPlotLayout::AddToLayout, location, position
         
         ;Make room for the location given. The layout will be updated and returned
         ;so that positions can be calculated properly.
-        self -> Make_Location, location, LAYOUT=layout
-        
-        ;If no position was provided, get the position associated with LOCATION
-        if n_elements(position) eq 0 then $
-            position = (*self.layout_positions)[*, location[0]-1, location[1]-1]
-            
-        ;Do not attempt to fill holes, i.e. preserve layout due to added location.
-        adjust_layout = 0
+        self -> Make_Location, location, LAYOUT=layout, POSITION=position, /UPDATE_LAYOUT
     endif
 
 ;---------------------------------------------------------------------
 ;Add Position and Location ///////////////////////////////////////////
 ;---------------------------------------------------------------------
 
-    ;Add a new location.
-    if n_elements(*self.plot_locations) eq 0 $
-        then *self.plot_locations = location $
-        else *self.plot_locations = [[*self.plot_locations], [location]]
+    ;Added the fixed position
+    if fixed then begin
+        self.nFixed += 1
+        *self.fixed_positions = [[*self.fixed_positions], [position]]
         
-    ;Add a new position.
-    if n_elements(*self.plot_positions) eq 0 $
-        then *self.plot_positions = position $
-        else *self.plot_positions = [[*self.plot_positions], [position]]
-    
-    ;Update the positions if the layout has been adjusted.
-    if n_elements(layout) ne 0 then self -> SetProperty, LAYOUT=layout
+    ;Indicate that a layout position has been taken
+    endif else begin
+        iList = self -> ConvertLocation(location, /TO_LIST_INDEX)
+print, 'location = ', location
+print, 'ilist = ', ilist
+        (*self.posIsTaken)[iList] = 1
+    endelse
     
     ;Increase the plot count
     self.nplots += 1
-end
-
-
-;+
-;   The purpose of this method is to recalculate the plot positions. This is necessary
-;   when some aspect of the plot layout changes. Any changes to the layout should have
-;   already been applied via the Set, Add, or Remove mehtods.
-;-
-pro MrPlotLayout::UpdateLayout
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return
-    endif
-
-;---------------------------------------------------------------------
-;Apply New Positions /////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;If there are no plots left, then there is nothing to reposition
-    if self.nPlots eq 0 then return
-    
-    ;Find the Auto-Adjusting plots.
-    thesePlots = where((*self.plot_locations)[0,*] ne -1, nAuto)
-
-    ;Reposition each Auto-Updating plot
-    for i = 0, nAuto - 1 do begin
-        thisPlot = thesePlots[i]
-        thisLoc = (*self.plot_locations)[*,thisPlot]
-        
-        ;Reposition the plots
-        (*self.plot_positions)[*,i] = (*self.layout_positions)[*, thisLoc[0]-1, thisLoc[1]-1]
-    endfor
-end
-
-
-;+
-;   Adjust the layout of the plots by moving plots to fill in gaps and then
-;   removing any empty columns or rows.
-;
-; :Private:
-;-
-pro MrPlotLayout::AdjustLayout
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return
-    endif
-    
-    ;If there are no plots, then there is nothing to adjust
-    nplots = n_elements(*self.plot_positions)/4
-    if nplots eq 0 then return
-    
-    ;find where holes are in the plot layout
-    holes = self -> FindLayoutHoles(NHOLES=nholes, PLOT_NUMBERS=plot_numbers)
-    
-    plot_numbers_new = plot_numbers
-    
-    ;while holes remain...
-    while nholes gt 0 do begin
-        ;only adjust the plots that are after the hole
-        ;determine how many locations to shift the plots to fill the first hole, then fill it
-        to_adjust = where(plot_numbers_new gt holes[0], n_to_adjust)
-
-        if n_to_adjust ne 0 then shift_size = plot_numbers_new[to_adjust[0]] - holes[0] $
-                            else shift_size = 0
-        plot_numbers_new[to_adjust[0]:*] -= shift_size
-
-        ;reduce the number of holes and get rid of the filled hole location
-        nholes -= 1
-        if nholes gt 0 then holes = holes[1:*]
-    endwhile
-
-    ;fit the plots within the current layout scheme at their new locations
-    ;must go from a 1-based PLOT_NUMBER to a 0-based index, then back
-    exists = self -> plotExists(plot_numbers_new, colrow, /PLOT_INDEX, /TO_COLROW)
-    *self.plot_locations = colrow
-
-    ;if any columns or rows have become empty (i.e. filled with holes) then trim them
-    ;set the new layout (1-based). Update the positions of all plots.
-    void = self -> GetMaxLocation(MAXCOL=maxCol, MAXROW=maxRow)
-    self -> SetProperty, LAYOUT=[maxCol, maxRow]
 end
 
 
@@ -323,8 +272,10 @@ pro MrPlotLayout::CalcLayoutPositions
         return
     endif
     
-    ;Return if no layout has been provided.
-    if array_equal(self.layout, [0,0]) then return
+    ;Return if the layout is not yet valid (Must have at least 1 column and 1 row).
+    if self.layout[0] eq 0 || self.layout[1] eq 0 $
+        then message, FORMAT='(%"Cannot calculate position. Layout [%i, %i] at least' + $
+                                'one column and one row.")', self.layout
 
     ;Calculate positions
     *self.layout_positions = MrPlotLayout(self.layout, $
@@ -333,13 +284,22 @@ pro MrPlotLayout::CalcLayoutPositions
                                           XMARGIN = self.xmargin, $
                                           YGAP = self.ygap, $
                                           YMARGIN = self.ymargin)
+
 end
 
 
 ;+
 ;   The purpose of this method is to clear the lists of positions and locations.
+;
+; :Keywords:
+;       FIXED:          in, optional, type=boolean
+;                       If set, only the fixed positions will be cleared.
+;       LAYOUT:         in, optional, type=boolean
+;                       If set, only the layout positions will be cleared.
 ;-
-pro MrPlotLayout::ClearLayout
+pro MrPlotLayout::ClearLayout, $
+FIXED=fixed, $
+LAYOUT=layout
     compile_opt idl2
     
     ;Error handling
@@ -350,38 +310,77 @@ pro MrPlotLayout::ClearLayout
         return
     endif
     
-    ;Reset the position and location pointers.
-    ptr_free, self.plot_locations, self.plot_positions
-    self.plot_locations = ptr_new(/ALLOCATE_HEAP)
-    self.plot_positions = ptr_new(/ALLOCATE_HEAP)
+    ;Defaults
+    fixed = keyword_set(fixed)
+    layout = keyword_set(layout)
+    if fixed + layout eq 0 then begin
+        fixed = 1
+        layout = 1
+    endif
     
-    ;Reset the layout.
-    self.nplots = 0
-    self.layout = [0,0]
+    ;Clear fixed positions.
+    if fixed eq 1 then begin
+        ptr_free, self.fixed_positions
+        self.fixed_positions = ptr_new(/ALLOCATE_HEAP)
+        self.nPlots -= self.nFixed
+        self.nFixed = 0
+    endif
+    
+    ;Clear layout positions
+    if layout eq 1 then begin
+        ptr_free, self.layout_positions
+        ptr_free, self.posIsTaken
+        
+        self.layout_positions = ptr_new(/ALLOCATE_HEAP)
+        self.posIsTaken       = ptr_new(/ALLOCATE_HEAP)
+        
+        nLayout = self.nPlots - self.nFixed
+        self.nPlots -= nLayout
+        self.layout = [0,0]
+    endif
 end
 
 
-
 ;+
-;       Find the 1-based plot numbers (ordered top -> bottom, left -> right) of any
-;       hole in the plotting grid
+;   The purpose of this method is to convert from a [col, row] plot location to a
+;   plot-index location, and vice versa.
 ;
-; :Private:
+; :Params:
+;       LOCATION:       in, required, type=intarr(2)
+;                       The [col, row] location of a plot to be converted.
+;                           If LOCATION[0] < 0, then it is the location of a fixed
+;                           position. In this case, the list index will be returned.
+;       LAYOUT:         in, optional, type=intarr(2), default=self.layout
+;                       The number of columns and rows in the layout: [ncols, nrows].
 ;
 ; :Keywords:
-;
-;       NHOLES:             out, optional, type=int
-;                           the number of holes found
-;       PLOT_NUMBERS:       out, optional, type=intarr()
-;                           the plot numbers for all of the plots
+;       EXISTS:         out, optional, type=boolean
+;                       Returns 1 if `LOCATION` exists within `LAYOUT` and 0 otherwise.
+;                           If EXISTS is 0 and no named variable is present, an error 
+;                           will occur.
+;       LIST_INDEX      in, optional, type=boolean, default=0
+;                       Indicate that `LOCATION` is actually a list-index.
+;       PLOT_INDEX:     in, optional, type=boolean, default=0
+;                       Indicate that `LOCATION` is actually a plot-index.
+;       TO_COLROW:      in, optional, type=boolean
+;                       Indicate that `LOCATION` is to be converted to a [col, row] location.
+;       TO_LIST_INDEX:  in, optional, type=boolean, default=0
+;                       Indicate that `LOCATION` is to be converted to a list-index.
+;                           This is the default.
+;       TO_PLOT_INDEX:  in, optional, type=boolean, default=0
+;                       Indicate that `LOCATION` is to be converted to a plot-index.
+;       
 ;
 ; :Returns:
-;
-;       LAYOUTHOLES     [array] the 1-based plot grid number where no plots exist
+;       RESULT:         The result of the convertion.
 ;-
-function MrPlotLayout::FindLayoutHoles, $
-NHOLES = nholes, $
-PLOT_NUMBERS = plot_numbers
+function MrPlotLayout::ConvertLocation, location, layout, $
+EXISTS=exists, $
+LIST_INDEX=list_index, $
+PLOT_INDEX=plot_index, $
+TO_LIST_INDEX=to_list_index, $
+TO_PLOT_INDEX=to_plot_index, $
+TO_COLROW=to_colrow
     compile_opt idl2
     
     ;Error handling
@@ -389,29 +388,157 @@ PLOT_NUMBERS = plot_numbers
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        nholes = 0
         return, -1
     endif
 
-    ;If there are no plots, then there are no holes.
-    nplots = n_elements(*self.plot_positions)/4
-    if nplots eq 0 then begin
-        nholes = 0
-        return, -1
-    endif
+;---------------------------------------------------------------------
+;Defaults ////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Default to a [col, row] location.
+    SetDefaultValue, layout, self.layout
+    plot_index = keyword_set(plot_index)
+    list_index = keyword_set(list_index)
+    to_plot_index = keyword_set(to_plot_index)
+    to_list_index = keyword_set(to_list_index)
+    to_colrow = keyword_set(to_colrow)
 
-    ;Total number of possible plots and their plot numbers.
-    nTot = self.layout[0] * self.layout[1]
-    all_plot_numbers = indgen(nTot) + 1
+;---------------------------------------------------------------------
+;Fixed Position //////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     
-    ;Find the holes
-    theseIndices = where((*self.plot_locations)[0,*] ne -1, count)
-    if count ne 0 then begin
-        exists = self -> plotExists((*self.plot_locations)[*,theseIndices], plot_numbers, /TO_PLOT_INDEX)
-        void = ismember(plot_numbers, all_plot_numbers, NONMEMBER_INDS=layoutHoles, N_NONMEMBERS=nholes)
+    ;Fixed locations
+    if location[0] lt 0 then begin
+        result = location[1]-1
+        return, result
     endif
 
-    return, layoutHoles
+;---------------------------------------------------------------------
+;Check Inputs ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Put restrictions.
+    if plot_index + list_index eq 2 then $
+        message, 'PLOT_INDEX and LIST_INDEX cannot be specified together.'
+    
+    ;Default to converting to a list index.
+    if to_plot_index + to_list_index + to_colrow eq 0 then to_list_index = 1
+    if to_plot_index + to_list_index + to_colrow ne 1 then $
+        message, 'One and only one of TO_PLOT_INDEX, TO_LIST_INDEX, and TO_COLROW are allowed.'
+    
+    ;Make sure the location exists
+    exists = self -> PlotExists(location, layout, PLOT_INDEX=plot_index, LIST_INDEX=list_index)
+    if max(exists) eq 0 then if arg_present(exists) $
+        then return, !Null $
+        else message, 'Location does not exist within layout. Cannot convert.'
+
+;---------------------------------------------------------------------
+;Convert /////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;
+    ;Not the PLOT_INDEX is row-major while LIST_INDEX is column-major
+    ;
+
+    ;TO PLOT INDEX
+    if keyword_set(to_plot_index) then begin
+        case 1 of
+            keyword_set(list_index): begin
+                colrow = twoD_to_oneD_index(location, layout, /oneD_to_twoD, /COL_MAJOR) ;row-major location -> [col,row]
+                result = twoD_to_oneD_index(colrow, layout)                              ;[col,row] -> col-major index
+            endcase
+            keyword_set(plot_index): result = location
+            else                   : result = twoD_to_oneD_index(location-1, layout)+1
+        endcase
+    
+    ;TO [COL, ROW]
+    endif else if keyword_set(to_colrow) then begin
+        case 1 of
+            keyword_set(plot_index): result = twoD_to_oneD_index(location-1, layout, /oneD_to_twoD)+1
+            keyword_set(list_index): result = twoD_to_oneD_index(location,   layout, /oneD_to_twoD, /COL_MAJOR)+1
+            else                   : result = location
+        endcase
+          
+    ;TO LIST INDEX
+    endif else if keyword_set(to_list_index) then begin
+        case 1 of
+            keyword_set(plot_index): begin
+                colrow = twoD_to_oneD_index(location, layout, /oneD_to_twoD)
+                result = twoD_to_oneD_index(colrow, layout, /COL_MAJOR)
+            endcase
+            keyword_set(list_index): result = location
+            else                   : result = twoD_to_oneD_index(location-1, layout, /COL_MAJOR)
+        endcase
+    endif
+    
+    return, result
+end
+
+
+;+
+;   The purpose of this method is to determine which positions are available and
+;   which are unavailable.
+;
+; :Keywords:
+;       FIXED:          in, optional, type=Boolean, default=0
+;                       If set, fixed positions will be searched instead of layout
+;                           positions. In this case, `NUNAVAILABLE` is the the only
+;                           value that will be returned.
+;       PITAKEN:        out, optional, type=intarr
+;                       Plot indices of layout positions that are currently occupied.
+;       NTAKEN:         out, optional, type=intarr
+;                       Number of layout positions that are currently occupied.
+;       NFREE:          out, optional, type=intarr
+;                       Number of layout positions that are currently unoccupied.
+;
+; :Returns:
+;       PITAKEN:        Plot indices of layout positions that are currently unoccupied.
+;-
+function MrPlotLayout::GetPlotIndexAvailability, $
+FIXED = fixed, $
+PITAKEN = piTaken, $
+NFREE = nFree, $
+NTAKEN = nTaken
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, !Null
+    endif
+
+;---------------------------------------------------------------------
+;Fixed Positions /////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Return highest used plot number
+    if keyword_set(fixed) then begin
+        nTaken = self.nFixed
+        return, !Null
+    endif
+
+;---------------------------------------------------------------------
+;Layout Positions ////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Special case if the layout is empty
+    if array_equal(self.layout, [0,0]) then begin
+        nFree = 0
+        piFree = !Null
+        nTaken = 0
+        piTaken = !Null
+        return, nFree
+    endif
+    
+    ;Which are un/available?
+    piFree = where(*self.posIsTaken eq 0, nFree, /NULL, $
+                   COMPLEMENT=piTaken, NCOMPLEMENT=nTaken)
+    
+    ;Convert from list index to plot index.
+    if nFree  gt 0 then piFree += 1
+    if nTaken gt 0 then piTaken += 1
+  
+    return, piFree
 end
 
 
@@ -430,8 +557,10 @@ end
 ;
 ; :Keywords:
 ;       FIXED:              in, optional, type=boolean, default=0
-;                           Return the location and position of a "fixed" plot instead
-;                               of an "auto-updating" location.
+;                           If set and `POSITION` is provided, `LOCATION` will be updated
+;                               to contain the location of the provided position. If not
+;                               found, `LOCATION` will be filled with the next available
+;                               fixed position location.
 ;       LAYOUT:             out, optional, type=intarr(2)
 ;                           A two-element vector [col, row] indicating the number of
 ;                               columns and rows in the plot layout. Will be different
@@ -442,6 +571,11 @@ end
 ;                           The lower-left and upper-right corners of a plot in normal
 ;                               coordinates. If `FIXED` is set, then this is the `POSITION`
 ;                               of the fixed plot for which a location is to be generated.
+;       UPDATE_LAYOUT:      in, optional, type=boolean, default=0
+;                           If set, the plot layout will be adjusted to accomodate the
+;                               location and position being retrieved. Plot positions
+;                               will be recalculated to fit the new layout. This applies
+;                               only when `FIXED`=0.
 ;                               
 ;       _REF_EXTRA:         in, optional, type=Structure
 ;                           Any keyword accepted by MrPlotLayout.pro
@@ -454,6 +588,7 @@ pro MrPlotLayout::GetPositions, location, $
 FIXED = fixed, $
 LAYOUT = layout, $
 POSITION = position, $
+UPDATE_LAYOUT = update_layout, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -466,6 +601,7 @@ _REF_EXTRA = extra
     endif
     
     npos = n_elements(position)
+    update_layout = keyword_set(update_layout)
 
 ;---------------------------------------------------------------------
 ;Get a Fixed Location and its Position ///////////////////////////////
@@ -473,29 +609,27 @@ _REF_EXTRA = extra
     if keyword_set(fixed) then begin
 
         ;Search for an existing location                    
-        if npos gt 0 then for i = 0, self.nplots - 1 do begin
-            if array_equal((*self.plot_positions)[*,i], position) $
-                then location = (*self.plot_locations)[*,i]
+        if npos gt 0 then for i = 0, self.nFixed - 1 do begin
+            if array_equal((*self.fixed_positions)[*,i], position) $
+                then location = [-1, i+1]
         endfor
         
         ;If no existing position matches, then get a new location
         if n_elements(location) eq 0 then begin
-            loc = self -> GetMaxLocation(/FIXED)
-            location = [-1, loc-1]
+            void = self -> GetPlotIndexAvailability(/FIXED, NTAKEN=nTaken)
+            location = [-1, nTaken+1]
         endif
 
 ;---------------------------------------------------------------------
-;Get a Auto-Updating Location and its Position ///////////////////////
+;Get an Auto-Updating Location and its Position //////////////////////
 ;---------------------------------------------------------------------
     endif else begin
-        ;Get the lowest available position and location.
-        self -> Make_Location, location, LAYOUT=layout, UPDATE_LAYOUT=0
-
-        ;Calculate the plot position.
-        position = MrPlotLayout(layout, location, $
-                                XMARGIN=self.xmargin, XGAP=self.xgap, $
-                                YMARGIN=self.ymargin, YGAP=self.ygap, $
-                                _STRICT_EXTRA=extra)
+        ;If LOCATION was given, find a layout to fit it. If not, get a
+        ;location at the end of the line. Add a row if necessary.
+        self -> Make_Location, location, $
+                               LAYOUT=layout, $
+                               POSITION=position, $
+                               UPDATE_LAYOUT=update_layout
     endelse
 end
 
@@ -551,12 +685,12 @@ YGAP = ygap
     endif
     
     ;Get Properties
-    if arg_present(aspect) and n_elements(*self.aspect) ne 0 then aspect = *self.aspect
-    if arg_present(layout)   then layout = self.layout
-    if arg_present(nplots)   then nplots = self.nplots
-    if arg_present(xgap)     then xgap = self.xgap
+    if arg_present(aspect)   and n_elements(*self.aspect) ne 0 then aspect = *self.aspect
+    if arg_present(layout)   then layout  = self.layout
+    if arg_present(nplots)   then nplots  = self.nplots
+    if arg_present(xgap)     then xgap    = self.xgap
     if arg_present(xmargin)  then xmargin = self.xmargin
-    if arg_present(ygap)     then ygap = self.ygap
+    if arg_present(ygap)     then ygap    = self.ygap
     if arg_present(ymargin)  then ymargin = self.ymargin 
     if arg_present(location) then $
         if n_elements(thisLocation) ne 0 and n_elements(*self.layout_positions) ne 0 $
@@ -565,28 +699,20 @@ end
 
 
 ;+
-;   The purpose of this method is to find the plot number of the last plot, 
-;   ordered top -> bottom, left -> right.
+;   The purpose of this method is to provide a means of generating new plot locations
+;   within the 2D plotting grid.
 ;
-; :Keywords:
-;
-;       MAXCOL:         out, optional, type=int
-;                       the 1 based column number where the last plot is found
-;       MAXROW:         out, optional, type=int
-;                       the 1 based row number where the last plot is found
-;       FIXED:          in, optional, type=Boolean, default=0
-;                       Search through the plots with user-supplied positions. Return
-;                           the last location of such plots.
+; :Params:
+;       LOCATION:           in, out, optional, type=long
+;                           The [col, row] location of the position that is being checked.
+;                               If LOCATION[0] < 0 then the Fixed positions will be
+;                               checked for availability.
 ;
 ; :Returns:
-;
-;       NUMBER:         the 1-based plot number of the last plot,
-;                       ordered top -> bottom, left -> right (see twoD_to_oneD_index.pro)
+;       TF_AVAILABLE:       1 if the position indicated by `LOCATION` is avaialble,
+;                           0 if not.
 ;-
-function MrPlotLayout::GetMaxLocation, $
-MAXCOL = maxcol, $
-MAXROW = maxrow, $
-FIXED = fixed
+function MrPlotLayout::IsAvailable, location
     compile_opt idl2
     
     ;Error handling
@@ -594,38 +720,28 @@ FIXED = fixed
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, -1
+        return, 0
     endif
     
-    ;Search through the user-supplied positions, which are stored at negative locations.
-    ;Return the most negative row. (These plots are given a location of [-1, -i], where
-    ;"i" is the i-th plot with a user-supplied position.)
-    if keyword_set(fixed) then begin
-        number = 0
-        for i = 0, self.nplots - 1 do begin
-            loc = (*self.plot_locations)[*,i]
-            if loc[1] lt number then number = loc[1]
-        endfor
-            
-        return, number
-    endif
+    ;Fixed locations.
+    if location[0] lt 0 then begin
+        tf_available = location[1] gt self.nFixed
     
-    ;keep track of the highest plot number reached
-    max_pnum = 0
-    maxcol = 0
-    maxrow = 0
-
-    ;step through each plot lcocation...
-    for i = 0, self.nplots - 1 do begin
-        ;get the biggest plot number
-        colrow = (*self.plot_locations)[*,i]
-        exists = self -> plotExists(colrow, plot_number, /TO_PLOT_INDEX)
-        if plot_number gt max_pnum then max_pnum = plot_number
-        if colrow[0] gt maxcol then maxcol = colrow[0]
-        if colrow[1] gt maxrow then maxrow = colrow[1]
-    endfor
-  
-    return, max_pnum
+    ;Layout locations.
+    endif else begin
+    
+        ;If the layout is empty, then the location is avaialble
+        if array_equal(self.layout, [0,0]) then return, 1
+    
+        ;If LOCATION is outside of the layout, then the location is aviable
+        if self -> PlotExists(location) eq 0 then return, 1
+    
+        ;Check if the position has been taken already
+        iList = self -> ConvertLocation(location, /TO_LIST_INDEX)
+        tf_available = ~(*self.posIsTaken)[iList]
+    endelse
+    
+    return, tf_available
 end
 
 
@@ -639,7 +755,7 @@ end
 ;           - An extra row will be added to make room, if necessary.
 ;
 ; :Params:
-;       LOCATION:           in, out, optional, type=long/lonarr(2)
+;       LOCATION:           in, out, optional, type=lonarr(2)
 ;                           If provided and defined, then this is a named variable
 ;                               containing the [Col, Row] location of a plot. If the plot
 ;                               does not fit within the current plot layout, the layout
@@ -648,12 +764,13 @@ end
 ;                               lowest available [Col, Row] plot location will be returned.
 ;
 ; :Keywords:
-;       UPDATE_LAYOUT:      in, optional, type=boolean, default=1
-;                           Adjust the layout and recalculate plot positions after
-;                               determining the location.
+;       UPDATE_LAYOUT:      in, optional, type=boolean, default=0
+;                           If set, the plot layout will be adjusted to accomodate the
+;                               location and position being retrieved. Plot positions
+;                               will be recalculated to fit the new layout.
 ;       LAYOUT:             out, optional, type=intarr(2)
-;                           The layout needed to fit the `LOCATION`. Provided as
-;                               a means of returning the new layout if `UPDATE_LAYOUT`=0
+;                           The layout needed to fit the `LOCATION`. Returned only if
+;                               `UPDATE_LAYOUT`=0
 ;
 ; :Uses:
 ;   Uses the following external programs::
@@ -661,7 +778,8 @@ end
 ;-
 pro MrPlotLayout::Make_Location, location, $
 UPDATE_LAYOUT = update_layout, $
-LAYOUT = layout
+LAYOUT = layout, $
+POSITION = position
     compile_opt idl2
     
     ;Error handling
@@ -676,8 +794,8 @@ LAYOUT = layout
 ;Check Initial Condition /////////////////////////////////////////////
 ;---------------------------------------------------------------------
     n_loc = n_elements(location)
-    layout_init = self.layout
-    setDefaultvalue, update_layout, 1, /BOOLEAN
+
+    setDefaultValue, update_layout, 0, /BOOLEAN
     
     ;SELF.LAYOUT is initialized to [0,0], which is an invalid plot location. If this
     ;is still the case, and LOCATION was not given, then make sure location is defined.
@@ -687,47 +805,181 @@ LAYOUT = layout
     endif
 
 ;---------------------------------------------------------------------
-;Adjust Plotting Layout and Find a Place to Put the Plot /////////////
+;Location Provided ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    ;
-    ; Not that even if ADJUST_LAYOUT = 0, we still need to change
-    ; SELF.LAYOUT so that PLOT_EXISTS can convert between plot
-    ; index numbers and [col, row] locations.
-    ;
-    
-    ;if LOCATION is in [col, row] format, then make sure it fits within the plotting grid.
-    ;Adjust the plot layout to accomodate the location if necessary.
     if n_loc eq 2 then begin
-        if location[0] gt self.layout[0] then self.layout[0] = location[0]
-        if location[1] gt self.layout[1] then self.layout[1] = location[1]
-        
-        ;Check if there is a plot in this location. If there is, shift the plots.
-        exists = self -> plotExists(location)
-        if exists and keyword_set(update_layout) then self -> shiftPlots, location
+
+        ;Check if there is a plot in this location
+        tf_free = self -> IsAvailable(location)
+
+    ;---------------------------------------------------------------------
+    ;Already Exists? /////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        if tf_free eq 0 then begin
+            ;Shift plots out of the way?
+            if keyword_set(update_layout) then begin
+                self -> ShiftPlots, location
+                
+            ;If not...
+            endif else begin
+                ;Get the index of the desired location and all available locations.
+                iList = self -> ConvertLocation(location, /TO_LIST_INDEX)
+                piAvailable = self -> GetPlotIndexAvailablility(NAVAILABLE=nAvailable)
+                
+                ;If there are no available locations after the desired one, add a row
+                ;so that current positions can be shifted out of the way to make room
+                ;for the new one.
+                if nAvailable eq 0 || (max(iAvailable gt iList) eq 0) $
+                    then layout = self.layout + [0,1] $
+                    else layout = self.layout
+            endelse
+
+    ;---------------------------------------------------------------------
+    ;Does Not Exist? /////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        endif else begin
+            ;Are more columns needed?
+            if location[0] gt self.layout[0] $
+                then nCols = location[0] - self.layout[0] $
+                else nCols = 0
+            
+            ;Are more rows needed?
+            if location[1] gt self.layout[1] $
+                then nRows = location[1] - self.layout[1] $
+                else nRows = 0
+            
+            ;Update the layout?
+            if keyword_set(update_layout) $
+                then self -> ExpandLayout, nCols, nRows $
+                else layout = self.layout + [nCols, nRows]
+        endelse
     
-    ;if no location was supplied, find the next available location
+;---------------------------------------------------------------------
+;Location Needed /////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     endif else if n_loc eq 0 then begin
-        ;find the highest unused plot number, then increase it by 1 to get an empty spot
-        plot_num = self -> GetMaxLocation() + 1
+        ;Get availability 
+        piFree = self -> GetPlotIndexAvailability(NFREE=nFree, $
+                                                  PITAKEN=piTaken, $
+                                                  NTAKEN=nTaken)
         
-        ;find how many plot spaces there are.
-        nlocs = self.layout[0] * self.layout[1]
-        
-        ;if the highest unused plot number is greater than the spaces available, then
-        ;add an additional row to the plot and turn the plot number into its
-        ;[col, row] location.
-        if plot_num gt nlocs then self.layout += [0,1]
-        exists = self -> plotExists(plot_num, location, /PLOT_INDEX, /TO_COLROW)
+        ;
+        ;We want to return a position that is after the last unavailable position.
+        ;In this way, new positions are ways taken from the end of the line.
+        ;
+
+    ;---------------------------------------------------------------------
+    ;Everything Available? ///////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        if nTaken eq 0 then begin
+            ;Take the first one.
+            location = [1,1]
+            layout = self.layout
+            
+    ;---------------------------------------------------------------------
+    ;Something Already Taken? ////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        endif else begin
+            ;Take the highest available location
+            piLoc = piTaken[-1] + 1
+            
+        ;---------------------------------------------------------------------
+        ;Outside Current Layout? /////////////////////////////////////////////
+        ;---------------------------------------------------------------------
+            if piLoc gt self.layout[0]*self.layout[1] then begin
+            
+                ;Update the layout?
+                if keyword_set(update_layout) $
+                    then self -> ExpandLayout, 0, 1 $
+                    else layout = self.layout + [0,1]
+                
+                ;Find the location in the new layout.
+                piLoc = RePosition(self.layout, self.layout-[0,1], piLoc)
+                location = ConvertLocation(piLoc, /PLOT_INDEX, /TO_COLROW)
+            
+        ;---------------------------------------------------------------------
+        ;Inside Current Layout? //////////////////////////////////////////////
+        ;---------------------------------------------------------------------
+            endif else begin
+                location = ConvertLocation(piLoc, /PLOT_INDEX, /TO_COLROW)
+                layout = self.layout
+            endelse
+        endelse
         
     ;otherwise, throw an error message
-    endif else message, 'if given, Location must be a 2 element vector [col, row]'
+    endif else message, 'LOCATION: incorrect number of elements.'
     
-    layout = self.layout
+;---------------------------------------------------------------------
+;Return Associated Position? /////////////////////////////////////////
+;---------------------------------------------------------------------
+    if arg_present(position) then begin
+        ;Was the layout updated?
+        if keyword_set(update_layout) then begin
+            position = (*self.layout_positions)[*, location[0]-1, location[1]-1]
+        endif else begin
+            position = MrPlotLayout(layout, location, $
+                                    XMARGIN=self.xmargin, XGAP=self.xgap, $
+                                    YMARGIN=self.ymargin, YGAP=self.ygap)
+        endelse
+    endif
+end
+
+
+;+
+;   Determine whether a location will fit inside the given layout.
+;
+; :Params:
+;       LOCATION:       in, required, type=intarr(2\,*)
+;                       the 1 based plot location [col, row] at which to check 
+;                           for existence.
+;
+; :Keywords:
+;       LIST_INDEX:     in, optional, type=boolean, default=0
+;                       If set, `LOCATION` is a vector of list index locations. The list
+;                           index is the index at which the plot's object reference is
+;                           stored. See the "Plots_Present" method.
+;       PLOT_INDEX:     in, optional, type=boolean, default=0
+;                       If set, `LOCATION` is a vector of 1D plot locations. In this case,
+;                           the upper left plot is index 1, and the index number increases
+;                           first downward, then across.
+;
+; :Returns:
+;       EXISTS:         Tells whether the plot exists (1) or not (0).
+;-
+function MrPlotLayout::PlotExists, location, layout, $
+LIST_INDEX = list_index, $
+PLOT_INDEX = plot_index
+    compile_opt idl2
     
-    ;Calculate the new positions if requested.
-    if keyword_set(update_layout) $
-        then self -> SetProperty, LAYOUT=layout $
-        else self.layout = layout_init
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, 0
+    endif
+    
+    ;Default to current layout
+    SetDefaultValue, layout, self.layout
+
+    ;Layout Positions
+    if location[0] ge 0 then begin
+        ;The position does not exist if it is outside the layout
+        case 1 of
+            keyword_set(list_index): exists = location le layout[0]*layout[1]-1
+            keyword_set(plot_index): exists = location le layout[0]*layout[1]
+            else                   : exists = (location[0,*] le layout[0]) and $
+                                              (location[1,*] le layout[1])
+        endcase
+    
+    ;Fixed Positions
+    endif else begin
+        if location[1] gt self.nFixed || location[1] le 0 $
+            then exists = 0 $
+            else exists = 1
+    endelse
+    
+    return, exists
 end
 
 
@@ -741,39 +993,13 @@ end
 ;                           [1,1] indicates the plot in the top-left corner.
 ;
 ; :Keywords:
-;       ADJUST_LAYOUT:  in, optional, type=boolean, default=0
+;       FILLHOLES:      in, optional, type=boolean, default=0
 ;                       Sometimes removing a plot from the 2D auto-updating grid can leave
 ;                           holes in the layout. Set this keyword to 1 (one) to adjust
 ;                           plot locations so that those holes are filled.
-;       LIST_INDEX:     in, optional, type=boolean, default=0
-;                       If set, `LOCATION` is a vector of list index locations. The list
-;                           index is the index at which the plot's object reference is
-;                           stored. See the "Plots_Present" method.
-;       PLOT_INDEX:     in, optional, type=boolean, default=0
-;                       If set, `LOCATION` is a vector of 1D plot locations. In this case,
-;                           the upper left plot is index 1, and the index number increases
-;                           first downward, then across.
-;       TO_COLROW:      in, optional, type=boolean, default=0
-;                       If set, then `LOCATION` will be converted to a [Col, Row]
-;                           location.
-;       TO_LIST_INDEX:  in, optional, type=boolean, default=0
-;                       If set, then `LOCATION` will be converted to its corresponding
-;                           list index number.
-;       TO_PLOT_INDEX:  in, optional, type=boolean, default=0
-;                       If set, then `LOCATION` will be converted to its corresponcing
-;                           plot index number.
-;
-; :Uses:
-;   Uses the following external programs::
-;       ismember.pro
 ;-
-pro MrPlotLayout::RemovePositions, location, $
-ADJUST_LAYOUT = adjust_layout, $
-LIST_INDEX = list_index, $
-PLOT_INDEX = plot_index, $
-TO_COLROW = to_colrow, $
-TO_LIST_INDEX = to_list_index, $
-TO_PLOT_INDEX = to_plot_index
+pro MrPlotLayout::RemoveFromLayout, location, $
+FILLHOLES = fillHoles
     compile_opt idl2
     
     ;Error handling
@@ -785,221 +1011,68 @@ TO_PLOT_INDEX = to_plot_index
     endif
     
     ;Defaults
-    adjust_layout = keyword_set(adjust_layout)
-    list_index = keyword_set(list_index)
-    plot_index = keyword_set(plot_index)
-    to_colrow = keyword_set(colrow)
-    to_list_index = keyword_set(to_list_index)
-    to_plot_index = keyword_set(to_plot_index)
+    fillHoles = keyword_set(fillHoles)
+    nRemove = n_elements(location)
     
-    ;Convert LOCATION to a list index
-    exists = self -> plotExists(location, index, $
-                                LIST_INDEX=list_index, PLOT_INDEX=plot_index, $
-                                /TO_LIST_INDEX)
-    if exists eq 0 then return
-    
-    ;Convert plot locations of all plots to list index locations
-    void = self -> plotExists(*self.plot_locations, list_index, $
-                              LIST_INDEX=list_index, PLOT_INDEX=plot_index, $
-                              /TO_LIST_INDEX)
+    ;Check if a position exists at the given location.
+    tf_free = self -> IsAvailable(location)
+    if tf_free eq 1 then return
 
-    ;Find which plots to keep
-    void = ismember(list_index, index, NONMEMBER_INDS=ikeep)
-    
-    ;Get rid of the indices to be removed.
-    if n_elements(ikeep) eq 0 then begin
-        self -> ClearLayout
+;---------------------------------------------------------------------
+;Fixed Positions /////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if location[0] lt 0 then begin
+        ipAll = indgen(self.nFixed)+1
+        iKeep = where(ipAll ne location, nKeep)
+
+        if nKeep eq 0 then begin
+            self -> ClearLayout, /FIXED
+        endif else begin
+            self.nFixed -= nRemove
+            self.nPlots -= nRemove
+            *self.fixed_positions = (*self.fixed_positions)[*,iKeep]
+        endelse
+
+;---------------------------------------------------------------------
+;Layout Positions ////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     endif else begin
-        *self.plot_locations = (*self.plot_locations)[*,ikeep]
-        *self.plot_positions = (*self.plot_positions)[*,ikeep]
+        ipAll = indgen(self.nPlots - self.nFixed)+1
+        iKeep = where(ipAll ne plot_index, nKeep)
+        
+        if nKeep eq 0 then begin
+            self -> ClearLayout, /LAYOUT
+        endif else begin
+            self.nPlots -= nRemove
+            (*self.posIsTaken)[plot_index-1] = 0
+        endelse
     endelse
     
     ;Fill holes in the layout?
-    if adjust_layout then self -> AdjustLayout
-    
-    ;Decrease the plot count
-    self.nplots -= 1
-
+    if fillHoles then self -> FillHoles
 end
 
 
 ;+
-;   The purpose of this method is to change/replace the position and/or location of a
-;   plot that already exists within the 2D plotting grid.
+;   If the number of rows and columns change, the index of each plot will refer to a
+;   different plot position and a different [col, row] location. This method ensures
+;   that a position's [col, row] location is invariant under changes to the layout.
+;
+; :Private:
 ;
 ; :Params:
-;       LOCATION:           in, optional, type=long
-;                           The [col, row] location of the plot to replace.
 ;
-; :Keywords:
-;       LIST_INDEX:         in, optional, type=boolean, default=0
-;                           If set, `LOCATION` is a vector of list index locations. The list
-;                               index is the index at which the plot's object reference is
-;                               stored. See the "Plots_Present" method.
-;       PLOT_INDEX:         in, optional, type=boolean, default=0
-;                           If set, `LOCATION` is a vector of 1D plot locations. In this case,
-;                               the upper left plot is index 1, and the index number increases
-;                               first downward, then across.
-;       POSITION:           out, optional, type=fltarr(4)
-;                           The lower-left and upper-right corners of a plot in normal
-;                               coordinates. If `SETLOCATION` is in use, then this is the
-;                               new position of the plot indicated by `LOCATION`.
-;       SETLOCATION:        in, optional, type=lonarr(2)
-;                           Use this kewyord to set the [col, row] location of the plot
-;                               indicated by `LOCATION`::
-;                                   `LOCATION`[0] > 0, `SETLOCATION[0] < 0 
-;                                       An auto-updating plot will become fixed at
-;                                       its present position.
-;                                   `LOCATION`[0] < 0, `SETLOCATION`[0] > 0 
-;                                       A fixed plot will be put into the auto-updating
-;                                       grid at the location indicated.
-;                                   `LOCATION`[0] > 0, `SETLOCATION`[0] > 0 
-;                                       An auto-updating plot will be moved within the 
-;                                       grid to the location indicated.
-;                                   `LOCATION`[0] < 0, `SETLOCATION`[0] < 0 
-;                                       Ignored. A fixed plot is fixed no matter what.
-;       SETPOSITION:        in, optional, type=fltarr(4)
-;                           A four-element vector in the form [x0, y0, x1, y1] specifying
-;                               the location of the lower right [x0, y0] and upper-left
-;                               [x1, y1] corners of a plot. If set, then the plot given
-;                               by `LOCATION` will have its position changed to SETPOSITION.
-;                               If `LOCATION` is that of an auto-updating plot, it will
-;                               become fixed. If a location has been changed, it will be
-;                               returned in `SETLOCATION`.
-;
-; :Uses:
-;   Uses the following external programs::
-;       MrPlotLayout.pro
-;-
-pro MrPlotLayout::ReplacePositions, location, $
-LIST_INDEX = list_index, $
-PLOT_INDEX = plot_index, $
-POSITION = position, $
-SETLOCATION = setLocation, $
-SETPOSITION = setPosition
-    compile_opt idl2
-
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return
-    endif
-
-;---------------------------------------------------------------------
-;If LOCATION is Present //////////////////////////////////////////////
-;---------------------------------------------------------------------
-    
-    exists = self -> plotExists(location, index, $
-                                PLOT_INDEX=plot_index, LIST_INDEX=list_index, $
-                                /TO_LIST_INDEX)
-    if exists eq 0 then message, 'LOCATION does not exist.'
-            
-;---------------------------------------------------------------------
-;Set a [Col, Row] Location ///////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    if n_elements(SetLocation) ne 0 then begin
-        ;Fixed -> Fixed
-        if location[0] lt 0 and SetLocation[0] lt 0 then begin
-            ;Ignored
-            
-        ;Auto-Update -> Fixed
-        endif else if location[0] gt 0 and SetLocation[0] lt 0 then begin
-            loc = self -> GetMaxLocation(/FIXED)
-            location = [-1, loc-1]
-            position = (*self.plot_positions)[*,index]
-        
-        
-        ;Auto-Update -> Auto-Update || Fixed -> Auto-Update
-        endif else begin
-            ;Find a layout that will accommodate the new location
-            ;(the layout will be updated later)
-            self -> Make_Location, setLocation, LAYOUT=layout, UPDATE_LAYOUT=0
-        
-            ;Calculate the new position.
-            position = MrPlotLayout(layout, setLocation, $
-                                    XMARGIN=self.xmargin, XGAP=self.xgap, $
-                                    YMARGIN=self.ymargin, YGAP=self.ygap, $
-                                    _STRICT_EXTRA=extra)
-        endelse
-        
-        ;Set the new location and position.
-        (*self.plot_locations)[*,index] = setLocation
-        (*self.positions)[index] = position
-        
-;---------------------------------------------------------------------
-;Set a Position //////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    endif else if n_elements(SetPosition) ne 0 then begin
-    
-        ;Auto-Updating -> Fixed
-        if (*self.plot_locations)[0,index] gt 0 then begin
-            loc = self -> GetMaxLocation(/FIXED)
-            SetLocation = [-1, loc-1]
-        
-        ;Fixed -> Fixed
-        endif else SetLocation = location
-        
-        ;Update the location and position
-        (*self.plot_locations)[*,index] = SetLocation
-        (*self.plot_positions)[*,index] = SetPosition
-        
-    endif
-    
-    ;If the layout was changed, we need to update the other positions as well
-    if n_elements(layout) ne 0 then self -> SetProperty, LAYOUT=layout
-end
-
-
-;+
-;   Determine whether or not a plot exists at the specified location.
-;
-;   NOTE::
-;       There is only one plot at each [col, row] plot location.
-;
-; :Params:
-;       LOCATION:       in, required, type=intarr(2\,*)
-;                       the 1 based plot location [col, row] at which to check 
-;                           for existence.
-;       LOCATION_OUT:   out, optional, type=intarr
-;                       If `TO_COLROW`, `TO_LIST_INDEX`, or 'TO_PLOT_INDEX` are set, then
-;                           this is `LOCATION` converted to the indicated location-type.
-;
-; :Keywords:
-;       LIST_INDEX:     in, optional, type=boolean, default=0
-;                       If set, `LOCATION` is a vector of list index locations. The list
-;                           index is the index at which the plot's object reference is
-;                           stored. See the "Plots_Present" method.
-;       PLOT_INDEX:     in, optional, type=boolean, default=0
-;                       If set, `LOCATION` is a vector of 1D plot locations. In this case,
-;                           the upper left plot is index 1, and the index number increases
-;                           first downward, then across.
-;       TO_COLROW:      in, optional, type=boolean, default=0
-;                       If set, then `LOCATION` will be converted to a [Col, Row]
-;                           location.
-;       TO_LIST_INDEX:  in, optional, type=boolean, default=0
-;                       If set, then `LOCATION` will be converted to its corresponding
-;                           list index number.
-;       TO_PLOT_INDEX:  in, optional, type=boolean, default=0
-;                       If set, then `LOCATION` will be converted to its corresponcing
-;                           plot index number.
+;       OLD_LAYOUT:         in, required, type=lonarr(2)
+;                           The old 1 based plotting layout [column, row]
+;       NEW_LAYOUT:         in, required, type=lonarr(2)
+;                           The new 1 based plotting layout [column, row] into which the
+;                               currently stored plot locations will be fitted
 ;
 ; :Returns:
-;       PLOT_EXISTS:    Tells whether the plot exists (1) or not (0).
-;
-; :Uses:
-;   Uses the following external programs::
-;       twoD_to_oneD_index.pro
+;       NEWISTAKEN:         An array indicating which positions are taken within the new
+;                               layout scheme.
 ;-
-function MrPlotLayout::plotExists, location, location_out, $
-LIST_INDEX = list_index, $
-PLOT_INDEX = plot_index, $
-TO_COLROW = to_colrow, $
-TO_LIST_INDEX = to_list_index, $
-TO_PLOT_INDEX = to_plot_index
+function MrPlotLayout::RePosition, old_layout, new_layout, plot_index
     compile_opt idl2
     
     ;Error handling
@@ -1007,109 +1080,51 @@ TO_PLOT_INDEX = to_plot_index
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, 0
+        return, !Null
+    endif
+
+    ;If the old layout is empty, check if PLOT_INDEX fits in the new layout.
+    if array_equal(old_layout, [0,0]) then begin
+        ;If no plot index was given, then there *should* be nothing to convert.
+        if n_elements(plot_index) eq 0 then $
+            if n_elements(*self.posIsTaken) eq 0 $
+                then return, !Null $
+                else message, 'OLD_LAYOUT did not match posIsTaken. Report bug.'
+    
+        if self -> PlotExists(plot_index, new_layout) $
+            then return, plot_index $
+            else message, 'PLOT_INDEX is outside of NEW_LAYOUT. Cannot Re-Position.'
     endif
     
-;---------------------------------------------------------------------
-;Check Inputs ////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;If no plots are present, then LOCATION does not exist
-    if n_elements(*self.plot_locations) eq 0 then return, 0
-    nplots = (*self.plot_locations)[0,*]
+    ;If the new layout is empty, 
+    if new_layout[0] eq 0 || new_layout[1] eq 0 $
+        then message, 'NEW_LAYOUT is invalid. Must have at least 1 column and 1 row.'
+    
+    ;Convert a plot index
+    if n_elements(plot_index) gt 0 then begin
+        old_colrow     = self -> ConvertLocation(plot_index, old_layout, /PLOT_INDEX, /TO_COLROW)
+        new_plot_index = self -> ConvertLocation(old_colrow, new_layout, /TO_PLOT_INDEX)
+        return, new_plot_index
+    endif
+    
+    ;Find the indices of the filled positions in the old layout.
+    iOldTaken = where(*self.posIsTaken eq 1, nOldTaken)
+    
+    ;Make a new array for the new layout.
+    nNew = new_layout[0]*new_layout[1]
+    newIsTaken = bytarr(nNew)
+    
+    ;If no positions were taken in the old layout, then none are taken in the new one.
+    if nOldTaken eq 0 then return, newIsTaken
 
-    ;Check keywords
-    plot_index = keyword_set(plot_index)
-    list_index = keyword_set(list_index)
-    to_colrow = keyword_set(to_colrow)
-    to_list_index = keyword_set(to_list_index)
-    to_plot_index = keyword_set(to_plot_index)
-    
-    if plot_index + list_index gt 1 then $
-        message, 'PLOT_INDEX and LIST_INDEX are mutually exclusive.'
-    
-    if to_colrow + to_list_index + to_plot_index gt 1 then $
-        message, 'TO_COLROW, TO_LIST_INDEX, and TO_PLOT_INDEX are mutually exclustive.'
-    
-    ;Number of elements
-    if keyword_set(plot_index) || keyword_set(list_index) $
-        then nlocations = n_elements(location) $
-        else nlocations = n_elements(location[0,*])
-    
-    ;Allocate memory
-    plot_exists = intarr(nlocations)
-    
-    if keyword_set(to_colrow) $
-        then location_out = intarr(2, nlocations) $
-        else if keyword_set(to_list_index) or keyword_set(to_plot_index) $
-            then location_out = intarr(nlocations)
-    
-;---------------------------------------------------------------------
-;A Plot Index Location was Provided //////////////////////////////////
-;---------------------------------------------------------------------
-    
-    ;If a plot index was given
-    if keyword_set(plot_index) then begin
-        ;If a plot index was given, convert it to a [col, row] location
-        loc_colrow = twoD_to_oneD_index(location-1, self.layout, /ONED_TO_TWOD) + 1
-        
-        ;Check if the plots exist
-        for i = 0, nlocations - 1 do begin
-            thisPlot = where((*self.plot_locations)[0,*] eq loc_colrow[0,i] and $
-                             (*self.plot_locations)[1,*] eq loc_colrow[1,i], nmatches)
-            
-            if nmatches eq 0 $
-                then plot_exists[i] = 0 $
-                else plot_exists[i] = 1
-            
-            ;Convert to list index?
-            if to_list_index then location_out[i] = thisPlot
-        endfor
-        
-        ;Convert to [Col, Row]?
-        if to_colrow then location_out = loc_colrow
-        if to_plot_index then location_out = location
-    
-;---------------------------------------------------------------------
-;A List Index Location was Provided //////////////////////////////////
-;---------------------------------------------------------------------
-    endif else if keyword_set(list_index) then begin
-        ;Plots are stored contiguously. List_Index must be < NPlots.
-        plot_exists = location lt nplots
-        
-        ;Convert?
-        if keyword_set(to_list_index) then location_out = location
-        if keyword_set(to_colrow) then location_out = (*self.plot_locations)[*,location]
-        if keyword_set(to_plot_index) then begin
-            loc_colrow = (*self.plot_locations)[*,location]
-            location_out = twoD_to_oneD_index(loc_colrow-1, self.layout) + 1
-        endif
-        
-;---------------------------------------------------------------------
-;A [Col, Row] Location was Provided //////////////////////////////////
-;---------------------------------------------------------------------
-    endif else begin
-        ;Check if the plots exist
-        for i = 0, nlocations - 1 do begin
-            thisPlot = where((*self.plot_locations)[0,*] eq location[0,i] and $
-                             (*self.plot_locations)[1,*] eq location[1,i], nmatches)
-            
-            if nmatches eq 0 $
-                then plot_exists[i] = 0 $
-                else plot_exists[i] = 1
-                
-            ;Convert to list index?
-            if keyword_set(to_list_index) then location_out[i] = thisPlot
-        endfor
+    ;Convert the indices of the taken positions to [col, row] locations.
+    oldTaken_colrow = self -> ConvertLocation(iOldTaken, old_layout, /LIST_INDEX, /TO_COLROW)
+    iNewTaken = self -> ConvertLocation(oldTaken_colrow, new_layout)
 
-        ;Convert to [Col, Row]?
-        if keyword_set(to_colrow) then location_out = location
-        if keyword_set(to_plot_index) then location_out = twoD_to_oneD_index(location-1, self.layout) + 1
-    endelse
-
-    ;If a scalar was given, return a scalar    
-    if nlocations eq 1 then plot_exists = plot_exists[0]
+    ;Record which positions are taken in the new layout.
+    newIsTaken[iNewTaken] = 1
     
-    return, plot_exists
+    return, newIsTaken
 end
 
 
@@ -1157,16 +1172,28 @@ YGAP = ygap
 
     ;Set Properties
     if n_elements(aspect)  ne 0 then *self.aspect = aspect
-    if n_elements(layout)  ne 0 then self.layout = layout
     if n_elements(xgap)    ne 0 then self.xgap = xgap
     if n_elements(xmargin) ne 0 then self.xmargin = xmargin
     if n_elements(ygap)    ne 0 then self.ygap = ygap
     if n_elements(ymargin) ne 0 then self.ymargin = ymargin
     
-    ;Calculate the positions of the plots within the new layout, then apply them
-    ;to the plots that exist within said layout.
+    ;Make sure plot locations are invariant to changes in the layout
+    if n_elements(layout) ne 0 then begin
+    
+        ;Make sure the new layout will be valid.
+        if layout[0] eq 0 || layout[1] eq 0 then $
+            message, 'LAYOUT must have at least 1 column and 1 row.'
+        
+        ;Resposition all of the existing plots        
+        *self.posIsTaken = self -> RePosition(self.layout, layout)
+        if *self.posIsTaken eq !Null then *self.posIsTaken = bytarr(layout[0]*layout[1])
+
+        ;Change the layout
+        self.layout = layout
+    endif
+    
+    ;Calculate the positions of the plots within the new layout
     self -> CalcLayoutPositions
-    self -> UpdateLayout
 end
 
 
@@ -1178,18 +1205,10 @@ end
 ; :Params:
 ;
 ;       LOCATION:           in, required, type=lonarr(2)
-;                           The 1 based plot location [col, row]  at which to begin 
+;                           The 1-based plot location [col, row] at which to begin 
 ;                               shifting plots.
-;
-; :Keywords:
-;       LIST_INDEX:         in, optional, type=Boolean, default=0
-;                           Indicate that `LOCATION` is the index within the
-;                               internal data lists at which to begin shifting plots. All
-;                               plots with a plot grid index number greater than or equal
-;                               to this plot will be moved.
 ;-
-pro MrPlotLayout::shiftPlots, location, $
-LIST_INDEX = list_index
+pro MrPlotLayout::ShiftPlots, location
     compile_opt idl2
     
     ;Error handling
@@ -1202,39 +1221,24 @@ LIST_INDEX = list_index
 
     ;get the [Col, Row] location of where to start shifting plots and convert it to a
     ;1-based, 1D plot number.
-    is_colrow = ~keyword_set(list_index)
-    exists = self -> plotExists(location, index, LIST_INDEX=list_index, /TO_LIST_INDEX)
-    colrow = (*self.plot_locations)[*,index]
+    iList = self -> ConvertLocation(location, /TO_LIST_INDEX)
     
-    exists = self -> plotExists(colrow, plot_index, /TO_PLOT_INDEX)
-
-    ;Find the 1D plot number of each existing plot. Allocate an array with -1's and skip
-    ;all plots with user-supplied positions, leaving the plotIndex of said plots -1.
-    plotIndices = lonarr(n_elements(*self.plot_locations)/2) - 1
-    theseIndices = where((*self.plot_locations)[0,*] ne -1, count)
-    if count ne 0 then begin
-        exists = self -> plotExists((*self.plot_locations)[*,theseIndices], pindex, /TO_PLOT_INDEX)
-        plotIndices[theseIndices] = pindex
-    endif
+    ;Find the positions that are not yet taken
+    iNotTaken = where((*self.posIsTaken)[iList:*] eq 0, nNotTaken)
     
-    ;find all of the plots that need to be moved
-    moveThese = where(plotIndices ge plot_index, count)
-    if count eq 0 then return
+    ;If all positions are taken, add another row to the layout
+    if nNotTaken eq 0 then begin
+        self -> ExpandLayout, 0, 1
+        iList = self -> ConvertLocation(location, /TO_INDEX)
+        iNotTaken = min(where((*self.posIsTaken)[iList:*] eq 0))
+    endif else begin
+        iNotTaken = iNotTaken[0]
+    endelse
     
-    ;add one to their index number, essentially moving them to the next plot location over
-    plotIndices[moveThese] += 1
-    
-    ;if there are more plots than there are positions available, add a row to the plot layout
-    nLocations = self.layout[0] * self.layout[1]
-    if max(plotIndices) gt nLocations then self.layout += [0, 1]
-        
-    ;recalculate all of the plot locations
-    ;convert the 0-based plot indices to 1-based plot locations [col, row]
-    theseIndices = where(plotIndices ne -1, count)
-    if count ne 0 then begin
-        exists = self -> plotExists(plotIndices[theseIndices], colrow_out, /PLOT_INDEX, /TO_COLROW)
-        (*self.plot_locations)[*,theseIndices] = colrow_out
-    endif
+    ;Make the first available position unavailable, then make the chosen position
+    ;available. All positions in between remain unavailable.
+    (*self.posIsTaken)[iNotTaken] = 1
+    (*self.posIsTaken)[iList] = 0
 end
 
 
@@ -1242,8 +1246,7 @@ end
 ;   The purpose of this method is to describe the layout as well as the locations and
 ;   positions of the plots currently stored in it.
 ;-
-pro MrPlotLayout::whichLayout, old_layout, new_layout
-INDEX=index
+pro MrPlotLayout::whichLayout
     compile_opt idl2
     
     ;Error handling
@@ -1253,42 +1256,72 @@ INDEX=index
         void = error_message()
         return
     endif
+
+;---------------------------------------------------------------------
+;LAYOUT //////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     
     ;Print information about the overall layout.
+    print, ''
     print, '-------LAYOUT-------'
-    print, FORMAT='(%"  Layout:     [%i, %i]")', self.layout
-    print, FORMAT='(%"  # of Plots: %i")', self.nplots
+    print, FORMAT='(%"  Layout:    [%i, %i]")', self.layout
+    print, FORMAT='(%"  nPlots:    %i")', self.nPlots
+    print, FORMAT='(%"  nFixed:    %i")', self.nFixed
     if n_elements(*self.aspect) ne 0 then print, FORMAT='(%"  Aspect:     %f")', *self.aspect
-    print, FORMAT='(%"  XMargins:   [%i, %i]")', self.xmargin
-    print, FORMAT='(%"  YMargins:   [%i, %i]")', self.ymargin
-    print, FORMAT='(%"  XGaps:      %i")', self.xgap
-    print, FORMAT='(%"  YGaps:      %i")', self.ygap
+    print, FORMAT='(%"  XMargins:  [%i, %i]")', self.xmargin
+    print, FORMAT='(%"  YMargins:  [%i, %i]")', self.ymargin
+    print, FORMAT='(%"  XGaps:     %i")', self.xgap
+    print, FORMAT='(%"  YGaps:     %i")', self.ygap
+
+;---------------------------------------------------------------------
+;LAYOUT POSITIONS & LOCATIONS ////////////////////////////////////////
+;---------------------------------------------------------------------
+    void = self -> GetPlotIndexAvailability(PITAKEN=piTaken, NTAKEN=nTaken)
+    if nTaken gt 0 then colrow = self -> ConvertLocation(piTaken, /PLOT_INDEX, /TO_COLROW)
+
+    if nTaken gt 0 then begin
+        print, ''
+        print, '--LOCATIONS--               --POSITIONS--'
+        for i = 0, nTaken - 1 do begin
+            print, FORMAT='(%"   [ %i, %i]          [%6.4f, %6.4f, %6.4f, %6.4f]")', $
+                   colrow[*,i], (*self.layout_positions)[*, colrow[0,i]-1, colrow[1,i]-1]
+        endfor
+    endif
+
+;---------------------------------------------------------------------
+;FIXED POSITIONS & LOCATIONS /////////////////////////////////////////
+;---------------------------------------------------------------------
+    if self.nFixed gt 0 then begin
+        if nTaken eq 0 then print, '--LOCATIONS--               --POSITIONS--'
     
-    ;Print the locations and positions of each plot
-    print, '--LOCATIONS--               --POSITIONS--'
-    for i = 0, self.nplots - 1 do begin
-        print, FORMAT='(%"   [%i, %i]          [%6.4f, %6.4f, %6.4f, %6.4f]")', $
-               (*self.plot_locations)[*,i], (*self.plot_positions)[*,i]
-    endfor
+        for i = 0, self.nFixed - 1 do begin
+            print, FORMAT='(%"   [%i, %i]          [%6.4f, %6.4f, %6.4f, %6.4f]")', $
+                   [-1,i+1], (*self.fixed_positions)[*,i]
+        endfor
+    endif
+
+;---------------------------------------------------------------------
+;GRID OF AVAILABILITY ////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if n_elements(*self.posIsTaken) gt 0 then begin
+        isTaken = reform(*self.posIsTaken, self.layout[0], self.layout[1])
+        print, ''
+        print, '--LAYOUT AVAILABILITY--'
+        for i = 0, self.layout[1]-1 do begin
+            print, FORMAT='(a2, ' + strtrim(self.layout[0],2) + '(i1, 1x), a1)', $
+                   '| ', ~isTaken[*,i], '|'
+        endfor
+    endif
 end
 
 
 ;+
-;       Renumber the plots in case of a change to the layout (i.e. the number of rows and
-;       columns is changed).
+;   Adjust the layout of the plots by moving plots to fill in gaps and then
+;   removing any empty columns or rows.
 ;
 ; :Private:
-;
-; :Params:
-;
-;       OLD_LAYOUT:         in, required, type=lonarr(2)
-;                           The old 1 based plotting layout [column, row]
-;       NEW_LAYOUT:         in, required, type=lonarr(2)
-;                           The new 1 based plotting layout [column, row] into which the
-;                               currently stored plot locations will be fitted
 ;-
-pro MrPlotLayout::renumber, old_layout, new_layout
-INDEX=index
+pro MrPlotLayout::FillHoles
     compile_opt idl2
     
     ;Error handling
@@ -1299,16 +1332,211 @@ INDEX=index
         return
     endif
     
-    ;for each plot...
-    for i = 0, self.nplots-1 do begin
-        ;convert the plot location to an index number. Plot locations are 1-based. They
-        ;must be converted to 0-based index values.
-        old_plot_number = twoD_to_oneD_index((*self.plot_locations)[*,i] - 1, old_layout)
+    ;If there are no plots, then there is nothing to adjust
+    nplots = n_elements(*self.plot_positions)/4
+    if nplots eq 0 then return
+    
+    ;find where holes are in the plot layout
+    holes = self -> FindLayoutHoles(NHOLES=nholes, PLOT_NUMBERS=plot_numbers)
+    
+    plot_numbers_new = plot_numbers
+    
+    ;while holes remain...
+    while nholes gt 0 do begin
+        ;only adjust the plots that are after the hole
+        ;determine how many locations to shift the plots to fill the first hole, then fill it
+        to_adjust = where(plot_numbers_new gt holes[0], n_to_adjust)
+
+        if n_to_adjust ne 0 then shift_size = plot_numbers_new[to_adjust[0]] - holes[0] $
+                            else shift_size = 0
+        plot_numbers_new[to_adjust[0]:*] -= shift_size
+
+        ;reduce the number of holes and get rid of the filled hole location
+        nholes -= 1
+        if nholes gt 0 then holes = holes[1:*]
+    endwhile
+
+    ;fit the plots within the current layout scheme at their new locations
+    ;must go from a 1-based PLOT_NUMBER to a 0-based index, then back
+    exists = self -> PlotExists(plot_numbers_new, colrow, /PLOT_INDEX, /TO_COLROW)
+    *self.plot_locations = colrow
+
+    ;if any columns or rows have become empty (i.e. filled with holes) then trim them
+    ;set the new layout (1-based). Update the positions of all plots.
+    void = self -> GetPlotIndexAvailability(MAXCOL=maxCol, MAXROW=maxRow)
+    self -> SetProperty, LAYOUT=[maxCol, maxRow]
+end
+
+
+;+
+;       Find the 1-based plot numbers (ordered top -> bottom, left -> right) of any
+;       hole in the plotting grid
+;
+; :Private:
+;
+; :Keywords:
+;
+;       NHOLES:             out, optional, type=int
+;                           the number of holes found
+;       PLOT_NUMBERS:       out, optional, type=intarr()
+;                           the plot numbers for all of the plots
+;
+; :Returns:
+;
+;       LAYOUTHOLES     [array] the 1-based plot grid number where no plots exist
+;-
+function MrPlotLayout::FindLayoutHoles, $
+NHOLES = nholes, $
+PLOT_NUMBERS = plot_numbers
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        nholes = 0
+        return, -1
+    endif
+
+    ;If there are no plots, then there are no holes.
+    nplots = n_elements(*self.plot_positions)/4
+    if nplots eq 0 then begin
+        nholes = 0
+        return, -1
+    endif
+
+    ;Total number of possible plots and their plot numbers.
+    nTot = self.layout[0] * self.layout[1]
+    all_plot_numbers = indgen(nTot) + 1
+    
+    ;Find the holes
+    theseIndices = where((*self.plot_locations)[0,*] ne -1, count)
+    if count ne 0 then begin
+        exists = self -> PlotExists((*self.plot_locations)[*,theseIndices], plot_numbers, /TO_PLOT_INDEX)
+        void = ismember(plot_numbers, all_plot_numbers, NONMEMBER_INDS=layoutHoles, N_NONMEMBERS=nholes)
+    endif
+
+    return, layoutHoles
+end
+
+
+;+
+;   The purpose of this method is to change/replace the position and/or location of a
+;   plot that already exists within the 2D plotting grid.
+;
+; :Params:
+;       LOCATION:           in, optional, type=long
+;                           The [col, row] location of the plot to replace.
+;
+; :Keywords:
+;       POSITION:           out, optional, type=fltarr(4)
+;                           The lower-left and upper-right corners of a plot in normal
+;                               coordinates. If `SETLOCATION` is in use, then this is the
+;                               new position of the plot indicated by `LOCATION`.
+;       SETLOCATION:        in, optional, type=lonarr(2)
+;                           Use this kewyord to set the [col, row] location of the plot
+;                               indicated by `LOCATION`::
+;                                   `LOCATION`[0] > 0, `SETLOCATION`[0] < 0 
+;                                       An auto-updating plot will become fixed at
+;                                       its present position.
+;                                   `LOCATION`[0] < 0, `SETLOCATION`[0] > 0 
+;                                       A fixed plot will be put into the auto-updating
+;                                       grid at the location indicated.
+;                                   `LOCATION`[0] > 0, `SETLOCATION`[0] > 0 
+;                                       An auto-updating plot will be moved within the 
+;                                       grid to the location indicated.
+;                                   `LOCATION`[0] < 0, `SETLOCATION`[0] < 0 
+;                                       Ignored. A fixed plot is fixed no matter what.
+;       SETPOSITION:        in, optional, type=fltarr(4)
+;                           A four-element vector in the form [x0, y0, x1, y1] specifying
+;                               the location of the lower right [x0, y0] and upper-left
+;                               [x1, y1] corners of a plot. If set, then the plot given
+;                               by `LOCATION` will have its position changed to SETPOSITION.
+;                               If `LOCATION` is that of an auto-updating plot, it will
+;                               become fixed. If a location has been changed, it will be
+;                               returned in `SETLOCATION`.
+;
+; :Uses:
+;   Uses the following external programs::
+;       MrPlotLayout.pro
+;-
+pro MrPlotLayout::ReplacePositions, location, $
+POSITION = position, $
+SETLOCATION = setLocation, $
+SETPOSITION = setPosition
+    compile_opt idl2
+
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+;---------------------------------------------------------------------
+;If LOCATION is Present //////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    exists = self -> PlotExists(location)
+    if exists eq 0 then message, 'LOCATION does not exist.'
+            
+;---------------------------------------------------------------------
+;Set a [Col, Row] Location ///////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    if n_elements(SetLocation) ne 0 then begin
+        ;Fixed -> Fixed
+        if location[0] lt 0 and SetLocation[0] lt 0 then begin
+            ;Ignored
+            
+        ;Auto-Update -> Fixed
+        endif else if location[0] gt 0 and SetLocation[0] lt 0 then begin
+            loc = self -> GetPlotIndexAvailability(/FIXED)
+            location = [-1, loc-1]
+            position = (*self.plot_positions)[*,index]
         
-        ;find the plot's location in the new layout. Plot numbers are 0-based. They
-        ;must be converted to 1-based location values.
-        (*self.plot_locations)[*,i] = twoD_to_oneD_index(old_plot_number, new_layout, /oneD_to_twoD) + 1
-    endfor
+        
+        ;Auto-Update -> Auto-Update || Fixed -> Auto-Update
+        endif else begin
+            ;Find a layout that will accommodate the new location
+            ;(the layout will be updated later)
+            self -> Make_Location, setLocation, LAYOUT=layout, UPDATE_LAYOUT=0
+        
+            ;Calculate the new position.
+            position = MrPlotLayout(layout, setLocation, $
+                                    XMARGIN=self.xmargin, XGAP=self.xgap, $
+                                    YMARGIN=self.ymargin, YGAP=self.ygap, $
+                                    _STRICT_EXTRA=extra)
+        endelse
+        
+        ;Set the new location and position.
+        (*self.plot_locations)[*,index] = setLocation
+        (*self.positions)[index] = position
+        
+;---------------------------------------------------------------------
+;Set a Position //////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    endif else if n_elements(SetPosition) ne 0 then begin
+    
+        ;Auto-Updating -> Fixed
+        if (*self.plot_locations)[0,index] gt 0 then begin
+            loc = self -> GetPlotIndexAvailability(/FIXED)
+            SetLocation = [-1, loc-1]
+        
+        ;Fixed -> Fixed
+        endif else SetLocation = location
+        
+        ;Update the location and position
+        (*self.plot_locations)[*,index] = SetLocation
+        (*self.plot_positions)[*,index] = SetPosition
+        
+    endif
+    
+    ;If the layout was changed, we need to update the other positions as well
+    if n_elements(layout) ne 0 then self -> SetProperty, LAYOUT=layout
 end
 
 
@@ -1327,9 +1555,9 @@ pro MrPlotLayout::cleanup
     endif
     
     ptr_free, self.aspect
+    ptr_free, self.fixed_positions
     ptr_free, self.layout_positions
-    ptr_free, self.plot_locations
-    ptr_free, self.plot_positions
+    ptr_free, self.posIsTaken
 end
 
 
@@ -1391,9 +1619,9 @@ YGAP = ygap
     self.ymargin = ymargin
     self.xgap = xgap
     self.ygap = ygap
+    self.fixed_positions = ptr_new(/ALLOCATE_HEAP)
     self.layout_positions = ptr_new(/ALLOCATE_HEAP)
-    self.plot_locations = ptr_new(/ALLOCATE_HEAP)
-    self.plot_positions = ptr_new(/ALLOCATE_HEAP)
+    self.posIsTaken = ptr_new(/ALLOCATE_HEAP)
     
     if n_elements(aspect) eq 0 $
         then self.aspect = ptr_new(/ALLOCATE_HEAP) $
@@ -1414,11 +1642,12 @@ pro MrPlotLayout__define
     
     class = {mrplotlayout, $
              aspect: ptr_new(), $           ;Aspect ratio of the plots.
+             fixed_positions: ptr_new(), $  ;Fixed, non-layout-related positions.
              layout: [0,0], $               ;Layout of the plot area [ncols, nrows].
-             nplots: 0, $                   ;Number of plots displayed.
              layout_positions: ptr_new(), $ ;Positions outlined by the 2D plot-layout grid.
-             plot_locations: ptr_new(), $   ;[col, row] location of each plot.
-             plot_positions: ptr_new(), $   ;Positions of each plot.
+             nplots: 0, $                   ;Number of plots displayed.
+             nfixed: 0, $                   ;Number of fixed positions.
+             posIsTaken: ptr_new(), $       ;Is the Layout_Position filled?
              xgap: 0, $                     ;Size of the gap between plots in the x-direction.
              xmargin: [0,0], $              ;Size of the [left, right] margins.
              ygap: 0, $                     ;Size of the gap between plots in the y-direction.
