@@ -176,7 +176,7 @@ end
 ;                           An object reference to the colorbar.
 ;   
 ;-
-pro MrCreateGraphic::ColorBar, $
+function MrCreateGraphic::ColorBar, $
 ADD = add, $
 DRAW = draw, $
 _REF_EXTRA = extra
@@ -187,7 +187,7 @@ _REF_EXTRA = extra
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return
+        return, obj_new()
     endif
 
     ;Set Defaults
@@ -208,12 +208,12 @@ end
 
 
 ;+
-;   Create a MrImagePlot object. It can be drawn to the display and/or
+;   Create a MrContour object. It can be drawn to the display and/or
 ;   added to the container
 ;
 ; :Keywords:
 ;       ADD:                in, optional, type=boolean, default=0
-;                           Add the plot object to the container. This assumes that the
+;                           Add the coutour object to the container. This assumes that the
 ;                               IDL_Container class or MrIDL_Container class is also a
 ;                               subclass.
 ;       DRAW:               in, optional, type=boolean, default=0
@@ -222,11 +222,11 @@ end
 ;                           Any keyword accepted by MrImagePlot__define.
 ;
 ; :Returns:
-;       THEIMAGE:           out, required, type=object
-;                           An object reference to the image.
+;       THECONTOUR:         out, required, type=object
+;                           An object reference to the contour.
 ;   
 ;-
-function MrCreateGraphic::Image, $
+function MrCreateGraphic::Contour, data, x, y, $
 ADD = add, $
 DRAW = draw, $
 _REF_EXTRA = extra
@@ -245,7 +245,57 @@ _REF_EXTRA = extra
     draw = keyword_set(draw)
 
     ;Create the color bar
-    theImage = obj_new('MrImagePlot', _STRICT_EXTRA=extra)
+    theContour = obj_new('MrContour', data, x, y, _STRICT_EXTRA=extra)
+    
+    ;Add the image
+    if keyword_set(add) then self -> Add, theContour
+    
+    ;Draw    
+    if keyword_set(draw) then self -> Draw
+    
+    return, theContour
+end
+
+
+;+
+;   Create a MrImagePlot object. It can be drawn to the display and/or
+;   added to the container
+;
+; :Keywords:
+;       ADD:                in, optional, type=boolean, default=0
+;                           Add the image object to the container. This assumes that the
+;                               IDL_Container class or MrIDL_Container class is also a
+;                               subclass.
+;       DRAW:               in, optional, type=boolean, default=0
+;                           Call the Draw method after adding the image to the list.
+;       _REF_EXTRA:         in, optional, type=structure
+;                           Any keyword accepted by MrImagePlot__define.
+;
+; :Returns:
+;       THEIMAGE:           out, required, type=object
+;                           An object reference to the image.
+;   
+;-
+function MrCreateGraphic::Image, image, x, y, $
+ADD = add, $
+DRAW = draw, $
+_REF_EXTRA = extra
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, obj_new()
+    endif
+
+    ;Set Defaults
+    add = keyword_set(add)
+    draw = keyword_set(draw)
+
+    ;Create the color bar
+    theImage = obj_new('MrImagePlot', image, x, y, _STRICT_EXTRA=extra)
     
     ;Add the image
     if keyword_set(add) then self -> Add, theImage
@@ -271,7 +321,7 @@ end
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by weLegendItem.
 ;-
-pro MrCreateGraphic::Legend, $
+function MrCreateGraphic::Legend, $
 ADD = add, $
 DRAW = draw, $
 _REF_EXTRA = extra
@@ -282,7 +332,7 @@ _REF_EXTRA = extra
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return
+        return, obj_new()
     endif
     
     ;Create the legend
@@ -326,7 +376,7 @@ end
 ;
 ;   
 ;-
-pro MrCreateGraphic::OverPlot, x, y, $
+function MrCreateGraphic::OverPlot, x, y, $
 ADD = add, $
 DRAW = draw, $
 _REF_EXTRA = extra
@@ -372,7 +422,7 @@ end
 ;                           An object reference to the plot.
 ;   
 ;-
-function MrCreateGraphic::Plot, $
+function MrCreateGraphic::Plot, x, y, $
 ADD = add, $
 DRAW = draw, $
 _REF_EXTRA = extra
@@ -391,7 +441,7 @@ _REF_EXTRA = extra
     draw = keyword_set(draw)
 
     ;Create the plot
-    thePlot = obj_new('MrPlotObject', _STRICT_EXTRA=extra)
+    thePlot = obj_new('MrPlotObject', x, y, _STRICT_EXTRA=extra)
     
     ;Add the plot
     if keyword_set(add) then self -> Add, thePlot

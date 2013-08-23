@@ -67,6 +67,8 @@
 ;       07/31/2013  -   Added the ConvertCoord method. - MRA
 ;       08/09/2013  -   Inherit MrIDL_Container - MRA
 ;       08/10/2013  -   Added the LAYOUT keyword. - MRA
+;       08/22/2013  -   Added the NOERASE keyword to Draw. Was forgetting to set the
+;                           position property in SetProperty. Fixed. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -132,7 +134,8 @@ end
 ;   first buffered into the pixmap for smoother opteration (by allowing motion events
 ;   to copy from the pixmap instead of redrawing the plot, the image does not flicker).
 ;-
-pro MrPlotObject::Draw
+pro MrPlotObject::Draw, $
+NOERASE = noerase
     compile_opt idl2
     
     ;Error handling
@@ -144,16 +147,16 @@ pro MrPlotObject::Draw
     endif
 
     ;Now draw the plot to the pixmap
-    self -> doPlot
+    self -> doPlot, NOERASE=noerase
     
     ;Save the system variables
     self.x_sysvar = !X
     self.y_sysvar = !Y
     self.p_sysvar = !P
-    
+
     ;Draw the other items
     oContained = self -> Get(/ALL, COUNT=count)
-    for i = 0, count - 1 do oContained[i] -> Draw
+    for i = 0, count - 1 do oContained[i] -> Draw, /NOERASE
 end
 
 
@@ -161,7 +164,8 @@ end
 ;   The purpose of this method is to do the actual plotting. Basically, having this here
 ;   merely to saves space in the Draw method.
 ;-
-pro MrPlotObject::doPlot
+pro MrPlotObject::doPlot, $
+NOERASE=noerase
     compile_opt idl2
     
     ;Error handling
@@ -171,6 +175,8 @@ pro MrPlotObject::doPlot
         void = error_message()
         return
     endif
+    
+    if n_elements(noerase) eq 0 then noerase = *self.noerase
 
     ;Draw the plot.
     wePlot, *self.indep, *self.dep, $
@@ -198,7 +204,7 @@ pro MrPlotObject::doPlot
             FONT=*self.font, $
             NOCLIP=*self.noclip, $
             NODATA=*self.nodata, $
-            NOERASE=*self.noerase, $
+            NOERASE=noerase, $
             POSITION=*self.position, $
             PSYM=*self.psym, $
             SUBTITLE=*self.subtitle, $
@@ -480,9 +486,6 @@ end
 ;       POLAR:              in, optional, type=boolean
 ;                           Indicates that X and Y are actually R and Theta and that the
 ;                               plot is in polar coordinates.
-;       POSITION:           in, optional, type=fltarr(4)
-;                           The location of the lower-left and upper-right corners of the
-;                               plot, in normal coordinates: [x0, y0, x1, y1].
 ;       X_SYSVAR:           in, optional, type=structure
 ;                           The !X system variable state associated with the image
 ;       XLOG:               in, optional, type=boolean
@@ -522,7 +525,6 @@ MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
 NSUM = nsum, $
 POLAR = polar, $
-POSITION = position, $
 XLOG = xlog, $
 YLOG = ylog, $
 YNOZERO = ynozero, $
@@ -540,7 +542,7 @@ _REF_EXTRA = extra
     ;Data Properties
     if n_elements(INDEP) ne 0 then *self.indep = indep
     if n_elements(DEP) ne 0 then *self.dep = dep
-    
+
     ;MrLinePlot Properties
     if n_elements(OPLOTS)      ne 0 then  self -> Add, oplots
     if n_elements(LEGENDS)     ne 0 then  self -> Add, legends
@@ -552,7 +554,10 @@ _REF_EXTRA = extra
     if n_elements(P_SYSVAR)    ne 0 then  self.p_sysvar = p_sysvar
     if n_elements(X_SYSVAR)    ne 0 then  self.x_sysvar = x_sysvar
     if n_elements(Y_SYSVAR)    ne 0 then  self.y_sysvar = y_sysvar
-    if n_elements(LAYOUT)      ne 0 then *self.position = MrPlotLayout(layout[0:1], layout[2:*])
+    if n_elements(LAYOUT)      ne 0 then  begin
+        *self.layout = layout
+        *self.position = MrPlotLayout(layout[0:1], layout[2:*])
+    endif
     
     ;Graphics Properties
     if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
@@ -594,11 +599,9 @@ pro MrPlotObject::cleanup
     ptr_free, self.ylog
     ptr_free, self.polar
     
-    ;Cleanup the remaining keywords by calling the superclass. This must be done because
-    ;the superclasses method has been over-ridden here.
+    ;Cleanup the superclass.
     self -> weGraphicsKeywords::CLEANUP
-    self -> MrAbstractOverPlot::cleanup
-    self -> MrAbstractLegend::cleanup
+    self -> MrIDL_Container::Cleanup
 end
 
 
@@ -778,8 +781,8 @@ _REF_EXTRA = extra
     self.ynozero = ptr_new(/ALLOCATE_HEAP)
     
     ;Add overplots and legends. Serves as an Init method.
-    self -> addOverPlots, oplots
-    self -> addLegends, legends
+    if n_elements(oplots)  ne 0 then self -> Add, oplots
+    if n_elements(legends) ne 0 then self -> Add, legends
     
     ;weGraphicsKeywords defaults COLOR to a scalar string ('black'). We must
     ;replicate it if more than one column was given.

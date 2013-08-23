@@ -49,10 +49,16 @@
 ; :History:
 ;   Modification History::
 ;       08/09/2013  -   Written by Matthew Argall
+;       08/22/2013  -   Added the DESTROY keyword and Remove method. The Which method
+;                           now finds the class names correctly. - MRA
 ;-
 ;*****************************************************************************************
 ;+
-;   The purpose of this method is to add functionality to the IDL_Container::Add method. 
+;   The purpose of this method is to add functionality to the IDL_Container::Add method.
+;   Additions include::
+;       - Container can be cleared before new objects are added
+;       - Objects cleared in this way can be destroyed
+;       - POSITION is now named INDEX
 ;
 ; :Params:
 ;       OBJECTS:        in, required, type=object/objarr
@@ -65,10 +71,14 @@
 ;                       Each index value specifies the position within the container at
 ;                           which a new object should be placed. If not specified, objects
 ;                           are added to the end of the list of contained items.
+;       DESTROY:        in, optional, type=boolean, default=0
+;                       Destroy all objects being cleared. This is only valid when
+;                           `CLEAR` is set.
 ;-
 pro MrIDL_Container::Add, Objects, $
 CLEAR = clear, $
-POSITION = Index
+DESTROY = destroy, $
+INDEX = Index
     compile_opt idl2
     
     ;Error handling
@@ -79,8 +89,11 @@ POSITION = Index
         return
     endif
     
+    ;Defaults
+    SetDefaultValue, destroy, 0, /BOOLEAN
+    
     ;Clear all contained items?
-    if keyword_set(clear) then self -> Remove, /ALL
+    if keyword_set(clear) then self -> Remove, /ALL, DESTROY=destroy
     
     ;Add the objects
     self -> IDL_Container::Add, Objects, POSITION=Index
@@ -97,8 +110,13 @@ end
 ;                           replaced. If an object, then the object reference to be replace.
 ;       NEW:            in, required, type=object
 ;                       The object that will replace `OLD`
+;
+; :Keywords:
+;       DESTROY:            in, optional, type=boolean, default=0
+;                           Destroy the `OLD` object being replaced
 ;-
-pro MrIDL_Container::Replace, old, new
+pro MrIDL_Container::Replace, old, new, $
+DESTROY = destroy
     compile_opt idl2
     
     ;Error handling
@@ -110,6 +128,7 @@ pro MrIDL_Container::Replace, old, new
     endif
     
     szOld = size(old, /TYPE)
+    SetDefaultValue, destroy, 0, /BOOLEAN
     
     ;Was an object given?
     if szOld eq 11 then begin
@@ -118,14 +137,113 @@ pro MrIDL_Container::Replace, old, new
         if tf_contained eq 0 then message, 'Object "OLD" not found. Cannot replace.'
         
         ;Remove the old object and add the new one.
-        self -> Remove, old
+        self -> Remove, old, DESTROY=destroy
         self -> Add, new, POSITION=index
     
     ;Was an index given?
     endif else begin
-        self -> Remove, POSITION=old
+        self -> Remove, POSITION=old, DESTROY=destroy
         self -> Add, new, POSITION=old
     endelse
+end
+
+
+
+;+
+;   The purpose of this method is to add functionality to the IDL_Container class.
+;   Additions include::
+;       - Position has been renamed to Index
+;       - Specific classes of objects can be removed.
+;       - Child_Object, Index, and Type can be supplied together
+;       - Objects can be destroyed while being removed.
+;
+; :Params:
+;       Child_Object:       in, optional, type=object
+;                           The object reference(s) for the objects to be removed from
+;                               the container. If not provided, and neither are `ALL`,
+;                               `INDEX`, and `TYPE`, then the first object in the container
+;                               will be removed.
+;
+; :Keywords:
+;       ALL:                in, optional, type=boolean, default=0
+;                           Remove all objects from the container.
+;       DESTROY:            in, optional, type=boolean, default=0
+;                           Destroy all objects being removed.
+;       INDEX:              in, optional, type=integer
+;                           The index value within the container of the object to be
+;                               destroyed.
+;       TYPE:               in, optional, type=string/strarr
+;                           The class names of the objects to be destroyed.
+;-
+pro MrIDL_Container::Remove, Child_Object, $
+ALL = all, $
+DESTROY = destroy, $
+INDEX = index, $
+TYPE = type
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Defaults
+    SetDefaultValue, destroy, 0, /BOOLEAN
+    SetDefaultValue, all, 0, /BOOLEAN
+        
+;---------------------------------------------------------------------
+;Remove All? /////////////////////////////////////////////////////////
+;--------------------------------------------------------------------- 
+    ;Remove all objects?
+    if keyword_set(all) then begin
+        if destroy then allObj = self -> Get(/ALL)
+        self -> IDL_Container::Remove, /ALL
+        if destroy then obj_destroy, allObj
+        return
+    endif
+        
+;---------------------------------------------------------------------
+;Remove An Index? ////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Remove Indices first.
+    if n_elements(index) ne 0 then begin
+        if destroy then RemoveThese = self -> Get(POSITION=index)
+        self -> IDL_Container::Remove, POSITION=index
+        if destroy then obj_destroy, RemoveThese
+    endif
+        
+;---------------------------------------------------------------------
+;Remove a Specific Type? /////////////////////////////////////////////
+;--------------------------------------------------------------------- 
+    
+    if n_elements(type) ne 0 then begin
+        RemoveThese = self -> Get(/ALL, ISA=type)
+        self -> IDL_Container::Remove, RemoveThese
+        if destroy then obj_destroy, RemoveThese
+    endif
+        
+;---------------------------------------------------------------------
+;Remove Children? ////////////////////////////////////////////////////
+;--------------------------------------------------------------------- 
+    if n_elements(Child_Object) ne 0 then begin
+        self -> IDL_Container::Remove, Child_Object
+        if destroy then obj_destroy, Child_Object
+        
+;---------------------------------------------------------------------
+;Remove First Object? ////////////////////////////////////////////////
+;--------------------------------------------------------------------- 
+    
+    ;Remove the first object in the container if nothing else is removed.
+    endif else if (n_elements(type) eq 0) && (n_elements(index) eq 0) then begin
+        if destroy then theObj = self -> Get(POSITION=0)
+        self -> IDL_Container::Remove
+        if destroy then obj_destroy, theObj
+    endif
+    
 end
 
 
@@ -145,14 +263,14 @@ pro MrIDL_Container::Which
     endif
 
     ;Get each of the objects.
-    oContained = self -> Get(/ALL, ISA=class_name, COUNT=count)
-    
+    oContained = self -> Get(/ALL, COUNT=count)
+
     ;Print a header.
     print, '-Index-', '--Class--', FORMAT='(a7, 3x, a9)'
     
     ;Print the index and class name of each object.
     for i = 0, count - 1 do $
-        print, i, class_name, FORMAT='(2x, i3, 6x, a0)'
+        print, i, typename(oContained[i]), FORMAT='(2x, i3, 6x, a0)'
 
 end
 

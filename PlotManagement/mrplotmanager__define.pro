@@ -78,6 +78,10 @@
 ;                           The Add method now forwards actions to other methods instead
 ;                           of being a secondary method. Removed the allObjects property. 
 ;                           Removed the Add* methods for individual graphic types. - MRA
+;       08/22/2013  -   Add, ShiftPlots, ApplyPositions, WhatAmI, and Config methods are
+;                           working properly after remodelling the MrPlotLayout class.
+;                           Added the Plot, Image, and Contour methods. The Remove
+;                           method now works. - MRA
 ;                                   
 ;-
 ;*****************************************************************************************
@@ -114,6 +118,7 @@ POSITION = position
     ;How many objects were given?
     nObj = n_elements(theObjects)
     nIndex = n_elements(index)
+    layout_init = self.layout
     
 ;---------------------------------------------------------------------
 ;Add to Master List //////////////////////////////////////////////////
@@ -131,12 +136,12 @@ POSITION = position
         skip = 0
         if nIndex gt 0 then thisIndex = index[i]
         ImA = self -> WhatAmI(theObjects[i])
-            
+
     ;---------------------------------------------------------------------
     ;Unknown Objects /////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
         if ImA eq '' then begin
-            print, FORMAT='(%"Object \"%s\" at index %i is not recognized. Cannot add.")', $
+            print, FORMAT='(%"MrPlotManager::Add: Object \"%s\" at index %i is not recognized. Cannot add.")', $
                    typename(theObjects[i]), i
             continue
         endif
@@ -144,9 +149,9 @@ POSITION = position
     ;---------------------------------------------------------------------
     ;"Annotation" Objects ////////////////////////////////////////////////
     ;---------------------------------------------------------------------
-        isData = isMember([*self.type.plot, *self.type.image], ImA) 
+        isData = isMember((*self.gTypes).ImAData, ImA) 
         if isData eq 0 then begin
-            self -> MrIDL_Container::Add, theObjects[i], POSITION=thisIndex
+            self -> MrIDL_Container::Add, theObjects[i], INDEX=thisIndex
             continue
         endif
         
@@ -154,9 +159,13 @@ POSITION = position
     ;"Data" Objects //////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
         
-        ;Get the position and layout of the object. If either are undefined, they
-        ;will be generated then set as properies of the current object.
+        ;Get the position and layout of the object.
         theObjects[i] -> GetProperty, POSITION=pos, LAYOUT=layout
+        
+        ;Record the initial position for comparison.
+        if n_elements(pos) eq 0 $
+            then pos_init = !Null $
+            else pos_init = pos
         
         ;Get the "location" part of the layout.
         case n_elements(layout) of
@@ -173,41 +182,43 @@ POSITION = position
         if skip then continue
 
         ;Set the location and position of the new plot.
-        self -> AddPositions, loc, pos
+        ;   If LOC is undefined, it will be returned either as an auto-updating location
+        ;       (if POS is undefined) or as a fixed location (if POS is defined). If LOC
+        ;       is defined and different plot already occupies that location, existing
+        ;       plots will be shifted out of the way to make room.
+        ;
+        ;   If POS is undefined, then Auto-Updating position and location will be returned.
+        ;       If defined and LOC is undefined, 
+        self -> AddToLayout, loc, pos
         
         ;Set the location and position as object properties
-        theObjects[i] -> SetProperty, POSITION=pos, LAYOUT=[(*self.layout)[0:1], loc]
+
+        if loc[0] gt 0 then theObjects[i] -> SetProperty, LAYOUT=[self.layout[0:1], loc]
+        theObjects[i] -> SetProperty, POSITION=pos
         
         ;Store the location and position if they were created.
         location[*,i] = temporary(loc)
         position[*,i] = temporary(pos)
 
         ;Add the object to the container.
-        self -> MrIDL_Container::Add, theObjects[i], POSITION=thisIndex
+        self -> MrIDL_Container::Add, theObjects[i], INDEX=thisIndex
     endfor
+    
+;---------------------------------------------------------------------
+;Apply New Positions /////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;If the layout has changed, we need to apply the new positions to all plots.
+    if array_equal(layout_init, self.layout) eq 0 $
+        then self -> ApplyPositions
 end
 
 
 ;+
-;   The purpose of this method is to clear all objects from the list of objects being
-;   displayed.
-;
-;   :Keywords:
-;       DESTROY:                in, optional, type=boolean, default=1
-;                               Destroy the objects being cleared.
-;       DRAW:                   in, optional, type=boolean, default=0
-;                               Call the Draw method after adding the legends to the list.
-;       IMAGES_ONLY:            in, optional, type=boolean, default=0
-;                               If set, only image objects will be cleared.
-;       PLOTS_ONLY:             in, optional, type=boolean, default=0
-;                               If set, only plot objects will be cleared.
-;       
+;   The purpose of this method is to apply the positions of a new layout to all plots
+;   within the layout.
 ;-
-pro MrPlotManager::Clear, $
-DRAW = draw, $
-DESTROY = destroy, $
-IMAGES_ONLY = images_only, $
-PLOTS_ONLY = plots_only
+pro MrPlotManager::ApplyPositions
     compile_opt idl2
     
     ;Error handling
@@ -217,74 +228,307 @@ PLOTS_ONLY = plots_only
         void = error_message()
         return
     endif
-            
-;---------------------------------------------------------------------
-;Check Inputs ////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    ;Defaults
-    SetDefaultValue, destroy, 1, /BOOLEAN
-    draw = keyword_set(draw)
-    images_only = keyword_set(images_only)
-    plots_only = keyword_set(plots_only)
-            
-;---------------------------------------------------------------------
-;Plots Only? /////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    
-    if keyword_set(plots_only) then begin
-        ;Find which objects are being cleared from the master list.
-        void = isMember(*self.plotObjects, *self.allObjects, iClear, NONMEMBER_INDS=iKeep)
         
-        ;If all objects are plots, clear everything
-        if n_elements(iKeep) eq 0 $
-            then self -> Clear, DESTROY=destroy, DRAW=draw $
-            else self -> RemovePlots, iClear, DESTROY=destroy, DRAW=draw
-            
 ;---------------------------------------------------------------------
-;Images Only? ////////////////////////////////////////////////////////
+;Reposition Plots ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
-    endif else if keyword_set(images_only) then begin
-        void = isMember(*self.imageObjects, *self.allObjects, iClear, NONMEMBER_INDS=iKeep)
+    ;Get all of the data objects
+    dataObjs = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nData)
+    
+    ;Step through each object
+    for i = 0, nData - 1 do begin
+    
+        ;Check to see that it has a LAYOUT specified
+        dataObjs[i] -> GetProperty, LAYOUT=layout
+        nLayout = n_elements(layout)
+        if nLayout eq 0 then continue
+        
+        ;Get the [col,row] location of the plot
+        case nLayout of
+            3: thisColRow = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
+            4: thisColRow = layout[2:3]
+            else: message, 'Layout has incorrect format.'
+        endcase
 
-        if n_elements(iKeep) eq 0 $
-            then self -> Clear, DESTROY=destroy, DRAW=draw $
-            else self -> RemoveImages, iClear, DESTROY=destroy, DRAW=draw
-            
-;---------------------------------------------------------------------
-;Clear All ///////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    endif else begin
-            
-    ;---------------------------------------------------------------------
-    ;Clear Superclasses //////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-    
-        self -> MrAbstractImage::Clear, DESTROY=destroy
-        self -> MrAbstractPlot::Clear, DESTROY=destroy
-    
-    ;---------------------------------------------------------------------
-    ;Clear Master List ///////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-    
-        ;If there are no objects to clear, then return
-        if ptr_valid(self.allObjects) eq 0 then return
-    
-        ;Destroy the objects?
-        if keyword_set(destroy) then obj_destroy, *self.allObjects
-    
-        ;Reset the pointer
-        ptr_free, self.allObjects
-        self.allObjects = ptr_new(/ALLOCATE_HEAP)
-    
-        ;Remove all locations and positions
-        self -> SetPositions, /CLEAR
-    
-        ;Draw?
-        if keyword_set(draw) then self -> Draw
+        ;Update the positions of each plot.
+        position = (*self.layout_positions)[*, thisColRow[0]-1, thisColRow[1]-1]
+        dataObjs[i] -> SetProperty, POSITION=position
+    endfor
+end
 
-    endelse
+
+;+
+;   Create a MrContour object. It can be drawn to the display and/or
+;   added to the container
+;
+; :Keywords:
+;       ADD:                in, optional, type=boolean, default=0
+;                           Add the coutour object to the container. This assumes that the
+;                               IDL_Container class or MrIDL_Container class is also a
+;                               subclass.
+;       DRAW:               in, optional, type=boolean, default=0
+;                           Call the Draw method after adding the image to the list.
+;       LAYOUT:             in, optional, type=intarr
+;                           A vector in the form [layout, location], where "layout" is
+;                               a 2-element vector specifying the number of rows and
+;                               columns, and "location" is a 2-element vector specifying
+;                               the [col,row] location within "layout" at which `THEPLOT`
+;                               should be placed.
+;       POSITION:           in, optional, type=boolean
+;                           The standard 4-element position vector accepted by PLOT. If
+;                               not given and the `ADD` is set, a position will be chosen
+;                               from the available layout positions.
+;       _REF_EXTRA:         in, optional, type=structure
+;                           Any keyword accepted by MrImagePlot__define.
+;
+; :Returns:
+;       THECONTOUR:         out, required, type=object
+;                           An object reference to the contour.
+;   
+;-
+function MrPlotManager::Contour, data, x, y, $
+ADD = add, $
+DRAW = draw, $
+LAYOUT = layout, $
+POSITION = position, $
+_REF_EXTRA = extra
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, obj_new()
+    endif
+    
+    SetDefaultValue, add, 1, /BOOLEAN
+    SetDefaultvalue, draw, 1, /BOOLEAN
+
+;---------------------------------------------------------------------
+;Fit within Current Layout? //////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Make sure the plot fits within the layout
+    if add eq 1 then begin
+        ;Was a [col,row] location provided?
+        case n_elements(layout) of
+            0: ;Do nothing
+            3: location = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
+            4: location = layout[2:3]
+            else: Message, 'Invalid layout. Cannot Plot.'
+        endcase
+    
+        ;Was a position provided?
+        if n_elements(position) eq 0 then fixed = 0 else fixed = 1
+
+        ;Get a location and/or position if none were provided.
+        self -> GetPositions, location, POSITION=position, LAYOUT=layout, UPDATE_LAYOUT=0
+        if location[0] gt 0 $
+            then layout = ptr_new([layout, location]) $
+            else layout = ptr_new(/ALLOCATE_HEAP)
+        
+    endif else layout = ptr_new(/ALLOCATE_HEAP)
+    
+;---------------------------------------------------------------------
+;Create the Image ////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Create the color bar
+    theContour = obj_new('MrContour', data, x, y, _STRICT_EXTRA=extra)
+    
+    ;Add the image
+    if keyword_set(add) then self -> Add, theContour
+    
+    ;Draw    
+    if keyword_set(draw) then self -> Draw
+    
+    return, theContour
+end
+
+
+;+
+;   Create a MrImagePlot object. It can be drawn to the display and/or
+;   added to the container
+;
+; :Keywords:
+;       ADD:                in, optional, type=boolean, default=0
+;                           Add the plot object to the container. This assumes that the
+;                               IDL_Container class or MrIDL_Container class is also a
+;                               subclass.
+;       DRAW:               in, optional, type=boolean, default=0
+;                           Call the Draw method after adding the image to the list.
+;       LAYOUT:             in, optional, type=intarr
+;                           A vector in the form [layout, location], where "layout" is
+;                               a 2-element vector specifying the number of rows and
+;                               columns, and "location" is a 2-element vector specifying
+;                               the [col,row] location within "layout" at which `THEPLOT`
+;                               should be placed.
+;       POSITION:           in, optional, type=boolean
+;                           The standard 4-element position vector accepted by PLOT. If
+;                               not given and the `ADD` is set, a position will be chosen
+;                               from the available layout positions.
+;       _REF_EXTRA:         in, optional, type=structure
+;                           Any keyword accepted by MrImagePlot__define.
+;
+; :Returns:
+;       THEIMAGE:           out, required, type=object
+;                           An object reference to the image.
+;   
+;-
+function MrPlotManager::Image, image, x, y, $
+ADD = add, $
+DRAW = draw, $
+LAYOUT = layout, $
+POSITION = position, $
+_REF_EXTRA = extra
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, obj_new()
+    endif
+    
+    SetDefaultValue, add, 1, /BOOLEAN
+    SetDefaultvalue, draw, 1, /BOOLEAN
+
+;---------------------------------------------------------------------
+;Fit within Current Layout? //////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Make sure the plot fits within the layout
+    if add eq 1 then begin
+        ;Was a [col,row] location provided?
+        case n_elements(layout) of
+            0: ;Do nothing
+            3: location = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
+            4: location = layout[2:3]
+            else: Message, 'Invalid layout. Cannot Plot.'
+        endcase
+    
+        ;Was a position provided?
+        if n_elements(position) eq 0 then fixed = 0 else fixed = 1
+
+        ;Get a location and/or position if none were provided.
+        self -> GetPositions, location, POSITION=position, LAYOUT=layout, UPDATE_LAYOUT=0
+        if location[0] gt 0 $
+            then layout = ptr_new([layout, location]) $
+            else layout = ptr_new(/ALLOCATE_HEAP)
+        
+    endif else layout = ptr_new(/ALLOCATE_HEAP)
+    
+;---------------------------------------------------------------------
+;Create the Image ////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Create the color bar
+    theImage = obj_new('MrImagePlot', image, x, y, _STRICT_EXTRA=extra)
+    
+    ;Add the image
+    if keyword_set(add) then self -> Add, theImage
+    
+    ;Draw    
+    if keyword_set(draw) then self -> Draw
+    
+    return, theImage
+end
+
+
+;+
+;   Create a MrPlotObject object. If it is being added to the current window's container,
+;   make sure it fits within the new layout. cgPlot automatically picks a position, so
+;   we need to pre-empt that.
+;
+; :Keywords:
+;       ADD:                in, optional, type=boolean, default=0
+;                           Add the plot object to the container. This assumes that the
+;                               IDL_Container class or MrIDL_Container class is also a
+;                               subclass.
+;       DRAW:               in, optional, type=boolean, default=0
+;                           Call the Draw method after adding the plot to the list.
+;       LAYOUT:             in, optional, type=intarr
+;                           A vector in the form [layout, location], where "layout" is
+;                               a 2-element vector specifying the number of rows and
+;                               columns, and "location" is a 2-element vector specifying
+;                               the [col,row] location within "layout" at which `THEPLOT`
+;                               should be placed.
+;       POSITION:           in, optional, type=boolean
+;                           The standard 4-element position vector accepted by PLOT. If
+;                               not given and the `ADD` is set, a position will be chosen
+;                               from the available layout positions.
+;       _REF_EXTRA:         in, optional, type=structure
+;                           Any keyword accepted by MrPlotObject__define.
+;
+; :Returns:
+;       THEPLOT:            out, required, type=object
+;                           An object reference to the plot.
+;   
+;-
+function MrPlotManager::Plot, x, y, $
+ADD = add, $
+DRAW = draw, $
+POSITION = position, $
+LAYOUT = layout, $
+_REF_EXTRA = extra
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        if ptr_valid(layout) then ptr_free, layout
+        void = error_message()
+        return, obj_new()
+    endif
+    
+    SetDefaultValue, add, 1, /BOOLEAN
+    SetDefaultvalue, draw, 1, /BOOLEAN
+
+;---------------------------------------------------------------------
+;Fit within Current Layout? //////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Make sure the plot fits within the layout
+    if add eq 1 then begin
+        ;Was a [col,row] location provided?
+        case n_elements(layout) of
+            0: ;Do nothing
+            3: location = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
+            4: location = layout[2:3]
+            else: Message, 'Invalid layout. Cannot Plot.'
+        endcase
+    
+        ;Was a position provided?
+        if n_elements(position) eq 0 then fixed = 0 else fixed = 1
+
+        ;Get a location and/or position if none were provided.
+        self -> GetPositions, location, POSITION=position, LAYOUT=layout, UPDATE_LAYOUT=0
+        if location[0] gt 0 $
+            then layout = ptr_new([layout, location]) $
+            else layout = ptr_new(/ALLOCATE_HEAP)
+        
+    endif else layout = ptr_new(/ALLOCATE_HEAP)
+    
+;---------------------------------------------------------------------
+;Create the Plot /////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Create the plot
+    thePlot = obj_new('MrPlotObject', $
+                      x, y, $
+                      POSITION=position, $
+                      LAYOUT=*layout, $
+                      _EXTRA=extra)
+    ptr_free, layout
+
+    ;Add the plot to the container?
+    if keyword_set(add) then self -> Add, thePlot
+    
+    ;Draw the plot?
+    if keyword_set(draw) then self -> Draw
+    
+    return, thePlot
 end
 
 
@@ -304,7 +548,7 @@ end
 ;                               Destroy the objects being replaced.
 ;       DRAW:                   in, optional, type=boolean, default=0
 ;                               Call the Draw method after adding the legends to the list.
-;       LIST_INDEX              in, optional, type=boolean, default=0
+;       INDEX                   in, optional, type=boolean, default=0
 ;                               If set, then `LOCATION` is actually the index within at
 ;                                   which the plot is stored.
 ;       PLOT_INDEX:             in, optional, type=int, default=0
@@ -313,12 +557,12 @@ end
 ;                                   1, and the plot index increases as you go down the
 ;                                   column, then across the row.
 ;-
-pro MrPlotManager::Remove, location, $
-ADJUST_LAYOUT = adjust_layout, $
+pro MrPlotManager::Remove, Child_object, $
+ALL = all, $
 DESTROY = destroy, $
 DRAW = draw, $
-LIST_INDEX = list_index, $
-PLOT_INDEX = plot_index
+INDEX = index, $
+TYPE = type
     compile_opt idl2
     
     ;Error handling
@@ -331,73 +575,98 @@ PLOT_INDEX = plot_index
     
     ;Defaults
     SetDefaultValue, draw, 0, /BOOLEAN
-    SetDefaultValue, list_index, 0, /BOOLEAN
-    SetDefaultValue, location, [1,1]
-    SetDefaultValue, plot_index, 0, /BOOLEAN
-    
-    ;Convert LOCATION to a list index value if not one already
-    if n_elements(location) ne 0 $
-        then exists = self -> plotExists(location, iList, PLOT_INDEX=plot_index, $
-                                         LIST_INDEX=list_index, /TO_LIST_INDEX) $
-        else exists = 0
+    SetDefaultValue, destroy, 1, /BOOLEAN
         
 ;---------------------------------------------------------------------
-;Determine Which to Keep /////////////////////////////////////////////
+;Remove All //////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    ;Make sure the plot exists
-    if exists eq 0 then message, 'LOCATION does not exist. Cannot remove.'
-    
-    ;Find which plots are to be kept
-    void = self -> plotExists(*self.plot_loc, all_list_index, /TO_LIST_INDEX)
-    void = isMember(iList, all_list_index, NONMEMBER_INDS=ikeep)
-        
-;---------------------------------------------------------------------
-;Remove From Superclasses First //////////////////////////////////////
-;---------------------------------------------------------------------
-
-    ;The objects to remove
-    oRemove = (*self.allObjects)[iList]
-    
-    ;Plot Objects
-    if ptr_valid(self.plotObjects) then begin
-        ;Find the indices of objects to remove
-        void = isMember(oRemove, *self.plotObjects, iRemove, N_MATCHES=nRemove)
-        
-        ;Remove them
-        if nRemove ne 0 then self -> MrAbstractPlot::Remove, iRemove, DESTROY=0
-    endif
-    
-    ;Image Objects -- same process
-    if ptr_valid(self.imageObjects) then begin
-        void = isMember(oRemove, *self.imageObjects, iRemove, N_MATCHES=nRemove)
-        if nRemove ne 0 then self -> MrAbstractImage::Remove, iRemove, DESTROY=0
+    if keyword_set(all) then begin
+        self -> MrIDL_Container::Remove, /ALL, DESTROY=destroy
+        self -> ClearLayout
+        return
     endif
         
 ;---------------------------------------------------------------------
-;Remove From Master List /////////////////////////////////////////////
+;Remove Indices //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-
-    ;If no plots will remain after removing the desired plots...
-    if n_elements(ikeep) eq 0 then begin
-
-        ;Clear all positions and plot positions
-        self -> Clear, DESTROY=destroy
-        self -> ClearPositions
     
-    ;If some plots will remain...
-    endif else begin
+    if n_elements(index) gt 0 then begin
+        ;Get the objects being removed.
+        removeThese = self -> Get(POSITION=index, COUNT=nRemove)
+        
+        ;Step through all of the objects.
+        for i = 0, nRemove - 1 do begin
+            ;Get their position and layout.
+            removeThese[i] -> GetProperty, LAYOUT=layout, POSITION=position
+            
+            ;Get their [col, row] location.
+            case n_elements(layout) of
+                0: thisLoc = self -> FindFixedLocation(position)
+                3: thisLoc = self -> ConvertLocation(layout[2:3], layout, /PLOT_INDEX, /TO_COLROW)
+                4: thisLoc = layout[2:3]
+                else: message, 'Layout has incorrect format. Cannot be removed.'
+            endcase
+            
+            ;Remove from the container and from the layout.
+            self -> MrIDL_Container::Remove, removeThese[i], DESTROY=destroy
+            self -> RemoveFromLayout, thisLoc
+        endfor
+    endif
+        
+;---------------------------------------------------------------------
+;Remove Type /////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     
-        ;Destroy the objects being removed
-        if keyword_set(destroy) then obj_destroy, (*self.allObjects)[iList]
+    if n_elements(type) gt 0 then begin
+        ;Get the objects being removed.
+        removeThese = self -> Get(ISA=type, COUNT=nRemove)
         
-        ;Remove the indicated objects
-        *self.allObjects = (*self.allObjects)[ikeep]
-
-        ;Remove their locations and positions
-        self -> RemovePositions, iList, /LIST_INDEX, ADJUST_LAYOUT=adjust_layout
-    endelse
+        ;Step through all of the objects.
+        for i = 0, nRemove - 1 do begin
+            ;Get their position and layout.
+            removeThese[i] -> GetProperty, LAYOUT=layout, POSITION=position
+            
+            ;Get their [col, row] location.
+            case n_elements(layout) of
+                0: thisLoc = self -> FindFixedLocation(position)
+                3: thisLoc = self -> ConvertLocation(layout[2:3], layout, /PLOT_INDEX, /TO_COLROW)
+                4: thisLoc = layout[2:3]
+                else: message, 'Layout has incorrect format. Cannot be removed.'
+            endcase
+            
+            ;Remove from the container and from the layout.
+            self -> MrIDL_Container::Remove, removeThese[i], DESTROY=destroy
+            self -> RemoveFromLayout, thisLoc
+        endfor
+    endif
         
+;---------------------------------------------------------------------
+;Remove Child_Objects ////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    if n_elements(Child_Object) gt 0 then begin
+        nRemove = n_elements(Child_Object)
+        
+        ;Step through all of the objects.
+        for i = 0, nRemove - 1 do begin
+            ;Get their position and layout.
+            Child_Object[i] -> GetProperty, LAYOUT=layout, POSITION=position
+            
+            ;Get their [col, row] location.
+            case n_elements(layout) of
+                0: thisLoc = self -> FindFixedLocation(position)
+                3: thisLoc = self -> ConvertLocation(layout[2:3], layout, /PLOT_INDEX, /TO_COLROW)
+                4: thisLoc = layout[2:3]
+                else: message, 'Layout has incorrect format. Cannot be removed.'
+            endcase
+            
+            ;Remove from the container and from the layout.
+            self -> MrIDL_Container::Remove, Child_Object[i], DESTROY=destroy
+            self -> RemoveFromLayout, thisLoc
+        endfor
+    endif
+    
 ;---------------------------------------------------------------------
 ;Draw ////////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -408,86 +677,15 @@ PLOT_INDEX = plot_index
 
 
 ;+
-;   The purpose of this method is to provide a means of changing the overall layout of
-;   the 2D plotting grid. In addition, individual plot locations and positions can be
-;   altered or added by using the the following keywords::
-;
-;       SETLOCATION -   Set the location of an existing plot
-;                           Fixed         -> Auto-Updating
-;                           Auto-Updating -> Fixed
-;                           Auto-Updating -> Auto-Updating
-;
-;       SETPOSITION -   Set the position of an existing plot
-;                           Auto-Updating -> Fixed
-;                           Fixed         -> Fixed
-;
-;       ADD         -   Add a new location and position to the lists.
-;                           Auto-Updating
-;                           Fixed
+;   Shift all plots located at and after LOCATION up one index value.
 ;
 ; :Params:
-;       LOCATION:           in, optional, type=long
-;                           The [col, row] location of the plot. Used with `ADD` and
-;                               `SETLOCATION`.
 ;
-; :Keywords:
-;       ADD:                in, optional, type=Boolean, default=0
-;                           If set, `LOCATION` and `POSITION` are appended to their
-;                               respective lists. If `LOCATION` is not set, then a new
-;                               one will be created. This new `LOCATION` will be "fixed"
-;                               if `POSITION` is not present, and "auto-updating" if it is.
-;                               New locations and positions will be returned via their
-;                               respective parameter and keyword.
-;       ADJUST_LAYOUT:      in, optional, private, type=Boolean, default=0
-;                           Sometimes holes are created in the plot layout when an auto-
-;                               updating plot's location changes. Set this keyword to
-;                               remove holes in the plot layout.
-;       LAYOUT:             in, out, optional, type=intarr(2)
-;                           A two-element vector [col, row] indicating the number of
-;                               columns and rows in the plot layout. If set, the layout
-;                               and positions will be updated. Furthermore, if the layout
-;                               changes as a result of adding, moving, or fixing plots
-;                               from the auto-updating grid, then the new layout will be
-;                               returned.
-;       LIST_INDEX:         in, optional, type=Boolean, default=0
-;                           Indicate that `LOCATION` is the index location within the
-;                               internal data lists of the plot whose position is to
-;                               be altered. To obtain the list index, use the
-;                               "plotsPresent" method.
-;       POSITION:           out, optional, type=fltarr(4)
-;                           The lower-left and upper-right corners of a plot in normal
-;                               coordinates. If `SETLOCATION` is in use, then this is the
-;                               new position of the plot indicated by `LOCATION`.
-;       SETLOCATION:        in, optional, type=lonarr(2)
-;                           Use this kewyord to set the [col, row] location of the plot
-;                               indicated by `LOCATION`::
-;                                   `LOCATION`[0] > 0, `SETLOCATION[0] < 0 
-;                                       An auto-updating plot will become fixed at
-;                                       its present position.
-;                                   `LOCATION`[0] < 0, `SETLOCATION`[0] > 0 
-;                                       A fixed plot will be put into the auto-updating
-;                                       grid at the location indicated.
-;                                   `LOCATION`[0] > 0, `SETLOCATION`[0] > 0 
-;                                       An auto-updating plot will be moved within the 
-;                                       grid to the location indicated.
-;                                   `LOCATION`[0] < 0, `SETLOCATION`[0] < 0 
-;                                       Ignored. A fixed plot is fixed no matter what.
-;       SETPOSITION:        in, optional, type=fltarr(4)
-;                           A four-element vector in the form [x0, y0, x1, y1] specifying
-;                               the location of the lower right [x0, y0] and upper-left
-;                               [x1, y1] corners of a plot. If set, then the plot given
-;                               by `LOCATION` will have its position changed to SETPOSITION.
-;                               If `LOCATION` is that of an auto-updating plot, it will
-;                               become fixed. If a location has been changed, it will be
-;                               returned in `SETLOCATION`.
-;       _REF_EXTRA:         in, optional, type=Structure
-;                           Any keyword accepted by MrPlotLayout.pro
-;
-; :Uses:
-;   Uses the following external programs::
-;       MrPlotLayout.pro
+;       LOCATION:           in, required, type=lonarr(2)
+;                           The 1-based plot location [col, row] at which to begin 
+;                               shifting plots.
 ;-
-pro MrPlotManager::ApplyPositions
+pro MrPlotManager::ShiftPlots, location
     compile_opt idl2
     
     ;Error handling
@@ -498,32 +696,65 @@ pro MrPlotManager::ApplyPositions
         return
     endif
     
-    ;First deal with the superclass
-    self -> MrPlotLayout::ApplyPositions
+    layout_init = self.layout
     
 ;---------------------------------------------------------------------
-;Reposition Plots ////////////////////////////////////////////////////
+;Start and Stop Shift ////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    ;
-    ; From the Plot method, the following actions have been completed:
-    ;   1) Adjusted locations and positions of each plot
-    ;   2) Applied the new positions to each plot
-    ;   3) Adjusted the layout
-    ;
-    ; Now we need to do the following:
-    ;   4) Update the positions in the allObjects list.
-    ;   5) Update the colorbar positions.
-    ;
-    isData = [*self.type.plot, *self.type.image]
-    dataObjs = self -> Get(/ALL, ISA=isData, POSITION=iData, COUNT=nData)
     
+    ;Convert LOCATION to a plot index
+    pStartShift = self -> ConvertLocation(location, /TO_PLOT_INDEX)
     
-    ;If there are no plots, then there is nothing to reposition.
-    if nData eq 0 then return
-
-    ;Update the position of each plot.
-    for i = 0, nData - 1 do $
-        (*self.allObjects)[i] -> SetProperty, POSITION=(*self.plot_positions)[*,i]
+    ;Get the available list indices
+    iFree = self -> GetListIndexAvailability(NFREE=nFree)
+    if nFree gt 0 then pFree = self -> ConvertLocation(iFree, /LIST_INDEX, /TO_PLOT_INDEX)
+    
+    ;Which interval is being shifted? If a new row needs to be added,
+    ;re-calculate the starting plot index within the new layout.
+    if nFree eq 0 || max(pFree gt pStartShift) eq 0 then begin
+        layout = self.layout + [0,1]
+        pStartShift = self -> ConvertLocation(location, layout, /TO_PLOT_INDEX)
+        pStopShift = self -> ConvertLocation([1, layout[1]], layout, /TO_PLOT_INDEX)
+    endif else begin
+        layout = self.layout
+        pStopShift = min(where((pFree gt pStartShift) eq 1))
+    endelse
+    
+;---------------------------------------------------------------------
+;Superclass //////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Shift the layout so that the layout_positions are up-to-date.
+    self -> MrPlotLayout::ShiftPlots, location
+    
+;---------------------------------------------------------------------
+;Shift Plots /////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Get all of the relevant objects
+    theseObj = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nObj)
+    
+    ;Start shifting them
+    for i = 0, nObj - 1 do begin
+        theseObj[i] -> GetProperty, LAYOUT=objLayout
+        nLayout = n_elements(objLayout)
+        if nLayout eq 0 then continue
+        
+        case nLayout of
+            3: thisPIndex = objLayout[2]
+            4: thisPIndex = self -> ConvertLocation(objLayout[2:3], layout, /TO_PLOT_INDEX)
+            else: message, 'Layout has incorrect format. Cannot be shifted.'
+        endcase
+        
+        if thisPIndex lt pStartShift then continue
+        if thisPIndex ge pStopShift then break
+        
+        ;If we make it to here, shift the plot
+        thisPIndex += 1
+        newLocation = self -> ConvertLocation(thisPIndex, layout, /PLOT_INDEX, /TO_COLROW)
+        newPosition = (*self.layout_positions)[*, newLocation[0]-1, newLocation[1]-1]
+        theseObj[i] -> SetProperty, LAYOUT=[layout, newLocation], POSITION=newPosition
+    endfor
 end
 
 
@@ -553,19 +784,12 @@ function MrPlotManager::WhatAmI, objRef
         return, ''
     endif
     
-    ;How many objects are there?
-    nObjs = self -> Count()
-    if nObjs eq 0 then return, ''
-    
-    ;Is this object in the container?
-    tf_contained = self -> IsContained(objRef)
-    if tf_contained eq 0 then return, ''
-    
     ;What type of object is it?
     className = typename(objRef)
     case className of
         'MRPLOTOBJECT':  ImA = 'PLOT'
         'MRIMAGEOBJECT': ImA = 'IMAGE'
+        'MRCONTOUR':     ImA = 'CONTOUR'
         'WECOLORBAR':    ImA = 'COLORBAR'
         'WETEXT':        ImA = 'TEXT'
         'WEARROW':       ImA = 'ARROW'
@@ -591,22 +815,26 @@ pro MrPlotManager::Config
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, ''
+        return
     endif
     
     ;Class names of the supported graphics types
     types = { plot: ['PLOT', 'MRPLOTOBJECT'], $
               image: ['IMAGE', 'MRIMAGEOBJECT'], $
+              contour: ['CONTOUR', 'MRCONTOUR'], $
               colorbar: ['WECOLORBAR'], $
               axis: ['WEAXIS'], $
               legend: ['WELEGENDITEM'], $
               arrow: ['WEARROW'], $
               text: ['WETEXT'], $
               overplot: ['WEOVERPLOT'], $
+              ImAData: ['PLOT', 'IMAGE', 'CONTOUR'], $     ;TO BE USED WITH ::WHATAMI
+              data: ['PLOT', 'MRPLOTOBJECT', 'IMAGE', 'MRIMAGEOBJECT', 'CONTOUR', 'MRCONTOUR'], $
+              annotate: ['WECOLORBAR', 'WEAXIS', 'WELEGENDITEM', 'WEARROW', 'WETEXT'] $
             }
     
     ;Store them as a class property
-    self.types = ptr_new(types)
+    self.gTypes = ptr_new(types, /NO_COPY)
 
 end
 
@@ -618,12 +846,12 @@ pro MrPlotManager::cleanup
     compile_opt idl2
     
     ;Destroy all weLegendItem objects
-    self -> MrAbstractPlot::Cleanup
-    self -> MrAbstractImage::Cleanup
     self -> MrPlotLayout::Cleanup
+    self -> MrIDL_Container::Cleanup
+    self -> MrCreateGraphic::Cleanup
     
     ;Free pointers
-    ptr_free, self.type
+    ptr_free, self.gTypes
 end
 
 
@@ -671,6 +899,6 @@ pro MrPlotManager__define, class
                inherits MrIDL_Container, $      ;An object container
                inherits MrCreateGraphic, $      ;Plots, Images, Colorbars, Text, Arrows, etc.
                inherits MrPlotLayout, $         ;Manage plot layout
-               type = ptr_new() $               ;Supported graphics types.
+               gTypes: ptr_new() $              ;Supported graphics types.
              }
 end

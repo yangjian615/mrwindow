@@ -253,23 +253,19 @@ pro MrWindow::Draw
         erase
     endif
     
-    nPlots = n_elements(*self.allObjects)
+    allObj = self -> Get(/ALL, COUNT=nObj)
     
-    ;Create an empty plot if none exists
-    if nPlots eq 0 then cgErase
+    ;Create an empty plot if none exists.
+    if nObj eq 0 then cgErase
 
-    ;Plot and Image both erase the plotting area. Make sure only the first "draw" does.
-    if n_elements(*self.plotObjects) eq 0 then noerase=0 else noerase=1
-
-    ;Call all of the superclass draw methods.
-    self -> MrAbstractPlot::Draw
-    self -> MrAbstractImage::Draw, NOERASE=noerase
-    self -> MrAbstractColorbar::Draw
-    self -> MrAbstractArrow::Draw
-    self -> MrAbstractText::Draw
+    ;Draw all of the objects.
+    for i = 0, nObj - 1 do begin
+        if i eq 0 then noerase = 0 else noerase = 1
+        allObj[i] -> Draw, NOERASE=noerase
+    endfor
     
     ;Reset the focus.
-    if self.nplots gt 0 then self -> Focus
+;    if self.nplots gt 0 then self -> Focus
     
     ;Copy plot from the pixmap
     if (!d.flags and 256) ne 0 then begin
@@ -1196,7 +1192,8 @@ pro MrWindow::TLB_Resize_Events, event
     
     ;Recalculate the normalized positions based on the new window size.
     ;Draw the plot to the new size
-    self -> MrPlotLayout::SetProperty
+    self -> CalcLayoutPositions
+    self -> ApplyPositions
     self -> Draw
 end
 
@@ -1294,13 +1291,42 @@ pro MrWindow::whichObjects
         return
     endif
     
-    ;Display all of the objects and their index numbers.
-    self -> whichPlots
-    self -> whichImages
-    self -> whichColorbars
-    self -> whichText
-    self -> whichArrows
+    ;Get all of the data objects
+    dataObj = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nData)
+    
+    ;The string length of the longest type
+    typeLen = string(max(strlen((*self.gTypes).data)), FORMAT='(i0)')
+    
+    ;Step through each object
+    for i = 0, nData - 1 do begin
+        ;Print a header.
+        if i eq 0 then print, '--Type--', '-Location-', '--Position--', $
+                              FORMAT='(a' + typeLen + ', 2x, a10, 2x, a12)'
+                              
+        ;Get the object's position and layout
+        dataObj[i] -> GetProperty, POSITION=position, LAYOUT=layout
+        
+        ;If no layout exists, find its fixed position
+        if n_elements(layout) eq 0 $
+            then self -> GetPositions, location, POSITION=position $
+            else location = layout[2:3]
+        
+        ;Print the type-name, location, and position
+        print, FORMAT='(%"%s [ %i, %i] [%6.4f, %6.4f, %6.4f, %6.4f]")', $
+               typename(dataObj[i]), location, position
+    
+    endfor
 
+
+    annObj = self -> Get(/ALL, ISA=(*self.gTypes).annotate, COUNT=nAnn)
+    
+    ;The string length of the longest type
+    typeLen = string(max(strlen((*self.gTypes).annotate)), FORMAT='(i0)')
+    
+    
+    for i = 0, nAnn - 1 do begin
+    
+    endfor
 end
 
 
@@ -1484,6 +1510,7 @@ _REF_EXTRA = extra
 
     if self -> MrPlotManager::init(_EXTRA=extra) eq 0 then return, 0
     if self -> MrAbstractSaveAs::init() eq 0 then return, 0
+    if self -> MrAbstractZoom::init() eq 0 then return, 0
 
 ;---------------------------------------------------------------------
 ;Keywords ////////////////////////////////////////////////////////////
@@ -1546,11 +1573,11 @@ _REF_EXTRA = extra
     self.zoomfactor = zoomfactor
     
     ;Serves as an INIT method.
-    self -> AddArrows, arrows
-    self -> AddColorbars, colorbars
-    self -> AddPlots, plotObjects
-    self -> AddImages, imageObjects
-    self -> AddText, text
+    if n_elements(arrows)       gt 0 then self -> Add, arrows
+    if n_elements(colorbars)    gt 0 then self -> Add, colorbars
+    if n_elements(plotObjects)  gt 0 then self -> Add, plotObjects
+    if n_elements(imageObjects) gt 0 then self -> Add, imageObjects
+    if n_elements(text)         gt 0 then self -> Add, text
 
 ;---------------------------------------------------------------------
 ;Display Window //////////////////////////////////////////////////////
@@ -1639,14 +1666,15 @@ pro MrWindow__define, class
     compile_opt idl2
     
     class = { MrWindow, $
-              inherits MrAbstractAnalysis, $    ;Analysis events and menu
-              inherits MrAbstractArrow, $       ;Arrow events and menu
-              inherits MrAbstractCDF, $         ;Plotting data from CDF files
-              inherits MrAbstractCursor, $      ;Cursor events and menu
-              inherits MrAbstractText, $        ;Text events and menu
+              ;In order of importance.
+              inherits MrPlotManager, $         ;Manage plot layout
               inherits MrAbstractSaveAs, $      ;SaveAs menu
               inherits MrAbstractZoom, $        ;Zoom events and menu
-              inherits MrPlotManager, $         ;Manage plot layout
+              inherits MrAbstractCursor, $      ;Cursor events and menu
+              inherits MrAbstractCDF, $         ;Plotting data from CDF files
+              inherits MrAbstractText, $        ;Text events and menu
+              inherits MrAbstractArrow, $       ;Arrow events and menu
+              inherits MrAbstractAnalysis, $    ;Analysis events and menu
               
               tlb: 0, $                         ;Widget ID of the top level base
               display: 0, $                     ;Display the graphics?
