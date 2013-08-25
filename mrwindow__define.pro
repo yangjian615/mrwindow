@@ -52,13 +52,68 @@
 ;
 ;   For details concerning zooming, cursor, annotation, and save options, see::
 ;       MrAbstractArrow__define.pro
-;       MrAbstractCursor__define.pro
+;       MrCursor__define.pro
 ;       MrAbstractSaveAs__define.pro
 ;       MrAbstractText__define.pro
-;       MrAbstractZoom__define.pro
+;       MrZoom__define.pro
 ;
 ;   For details concerning the automatically updating 2D plotting grid, see::
 ;       MrPlotLayout__define.pro
+;
+; :Examples:
+;   What follows is one large example exhibiting the utility of MrWindow
+;
+;   ;Create a MrWindow object::
+;       mywin = MrWindow()
+;
+;   ;Add three line plots: Cos(x), Sin(x), x^2. Specify the LAYOUT. Note how they
+;   ;are adjusted to make room::
+;       x = findgen(100)/99.0
+;       y = sin(2*!pi*x)
+;       z = cos(2*!pi*x)
+;       w = x^2
+;       Plot1 = mywin -> Plot(x, y, TITLE='Sin(x)', XTITLE='Time', YTITLE='Amplitude')
+;       Plot2 = mywin -> Plot(x, z, TITLE='Cos(x)', XTITLE='Time', YTITLE='Amplitude', LAYOUT=[1,2,1,1])
+;       Plot3 = mywin -> Plot(x, w, TITLE='x^2', XTITLE='Time', YTITLE='Amplitude', LAYOUT=[1,2,1,2])
+;
+;   ;Add an image to the layout.
+;       image = dist(256)
+;       imx = findgen(256)
+;       imy = findgen(256)
+;       Image1 = mywin -> Image(image, imx, imy, TITLE='Dist(256)', XTITLE='X-Title', YTITLE='Y-Title', /SCALE, /AXES, CTINDEX=13)
+;       mywin -> SetProperty, XMARGIN=[10,15], XSIZE=550, YSIZE=675, /DRAW
+;
+;   ;Give the image a colorbar
+;       mywin -> whichobjects
+;       mywin -> GetProperty, 3, RANGE=range
+;       c1 = mywin -> Colorbar(CBLOCATION='RIGHT', CTINDEX=13, GRAPHIC=Image1, RANGE=range, /RIGHT, TITLE='CB Title')
+;
+;   ;Finally, add a contour plot with colorbar. Reporduce the "Filled Contour Plot"
+;   ;example in the `Coyote Graphics Graphics Plot Gallery 
+;   ;<http://www.idlcoyote.com/gallery/>`::
+;       data = cgDemoData(26)
+;       minValue = Floor(Min(data))
+;       maxValue = Ceil(Max(data))
+;       nLevels = 10
+;       xtitle = 'X Axis'
+;       ytitle = 'Y Axis'
+;       cbTitle = 'Data Value'
+;       cgLoadCT, 33, NColors=nlevels, Bottom=1, CLIP=[30,255]
+;       contourLevels = cgConLevels(data, NLevels=nLevels, MinValue=minValue)
+;
+;       cont = mywin -> Contour(data, /FILL, LEVELS=contourLevels, $
+;                               C_COLORS=bindgen(nlevels)+1B, /OUTLINE, POSITION=position, $
+;                               XTITLE=xtitle, YTITLE=ytitle, DRAW=0)
+;               
+;       conCB = mywin -> Colorbar(NColors=nlevels, Bottom=1, Graphic=cont, CBLOCATION='RIGHT', $
+;                                 Range=[MinValue, MaxValue], /RIGHT, Divisions=nlevels, /Discrete, $
+;                                 Title=cbTitle, TLocation='Right')
+;
+;   ;Remove the line plots. Fill holes in layout. Trim off empty rows and columns.
+;       mywin -> Remove, POSITION=[0,1,2], /FILLHOLES, /TRIMLAYOUT, /DRAW
+;
+;   ;Destroy the window
+;       mywin -> Destroy
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -137,6 +192,12 @@
 ;                           without first realizing the window... Recalculate the plot
 ;                           positions if DRAW is set in the SetProperty method. Before,
 ;                           the plot bled off the window. - MRA.
+;       08/23/2013  -   Focus is now always done. Removed from Cursor menu. Never turn
+;                           off button events so that FOCUS always works. Moved the Focus
+;                           method from MrCursor to here. Added example that works. - MRA
+;       08/24/2013  -   Focus was saving the index of a subarray of objects, not an
+;                           index into the container. Fixed.  Inherit CDF_Plot instead
+;                           of MrAbstractCDF. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -195,16 +256,16 @@ YSIZE = ysize
     ;Create the Zoom Menu
     self -> Create_Zoom_Menu, menuID
 
-    ;Create the Cursor Menu
-    self -> Create_Cursor_Menu, menuID
+    ;Create the Cursor Menu. Do not make a button for FOCUS
+    self -> Create_Cursor_Menu, menuID, /MENU, /NONE, /CROSS_HAIRS, /GET_POINT, /SHOW_XY
     
     ;Create the Analysis Menu
-    self -> Create_Analysis_Menu, menuID
+;    self -> Create_Analysis_Menu, menuID
 
     ;Create the Arrow and Text Menus
-    annotateID = widget_button(menuID, VALUE='Annotate', /MENU)
-    self -> Create_Arrow_Menu, annotateID
-    self -> Create_Text_Menu, annotateID
+;    annotateID = widget_button(menuID, VALUE='Annotate', /MENU)
+;    self -> Create_Arrow_Menu, annotateID
+;    self -> Create_Text_Menu, annotateID
 
     ;Make the draw widget. We still need to get the Window ID in which the plot
     ;is drawn, so get that when the window is realized (see note within ::init).
@@ -253,20 +314,16 @@ pro MrWindow::Draw
         erase
     endif
     
-    nPlots = n_elements(*self.allObjects)
+    allObj = self -> Get(/ALL, COUNT=nObj)
     
-    ;Create an empty plot if none exists
-    if nPlots eq 0 then cgErase
+    ;Create an empty plot if none exists.
+    if nObj eq 0 then cgErase
 
-    ;Plot and Image both erase the plotting area. Make sure only the first "draw" does.
-    if n_elements(*self.plotObjects) eq 0 then noerase=0 else noerase=1
-
-    ;Call all of the superclass draw methods.
-    self -> MrAbstractPlot::Draw
-    self -> MrAbstractImage::Draw, NOERASE=noerase
-    self -> MrAbstractColorbar::Draw
-    self -> MrAbstractArrow::Draw
-    self -> MrAbstractText::Draw
+    ;Draw all of the objects.
+    for i = 0, nObj - 1 do begin
+        if i eq 0 then noerase = 0 else noerase = 1
+        allObj[i] -> Draw, NOERASE=noerase
+    endfor
     
     ;Reset the focus.
     if self.nplots gt 0 then self -> Focus
@@ -343,8 +400,9 @@ pro MrWindow::Draw_Events, event
 ;---------------------------------------------------------------------
 
     if event.type eq 0 then begin
+        self -> Focus, event      ; Always Focus
+        
         ;Cursor Events
-        if ((self.cmode and 8) gt 0) then self -> Focus, event      ;Focus
         if ((self.cmode and 1) gt 0) then self -> Get_Point, event  ;Get Point
         
         ;Analysis Events
@@ -469,6 +527,85 @@ end
 
 
 ;+
+;   Event handler for Focus events. Find the closest plot to the clicked point.
+;
+; :Params:
+;   EVENT:              in, optional, type=structure/int
+;                       The event returned by the windows manager. If not given, the
+;                           plot indicated by SELF.IFOCUS will become the object of focus.
+;                           If EVENT is an integer, then it is the index value of the
+;                           object within the container on which to focus.
+;-
+pro MrWindow::Focus, event
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = error_message()
+        return
+    endif
+
+;---------------------------------------------------------------------
+;Event? //////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    event_type = size(event, /TYPE)
+    if event_type eq 8 then begin
+
+        ;Only listen to button presses.
+        if event.type ne 0 then return
+    
+    ;---------------------------------------------------------------------
+    ;Find the Objects that Were Clicked //////////////////////////////////
+    ;---------------------------------------------------------------------
+        dataObj = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nObj)
+        tf_clicked = bytarr(nObj)
+        delta = fltarr(nObj)
+        for i = 0, nObj - 1 do begin
+            tf_clicked[i] = dataObj[i] -> IsInside(event.x, event.y, DELTA=del)
+            delta[i] = del
+        endfor
+    
+    ;---------------------------------------------------------------------
+    ;Pick the Focus //////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        
+        iClicked = where(tf_clicked eq 1, nClicked)
+        case nClicked of
+            0: begin
+                void = min(delta, imin)
+                iFocus = self -> GetIndex(dataObj[imin])        ;Take the closest one
+            endcase
+            1: iFocus = self -> GetIndex(dataObj[iClicked])
+            else: iFocus = GetIndex(dataObj[iClicked[0]])
+        endcase
+                
+        self.iFocus = iFocus
+        
+;---------------------------------------------------------------------
+;Container Index Given? //////////////////////////////////////////////
+;---------------------------------------------------------------------
+    endif else if event_type ne 0 then begin
+        self.iFocus = event        
+    endif
+
+;---------------------------------------------------------------------
+;Set Focus ///////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Set the system variables and synchronize.
+    theObj = self -> Get(POSITION=self.iFocus)
+
+    theObj -> getProperty, X_SYSVAR=x_sysvar, Y_SYSVAR=y_sysvar, P_SYSVAR=p_sysvar
+    !X = x_sysvar
+    !Y = y_sysvar
+    !P = p_sysvar
+end
+
+
+;+
 ;   Destroy the object and, if it exists, the widget.
 ;
 ; :Params:
@@ -489,7 +626,6 @@ pro MrWindow::Error_Handler, event
     self -> MrAbstractAnalysis::Error_Handler
     self -> Turn_Everything_Off
 end
-
 
 
 ;+
@@ -523,29 +659,31 @@ pro MrWindow::File_Menu_Events, event
     ;---------------------------------------------------------------------
         'OPEN CDF': begin
             ;Create the plot from the data
-            thePlot = self -> Plot_CDF(GROUP_LEADER=self.tlb, $
-                                       DISPLAY_TYPE=display_type, $
-                                       OCOLORBAR=theColorbar)
+            cdf_obj = obj_new('CDF_PLOT')
+            thePlot = cdf_obj -> Plot(GROUP_LEADER=self.tlb, $
+                                      DISPLAY_TYPE=display_type, $
+                                      OCOLORBAR=theColorbar)
             if obj_valid(thePlot) eq 0 then return
             
             ;Add it to the proper lists.
             case strupcase(display_type) of
-                'TIME_SERIES': self -> AddPlots, thePlot, /DRAW
+                'TIME_SERIES': self -> Add, thePlot, /DRAW
                 '3D_SPECTROGRAM': begin
                     ;Add the image and get its position
-                    self -> AddImages, thePlot, /DRAW
-                    thePlot -> GetProperty, POSITION=position
+                    self -> Add, [thePlot, theColorbar]
                     
                     ;Make sure there is enough room for a colorbar.
                     if self.xmargin[1] lt 15 then self -> SetProperty, XMARGIN=[self.xmargin[0],15]
 
                     ;Add the colorbar and bind it to the image.
-                    self -> AddColorbars, theColorbar, position, LOCATION='RIGHT'
                     self -> Bind, thePlot, theColorbar, /CAXIS
                     self -> Draw
                 endcase
                 else: message, 'Display type "' + display_type + '" not recognized.'
             endcase
+            
+            ;Destroy the object
+            obj_destroy, cdf_obj
         endcase
         
         else: message, 'Button "' + button_name + '" not recognized.'
@@ -559,70 +697,34 @@ end
 ;
 ; :Params:
 ;       INDEX:              in, optional, type=int
-;                           If given, the index value of the object for which to obtain
-;                               properties. INDEX can be obtained via the whichObjects
-;                               method and the object type is set with the `ARROW`, 
-;                               `COLORBAR`, `IMAGE`, `PLOT`, and `TEXT` keywords.
+;                           If given, the index within the container of the object whose
+;                               properties are to be retrieved.INDEX can be obtained via
+;                               the whichObjects method.
 ;
 ; :Keywords:
 ;
 ;       AMODE:              out, optional, type=int
 ;                           The analysis mode(s) presently enabled.
-;       LMODE:              out, optional, type=int
-;                           The zoom mode associated with the left mouse button.
-;       OREF:               out, optional, type=boolean, default=0
+;       THEOBJ:             out, optional, type=boolean, default=0
 ;                           The object reference of the object referred to by `INDEX`.
-;       RMODE:              out, optional, type=int
-;                           The zoom mode associated with the right mouse button.
 ;       SAVEDIR:            out, optional, type=string
 ;                           The directory in which plots will be saved.
 ;       XSIZE:              out, optional, type=long, default=512
 ;                           The width of the draw window in pixels
 ;       YSIZE:              out, optional, type=long, default=512
 ;                           The height of the draw window in pixels
-;       ZOOMFACTOR:         out, optional, type=float/fltarr(2)
-;                           The zoom factor with which the mouse wheel will cause the
-;                               x- and y-ranges to be adjusted. If only one value is given,
-;                               it will be applied to both axes.
-;
-;       ARROW:              in, optional, type=boolean, default=0
-;                           If set, then `INDEX` will be taken to refer to an arrow
-;                               object. Use with the `INDEX` keyword.
-;       COLORBAR:           in, optional, type=boolean, default=0
-;                           If set, then `INDEX` will be taken to refer to a colorbar
-;                               object. Use with the `INDEX` keyword.
-;       IMAGE:              in, optional, type=boolean, default=0
-;                           If set, then `INDEX` will be taken to refer to an image
-;                               object. Use with the `INDEX` keyword.
-;       PLOT:               in, optional, type=boolean, default=0
-;                           If set, then `INDEX` will be taken to refer to a plot
-;                               object. Use with the `INDEX` keyword.
-;       TEXT:               in, optional, type=boolean, default=0
-;                           If set, then `INDEX` will be taken to refer to an text
-;                               object. Use with the `INDEX` keyword.
-;
 ;       _REF_EXTRA:         out, optional, type=any
 ;                           If `INDEX` is present, then any keyword accepted by the
 ;                               indicated object's GetProperty method. If not present,
-;                               then any keyword accepted by MrPlotLayout::GetProperty.
+;                               then any keyword accepted by the MrZoom, MrSaveAs, 
+;                               MrCursor, or MrPlotLayout classes.
 ;                           
 ;-
 pro MrWindow::GetProperty, index, $
-CMODE = cmode, $
-LMODE = lmode, $
-RMODE = rmode, $
 SAVEDIR = save_dir, $
+THEOBJ = theObj, $
 XSIZE = xsize, $
 YSIZE = ysize, $
-ZOOMFACTOR = zoomfactor, $
-
-ARROW = arrow, $
-COLORBAR = colorbar, $
-IMAGE = image, $
-OREF = oref, $
-PLOT = plot, $
-TEXT = text, $
-
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -640,43 +742,8 @@ _REF_EXTRA = extra
     
     ;Get properties of a particular object?
     if n_params() eq 1 then begin
-        arrow = keyword_set(arrow)
-        colorbar = keyword_set(colorbar)
-        image = keyword_set(image)
-        plot = keyword_set(plot)
-        text = keyword_set(text)
-        
-        ;Make sure only one keyword is set.
-        if (image + plot + colorbar + arrow + text) ne 1 then $
-            message, 'Can "Get" properties from exactly one type of object at a time.'
-    
-        ;ARROWS
-        if arrow then begin
-            if arg_present(oref) then oref = (*self.arrowObjects)[index]
-            if n_elements(extra) gt 0 then (*self.arrowObjects)[index] -> GetProperty, _EXTRA=extra
-        
-        ;COLORBARS
-        endif else if colorbar then begin
-            if arg_present(oref) then oref = (*self.colorbars)[index]
-            if n_elements(extra) gt 0 then (*self.colorbars)[index] -> GetProperty, _EXTRA=extra
-        
-        ;IMAGES
-        endif else if image then begin
-            if arg_present(oref) then oref = (*self.imageObjects)[index]
-            if n_elements(extra) gt 0 then (*self.imageObjects)[index] -> GetProperty, _EXTRA=extra
-        
-        ;PLOTS
-        endif else if plot then begin
-            if arg_present(oref) then oref = (*self.plotObjects)[index]
-            if n_elements(extra) gt 0 then (*self.plotObjects)[index] -> GetProperty, _EXTRA=extra
-        
-        ;TEXT
-        endif else if text then begin
-            if arg_present(oref) then oref = (*self.text)[index]
-            if n_elements(extra) gt 0 then (*self.text)[index] -> GetProperty, _EXTRA=extra
-            
-        endif
-    
+        theObj = self -> Get(POSITION=index)
+        theObj -> GetProperty, _EXTRA=extra
         return
     endif
 
@@ -685,36 +752,58 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     
     ;Get Properties
-    if arg_present(cmode)      and n_elements(self.cmode)      ne 0 then cmode = self.cmode
-    if arg_present(lmode)      and n_elements(self.lmode)      ne 0 then lmode = self.lmode
-    if arg_present(rmode)      and n_elements(self.rmode)      ne 0 then rmode = self.rmode
-    if arg_present(savedir)    and n_elements(self.savedir)    ne 0 then savedir = self.savedir
-    if arg_present(xsize)      and n_elements(self.xsize)      ne 0 then xsize = self.xsize
-    if arg_present(ysize)      and n_elements(self.ysize)      ne 0 then ysize = self.ysize
-    if arg_present(zoomfactor) and n_elements(self.zoomfactor) ne 0 then zoomfactor = self.zoomfactor
+    if arg_present(cmode)   then cmode = self.cmode
+    if arg_present(savedir) then savedir = self.savedir
+    if arg_present(xsize)   then xsize = self.xsize
+    if arg_present(ysize)   then ysize = self.ysize
+
+    nExtra = n_elements(extra)
+    
+;---------------------------------------------------------------------
+;CURSOR PROPERTIES ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if nExtra gt 0 then begin
+        void = isMember(['CMODE'], extra, $
+                        iCursor, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
+                        N_NOMEMBERS=nExtra, /FOLD_CASE)
+        
+        if nMatches gt 0 then self -> MrCursor::GetProperty, _STRICT_EXTRA=extra[iCursor]
+        if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
+    endif
 
 ;---------------------------------------------------------------------
-;SUPERCLASS PROPERTIES ///////////////////////////////////////////////
+;SAVEAS PROPERTIES ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if n_elements(extra) gt 0 then begin
-
-    ;---------------------------------------------------------------------
-    ;SAVEAS PROPERTIES ///////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
+    if nExtra gt 0 then begin
         void = isMember(['ADJUSTSIZE', 'IM_DENSITY', 'IM_OPTIONS', 'IM_RASTER', 'IM_RESIZE', $
                          'IM_TRANSPARENT', 'IM_WIDTH', 'PDF_UNIX_CONVERT_CMD', 'PDF_PATH', $
                          'PS_CHARSIZE', 'PS_DECOMPOSED', 'PS_DELETE', 'PS_ENCAPSULATED', $
                          'PS_FONT', 'PS_METRIC', 'PS_QUIET', 'PS_SCALE_FACTOR', 'PS_TT_FONT'], $
-                         extra, iSaveAs, N_MATCHES=nmatches, NONMEMBER_INDS=iExtra, /FOLD_CASE)
+                         extra, iSaveAs, N_MATCHES=nmatches, NONMEMBER_INDS=iExtra, $
+                         N_NONMEMBERS=nExtra, /FOLD_CASE)
         
         if nmatches gt 0 then self -> MrAbstractSaveAs::GetProperty, _STRICT_EXTRA=extra[iSaveAs]
-        
-    ;---------------------------------------------------------------------
-    ;LAYOUT PROPERTIES ///////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-        self -> MrPlotLayout::GetProperty, _STRICT_EXTRA=extra[iExtra]
+        if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
     endif
     
+;---------------------------------------------------------------------
+;ZOOM PROPERTIES /////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if nExtra gt 0 then begin
+        void = isMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
+                        iZoom, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
+                        N_NOMEMBERS=nExtra, /FOLD_CASE)
+        
+        if nMatches gt 0 then self -> MrZoom::GetProperty, _STRICT_EXTRA=extra[iZoom]
+        if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
+    endif
+        
+;---------------------------------------------------------------------
+;LAYOUT PROPERTIES ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if nExtra gt 0 then begin
+        self -> MrPlotLayout::GetProperty, _STRICT_EXTRA=extra
+    endif
 end
 
 
@@ -782,14 +871,9 @@ OFF = off
         
     ;Turn off?
     endif else if keyword_set(off) then begin
-        if isOn eq 0 then return
-        
-        ;Turn button events off only if nothing else needs them. Cursor modes are the
-        ;only type of modes that can have multiple bits set at the same time.
-        if (self.zmode eq 0) and (self.arrowmode[0] eq 0) and $        ;Zoom, Arrow
-           (self.textmode)[0] eq 0 and ((self.cmode and 1) eq 0) and $ ;Text, Get Points
-           (self.amode)[0] eq 0 $                                      ;Analysis
-            then widget_control, self.drawID, DRAW_BUTTON_EVENTS=0
+        ;
+        ; Never turn off button events. FOCUS is always on.
+        ;
     endif
 end
 
@@ -994,64 +1078,32 @@ end
 ;       INDEX:              in, optional, type=int
 ;                           If given, the index value of the object for which to obtain
 ;                               properties. INDEX can be obtained via the whichObjects
-;                               method and the object type is set with the `ARROW`, 
-;                               `COLORBAR`, `IMAGE`, `PLOT`, and `TEXT` keywords.
+;                               method.
 ;
 ; :Keywords:
 ;       AMODE:              in, optional, type=int
-;                           The analysis mode(s) presently enabled.
-;       LMODE:              in, optional, type=int
-;                           The zoom mode associated with the left mouse button.
-;       RMODE:              in, optional, type=int
-;                           The zoom mode associated with the right mouse button.
+;                           The analysis mode(s) to be enabled.
+;       DRAW:               in, optional, type=boolean
+;                           Call the Draw method after setting properties.
 ;       SAVEDIR:            in, optional, type=string
 ;                           The directory in which plots will be saved.
 ;       XSIZE:              in, optional, type=long, default=512
 ;                           The width of the draw window in pixels
 ;       YSIZE:              in, optional, type=long, default=512
 ;                           The height of the draw window in pixels
-;       ZOOMFACTOR:         in, optional, type=float/fltarr(2)
-;                           The zoom factor with which the mouse wheel will cause the
-;                               x- and y-ranges to be adjusted. If only one value is given,
-;                               it will be applied to both axes.
-;
-;       ARROW:              in, optional, type=boolean, default=0
-;                           If set, then `INDEX` will be taken to refer to an arrow
-;                               object. Use with the `INDEX` keyword.
-;       CB:                 in, optional, type=boolean, default=0
-;                           If set, then `INDEX` will be taken to refer to a colorbar
-;                               object. Use with the `INDEX` keyword.
-;       IMAGE:              in, optional, type=boolean, default=0
-;                           If set, then `INDEX` will be taken to refer to an image
-;                               object. Use with the `INDEX` keyword.
-;       PLOT:               in, optional, type=boolean, default=0
-;                           If set, then `INDEX` will be taken to refer to a plot
-;                               object. Use with the `INDEX` keyword.
-;       TEXT:               in, optional, type=boolean, default=0
-;                           If set, then `INDEX` will be taken to refer to an text
-;                               object. Use with the `INDEX` keyword.
 ;
 ;       _REF_EXTRA:         out, optional, type=any
 ;                           If `INDEX` is present, then any keyword accepted by the
 ;                               indicated object's GetProperty method. If not present,
-;                               then any keyword accepted by MrPlotLayout::GetProperty.
+;                               then any keyword accepted by MrZoom, MrSaveAs,
+;                               MrCursor, or MrPlotLayout.
 ;-
 pro MrWindow::SetProperty, index, $
 AMODE = amode, $
 DRAW = draw, $
-LMODE = lmode, $
-RMODE = rmode, $
 SAVEDIR = savedir, $
 XSIZE = xsize, $
 YSIZE = ysize, $
-ZOOMFACTOR = zoomfactor, $
-
-ARROW = arrow, $
-CB = cb, $
-IMAGE = image, $
-PLOT = plot, $
-TEXT = text, $
-
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -1066,43 +1118,11 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ;INHERITED OBJECTS ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    
-    ;Get properties of a particular object?
-    if n_params() eq 1 then begin
-        arrow = keyword_set(arrow)
-        cb = keyword_set(cb)
-        image = keyword_set(image)
-        plot = keyword_set(plot)
-        text = keyword_set(text)
-        
-        ;Make sure only one keyword is set.
-        if (image + plot + cb + arrow + text) ne 1 then $
-            message, 'Can "Set" properties from exactly one type of object at a time.'
-    
-        ;ARROWS
-        if arrow then begin
-            (*self.arrowObjects)[index] -> SetProperty, _EXTRA=extra
-        
-        ;COLORBARS
-        endif else if cb then begin
-            (*self.colorbars)[index] -> SetProperty, _EXTRA=extra
-        
-        ;IMAGES
-        endif else if image then begin
-            (*self.imageObjects)[index] -> SetProperty, _EXTRA=extra
-        
-        ;PLOTS
-        endif else if plot then begin
-            (*self.plotObjects)[index] -> SetProperty, _EXTRA=extra
-        
-        ;TEXT
-        endif else if text then begin
-            (*self.textObjects)[index] -> SetProperty, _EXTRA=extra
-        endif
-        
-        ;Draw?
+
+    if n_elements(index) ne 0 then begin
+        theObj = self -> Get(POSITION=index)
+        theObj -> SetProperty, _EXTRA=extra
         if keyword_set(draw) then self -> Draw
-        
         return
     endif
 
@@ -1115,45 +1135,58 @@ _REF_EXTRA = extra
     if n_elements(xsize)      ne 0 then self -> ResizeDrawWidget, xsize, self.ysize
     if n_elements(ysize)      ne 0 then self -> ResizeDrawWidget, self.xsize, ysize
     if n_elements(savedir)    ne 0 then self.savedir = savedir
-    if n_elements(zoomfactor) ne 0 then self.zoomfactor = zoomfactor
+        
+    nExtra = n_elements(extra)
     
-    ;Make sure only one zoom bit is set
-    if n_elements(lmode) ne 0 then $
-        if total(fix(binary(lmode))) eq 1 $
-            then self.lmode = lmode $
-            else message, 'LMODE must have only one bit set'
-
-    ;Make sure only one zoom bit is set            
-    if n_elements(rmode) ne 0 then $
-        if total(fix(binary(rmode))) eq 1 $
-            then self.rmode = rmode $
-            else message, 'RMODE must have only one bit set'
-    
-    n_extra = n_elements(extra)
+;---------------------------------------------------------------------
+;CURSOR PROPERTIES ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if nExtra gt 0 then begin
+        void = isMember(['CMODE'], extra, $
+                        iCursor, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
+                        N_NONMEMBERS=nExtra, /FOLD_CASE)
+        
+        if nMatches gt 0 then self -> MrCursor::SetProperty, _STRICT_EXTRA=extra[iCursor]
+        if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
+    endif
 
 ;---------------------------------------------------------------------
-;SUPERCLASS PROPERTIES ///////////////////////////////////////////////
+;SAVEAS PROPERTIES ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if n_extra gt 0 then begin
-
-    ;---------------------------------------------------------------------
-    ;SAVEAS PROPERTIES ///////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
+    if nExtra gt 0 then begin
         void = isMember(['ADJUSTSIZE', 'IM_DENSITY', 'IM_OPTIONS', 'IM_RASTER', 'IM_RESIZE', $
                          'IM_TRANSPARENT', 'IM_WIDTH', 'PDF_UNIX_CONVERT_CMD', 'PDF_PATH', $
                          'PS_CHARSIZE', 'PS_DECOMPOSED', 'PS_DELETE', 'PS_ENCAPSULATED', $
                          'PS_FONT', 'PS_METRIC', 'PS_QUIET', 'PS_SCALE_FACTOR', 'PS_TT_FONT'], $
-                         extra, iSaveAs, N_MATCHES=nmatches, NONMEMBER_INDS=iExtra, /FOLD_CASE)
+                         extra, iSaveAs, N_MATCHES=nmatches, NONMEMBER_INDS=iExtra, $
+                         N_NONMEMBERS=nExtra, /FOLD_CASE)
         
         if nmatches gt 0 then self -> MrAbstractSaveAs::SetProperty, _STRICT_EXTRA=extra[iSaveAs]
+        if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
+    endif
+    
+;---------------------------------------------------------------------
+;ZOOM PROPERTIES /////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if nExtra gt 0 then begin
+        void = isMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
+                        iZoom, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
+                        N_NONMEMBERS=nExtra, /FOLD_CASE)
         
-    ;---------------------------------------------------------------------
-    ;LAYOUT PROPERTIES ///////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-        if n_elements(iExtra) ne 0 then self -> MrPlotLayout::SetProperty, _STRICT_EXTRA=extra[iExtra]
+        if nMatches gt 0 then self -> MrZoom::SetProperty, _STRICT_EXTRA=extra[iZoom]
+        if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
+    endif
+        
+;---------------------------------------------------------------------
+;LAYOUT PROPERTIES ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if nExtra gt 0 then begin
+        ;Recalculate the plot positions when layout changes.
+        self -> MrPlotLayout::SetProperty, _STRICT_EXTRA=extra
+        self -> ApplyPositions
     endif
 
-    ;Recalculate the plot positions in case the layout has changed.
+    ;Draw?
     if keyword_set(draw) then self -> draw
 end
 
@@ -1196,7 +1229,10 @@ pro MrWindow::TLB_Resize_Events, event
     
     ;Recalculate the normalized positions based on the new window size.
     ;Draw the plot to the new size
-    self -> MrPlotLayout::SetProperty
+    if self.layout[0] ne 0 && self.layout[1] ne 1 then begin
+        self -> CalcLayoutPositions
+        self -> ApplyPositions
+    endif
     self -> Draw
 end
 
@@ -1204,8 +1240,12 @@ end
 ;+
 ;   A method for temporarily turning off everything that would otherwise cause a
 ;   draw widget event.
+;
+; :Params:
+;       TLB:        in, optional, type=int
+;                   The widget ID of the top level base.
 ;-
-pro MrWindow::Turn_Everything_Off
+pro MrWindow::Turn_Everything_Off, tlb
     compile_opt idl2
     
     ;Error handling
@@ -1219,8 +1259,6 @@ pro MrWindow::Turn_Everything_Off
     ;Get the widget IDs of the "None" buttons
     AnnNoneID = widget_info(self.tlb, FIND_BY_UNAME='AnnNone')
     ANoneID = widget_info(self.tlb, FIND_BY_UNAME='ANone')
-    CNoneID = widget_info(self.tlb, FIND_BY_UNAME='CNone')
-    ZNoneID = widget_info(self.tlb, FIND_BY_UNAME='ZNone')
     
     ;Create an event and send it
     mockEvent = {id: ANoneID, top: self.tlb, handler: ANoneID}
@@ -1230,13 +1268,11 @@ pro MrWindow::Turn_Everything_Off
     mockEvent = {id: AnnNoneID, top: self.tlb, handler: AnnNoneID}
     widget_control, SEND_EVENT=mockEvent
     
-    ;Create an event and send it
-    mockEvent = {id: CNoneID, top: self.tlb, handler: CNoneID}
-    widget_control, SEND_EVENT=mockEvent
+    ;CURSOR
+    self -> MrCursor::Turn_Everything_Off, tlb
     
-    ;Create an event and send it
-    mockEvent = {id: ZNoneID, top: self.tlb, handler: ZNoneID}
-    widget_control, SEND_EVENT=mockEvent
+    ;ZOOM
+    self -> MrZoom::Turn_Everything_Off, tlb
 end
 
 
@@ -1262,22 +1298,21 @@ pro MrWindow::Wheel_Zoom, event
     if event.type ne 7 || self.wmode eq 0 then return
     
     ;Figure out which type of object has the focus.
-    theObject = (*self.allObjects)[self.ifocus]
+    theObject = self -> Get(POSITION=self.ifocus)
     oType = self -> WhatAmI(theObject)
 
     ;Choose the zoom type
     case oType of
-        'PLOT': self -> MrAbstractZoom::Wheel_Zoom_XY, event
+        'PLOT': self -> MrZoom::Wheel_Zoom_XY, event
         
         'IMAGE': begin
-            if self.wmode eq 1 then self -> MrAbstractZoom::Wheel_Zoom_XY, event
-            if self.wmode eq 2 then self -> MrAbstractZoom::Wheel_Zoom_Color, event
-            if self.wmode eq 4 then self -> MrAbstractZoom::Wheel_Zoom_Page, event
+            if self.wmode eq 1 then self -> MrZoom::Wheel_Zoom_XY, event
+            if self.wmode eq 2 then self -> MrZoom::Wheel_Zoom_Color, event
+            if self.wmode eq 4 then self -> MrZoom::Wheel_Zoom_Page, event
         endcase
         
         else: ;do nothing
     endcase
-
 end
 
 
@@ -1294,14 +1329,72 @@ pro MrWindow::whichObjects
         void = error_message()
         return
     endif
+        
+;---------------------------------------------------------------------
+;Data Objects ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     
-    ;Display all of the objects and their index numbers.
-    self -> whichPlots
-    self -> whichImages
-    self -> whichColorbars
-    self -> whichText
-    self -> whichArrows
+    ;Get all of the data objects
+    dataObj = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nData)
+    index = self -> GetIndex(dataObj)
+    
+    ;The string length of the longest type
+    typeLen = string(max(strlen((*self.gTypes).data)), FORMAT='(i0)')
+    
+    ;Step through each object
+    for i = 0, nData - 1 do begin
+        ;Print a header.
+        if i eq 0 then print, '--Index--', '--Type--', '-Location-', '--Position--', $
+                              FORMAT='(a9, 4x, a' + typeLen + ', 4x, a10, 4x, a12)'
+                              
+        ;Get the object's position and layout
+        dataObj[i] -> GetProperty, POSITION=position, LAYOUT=layout
+        
+        ;If no layout exists, find its fixed position
+        if n_elements(layout) eq 0 $
+            then location = self -> FindFixedLocation(position) $
+            else location = layout[2:3]
+        
+        ;Print the type-name, location, and position
+        sIndex    = string(index[i], FORMAT='(i2)')
+        sLocation = string(location, FORMAT='(%"[ %i, %i]")')
+        sPosition = string(position, FORMAT='(%"[%6.4f, %6.4f, %6.4f, %6.4f]")')
 
+        print, FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0, 5x, a32)', $
+               sIndex, typename(dataObj[i]), sLocation, sPosition
+    
+    endfor
+    print, ''
+
+;---------------------------------------------------------------------
+;Annotation Objects //////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    annObj = self -> Get(/ALL, ISA=(*self.gTypes).annotate, COUNT=nAnn)
+    if nAnn eq 0 then return
+    
+    index = self -> GetIndex(annObj)
+    
+    ;The string length of the longest type
+    typeLen = string(max(strlen((*self.gTypes).annotate)), FORMAT='(i0)')
+    
+    
+    for i = 0, nAnn - 1 do begin
+        ;Print a header.
+        if i eq 0 then print, '--Index--', '--Type--', '--Position--', $
+                              FORMAT='(a9, 4x, a' + typeLen + ', 4x, a12)'
+                              
+        ;Get the object's position and layout
+        dataObj[i] -> GetProperty, POSITION=position
+        
+        ;Print the type-name, location, and position
+        sIndex    = string(index[i], FORMAT='(i2)')
+        sPosition = string(position, FORMAT='(%"[%6.4f, %6.4f, %6.4f, %6.4f]")')
+
+        print, FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a32)', $
+               sIndex, typename(annObj[i]), sPosition
+    
+    endfor
+    print, ''
 end
 
 
@@ -1370,10 +1463,10 @@ pro MrWindow::cleanup
     ;Cleanup inherited properties.
     self -> MrAbstractAnalysis::Cleanup
     self -> MrAbstractArrow::Cleanup
-    self -> MrAbstractCursor::Cleanup
+    self -> MrCursor::Cleanup
     self -> MrAbstractText::Cleanup
     self -> MrAbstractSaveAs::Cleanup
-    self -> MrAbstractZoom::Cleanup
+    self -> MrZoom::Cleanup
     self -> MrPlotManager::Cleanup
     
     ;Delete the windows.
@@ -1400,8 +1493,6 @@ end
 ;       BUILD:              in, optional, type=Boolean, default=1
 ;                           Build the GUI. This gives the option to construct the GUI
 ;                               without having to realize it yet.
-;       CMODE:              in, optional, type=int, default=0
-;                           The default cursor mode in which to start
 ;       CREATEGUI:          in, optional, type=boolean, default=1
 ;                           If set, graphics will be drawn in either a MrWindow widget
 ;                               or in the widget specified by `PARENT`. If not set, graphics
@@ -1414,16 +1505,12 @@ end
 ;                               latter will aslo automatically set CreateGUI=0. This is
 ;                               useful, say, if you want to save an image without having
 ;                               it be displayed first.
-;       LMODE:              in, optional, type=int, default=4 (Box Zoom)
-;                           The zoom mode associated with the left mouse button.
 ;       REALIZE:            in, optional, type=boolean, default=1
 ;                           If set and `PARENT` is not given, then the MrWindow widget will
 ;                               be realized imediately after it is built. If not set, the
 ;                               GUI will be built but not realized. Realization causes a
 ;                               call to the Draw method via "Notify_Realize". Setting this
 ;                               also sets `BUILD`=1.
-;       RMODE:              in, optional, type=int, default=8 (Pan)
-;                           The zoom mode associated with the right mouse button.
 ;       SAVEDIR:            in, optional, type=string, default=current
 ;                           The directory in which to save files. When the display is
 ;                               saved via the ::saveImage method, if no filename is given,
@@ -1431,16 +1518,10 @@ end
 ;       TEXT:               in, optional, type=object
 ;                           A weText object or an array of weText objects to be added
 ;                               to the draw window.
-;       WMODE:              in, optional, type=int, default=8 (Pan)
-;                           The zoom mode associated with the mouse wheel.
 ;       XSIZE:              in, optional, type=long, default=512
 ;                           The width of the draw window in pixels
 ;       YSIZE:              in, optional, type=long, default=512
 ;                           The height of the draw window in pixels
-;       ZOOMFACTOR:         in, optional, type=float/fltarr(2), default=[0.05\, 0.05]
-;                           The zoom factor with which the mouse wheel will cause the
-;                               x- and y-ranges to be adjusted. If only one value is given,
-;                               it will be applied to both axes.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrPlotLayout__Define and 
 ;                               MrAbstractSaveAs__Define is also accepted for keyword
@@ -1458,20 +1539,15 @@ end
 function MrWindow::init, parent, $
 ;MrWindow Keywords
 ARROWS = arrows, $
-CMODE = cmode, $
 CREATEGUI = createGUI, $
 DISPLAY = display, $
 BUILD = build, $
-LMODE = lmode, $
 PLOTOBJECTS = plotObjects, $
 REALIZE = realize, $
-RMODE = rmode, $
 SAVEDIR = savedir, $
 TEXT = text, $
-WMODE = wmode, $
 XSIZE = xsize, $
 YSIZE = ysize, $
-ZOOMFACTOR = zoomfactor, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -1483,8 +1559,11 @@ _REF_EXTRA = extra
         return, 0
     endif
 
-    if self -> MrPlotManager::init(_EXTRA=extra) eq 0 then return, 0
-    if self -> MrAbstractSaveAs::init() eq 0 then return, 0
+    ;Superclasses
+    if self -> MrPlotManager::Init() eq 0 then return, 0
+    if self -> MrAbstractSaveAs::Init() eq 0 then return, 0
+    if self -> MrZoom::Init() eq 0 then return, 0
+    if self -> MrCursor::Init(CMODE=8) eq 0 then return, 0
 
 ;---------------------------------------------------------------------
 ;Keywords ////////////////////////////////////////////////////////////
@@ -1492,11 +1571,8 @@ _REF_EXTRA = extra
     cd, CURRENT=current
     
     ;Default window size
-    setDefaultValue, wmode, 0               ;None
-    setDefaultValue, cmode, 0               ;None
+    setDefaultValue, amode, 0, /BOOLEAN
     setDefaultValue, build, 1, /BOOLEAN
-    setDefaultValue, lmode, 0               ;None
-    setDefaultValue, rmode, 0               ;None
     setDefaultValue, realize, 1, /BOOLEAN
     setDefaultValue, savedir, current
     setDefaultvalue, xsize, 600
@@ -1513,45 +1589,19 @@ _REF_EXTRA = extra
         build = 0
     endif
     
-    ;Zoom Factor
-    case n_elements(zoomfactor) of
-        0: zoomfactor = [0.05, 0.05]
-        1: zoomfactor = [zoomfactor, zoomfactor]
-        2: zoomfactor = zoomfactor
-        else: message, 'ZOOMFACTOR: Incorrect number of elements.'
-    endcase
-    
-    ;Ensure only one zoom bit is set for the left mouse button
-    if total(fix(binary(lmode))) gt 1 then begin
-        message, 'LMODE must be a single bit. Defaulting to 0 (None)', /INFORMATIONAL
-        lmode = 0
-    endif
-    
-    ;Ensure only one zoom bit is set for the right mouse button
-    if total(fix(binary(rmode))) gt 1 then begin
-        message, 'LMODE must be a single bit. Defaulting to 0 (None)', /INFORMATIONAL
-        rmode = 0
-    endif
-    
-    ;Set object properties.
+    ;Set properties
+    self.amode = amode
     self.display = display
-    self.cmode = cmode
-    self.lmode = lmode
-    self.rmode = rmode
-    self.wmode = wmode
     self.savedir = savedir
     self.xsize = xsize
     self.ysize = ysize
-    self.x0 = -1
-    self.y0 = -1
-    self.zoomfactor = zoomfactor
-    
-    ;Serves as an INIT method.
-    self -> AddArrows, arrows
-    self -> AddColorbars, colorbars
-    self -> AddPlots, plotObjects
-    self -> AddImages, imageObjects
-    self -> AddText, text
+        
+    ;Add objects
+    if n_elements(arrows)       gt 0 then self -> Add, arrows
+    if n_elements(colorbars)    gt 0 then self -> Add, colorbars
+    if n_elements(plotObjects)  gt 0 then self -> Add, plotObjects
+    if n_elements(imageObjects) gt 0 then self -> Add, imageObjects
+    if n_elements(text)         gt 0 then self -> Add, text
 
 ;---------------------------------------------------------------------
 ;Display Window //////////////////////////////////////////////////////
@@ -1640,14 +1690,14 @@ pro MrWindow__define, class
     compile_opt idl2
     
     class = { MrWindow, $
-              inherits MrAbstractAnalysis, $    ;Analysis events and menu
-              inherits MrAbstractArrow, $       ;Arrow events and menu
-              inherits MrAbstractCDF, $         ;Plotting data from CDF files
-              inherits MrAbstractCursor, $      ;Cursor events and menu
-              inherits MrAbstractText, $        ;Text events and menu
-              inherits MrAbstractSaveAs, $      ;SaveAs menu
-              inherits MrAbstractZoom, $        ;Zoom events and menu
+              ;In order of importance.
               inherits MrPlotManager, $         ;Manage plot layout
+              inherits MrAbstractSaveAs, $      ;SaveAs menu
+              inherits MrZoom, $                ;Zoom events and menu
+              inherits MrCursor, $              ;Cursor events and menu
+              inherits MrAbstractText, $        ;Text events and menu
+              inherits MrAbstractArrow, $       ;Arrow events and menu
+              inherits MrAbstractAnalysis, $    ;Analysis events and menu
               
               tlb: 0, $                         ;Widget ID of the top level base
               display: 0, $                     ;Display the graphics?

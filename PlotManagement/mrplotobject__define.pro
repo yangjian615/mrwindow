@@ -65,72 +65,20 @@
 ;       07/04/2013  -   Added the COLOR keyword so that each column or row in DIMENSION
 ;                           can be plotted in a different color. - MRA
 ;       07/31/2013  -   Added the ConvertCoord method. - MRA
+;       08/09/2013  -   Inherit MrIDL_Container - MRA
+;       08/10/2013  -   Added the LAYOUT keyword. - MRA
+;       08/22/2013  -   Added the NOERASE keyword to Draw. Was forgetting to set the
+;                           position property in SetProperty. Fixed. - MRA
+;       08/23/2013  -   Added the IsInside method. - MRA
 ;-
 ;*****************************************************************************************
-;+
-;   Convert between data, normal, and device coordinates.
-;
-; :Params:
-;       X:                      in, required, type=numeric scalar/array
-;                               X components of the input coordinates. If only one argument
-;                                   is specified, then X[0,*] represents the X-coordinates,
-;                                   X[1,*] represents the Y-coordinates, and X[2,*]
-;                                   represents the Z-coordinates (if present).
-;       Y:                      in, optional, type=numeric scalar/array
-;                               Y components of the input coordinates.
-;       Z:                      in, optional, type=numeric scalar/array
-;                               Z components of the input coordinates.
-;
-; :Keywords:
-;       _REF_EXTRA:             in, optional, type=any
-;                               Any keyword accepted by IDL's Convert_Coord function is
-;                                   also accepted for keyword inheritance.
-;-
-function MrPlotObject::ConvertCoord, x, y, z, $
-_REF_EXTRA=extra
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return, -1
-    endif
-    
-    ;Get the current P, X, Y system variables
-    P_current = !P
-    X_current = !X
-    Y_current = !Y
-    
-    ;Load the syetem variable states as they relate to this plot
-    !P = self.p_sysvar
-    !X = self.x_sysvar
-    !Y = self.y_sysvar
-    
-    ;Convert coordinates
-    case n_params() of
-        1: coords = convert_coord(x, _STRICT_EXTRA=extra)
-        2: coords = convert_coord(x, y, _STRICT_EXTRA=extra)
-        3: coords = convert_coord(x, y, z, _STRICT_EXTRA=extra)
-        else: message, 'Incorrect number of parameters.'
-    endcase
-    
-    ;Reset the system variables
-    !P = P_current
-    !X = X_current
-    !Y = Y_current
-    
-    return, coords
-end
-
-
 ;+
 ;   The purpose of this method is to draw the plot in the draw window. The plot is
 ;   first buffered into the pixmap for smoother opteration (by allowing motion events
 ;   to copy from the pixmap instead of redrawing the plot, the image does not flicker).
 ;-
-pro MrPlotObject::Draw
+pro MrPlotObject::Draw, $
+NOERASE = noerase
     compile_opt idl2
     
     ;Error handling
@@ -142,14 +90,16 @@ pro MrPlotObject::Draw
     endif
 
     ;Now draw the plot to the pixmap
-    self -> doPlot
-    self -> MrAbstractLegend::Draw
-    self -> MrAbstractOverPlot::Draw
+    self -> doPlot, NOERASE=noerase
     
     ;Save the system variables
     self.x_sysvar = !X
     self.y_sysvar = !Y
     self.p_sysvar = !P
+
+    ;Draw the other items
+    oContained = self -> Get(/ALL, COUNT=count)
+    for i = 0, count - 1 do oContained[i] -> Draw, /NOERASE
 end
 
 
@@ -157,7 +107,8 @@ end
 ;   The purpose of this method is to do the actual plotting. Basically, having this here
 ;   merely to saves space in the Draw method.
 ;-
-pro MrPlotObject::doPlot
+pro MrPlotObject::doPlot, $
+NOERASE=noerase
     compile_opt idl2
     
     ;Error handling
@@ -167,6 +118,8 @@ pro MrPlotObject::doPlot
         void = error_message()
         return
     endif
+    
+    if n_elements(noerase) eq 0 then noerase = *self.noerase
 
     ;Draw the plot.
     wePlot, *self.indep, *self.dep, $
@@ -194,7 +147,7 @@ pro MrPlotObject::doPlot
             FONT=*self.font, $
             NOCLIP=*self.noclip, $
             NODATA=*self.nodata, $
-            NOERASE=*self.noerase, $
+            NOERASE=noerase, $
             POSITION=*self.position, $
             PSYM=*self.psym, $
             SUBTITLE=*self.subtitle, $
@@ -276,6 +229,12 @@ end
 ;                           A label is similar to a plot title, but it is aligned to the
 ;                               left edge of the plot and is written in hardware fonts.
 ;                               Use of the label keyword will suppress the plot title.
+;       LAYOUT:             out, optional, type=intarr(3)/intarr(4)
+;                           A vector specifying [# columns, # rows, index], or
+;                               [# columns, # rows, column, row] of the plot layout and
+;                               plot position. "index" increases first down then accross.
+;                               All numbers start with 1. If `POSITION` is also specified,
+;                               this keyword is ignored.
 ;       LEGENDS:            out, optional, type=object/obj_arr
 ;                           cgLegendItem objects to be added to the plot.
 ;       MAX_VALUE:          out, optional, type=float
@@ -316,6 +275,7 @@ DEP = dep, $
 DIMENSION = dimension, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
+LAYOUT = layout, $
 LABEL = label, $
 LEGENDS = legends, $
 OPLOTS = oplots, $
@@ -365,13 +325,14 @@ _REF_EXTRA = extra
         then axes = *self.axes $
         else axes = obj_new()
     
-    if arg_present(dimension)   then dimension = self.dimension
-    if arg_present(init_xrange) then init_xrange = self.init_xrange
-    if arg_present(init_yrange) then init_yrange = self.init_yrange
-    if arg_present(label)       then label = self.label
-    if arg_present(p_sysvar)    then p_sysvar = self.p_sysvar
-    if arg_present(x_sysvar)    then x_sysvar = self.x_sysvar
-    if arg_present(y_sysvar)    then y_sysvar = self.y_sysvar
+    if arg_present(dimension)   then dimension   =  self.dimension
+    if arg_present(init_xrange) then init_xrange =  self.init_xrange
+    if arg_present(init_yrange) then init_yrange =  self.init_yrange
+    if arg_present(layout)      then layout      = *self.layout
+    if arg_present(label)       then label       =  self.label
+    if arg_present(p_sysvar)    then p_sysvar    =  self.p_sysvar
+    if arg_present(x_sysvar)    then x_sysvar    =  self.x_sysvar
+    if arg_present(y_sysvar)    then y_sysvar    =  self.y_sysvar
     
     ;Graphics Properties
     if arg_present(MAX_VALUE) and n_elements(*self.MAX_VALUE) ne 0 then max_value = *self.max_value
@@ -385,6 +346,40 @@ _REF_EXTRA = extra
     ;Get all of the remaining keywords from weGraphicsKeywords
     if n_elements(EXTRA) ne 0 $
         then self -> weGraphicsKeywords::GetProperty, _STRICT_EXTRA=extra
+end
+
+
+;+
+;   Create a MrPlotObject object to be drawn in the device window.
+;
+; :Keywords:
+;       DRAW:               in, optional, type=boolean, default=0
+;                           Call the Draw method after adding the plot to the list.
+;       _REF_EXTRA:         in, optional, type=structure
+;                           Any keyword accepted by MrPlotObject__define.
+;   
+;-
+pro MrPlotObject::Plot, $
+DRAW = draw, $
+_REF_EXTRA = extra
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    ;Create the plot
+    thePlot = obj_new('MrPlotObject', _STRICT_EXTRA=extra)
+    
+    ;Add the plot
+    self -> Add, thePlot
+    
+    ;Draw    
+    if keyword_set(draw) then self -> Draw
 end
 
 
@@ -406,6 +401,12 @@ end
 ;       INIT_YRANGE:        in, optional, type=fltarr(2)
 ;                           The initial state of the YRANGE keyword. This is used to reset
 ;                               the zoom to its original state.
+;       LAYOUT:             in, optional, type=intarr(3)/intarr(4)
+;                           A vector specifying [# columns, # rows, index], or
+;                               [# columns, # rows, column, row] of the plot layout and
+;                               plot position. "index" increases first across then down.
+;                               All numbers start with 1. If `POSITION` is also specified,
+;                               this keyword is ignored.
 ;       LABEL:              in, optional, type=string
 ;                           A label is similar to a plot title, but it is aligned to the
 ;                               left edge of the plot and is written in hardware fonts.
@@ -453,9 +454,11 @@ DEP = dep, $
 DIMENSION = dimension, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
+LAYOUT = layout, $
 LABEL = label, $
 LEGENDS = legends, $
 OPLOTS = oplots, $
+CBOBJECTS = cbobjects, $
 P_SYSVAR = p_sysvar, $
 X_SYSVAR = x_sysvar, $
 Y_SYSVAR = y_sysvar, $
@@ -468,6 +471,10 @@ POLAR = polar, $
 XLOG = xlog, $
 YLOG = ylog, $
 YNOZERO = ynozero, $
+
+;weGraphics Properties
+XSTYLE = xstyle, $
+YSTYLE = ystyle, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -482,17 +489,22 @@ _REF_EXTRA = extra
     ;Data Properties
     if n_elements(INDEP) ne 0 then *self.indep = indep
     if n_elements(DEP) ne 0 then *self.dep = dep
-    
+
     ;MrLinePlot Properties
-    if n_elements(OPLOTS)      ne 0 then self -> AddOverplots, oplots, /CLEAR
-    if n_elements(LEGENDS)     ne 0 then self -> AddLegends, legends, /CLEAR
-    if n_elements(DIMENSION)   ne 0 then self.dimension = dimension
-    if n_elements(LABEL)       ne 0 then self.label = label
-    if n_elements(INIT_XRANGE) ne 0 then self.init_xrange = init_xrange
-    if n_elements(INIT_YRANGE) ne 0 then self.init_yrange = init_yrange
-    if n_elements(P_SYSVAR)    ne 0 then self.p_sysvar = p_sysvar
-    if n_elements(X_SYSVAR)    ne 0 then self.x_sysvar = x_sysvar
-    if n_elements(Y_SYSVAR)    ne 0 then self.y_sysvar = y_sysvar
+    if n_elements(OPLOTS)      ne 0 then  self -> Add, oplots
+    if n_elements(LEGENDS)     ne 0 then  self -> Add, legends
+    if n_elements(CBOBJECTS)   ne 0 then  self -> Add, cbobjects
+    if n_elements(DIMENSION)   ne 0 then  self.dimension = dimension
+    if n_elements(LABEL)       ne 0 then  self.label = label
+    if n_elements(INIT_XRANGE) ne 0 then  self.init_xrange = init_xrange
+    if n_elements(INIT_YRANGE) ne 0 then  self.init_yrange = init_yrange
+    if n_elements(P_SYSVAR)    ne 0 then  self.p_sysvar = p_sysvar
+    if n_elements(X_SYSVAR)    ne 0 then  self.x_sysvar = x_sysvar
+    if n_elements(Y_SYSVAR)    ne 0 then  self.y_sysvar = y_sysvar
+    if n_elements(LAYOUT)      ne 0 then  begin
+        *self.layout = layout
+        *self.position = MrPlotLayout(layout[0:1], layout[2:*])
+    endif
     
     ;Graphics Properties
     if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
@@ -504,6 +516,8 @@ _REF_EXTRA = extra
     if n_elements(YNOZERO)   ne 0 then *self.ynozero = keyword_set(ynozero)
         
     ;weGraphicsKeywords Properties
+    if n_elements(xstyle) ne 0 then *self.xstyle = ~(xstyle and 1) + xstyle
+    if n_elements(ystyle) ne 0 then *self.ystyle = ~(ystyle and 1) + ystyle
     if n_elements(EXTRA) ne 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra
     
     if keyword_set(draw) then self -> draw
@@ -534,11 +548,9 @@ pro MrPlotObject::cleanup
     ptr_free, self.ylog
     ptr_free, self.polar
     
-    ;Cleanup the remaining keywords by calling the superclass. This must be done because
-    ;the superclasses method has been over-ridden here.
+    ;Cleanup the superclass.
     self -> weGraphicsKeywords::CLEANUP
-    self -> MrAbstractOverPlot::cleanup
-    self -> MrAbstractLegend::cleanup
+    self -> MrIDL_Container::Cleanup
 end
 
 
@@ -573,7 +585,16 @@ end
 ;                           If set, the data will be drawn to the plot. DRAW=1 always if
 ;                               `GUI`=1.
 ;       OPLOTS:             in, optional, type=obj/obj_arr
-;                           A single or array of cgOverPlot objects
+;                           A single or array of cgOverPlot objects.
+;       LAYOUT:             in, optional, type=intarr(3)/intarr(4)
+;                           The location of the plot in a 2D plotting grid. The first two
+;                               elements specify the total number of columns and rows in
+;                               the 2D layout. If 3-elements exist, the third specifies
+;                               the overall position of the plot: [ncols, nrows, index].
+;                               If 4-elements, the column and row in which the plot is to
+;                               be placed: [ncols, nrows, col, row]. "index" begins at 1
+;                               the with plot in the upper-left corner, then increases
+;                               first down, then right.
 ;       LEGENDS:            in, optional, type=object/obj_arr
 ;                           weLegendItem or cgLegendItem objects to be added to the plot.
 ;       MAX_VALUE:          in, optional, type=float
@@ -616,6 +637,7 @@ function MrPlotObject::init, x, y, $
 ;MrPlotObject Keywords
 DIMENSION = dimension, $
 DRAW = draw, $
+LAYOUT = layout, $
 LEGENDS = legends, $
 OPLOTS = oplots, $
 
@@ -698,6 +720,7 @@ _REF_EXTRA = extra
     ;Allocate heap for the variables
     self.indep = ptr_new(/ALLOCATE_HEAP)
     self.dep = ptr_new(/ALLOCATE_HEAP)
+    self.layout = ptr_new(/ALLOCATE_HEAP)
     self.min_value = ptr_new(/ALLOCATE_HEAP)
     self.max_value = ptr_new(/ALLOCATE_HEAP)
     self.nsum = ptr_new(/ALLOCATE_HEAP)
@@ -707,8 +730,8 @@ _REF_EXTRA = extra
     self.ynozero = ptr_new(/ALLOCATE_HEAP)
     
     ;Add overplots and legends. Serves as an Init method.
-    self -> addOverPlots, oplots
-    self -> addLegends, legends
+    if n_elements(oplots)  ne 0 then self -> Add, oplots
+    if n_elements(legends) ne 0 then self -> Add, legends
     
     ;weGraphicsKeywords defaults COLOR to a scalar string ('black'). We must
     ;replicate it if more than one column was given.
@@ -731,6 +754,7 @@ _REF_EXTRA = extra
                          DEP = dep, $
                          COLOR = color, $
                          DIMENSION = dimension, $
+                         LAYOUT = layout, $
                          LABEL = label, $
                          MAX_VALUE = max_value, $
                          MIN_VALUE = min_value, $
@@ -771,9 +795,9 @@ pro MrPlotObject__define, class
     compile_opt idl2
     
     class = {MrPlotObject, $
+             inherits MrIDL_Container, $
+             inherits MrGraphicAtom, $
              inherits weGraphicsKeywords, $
-             inherits MrAbstractLegend, $
-             inherits MrAbstractOverPlot, $
              
              ;Data Properties
              indep: ptr_new(), $               ;independent variable
@@ -791,6 +815,7 @@ pro MrPlotObject__define, class
              ;MrPlotObject Properties
              dimension: 0, $                   ;The over which plots will be made
              label: '', $                      ;*
+             layout: ptr_new(), $              ;Location of plot in a 2D layout
              init_xrange: dblarr(2), $         ;Initial y-range
              init_yrange: dblarr(2), $         ;Initial x-range
              x_sysvar: !X, $                   ;Save the X system variable

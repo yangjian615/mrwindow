@@ -1,7 +1,7 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;       MrAbstractCursor__Define
+;       MrCursor__Define
 ;
 ;*****************************************************************************************
 ;   Copyright (c) 2013, Matthew Argall                                                   ;
@@ -87,7 +87,6 @@
 ;       1       -   Get Point
 ;       2       -   Cross Hairs
 ;       4       -   Show [X,Y]
-;       8       -   Focus
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -106,33 +105,39 @@
 ;       06/27/2013  -   Added the Focus method.
 ;       07/07/2013  -   All buttons are individually implementable. - MRA
 ;       07/31/2013  -   A list index can now be given to the focus method. - MRA
+;       08/23/2013  -   Added the Init, SetProperty and GetProperty methods. Renamed
+;                           to MrCursor__Define from MrAbstractCursor__Define. Added
+;                           the Turn_Everything_Off method. Keywords to Create_Cursor_Menu
+;                           are now being used. Superclass is now assumed to use either
+;                           IDL_Container or MrIDL_Container. Removed the Focus method
+;                           because it did not fit conceptually. Moved to MrWindow__Define. - MRA
 ;-
 ;*****************************************************************************************
 ;+
-;   Create a menu bar with various zoom options in it.
+;   Create a menu bar with various cursor options in it. If no keywords are set, then all
+;   buttons will be created.
 ;
 ; :Params:
 ;       PARENT:             in, required, type=integer
 ;                           The widget ID of the parent widget.
 ;
 ; :Keywords:
-;       MENU:               in, optional, type=boolean, default=1
+;       MENU:               in, optional, type=boolean, default=0
 ;                           If set, all buttons will be placed under a "Cursor" submenu.
-;       CROSS_HAIRS:        in, optional, type=boolean, default=1
+;       CROSS_HAIRS:        in, optional, type=boolean, default=0
 ;                           Create the "Cross Hairs" button.
-;       FOCUS:              in, optional, type=boolean, default=1
+;       FOCUS:              in, optional, type=boolean, default=0
 ;                           Create the "Focus" button.
-;       GET_POINT:          in, optional, type=boolean, default=1
+;       GET_POINT:          in, optional, type=boolean, default=0
 ;                           Create the "Get Point" button.
-;       SHOW_XY:            in, optional, type=boolean, default=1
+;       SHOW_XY:            in, optional, type=boolean, default=0
 ;                           Create the "Show [X,Y]" button.
-;       NONE:               in, optional, type=boolean, default=1
+;       NONE:               in, optional, type=boolean, default=0
 ;                           Create the "None" button.
 ;-
-pro MrAbstractCursor::Create_Cursor_Menu, parent, $
+pro MrCursor::Create_Cursor_Menu, parent, $
 MENU = menu, $
 CROSS_HAIRS = cross_hairs, $
-FOCUS = focus, $
 GET_POINT = get_point, $
 SHOW_XY = show_xy, $
 NONE = none
@@ -146,24 +151,32 @@ NONE = none
         return
     endif
     
-    setDefaultValue, menu, 1, /BOOLEAN
-    setDefaultValue, cross_hairs, 1, /BOOLEAN
-    setDefaultValue, focus, 1, /BOOLEAN
-    setDefaultValue, get_point, 1, /BOOLEAN
-    setDefaultValue, show_xy, 1, /BOOLEAN
-    setDefaultValue, none, 1, /BOOLEAN
+    ;Defaults
+    setDefaultValue, menu, 0, /BOOLEAN
+    setDefaultValue, cross_hairs, 0, /BOOLEAN
+    setDefaultValue, get_point, 0, /BOOLEAN
+    setDefaultValue, show_xy, 0, /BOOLEAN
+    setDefaultValue, none, 0, /BOOLEAN
+    
+    ;If nothing was selected, create all buttons
+    if cross_hairs + get_point + show_xy eq 0 then begin
+        cross_haris = 1
+        focus = 1
+        get_point = 1
+        show_xy = 1
+        none = 1
+    endif
     
     ;Create the Menu
     if keyword_set(menu) $
         then cursorID = widget_button(parent, VALUE='Cursor', /MENU) $
         else cursorID = parent
     
-    
-    button = widget_button(cursorID, VALUE='Cross Hairs', UNAME='CROSS_HAIRS', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
-    button = widget_button(cursorID, VALUE='Focus', UNAME='FOCUS', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
-    button = widget_button(cursorID, VALUE='Get Point', UNAME='GET_POINT', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
-    button = widget_button(cursorID, VALUE='Show [x,y]', UNAME='SHOW_XY', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
-    button = widget_button(cursorID, VALUE='None', UNAME='CNONE', UVALUE={object: self, method: 'Cursor_Menu_Events'})
+    ;Create Buttons
+    if cross_hairs then button = widget_button(cursorID, VALUE='Cross Hairs', UNAME='CROSS_HAIRS', /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
+    if get_point   then button = widget_button(cursorID, VALUE='Get Point',   UNAME='GET_POINT',   /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
+    if show_xy     then button = widget_button(cursorID, VALUE='Show [x,y]',  UNAME='SHOW_XY',     /CHECKED_MENU, UVALUE={object: self, method: 'Cursor_Menu_Events'})
+    if none        then button = widget_button(cursorID, VALUE='None',        UNAME='CURSOR_NONE',                UVALUE={object: self, method: 'Cursor_Menu_Events'})
 end
 
 
@@ -175,7 +188,7 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractCursor::Cursor_Menu_Events, event
+pro MrCursor::Cursor_Menu_Events, event
     compile_opt idl2
     
     ;Error handling
@@ -194,21 +207,7 @@ pro MrAbstractCursor::Cursor_Menu_Events, event
     isSet = ~isSet
     
     case strupcase(cursor_type) of
-        'NONE': begin
-            ;Turn everything off and copy the pixmap
-            self.cmode = 0
-            self -> On_Off_Button_Events, /OFF
-            self -> On_Off_Motion_Events, /OFF
-            self -> copyPixmap
-            
-            ;Get the button's siblings and uncheck them all
-            parent = widget_info(event.id, /PARENT)
-            kids = widget_info(parent, /ALL_CHILDREN)
-            for i = 0, n_elements(kids) - 1 do widget_control, kids[i], SET_BUTTON=0
-            
-            ;Make the status bar blank
-            widget_control, self.statusID, SET_VALUE=' '
-        endcase
+        'NONE': self -> Turn_Everything_Off, self.tlb
         
         'GET POINT': begin
             if isSet then begin
@@ -247,16 +246,6 @@ pro MrAbstractCursor::Cursor_Menu_Events, event
             endelse
         endcase
         
-        'FOCUS': begin
-            if isSet then begin
-                self.cmode += 8
-                self -> On_Off_Button_Events, /ON
-            endif else begin
-                self.cmode -= 8
-                self -> On_Off_Button_Events, /OFF
-            endelse
-        endcase
-                
         else: message, 'Button "' + cursor_type + '" unknown.'
     endcase
     
@@ -273,13 +262,14 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractCursor::Cross_Hairs, event
+pro MrCursor::Cross_Hairs, event
     compile_opt idl2
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Error_Handler
         void = error_message()
         return
     endif
@@ -312,7 +302,7 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractCursor::Draw_Events, event
+pro MrCursor::Draw_Events, event
     compile_opt idl2
     
     ;Error handling
@@ -327,7 +317,6 @@ pro MrAbstractCursor::Draw_Events, event
 ;Button Press Events /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if event.type eq 0 then begin
-        if ((self.cmode and 8) gt 0) then self -> Focus, event          ;Focus
         if ((self.cmode and 1) gt 0) then self -> Get_Point, event      ;Get Point
     endif
 
@@ -346,16 +335,9 @@ end
 
 
 ;+
-;   Event handler for Focus events. Find the closest plot to the clicked point.
-;
-; :Params:
-;   EVENT:              in, optional, type=structure/int
-;                       The event returned by the windows manager. If not given, the
-;                           plot indicated by SELF.IFOCUS will become the object of focus.
-;                           If EVENT is an integer, then it is the index value of the plot
-;                           on which to focus.
+;   Serve as a general error handler for event handling routines.
 ;-
-pro MrAbstractCursor::Focus, event
+pro MrZoom::Error_Handler
     compile_opt idl2
     
     ;Error handling
@@ -365,69 +347,8 @@ pro MrAbstractCursor::Focus, event
         void = error_message()
         return
     endif
-        
-;---------------------------------------------------------------------
-;Event? //////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    event_type = size(event, /TYPE)
-    
-    if event_type eq 8 then begin
 
-        ;Only listen to left button presses and only if the Focus bit is set
-        if event.type ne 0 || event.press ne 1 || ((self.cmode and 8) eq 0) then return
-    
-    ;---------------------------------------------------------------------
-    ;Only One Option /////////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-
-        if self.nplots eq 1 then begin
-            ifocus = 0
-        
-    ;---------------------------------------------------------------------
-    ;Find Clostest Plot //////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-        endif else begin
-            ;Convert clicked points to normal coordinates
-            xy = convert_coord(event.x, event.y, /DEVICE, /TO_NORMAL)
-
-            ;Get the location of the center of each plot
-            plot_centers = fltarr(2, n_elements(*self.plot_positions)/4)
-            plot_centers[0,*] = ( (*self.plot_positions)[2,*] - (*self.plot_positions)[0,*] ) / 2.0 + $
-                                (*self.plot_positions)[0,*]
-            plot_centers[1,*] = ( (*self.plot_positions)[3,*] - (*self.plot_positions)[1,*] ) / 2.0 + $
-                                (*self.plot_positions)[1,*]
-        
-            ;Find the distance from the plot centers to the clicked point.
-            distance = sqrt( (plot_centers[0,*] - xy[0])^2 + $
-                             (plot_centers[1,*] - xy[1])^2 )
-
-            ;Get the index of the plot closest to the clicked point.
-            void = min(distance, ifocus)
-        endelse
-        
-        self.ifocus = ifocus
-        
-;---------------------------------------------------------------------
-;Plot Index Given? ///////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    endif else if event_type ne 0 then begin
-        
-        self.ifocus = event
-        
-    endif
-
-;---------------------------------------------------------------------
-;Set Focus ///////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    ;Set the system variables and synchronize the modes.
-    theObj = (*self.allObjects)[self.ifocus]
-
-    theObj -> getProperty, X_SYSVAR=x_sysvar, Y_SYSVAR=y_sysvar, P_SYSVAR=p_sysvar
-    !X = x_sysvar
-    !Y = y_sysvar
-    !P = p_sysvar
+    self -> Turn_Everything_Off, self.tlb
 end
 
 
@@ -438,13 +359,14 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractCursor::Get_Point, event
+pro MrCursor::Get_Point, event
     compile_opt idl2
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Error_Handler
         void = error_message()
         return
     endif
@@ -459,6 +381,28 @@ end
 
 
 ;+
+;   The purpose of this method is to get object properties.
+;
+; :Keywords:
+;       CMODE:              out, optional, type=int
+;                           The cursor mode(s) currently active.
+;-
+pro MrCursor::GetProperty, $
+CMODE = cmode
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    if arg_present(cmode) ne 0 then cmode = self.cmode
+end
+
+;+
 ;   Turn DRAW_BUTTON_EVENTS on or off.
 ;
 ; :Keywords:
@@ -467,7 +411,7 @@ end
 ;       OFF:                    in, optional, type=boolean, default=0
 ;                               Turn motion events off.
 ;-
-pro MrAbstractCursor::On_Off_Button_Events, $
+pro MrCursor::On_Off_Button_Events, $
 ON = on, $
 OFF = off
     compile_opt idl2
@@ -499,8 +443,8 @@ OFF = off
         ;Turn motion events off only if nothing else needs them. Multiple cursor
         ;modes can be active at the same time. Use AND to check for bits.
         
-        ;Get Points, Focus
-        if ((self.cmode and 1) eq 0) and ((self.cmode and 8) eq 0) then $
+        ;Get Points
+        if ((self.cmode and 1) eq 0) then $
             widget_control, self.drawID, DRAW_BUTTON_EVENTS=0
     endif
 end
@@ -516,7 +460,7 @@ end
 ;       OFF:                    in, optional, type=boolean, default=0
 ;                               Turn motion events off.
 ;-
-pro MrAbstractCursor::On_Off_Motion_Events, $
+pro MrCursor::On_Off_Motion_Events, $
 ON = on, $
 OFF = off
     compile_opt idl2
@@ -558,19 +502,44 @@ end
 
 
 ;+
-;   Show the [x, y] coordinates of the cursor below the plot.
+;   The purpose of this method is to set object properties.
 ;
-; :Params:
-;       EVENT:              in, required, type=structure
-;                           An event structure returned by the windows manager.
+; :Keywords:
+;       CMODE:              in, optional, type=int
+;                           The cursor mode(s) to be active.
 ;-
-pro MrAbstractCursor::Show_XY, event
+pro MrCursor::SetProperty, $
+CMODE = cmode
     compile_opt idl2
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    if n_elements(cmode) ne 0 then self.cmode = cmode
+end
+
+
+;+
+;   Show the [x, y] coordinates of the cursor below the plot.
+;
+; :Params:
+;       EVENT:              in, required, type=structure
+;                           An event structure returned by the windows manager.
+;-
+pro MrCursor::Show_XY, event
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = Error_Message()
         return
     endif
 
@@ -586,19 +555,68 @@ end
 
 
 ;+
+;   A method for turning off all zoom options and effects.
+;
+; :Params:
+;       TLB:        in, optional, type=int
+;                   The widget ID of the top level base.
+;-
+pro MrCursor::Turn_Everything_Off, tlb
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    ;Reset event processing
+    self.cmode = 0
+    self -> On_Off_Button_Events, /OFF
+    self -> On_Off_Motion_Events, /OFF
+    
+    ;Copy the pixmap to erase the cursor.
+    self -> CopyPixmap
+    
+    ;Make the status bar blank.
+    widget_control, self.statusID, SET_VALUE=' '
+    
+    ;Uncheck all menu buttons
+    if n_elements(tlb) gt 0 && widget_info(tlb, /VALID_ID) then begin
+        ;Get the widget IDs of the menu buttons
+        chID  = widget_info(tlb, FIND_BY_UNAME='CROSS_HAIRS')
+        focID = widget_info(tlb, FIND_BY_UNAME='FOCUS')
+        gpID  = widget_info(tlb, FIND_BY_UNAME='GET_POINT')
+        sxyID = widget_info(tlb, FIND_BY_UNAME='SHOW_XY')
+
+        ;Uncheck the buttons
+        if widget_info(chID,  /VALID_ID) then widget_control, chID,  SET_BUTTON=0
+        if widget_info(focID, /VALID_ID) then widget_control, focID, SET_BUTTON=0
+        if widget_info(gpID,  /VALID_ID) then widget_control, gpID,  SET_BUTTON=0
+        if widget_info(sxyID, /VALID_ID) then widget_control, sxyID, SET_BUTTON=0
+    endif
+end
+
+
+;+
 ;   Clean up after the object is destroy
 ;-
-pro MrAbstractCursor::cleanup
+pro MrCursor::cleanup
     ;Nothing to clean up.
 end
 
 
 ;+
-;   The initialization method. Because MrAbstractCursor is an abstract class, it must
-;   be inherited. Any attempts to instantiate a MrAbstractCursor object will result
-;   in an error.
+;   The initialization method.
+;
+; :Keywords:
+;       CMODE:              in, optional, type=int
+;                           The cursor mode(s) to be active initially.
 ;-
-function MrAbstractCursor::init
+function MrCursor::init, $
+CMODE = cmode
     compile_opt idl2
     
     ;Error handling
@@ -609,7 +627,10 @@ function MrAbstractCursor::init
         return, 0
     endif
     
-    message, 'This is an abstract class and must be inherited.'
+    SetDefaultValue, cmode, 0
+    self -> SetProperty, CMODE=cmode
+    
+    return, 1
 end
 
 
@@ -620,11 +641,11 @@ end
 ;       CLASS:          out, optional, type=structure
 ;                       The class definition structure.
 ;-
-pro MrAbstractCursor__define, class
+pro MrCursor__define, class
     compile_opt idl2
     
-    class = {MrAbstractCursor, $
+    class = {MrCursor, $
              cmode: 0, $            ;Currntly active cursor mode(s).
-             ifocus: 0 $            ;Index of the plot on which to focus.
+             iFocus: 0 $            ;Index of the plot on which to focus.
             }
 end
