@@ -82,6 +82,7 @@
 ;                           working properly after remodelling the MrPlotLayout class.
 ;                           Added the Plot, Image, and Contour methods. The Remove
 ;                           method now works. - MRA
+;       08/24/2013  -   Added the FillHoles and TrimLayout methods. Inherit CDF_Plot.- MRA
 ;                                   
 ;-
 ;*****************************************************************************************
@@ -94,17 +95,27 @@
 ;                               The plot object(s) to add to the display.
 ;
 ;   :Keywords:
-;       INDEX:                  in, optional, type=int/intarr, default=[last]
+;       DRAW:                   in, optional, type=boolean, default=0
+;                               Call the Draw method after adding.
+;       POSITION:               in, optional, type=int/intarr, default=[last]
 ;                               The index location(s) into the container at which to add
 ;                                   the object(s). The default is to put the objects at
 ;                                   the end of the container.
-;       POSITION:               out, optional, type=fltarr(4\,N)
-;       LOCATION:               out, optional, type=intarr(2\,N)
+;       PLOT_POSITION:          out, optional, type=fltarr(4\,N)
+;                               The standard 4-element plot position for each object in
+;                                   `THEOBJECTS`. If an object is not a "data" object,
+;                                   then the position will be [0,0,0,0].
+;       PLOT_LOCATION:          out, optional, type=intarr(2\,N)
+;                               The [col, row] location of each object in `THEOBJECTS`
+;                                   where each plot will be placed in the 2D plotting grid.
+;                                   If the object is not a "data" object, then its location
+;                                   will be [0,0]
 ;-
 pro MrPlotManager::Add, theObjects, $
-INDEX = index, $
-LOCATION = location, $
-POSITION = position
+DRAW = draw, $
+POSITION = index, $
+PLOT_LOCATION = outPocation, $
+PLOT_POSITION = outPosition
     compile_opt idl2
     
     ;Error handling
@@ -128,8 +139,8 @@ POSITION = position
     if nObj eq 0 then return
         
     ;Allocate memory for the positions and locations.
-    location = intarr(2, nObj)
-    position = fltarr(4, nObj)
+    outLocation = intarr(2, nObj)
+    outPosition = fltarr(4, nObj)
     
     ;Make sure a location and position is defined for each plot
     for i = 0, nObj - 1 do begin
@@ -151,7 +162,7 @@ POSITION = position
     ;---------------------------------------------------------------------
         isData = isMember((*self.gTypes).ImAData, ImA) 
         if isData eq 0 then begin
-            self -> MrIDL_Container::Add, theObjects[i], INDEX=thisIndex
+            self -> MrIDL_Container::Add, theObjects[i], POSITION=thisIndex
             continue
         endif
         
@@ -167,9 +178,10 @@ POSITION = position
             then pos_init = !Null $
             else pos_init = pos
         
-        ;Get the "location" part of the layout.
+        ;Get the "location" part of the layout. Check for default Coyote Graphics position.
         case n_elements(layout) of
-            0: ;Do Nothing
+            0: if n_elements(pos) gt 0 && array_equal(pos, [0.125, 0.125, 0.925, 0.9]) $
+                    then void = temporary(pos)
             3: loc = layout[2]
             4: loc = layout[2:3]
             else: begin
@@ -197,11 +209,11 @@ POSITION = position
         theObjects[i] -> SetProperty, POSITION=pos
         
         ;Store the location and position if they were created.
-        location[*,i] = temporary(loc)
-        position[*,i] = temporary(pos)
+        outLocation[*,i] = temporary(loc)
+        outPosition[*,i] = temporary(pos)
 
         ;Add the object to the container.
-        self -> MrIDL_Container::Add, theObjects[i], INDEX=thisIndex
+        self -> MrIDL_Container::Add, theObjects[i], POSITION=thisIndex
     endfor
     
 ;---------------------------------------------------------------------
@@ -211,6 +223,9 @@ POSITION = position
     ;If the layout has changed, we need to apply the new positions to all plots.
     if array_equal(layout_init, self.layout) eq 0 $
         then self -> ApplyPositions
+        
+    ;Draw?
+    if keyword_set(draw) then self -> Draw
 end
 
 
@@ -259,40 +274,15 @@ end
 
 
 ;+
-;   Create a MrContour object. It can be drawn to the display and/or
-;   added to the container
+;   Fill holes in the layout by moving each plot to the lowest available plot index.
+;   Preserve the order of the plots.
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
-;                           Add the coutour object to the container. This assumes that the
-;                               IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
-;                           Call the Draw method after adding the image to the list.
-;       LAYOUT:             in, optional, type=intarr
-;                           A vector in the form [layout, location], where "layout" is
-;                               a 2-element vector specifying the number of rows and
-;                               columns, and "location" is a 2-element vector specifying
-;                               the [col,row] location within "layout" at which `THEPLOT`
-;                               should be placed.
-;       POSITION:           in, optional, type=boolean
-;                           The standard 4-element position vector accepted by PLOT. If
-;                               not given and the `ADD` is set, a position will be chosen
-;                               from the available layout positions.
-;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by MrImagePlot__define.
-;
-; :Returns:
-;       THECONTOUR:         out, required, type=object
-;                           An object reference to the contour.
-;   
+;       DRAW:           in, optional, type=boolean, default=0
+;                       If set, the draw method will be called after filling holes.
 ;-
-function MrPlotManager::Contour, data, x, y, $
-ADD = add, $
-DRAW = draw, $
-LAYOUT = layout, $
-POSITION = position, $
-_REF_EXTRA = extra
+pro MrPlotManager::FillHoles, $
+DRAW=draw
     compile_opt idl2
     
     ;Error handling
@@ -300,235 +290,62 @@ _REF_EXTRA = extra
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, obj_new()
+        return
     endif
-    
-    SetDefaultValue, add, 1, /BOOLEAN
-    SetDefaultvalue, draw, 1, /BOOLEAN
-
-;---------------------------------------------------------------------
-;Fit within Current Layout? //////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Make sure the plot fits within the layout
-    if add eq 1 then begin
-        ;Was a [col,row] location provided?
-        case n_elements(layout) of
-            0: ;Do nothing
-            3: location = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
-            4: location = layout[2:3]
-            else: Message, 'Invalid layout. Cannot Plot.'
-        endcase
-    
-        ;Was a position provided?
-        if n_elements(position) eq 0 then fixed = 0 else fixed = 1
-
-        ;Get a location and/or position if none were provided.
-        self -> GetPositions, location, POSITION=position, LAYOUT=layout, UPDATE_LAYOUT=0
-        if location[0] gt 0 $
-            then layout = ptr_new([layout, location]) $
-            else layout = ptr_new(/ALLOCATE_HEAP)
         
-    endif else layout = ptr_new(/ALLOCATE_HEAP)
+;---------------------------------------------------------------------
+;Find the Holes //////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Which are available?
+    tf_available = self -> IsAvailable(/PLOT_INDEX)
+    if tf_available eq !Null then return
+    
+    ;Where are the holes? pHoles is in plot-index order, but is 0-based.
+    ;We need 1-based to have plot-indices.
+    pHoles = where(tf_available eq 1, nHoles) + 1
+    if nHoles eq 0 then return
     
 ;---------------------------------------------------------------------
-;Create the Image ////////////////////////////////////////////////////
+;Fill Holes //////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-
-    ;Create the color bar
-    theContour = obj_new('MrContour', data, x, y, _STRICT_EXTRA=extra)
     
-    ;Add the image
-    if keyword_set(add) then self -> Add, theContour
+    ;Get all of the relevant objects
+    theseObj = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nObj)
     
-    ;Draw    
-    if keyword_set(draw) then self -> Draw
-    
-    return, theContour
-end
-
-
-;+
-;   Create a MrImagePlot object. It can be drawn to the display and/or
-;   added to the container
-;
-; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
-;                           Add the plot object to the container. This assumes that the
-;                               IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
-;                           Call the Draw method after adding the image to the list.
-;       LAYOUT:             in, optional, type=intarr
-;                           A vector in the form [layout, location], where "layout" is
-;                               a 2-element vector specifying the number of rows and
-;                               columns, and "location" is a 2-element vector specifying
-;                               the [col,row] location within "layout" at which `THEPLOT`
-;                               should be placed.
-;       POSITION:           in, optional, type=boolean
-;                           The standard 4-element position vector accepted by PLOT. If
-;                               not given and the `ADD` is set, a position will be chosen
-;                               from the available layout positions.
-;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by MrImagePlot__define.
-;
-; :Returns:
-;       THEIMAGE:           out, required, type=object
-;                           An object reference to the image.
-;   
-;-
-function MrPlotManager::Image, image, x, y, $
-ADD = add, $
-DRAW = draw, $
-LAYOUT = layout, $
-POSITION = position, $
-_REF_EXTRA = extra
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return, obj_new()
-    endif
-    
-    SetDefaultValue, add, 1, /BOOLEAN
-    SetDefaultvalue, draw, 1, /BOOLEAN
-
-;---------------------------------------------------------------------
-;Fit within Current Layout? //////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Make sure the plot fits within the layout
-    if add eq 1 then begin
-        ;Was a [col,row] location provided?
-        case n_elements(layout) of
-            0: ;Do nothing
-            3: location = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
-            4: location = layout[2:3]
-            else: Message, 'Invalid layout. Cannot Plot.'
-        endcase
-    
-        ;Was a position provided?
-        if n_elements(position) eq 0 then fixed = 0 else fixed = 1
-
-        ;Get a location and/or position if none were provided.
-        self -> GetPositions, location, POSITION=position, LAYOUT=layout, UPDATE_LAYOUT=0
-        if location[0] gt 0 $
-            then layout = ptr_new([layout, location]) $
-            else layout = ptr_new(/ALLOCATE_HEAP)
+    ;Start shifting them
+    for i = 0, nObj - 1 do begin
+        theseObj[i] -> GetProperty, LAYOUT=layout
+        nLayout = n_elements(layout)
+        if nLayout eq 0 then continue
         
-    endif else layout = ptr_new(/ALLOCATE_HEAP)
-    
-;---------------------------------------------------------------------
-;Create the Image ////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    ;Create the color bar
-    theImage = obj_new('MrImagePlot', image, x, y, _STRICT_EXTRA=extra)
-    
-    ;Add the image
-    if keyword_set(add) then self -> Add, theImage
-    
-    ;Draw    
-    if keyword_set(draw) then self -> Draw
-    
-    return, theImage
-end
-
-
-;+
-;   Create a MrPlotObject object. If it is being added to the current window's container,
-;   make sure it fits within the new layout. cgPlot automatically picks a position, so
-;   we need to pre-empt that.
-;
-; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
-;                           Add the plot object to the container. This assumes that the
-;                               IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
-;                           Call the Draw method after adding the plot to the list.
-;       LAYOUT:             in, optional, type=intarr
-;                           A vector in the form [layout, location], where "layout" is
-;                               a 2-element vector specifying the number of rows and
-;                               columns, and "location" is a 2-element vector specifying
-;                               the [col,row] location within "layout" at which `THEPLOT`
-;                               should be placed.
-;       POSITION:           in, optional, type=boolean
-;                           The standard 4-element position vector accepted by PLOT. If
-;                               not given and the `ADD` is set, a position will be chosen
-;                               from the available layout positions.
-;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by MrPlotObject__define.
-;
-; :Returns:
-;       THEPLOT:            out, required, type=object
-;                           An object reference to the plot.
-;   
-;-
-function MrPlotManager::Plot, x, y, $
-ADD = add, $
-DRAW = draw, $
-POSITION = position, $
-LAYOUT = layout, $
-_REF_EXTRA = extra
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        if ptr_valid(layout) then ptr_free, layout
-        void = error_message()
-        return, obj_new()
-    endif
-    
-    SetDefaultValue, add, 1, /BOOLEAN
-    SetDefaultvalue, draw, 1, /BOOLEAN
-
-;---------------------------------------------------------------------
-;Fit within Current Layout? //////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Make sure the plot fits within the layout
-    if add eq 1 then begin
-        ;Was a [col,row] location provided?
-        case n_elements(layout) of
-            0: ;Do nothing
-            3: location = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
-            4: location = layout[2:3]
-            else: Message, 'Invalid layout. Cannot Plot.'
+        case nLayout of
+            3: thisPIndex = layout[2]
+            4: thisPIndex = self -> ConvertLocation(layout[2:3], self.layout, /TO_PLOT_INDEX)
+            else: message, 'Layout has incorrect format. Cannot be shifted.'
         endcase
-    
-        ;Was a position provided?
-        if n_elements(position) eq 0 then fixed = 0 else fixed = 1
 
-        ;Get a location and/or position if none were provided.
-        self -> GetPositions, location, POSITION=position, LAYOUT=layout, UPDATE_LAYOUT=0
-        if location[0] gt 0 $
-            then layout = ptr_new([layout, location]) $
-            else layout = ptr_new(/ALLOCATE_HEAP)
+        ;If the plot is before the hole, then skip it.
+        if thisPIndex le pHoles[0] then continue
+
+        ;If we make it to here, fill a hole.
+        newLocation = self -> ConvertLocation(pHoles[0], /PLOT_INDEX, /TO_COLROW)
+        newPosition = (*self.layout_positions)[*, newLocation[0]-1, newLocation[1]-1]
+        theseObj[i] -> SetProperty, LAYOUT=[self.layout, newLocation], POSITION=newPosition
         
-    endif else layout = ptr_new(/ALLOCATE_HEAP)
+        ;Now there is a hole in the old location
+        pHoles[0] = thisPIndex
+        pHoles = pHoles[sort(pHoles)]
+    endfor
     
 ;---------------------------------------------------------------------
-;Create the Plot /////////////////////////////////////////////////////
+;Superclass //////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-
-    ;Create the plot
-    thePlot = obj_new('MrPlotObject', $
-                      x, y, $
-                      POSITION=position, $
-                      LAYOUT=*layout, $
-                      _EXTRA=extra)
-    ptr_free, layout
-
-    ;Add the plot to the container?
-    if keyword_set(add) then self -> Add, thePlot
     
-    ;Draw the plot?
+    ;Fill layout holes
+    self -> MrPlotLayout::FillHoles
+    
     if keyword_set(draw) then self -> Draw
-    
-    return, thePlot
 end
 
 
@@ -540,28 +357,29 @@ end
 ;                               The [col, row] location of the plot to replace
 ;
 ;   :Keywords:
-;       ADJUST_LAYOUT:          in, optional, private, type=Boolean, default=0
-;                               Sometimes holes are created in the plot layout when a
-;                                   plots are added or removed. Set this keyword to remove
-;                                   holes in the plot layout.
+;       ALL:                    in, optional, type=boolean, default=0
+;                               Remove all objects from the container.
 ;       DESTROY:                in, optional, type=boolean, default=1
 ;                               Destroy the objects being replaced.
 ;       DRAW:                   in, optional, type=boolean, default=0
 ;                               Call the Draw method after adding the legends to the list.
-;       INDEX                   in, optional, type=boolean, default=0
-;                               If set, then `LOCATION` is actually the index within at
-;                                   which the plot is stored.
-;       PLOT_INDEX:             in, optional, type=int, default=0
-;                               If set, then `LOCATION` is actually the 1D plot index of
-;                                   the plot. The upper-left-most plot has a plot index of
-;                                   1, and the plot index increases as you go down the
-;                                   column, then across the row.
+;       FILLHOLES:              in, optional, type=boolean, default=0
+;                               Sometimes removing plots can cause holes in the layout.
+;                                   Set this keyword to gather all remaining plots
+;                                   together at the lowest available plot-indices.
+;       POSITION:               in, optional, type=boolean, default=0
+;                               The index within the container of the object(s) to be
+;                                   removed.
+;       TRIMLAYOUT:             in, optional, type=int, default=0
+;                               If set, empty rows and columns will be removed.
 ;-
 pro MrPlotManager::Remove, Child_object, $
 ALL = all, $
 DESTROY = destroy, $
 DRAW = draw, $
-INDEX = index, $
+FILLHOLES=fillHoles, $
+POSITION = index, $
+TRIMLAYOUT = trimLayout, $
 TYPE = type
     compile_opt idl2
     
@@ -576,6 +394,8 @@ TYPE = type
     ;Defaults
     SetDefaultValue, draw, 0, /BOOLEAN
     SetDefaultValue, destroy, 1, /BOOLEAN
+    SetDefaultValue, fillHoles, 0, /BOOLEAN
+    SetDefaultValue, trimLayout, 0, /BOOLEAN
         
 ;---------------------------------------------------------------------
 ;Remove All //////////////////////////////////////////////////////////
@@ -670,6 +490,13 @@ TYPE = type
 ;---------------------------------------------------------------------
 ;Draw ////////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+
+    ;Fill holes?
+    if fillHoles eq 1 then self -> FillHoles
+    
+    ;Trim the layout?
+    if trimLayout eq 1 then self -> TrimLayout
+
     ;Draw?
     if keyword_set(draw) then self -> Draw
  
@@ -759,6 +586,36 @@ end
 
 
 ;+
+;   The purpose of this method is to trim empty rows and columns from the layout.
+;
+; :Keywords:
+;       DRAW:           in, optional, type=boolean, default=0
+;                       If set, the draw method will be called after trimming the layout.
+;-
+pro MrPlotManager::TrimLayout, $
+DRAW = draw
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+        
+    ;Call the superclass
+    self -> MrPlotLayout::TrimLayout
+    
+    ;Apply the new positions
+    self -> ApplyPositions
+    
+    ;Draw?
+    if keyword_set(draw) then self -> Draw
+end
+
+
+;+
 ;   Determine which type of object was given.
 ;
 ; :Params:
@@ -830,7 +687,8 @@ pro MrPlotManager::Config
               overplot: ['WEOVERPLOT'], $
               ImAData: ['PLOT', 'IMAGE', 'CONTOUR'], $     ;TO BE USED WITH ::WHATAMI
               data: ['PLOT', 'MRPLOTOBJECT', 'IMAGE', 'MRIMAGEOBJECT', 'CONTOUR', 'MRCONTOUR'], $
-              annotate: ['WECOLORBAR', 'WEAXIS', 'WELEGENDITEM', 'WEARROW', 'WETEXT'] $
+              annotate: ['WECOLORBAR', 'WEAXIS', 'WELEGENDITEM', 'WEARROW', 'WETEXT'], $
+              files: ['CDF_PLOT'] $
             }
     
     ;Store them as a class property

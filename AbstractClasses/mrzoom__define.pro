@@ -1,7 +1,7 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;       MrAbstractZoom__Define
+;       MrZoom__Define
 ;
 ;*****************************************************************************************
 ;   Copyright (c) 2013, Matthew Argall                                                   ;
@@ -97,12 +97,18 @@
 ;                       direction by the zoomfactor. The zoomfactor can be different
 ;                       for x and y.
 ;
-;   Zoom Bits::
+;   Button Zoom Bits::
 ;       0       -   No zoom effects
 ;       1       -   X Zoom
 ;       2       -   Y Zoom
 ;       4       -   Box Zoom
 ;       8       -   Pan
+;
+;   Wheel Zoom Bits::
+;       0       -   No zoom effects
+;       1       -   Zoom in the X- and Y-directions
+;       2       -   Zomm in the color range (for images)
+;       3       -   Flip pages (for images)
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -123,11 +129,17 @@
 ;       05/27/2013  -   Updated the Pan, Box_Zoom, XY_Zoom, and Wheel_Zoom methods to
 ;                           use the plotObjects and ifocus properties. The latter two
 ;                           properties are assumed to be present in the object that
-;                           inherits MrAbstractZoom. Incorporated bindings into the zoom
+;                           inherits MrZoom. Incorporated bindings into the zoom
 ;                           options. Renamed Wheel_Zoom to Wheel_XY_Zoom and added
 ;                           Wheel_Color_Zoom. - MRA
 ;       07/10/2013  -   Added the Wheel_Zoom_Page method. - MRA
 ;       07/14/2013  -   Added the Bindem method. - MRA
+;       08/23/2013  -   Added Init, GetProperty, and SetProperty methods. Renamed from
+;                           MrAbstractZoom__Define to MrZoom__Define. Now assumes objects
+;                           are stored in an IDL_Container. Menu buttons are now optional.
+;                           Added the Turn_Everything_Off method. Use the ConvertCoord
+;                           method of the object being zoomed to convert to data
+;                           coordinates. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -150,9 +162,8 @@
 ;                           Update the ranges for y-axis bindings.
 ;       ZAXIS:              in, optional, type=boolean, default=0
 ;                           Update the ranges for z-axis bindings.
-;       
 ;-
-pro MrAbstractZoom::Apply_Bindings, theObject, $
+pro MrZoom::Apply_Bindings, theObject, $
 ALL=all, $
 CAXIS = caxis, $
 XAXIS = xaxis, $
@@ -309,7 +320,7 @@ end
 ;       ZAXIS:              in, optional, type=boolean, default=0
 ;                           Bind the zaxis.
 ;-
-pro MrAbstractZoom::Bind, object1, object2, $
+pro MrZoom::Bind, object1, object2, $
 ALL=all, $
 APPLY = apply, $
 CAXIS = caxis, $
@@ -570,7 +581,7 @@ end
 ;       ZAXIS:              in, optional, type=boolean, default=0
 ;                           Bind the zaxis.
 ;-
-pro MrAbstractZoom::BindEm, theObjArr, $
+pro MrZoom::BindEm, theObjArr, $
 ALL=all, $
 APPLY = apply, $
 CAXIS = caxis, $
@@ -626,7 +637,7 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractZoom::Box_Zoom, event
+pro MrZoom::Box_Zoom, event
     compile_opt idl2
     
     ;Error handling
@@ -678,12 +689,16 @@ pro MrAbstractZoom::Box_Zoom, event
             ;Get rid of the box by copying the pixmap again
             self -> copyPixmap
             
+            ;Return if nothing changed.
+            if self.x0 eq event.x && self.y0 eq event.y then return
+            
             ;Order the clicks as [min, max]. Convert to data
             x = [self.x0 < event.x, self.x0 > event.x]
             y = [self.y0 < event.y, self.y0 > event.y]
 
-            ;Convert from device to data coordinates
-            xy = convert_coord(x, y, /DEVICE, /TO_DATA)
+            ;Get the object of focus. Convert data coordinates
+            theObj = self -> Get(POSITION=self.iFocus)
+            xy = theObj -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
             xrange = reform(xy[0,*])
             yrange = reform(xy[1,*])
             
@@ -691,13 +706,10 @@ pro MrAbstractZoom::Box_Zoom, event
             if self.x0 eq event.x then void = temporary(xrange)
             if self.y0 eq event.y then void = temporary(yrange)
             
-            ;Only update ranges and draw if points are different
-            if self.x0 ne event.x || self.y0 ne event.y then begin
-                theObj = (*self.plotObjects)[self.ifocus]
-                theObj -> setProperty, XRANGE=xrange, YRANGE=yrange
-                self -> Apply_Bindings, theObj, /xaxis, /yaxis
-                self -> Draw
-            endif
+            ;Set the new range and apply any bindings
+            theObj -> SetProperty, XRANGE=xrange, YRANGE=yrange
+            self -> Apply_Bindings, theObj, /XAXIS, /YAXIS
+            self -> Draw
             
             ;reset initial click
             self.x0 = -1
@@ -728,7 +740,7 @@ end
 ;       error_message.pro (Coyote Graphics)
 ;       MrUniq.pro
 ;-
-pro MrAbstractZoom::Consolidate_Bindings, $
+pro MrZoom::Consolidate_Bindings, $
 ALL=all, $
 CAXIS = caxis, $
 XAXIS = xaxis, $
@@ -830,13 +842,50 @@ end
 
 
 ;+
-;   Create a menu bar with various zoom options in it.
+;   Create a menu bar with various zoom options in it. If no buttons are selected, then
+;   all keywords will be turned set.
 ;
 ; :Params:
-;       PARENT:             in, required, type=integer
+;       PARENT:             in, required, type=boolean
 ;                           The widget ID of the parent widget for the new SaveAs Menu.
+;
+; :Keywords:
+;       BOX_ZOOM:           in, optional, type=boolean, default=0
+;                           Create a button for turning on and off Box Zoom.
+;       MENU:               in, optional, type=boolean, default=0
+;                           If set, zoom buttons will be placed in a menu.
+;       NONE:               in, optional, type=boolean, default=0
+;                           Create a button for turning on and off zoom effects.
+;       PAN:                in, optional, type=boolean, default=0
+;                           Create a button for turning on and off Panning.
+;       UNZOOM:             in, optional, type=boolean, default=0
+;                           Create a button to unzoom.
+;       WHEELZOOM_MENU:     in, optional, type=boolean, default=0
+;                           If set, and `MENU` is set, wheel zoom buttons will be 
+;                               placed in a sub-menu.
+;       WHEELZOOM_COLOR:    in, optional, type=boolean, default=0
+;                           Create a button for turning on and off wheel color-zoom.
+;       WHEELZOOM_PAGE:     in, optional, type=boolean, default=0
+;                           Create a button for turning on and off wheel paging.
+;       WHEELZOOM_XY:       in, optional, type=boolean, default=0
+;                           Create a button for turning on and off wheel xy-zooming.
+;       ZOOM_X:             in, optional, type=boolean, default=0
+;                           Create a button for turning on and off zooming in X.
+;       ZOOM_Y:             in, optional, type=boolean, default=0
+;                           Create a button for turning on and off zooming in Y.
 ;-
-pro MrAbstractZoom::Create_Zoom_Menu, parent
+pro MrZoom::Create_Zoom_Menu, parent, $
+BOX_ZOOM = box_zoom, $
+MENU = menu, $
+NONE = none, $
+PAN = pan, $
+UNZOOM = unzoom, $
+WHEELZOOM_MENU = wheelzoom_menu, $
+WHEELZOOM_COLOR = wheelzoom_color, $
+WHEELZOOM_PAGE = wheelzoom_page, $
+WHEELZOOM_XY = wheelzoom_xy, $
+ZOOM_X = zoom_x, $
+ZOOM_Y = zoom_y
     compile_opt idl2
     
     ;Error handling
@@ -846,23 +895,61 @@ pro MrAbstractZoom::Create_Zoom_Menu, parent
         void = error_message()
         return
     endif
-
-    ;Make the zoom menu in the menu bar
-    zoomID = widget_button(parent, VALUE='Zoom', /MENU)
-    button = widget_button(zoomID, VALUE='Zoom X', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
-    button = widget_button(zoomID, VALUE='Zoom Y', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
-    button = widget_button(zoomID, VALUE='Box Zoom', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
-    button = widget_button(zoomID, VALUE='Pan', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
     
-    ;Wheel zoom submenu
-    wheelID = widget_button(zoomID, VALUE='Wheel Zoom', /MENU)
-    button = widget_button(wheelID, VALUE='Wheel Zoom: XY', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
-    button = widget_button(wheelID, VALUE='Wheel Zoom: Color', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
-    button = widget_button(wheelID, VALUE='Wheel Zoom: Page', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
+    ;SetDefaults
+    SetDefaultValue, box_zoom,        0, /BOOLEAN
+    SetDefaultValue, menu,            0, /BOOLEAN
+    SetDefaultValue, none,            0, /BOOLEAN
+    SetDefaultValue, pan,             0, /BOOLEAN
+    SetDefaultValue, unzoom,          0, /BOOLEAN
+    SetDefaultValue, wheelzoom_color, 0, /BOOLEAN
+    SetDefaultValue, wheelzoom_menu,  0, /BOOLEAN
+    SetDefaultValue, wheelzoom_page,  0, /BOOLEAN
+    SetDefaultValue, wheelzoom_xy,    0, /BOOLEAN
+    SetDefaultValue, zoom_x,          0, /BOOLEAN
+    SetDefaultValue, zoom_y,          0, /BOOLEAN
+    
+    ;If nothing was chosen, create all of the buttons.
+    if (zoom_x + zoom_y + box_zoom + pan + $
+        wheelzoom_xy + wheelzoom_color + wheelzoom_page) eq 0 then begin
+        
+        box_zoom = 1
+        menu = 1
+        none = 1
+        pan = 1
+        unzoom = 1
+        wheelzoom_menu = 1
+        wheelzoom_xy = 1
+        wheelzoom_color = 1
+        wheelzoom_page = 1
+        zoom_x = 1
+        zoom_y = 1
+    endif
+    
+    ;Create a menu button?
+    if keyword_set(menu) $
+        then zoomID = widget_button(parent, VALUE='Zoom', /MENU) $
+        else zoomID = parent
+
+    ;Make the zoom buttons
+    if zoom_x   then button = widget_button(zoomID, VALUE='Zoom X',   UNAME='ZOOM_X',   /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
+    if zoom_y   then button = widget_button(zoomID, VALUE='Zoom Y',   UNAME='ZOOM_Y',   /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
+    if box_zoom then button = widget_button(zoomID, VALUE='Box Zoom', UNAME='BOX_ZOOM', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
+    if pan      then button = widget_button(zoomID, VALUE='Pan',      UNAME='ZOOM_X',   /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
+    
+    ;Create a wheel-zoom submenu?
+    if keyword_set(wheelzoom_menu) $
+        then wheelID = widget_button(zoomID, VALUE='Wheel Zoom', /MENU) $
+        else wheelID = zoomID
+
+    ;Create the wheel zoom buttons
+    if wheelzoom_xy    then button = widget_button(wheelID, VALUE='Wheel Zoom: XY',    UNAME='WHEELZOOM_XY',    /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
+    if wheelzoom_color then button = widget_button(wheelID, VALUE='Wheel Zoom: Color', UNAME='WHEELZOOM_COLOR', /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
+    if wheelzoom_page  then button = widget_button(wheelID, VALUE='Wheel Zoom: Page',  UNAME='WHEELZOOM_PAGE',  /CHECKED_MENU, UVALUE={object: self, method: 'Zoom_Menu_Events'})
     
     ;Back to main Zoom menu
-    button = widget_button(zoomID, VALUE='UnZoom', UVALUE={object: self, method: 'UnZoom'})
-    button = widget_button(zoomID, VALUE='None', UNAME='ZNone', UVALUE={object: self, method: 'Zoom_Menu_Events'})
+    if unzoom then button = widget_button(zoomID, VALUE='UnZoom', UNAME='UNZOOM',    UVALUE={object: self, method: 'UnZoom'})
+    if none   then button = widget_button(zoomID, VALUE='None',   UNAME='ZOOM_NONE', UVALUE={object: self, method: 'Zoom_Menu_Events'})
 end
 
 
@@ -893,7 +980,7 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractZoom::Draw_Events, event
+pro MrZoom::Draw_Events, event
     compile_opt idl2
     
     ;Error handling
@@ -927,22 +1014,19 @@ pro MrAbstractZoom::Draw_Events, event
 ;---------------------------------------------------------------------
     if event.type eq 2 then begin
         ;Do not compete for copying the pixmap
-        if ((self.zmode and 4) gt 0) || ((self.cmode and 2) gt 0) $  ;Box Zoom, Cross Hairs
-            then self -> copyPixmap
+        if (self.zmode eq 4) then self -> copyPixmap        ;Box Zoom
 
         ;Handle motion events
         if self.zmode eq 4 then self -> Box_Zoom, event     
         if self.zmode eq 8 then self -> Pan, event 
         
         ;Do not compete for drawing (Pan)
-        if self.zmode eq 8 then self -> Draw                  ;Pan
+        if self.zmode eq 8 then self -> Draw                ;Pan
     endif
 
 ;---------------------------------------------------------------------
 ;Wheel Events ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-
-    ;Zoom in the X and Y direction only. Forget about the color dimension (for now).
     if event.type eq 7 then begin
         if self.wmode eq 1 then self -> Wheel_Zoom_XY, event
         if self.wmode eq 2 then self -> Wheel_Zoom_Color, event
@@ -952,9 +1036,47 @@ end
 
 
 ;+
+;   The purpose of this method is to get object properties.
+;
+; :Keywords:
+;       LMODE:              out, optional, type=int
+;                           The zoom mode associated with the left mouse button.
+;       RMODE:              out, optional, type=int
+;                           The zoom mode associated with the right mouse button.
+;       WMODE:              out, optiona, type=int
+;                           The zoom mode associated with the mouse wheel.
+;       ZOOMFACTOR:         out, optional, type=float/fltarr(2)
+;                           The zoom factor with which the mouse wheel will cause the
+;                               x- and y-ranges to be adjusted. If only one value is given,
+;                               it will be applied to both axes.
+;-
+pro MrZoom::GetProperty, $
+LMODE = lmode, $
+RMODE = rmode, $
+WMODE = wmode, $
+ZOOMFACTOR = zoomfactor
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Get Properties
+    if arg_present(lmode) ne 0 then lmode = self.lmode
+    if arg_present(rmode) ne 0 then rmode = self.rmode
+    if arg_present(wmode) ne 0 then wmode = self.wmode
+    if arg_present(zoomfactor) ne 0 then zoomfactor = self.zoomfactor
+end
+
+
+;+
 ;   Serve as a general error handler for event handling routines.
 ;-
-pro MrAbstractZoom::Error_Handler
+pro MrZoom::Error_Handler
     compile_opt idl2
     
     ;Error handling
@@ -965,10 +1087,7 @@ pro MrAbstractZoom::Error_Handler
         return
     endif
 
-    self.x0 = -1
-    self.y0 = -1
-    self.zmode = 0
-
+    self -> Turn_Everything_Off, self.tlb
 end
 
 
@@ -981,7 +1100,7 @@ end
 ;       OFF:                    in, optional, type=boolean, default=0
 ;                               Turn motion events off.
 ;-
-pro MrAbstractZoom::On_Off_Button_Events, $
+pro MrZoom::On_Off_Button_Events, $
 ON = on, $
 OFF = off
     compile_opt idl2
@@ -1028,7 +1147,7 @@ end
 ;       OFF:                    in, optional, type=boolean, default=0
 ;                               Turn motion events off.
 ;-
-pro MrAbstractZoom::On_Off_Motion_Events, $
+pro MrZoom::On_Off_Motion_Events, $
 ON = on, $
 OFF = off
     compile_opt idl2
@@ -1068,6 +1187,116 @@ end
 
 
 ;+
+;   The purpose of this method is to set object properties.
+;
+; :Keywords:
+;       LMODE:              in, optional, type=int
+;                           The zoom mode associated with the left mouse button.
+;       RMODE:              in, optional, type=int
+;                           The zoom mode associated with the right mouse button.
+;       WMODE:              in, optiona, type=int
+;                           The zoom mode associated with the mouse wheel.
+;       ZOOMFACTOR:         in, optional, type=float/fltarr(2)
+;                           The zoom factor with which the mouse wheel will cause the
+;                               x- and y-ranges to be adjusted. If only one value is given,
+;                               it will be applied to both axes.
+;-
+pro MrZoom::SetProperty, $
+LMODE = lmode, $
+RMODE = rmode, $
+WMODE = wmode, $
+ZOOMFACTOR = zoomfactor
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    ;Make sure only one zoom bit is set
+    if n_elements(lmode) ne 0 then $
+        if total(fix(binary(lmode))) le 1 $
+            then self.lmode = lmode $
+            else message, 'LMODE must have only one bit set'
+
+    ;Make sure only one zoom bit is set            
+    if n_elements(rmode) ne 0 then $
+        if total(fix(binary(rmode))) le 1 $
+            then self.rmode = rmode $
+            else message, 'RMODE must have only one bit set'
+
+    ;Make sure only one zoom bit is set            
+    if n_elements(wmode) ne 0 then $
+        if total(fix(binary(wmode))) le 1 $
+            then self.wmode = wmode $
+            else message, 'WMODE must have only one bit set'
+
+    ;ZoomFactor
+    nZF = n_elements(zoomfactor)
+    case nZF of
+        0: ;Do nothing
+        1: self.zoomfactor = [zoomfactor, zoomfactor]
+        2: self.zoomfactor = zoomfactor
+        else: message, 'Incorrect number of elements: ZOOMFACTOR.'
+    endcase
+end
+
+
+;+
+;   A method for turning off all zoom options and effects.
+;
+; :Params:
+;       TLB:        in, optional, type=int
+;                   The widget ID of the top level base.
+;-
+pro MrZoom::Turn_Everything_Off, tlb
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    ;Reset event processing
+    self.x0 = -1
+    self.y0 = -1
+    self.rmode = 0
+    self.lmode = 0
+    self.wmode = 0
+    self.zmode = 0
+    self -> On_Off_Button_Events, /OFF
+    self -> On_Off_Motion_Events, /OFF
+    
+    ;Uncheck all menu buttons
+    if n_elements(tlb) gt 0 && widget_info(tlb, /VALID_ID) then begin
+        ;Get the widget IDs of the menu buttons
+        boxID   = widget_info(tlb, FIND_BY_UNAME='BOX_ZOOM')
+        panID   = widget_info(tlb, FIND_BY_UNAME='PAN')
+        colorID = widget_info(tlb, FIND_BY_UNAME='WHEELZOOM_COLOR')
+        pageID  = widget_info(tlb, FIND_BY_UNAME='WHEELZOOM_PAGE')
+        wxyID   = widget_info(tlb, FIND_BY_UNAME='WHEELZOOM_XY')
+        zxID    = widget_info(tlb, FIND_BY_UNAME='ZOOM_X')
+        zyID    = widget_info(tlb, FIND_BY_UNAME='ZOOM_Y')
+        
+        ;Uncheck the buttons
+        if widget_info(boxID,   /VALID_ID) then widget_control, boxID,   SET_BUTTON=0
+        if widget_info(panID,   /VALID_ID) then widget_control, panID,   SET_BUTTON=0
+        if widget_info(colorID, /VALID_ID) then widget_control, colorID, SET_BUTTON=0
+        if widget_info(pageID,  /VALID_ID) then widget_control, pageID,  SET_BUTTON=0
+        if widget_info(wxyID,   /VALID_ID) then widget_control, wxyID,   SET_BUTTON=0
+        if widget_info(zxID,    /VALID_ID) then widget_control, zxID,    SET_BUTTON=0
+        if widget_info(zyID,    /VALID_ID) then widget_control, zyID,    SET_BUTTON=0
+    endif
+end
+
+
+;+
 ;   Pan the plot left or right. Click and hold on the plot, then drag the mouse in any
 ;   direction.
 ;
@@ -1075,7 +1304,7 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractZoom::Pan, event
+pro MrZoom::Pan, event
     compile_opt idl2
     
     ;Error handling
@@ -1110,18 +1339,18 @@ pro MrAbstractZoom::Pan, event
         endcase
         
         2: begin    ;motion event
+            ;Get the object of focus
+            theObj = self -> Get(POSITION=self.iFocus)
+            theObj -> GetProperty, XRANGE=xrange, YRANGE=yrange
+            
             ;Convert to data coordinates.
             x = [self.x0, event.x]
             y = [self.y0, event.y]
-            xy = convert_coord(x, y, /DEVICE, /TO_DATA)
+            xy = theObj -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
             
             ;How much did the mouse move?
             delta_x = xy[0,1] - xy[0,0]
             delta_y = xy[1,1] - xy[1,0]
-            
-            ;Get the current x- and y-range
-            theObj = (*self.plotObjects)[self.ifocus]
-            theObj -> GetProperty, XRANGE=xrange, YRANGE=yrange
             
             ;A drag to the right will have delta_x < 0. Subtracting will then add the
             ;difference, panning more positive data into the window.
@@ -1145,7 +1374,8 @@ pro MrAbstractZoom::Pan, event
             self.y0 = -1
             
             ;Apply bindings. Need a Draw to update the bindings.
-            self -> Apply_Bindings, (*self.plotObjects)[self.ifocus], /XAXIS, /YAXIS
+            theObj = self -> Get(POSITION=self.iFocus)
+            self -> Apply_Bindings, theObj, /XAXIS, /YAXIS
             self -> Draw
         endcase
     endcase
@@ -1178,7 +1408,7 @@ end
 ;                           Unbind all of the `THEOBJECT`'s z-axis from all others sets
 ;                               of x-axes.
 ;-
-pro MrAbstractZoom::UnBind, theObject, $
+pro MrZoom::UnBind, theObject, $
 ALL=all, $
 CAXIS = caxis, $
 XAXIS = xaxis, $
@@ -1443,7 +1673,7 @@ end
 ;+
 ;   Return to initial, unzoomed x- and y-ranges
 ;-
-pro MrAbstractZoom::UnZoom, event
+pro MrZoom::UnZoom, event
     compile_opt idl2
     
     ;Error handling
@@ -1455,7 +1685,7 @@ pro MrAbstractZoom::UnZoom, event
     endif
     
     ;Set the x- and y-range
-    theObj = (*self.allObjects)[self.ifocus]
+    theObj = self -> Get(POSITION=self.iFocus)
     theObj -> getProperty, INIT_XRANGE=init_xrange, INIT_YRANGE=init_yrange
     theObj -> setProperty, XRANGE=init_xrange, YRANGE=init_yrange
     
@@ -1470,7 +1700,7 @@ end
 ;+
 ;   Print the heap variable numbers of the objects that are bound together.
 ;-
-pro MrAbstractZoom::whichBindings
+pro MrZoom::whichBindings
     compile_opt idl2
     
     ;Error handling
@@ -1548,19 +1778,20 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractZoom::Wheel_Zoom_XY, event
+pro MrZoom::Wheel_Zoom_XY, event
     compile_opt idl2
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Error_Handler
         void = error_message()
         return
     endif
 
     ;Get the current x- and y-range
-    theObj = (*self.allObjects)[self.ifocus]
+    theObj = self -> Get(POSITION=self.iFocus)
     theObj -> getProperty, XRANGE=xrange, YRANGE=yrange
 
     ;Zooming in and out is determined by the sign of events.clicks.
@@ -1595,19 +1826,20 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractZoom::Wheel_Zoom_Color, event
+pro MrZoom::Wheel_Zoom_Color, event
     compile_opt idl2
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Error_Handler
         void = error_message()
         return
     endif
 
     ;Get the current x- and y-range
-    theObj = (*self.allObjects)[self.ifocus]
+    theObj = self -> Get(POSITION=self.iFocus)
     theObj -> getProperty, RANGE=range
 
     ;Zooming in and out is determined by the sign of events.clicks.
@@ -1636,20 +1868,21 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractZoom::Wheel_Zoom_Page, event
+pro MrZoom::Wheel_Zoom_Page, event
     compile_opt idl2
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Error_Handler
         void = error_message()
         return
     endif
 
     ;Get the current x- and y-range
-    theObj = (*self.allObjects)[self.ifocus]
-    theObj -> getProperty, IMAGE=image, IDISPLAY=iDisplay
+    theObj = self -> Get(POSITION=self.iFocus)
+    theObj -> GetProperty, IMAGE=image, IDISPLAY=iDisplay
 
     ;Make sure the image has more than 2 dimensions
     ndims = n_elements(image)
@@ -1681,7 +1914,7 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractZoom::XY_Zoom, event
+pro MrZoom::XY_Zoom, event
     compile_opt idl2
     
     ;Error handling
@@ -1714,12 +1947,15 @@ pro MrAbstractZoom::XY_Zoom, event
         return
     endif
 
+    ;Get the object of focus
+    theObj = self -> Get(POSITION=self.iFocus)
+
     ;Order the clicks as [min, max]. Convert to data
     x = [self.x0 < event.x, self.x0 > event.x]
     y = [self.y0 < event.y, self.y0 > event.y]
 
     ;Convert from device to data coordinates
-    xy = convert_coord(x, y, /DEVICE, /TO_DATA)
+    xy = theObj -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
     xrange = reform(xy[0,*])
     yrange = reform(xy[1,*])
     
@@ -1727,7 +1963,6 @@ pro MrAbstractZoom::XY_Zoom, event
     case self.zmode of
         1: begin
             if self.x0 ne event.x then begin
-                theObj = (*self.plotObjects)[self.ifocus]
                 theObj -> SetProperty, XRANGE=xrange
                 self -> Apply_Bindings, theObj, /XAXIS
             endif
@@ -1735,7 +1970,6 @@ pro MrAbstractZoom::XY_Zoom, event
         
         2: begin
             if self.y0 ne event.y then begin
-                theObj = (*self.plotObjects)[self.ifocus]
                 theObj -> SetProperty, YRANGE=yrange
                 self -> Apply_Bindings, theObj, /YAXIS
             endif
@@ -1762,7 +1996,7 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrAbstractZoom::Zoom_Menu_Events, event
+pro MrZoom::Zoom_Menu_Events, event
     compile_opt idl2
     
     ;Error handling
@@ -1800,11 +2034,7 @@ pro MrAbstractZoom::Zoom_Menu_Events, event
     ;Set the zoom mode, set the event handling method, and indicate which type
     ;of events to listen for.
     case zoom_type of
-        'NONE': begin
-            self.lmode = 0
-            self -> On_Off_Button_Events, /OFF
-        endcase
-        
+        'NONE': self -> Turn_Everything_Off, self.tlb
         'ZOOM X': self.lmode = 1
         'ZOOM Y': self.lmode = 2
         'BOX ZOOM': self.lmode = 4
@@ -1826,7 +2056,7 @@ end
 ;+
 ;   Clean up after the object is destroy
 ;-
-pro MrAbstractZoom::cleanup
+pro MrZoom::cleanup
     compile_opt idl2
     
     ;Error handling
@@ -1847,11 +2077,25 @@ end
 
 
 ;+
-;   The initialization method. Because MrAbstractZoom is an abstract class, it must
-;   be inherited. Any attempts to instantiate a MrAbstractZoom object will result
-;   in an error.
+;   The initialization method.
+;
+; :Keywords:
+;       LMODE:              in, optional, type=int
+;                           The zoom mode associated with the left mouse button.
+;       RMODE:              in, optional, type=int
+;                           The zoom mode associated with the right mouse button.
+;       WMODE:              in, optiona, type=int
+;                           The zoom mode associated with the mouse wheel.
+;       ZOOMFACTOR:         in, optional, type=float/fltarr(2)
+;                           The zoom factor with which the mouse wheel will cause the
+;                               x- and y-ranges to be adjusted. If only one value is given,
+;                               it will be applied to both axes.
 ;-
-function MrAbstractZoom::init
+function MrZoom::init, $
+LMODE = lmode, $
+RMODE = rmode, $
+WMODE = wmode, $
+ZOOMFACTOR = zoomfactor
     compile_opt idl2
     
     ;Error handling
@@ -1862,7 +2106,20 @@ function MrAbstractZoom::init
         return, 0
     endif
     
-    message, 'This is an abstract class and must be inherited.'
+    ;Defaults
+    SetDefaultValue, lmode, 0
+    SetDefaultValue, rmode, 0
+    SetDefaultValue, wmode, 0
+    SetDefaultValue, zmode, 0
+    SetDefaultValue, zoomfactor, [0.05, 0.05]
+    
+    ;Set the property
+    Self -> SetProperty, LMODE = lmode, $
+                         RMODE = rmode, $
+                         WMODE = wmode, $
+                         ZOOMFACTOR = zoomfactor
+                         
+    return, 1
 end
 
 
@@ -1873,10 +2130,10 @@ end
 ;       CLASS:          out, optional, type=structure
 ;                       The class definition structure.
 ;-
-pro MrAbstractZoom__define, class
+pro MrZoom__define, class
     compile_opt idl2
     
-    class = {MrAbstractZoom, $
+    class = {MrZoom, $
              bind_x: obj_new(), $   ;X-axis bindings
              bind_y: obj_new(), $   ;Y-axis bindings
              bind_z: obj_new(), $   ;Z-axis bindings

@@ -51,6 +51,7 @@
 ;       08/09/2013  -   Written by Matthew Argall
 ;       08/22/2013  -   Added the DESTROY keyword and Remove method. The Which method
 ;                           now finds the class names correctly. - MRA
+;       08/23/2013  -   Added the GetIndex method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -78,7 +79,7 @@
 pro MrIDL_Container::Add, Objects, $
 CLEAR = clear, $
 DESTROY = destroy, $
-INDEX = Index
+POSITION = Index
     compile_opt idl2
     
     ;Error handling
@@ -97,6 +98,34 @@ INDEX = Index
     
     ;Add the objects
     self -> IDL_Container::Add, Objects, POSITION=Index
+end
+
+
+;+
+;   Get the index within the container at which the given object(s) is stored.
+;
+; :Params:
+;       OBJECTS:        in, required, type=object/objarr
+;                       An object instance or array of object instances to be added to
+;                           the container object.
+;
+; :Returns:
+;       INDEX:          The index within the container at which `OBJECTS` are stored.
+;-
+function MrIDL_Container::GetIndex, Objects
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, -1
+    endif
+    
+    ;Get the index at which the object is stored.
+    tf_contained = self -> IDL_Container::IsContained(Objects, POSITION=Index)
+    return, index
 end
 
 
@@ -148,7 +177,6 @@ DESTROY = destroy
 end
 
 
-
 ;+
 ;   The purpose of this method is to add functionality to the IDL_Container class.
 ;   Additions include::
@@ -169,16 +197,17 @@ end
 ;                           Remove all objects from the container.
 ;       DESTROY:            in, optional, type=boolean, default=0
 ;                           Destroy all objects being removed.
-;       INDEX:              in, optional, type=integer
+;       POSITION:           in, optional, type=integer
 ;                           The index value within the container of the object to be
-;                               destroyed.
+;                               destroyed. To see index values, call the WhichObjects
+;                               method.
 ;       TYPE:               in, optional, type=string/strarr
 ;                           The class names of the objects to be destroyed.
 ;-
 pro MrIDL_Container::Remove, Child_Object, $
 ALL = all, $
 DESTROY = destroy, $
-INDEX = index, $
+POSITION = index, $
 TYPE = type
     compile_opt idl2
     
@@ -251,7 +280,7 @@ end
 ;   The purpose of this method is to print a list of contained objects and the index
 ;   at which they can be found.
 ;-
-pro MrIDL_Container::Which
+pro MrIDL_Container::WhichObjects
     compile_opt idl2
     
     ;Error handling

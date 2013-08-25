@@ -79,72 +79,20 @@
 ; :History:
 ;   Modification History::
 ;       08/20/2013  -   Written by Matthew Argall
+;       08/23/2013  -   Added the NOERASE keyword to Draw. - MRA
+;       08/24/2013  -   Added init_[xy]range and [pxy]_sysvar properties. X and Y
+;                           coordinates, if not provided, are made to index the dimensions
+;                           of DATA. [XY]RANGE is defined and [XY]STYLE is made to have
+;                           the 2^0 bit set. - MRA
 ;-
 ;*****************************************************************************************
-;+
-;   Convert between data, normal, and device coordinates.
-;
-; :Params:
-;       X:                      in, required, type=numeric scalar/array
-;                               X components of the input coordinates. If only one argument
-;                                   is specified, then X[0,*] represents the X-coordinates,
-;                                   X[1,*] represents the Y-coordinates, and X[2,*]
-;                                   represents the Z-coordinates (if present).
-;       Y:                      in, optional, type=numeric scalar/array
-;                               Y components of the input coordinates.
-;       Z:                      in, optional, type=numeric scalar/array
-;                               Z components of the input coordinates.
-;
-; :Keywords:
-;       _REF_EXTRA:             in, optional, type=any
-;                               Any keyword accepted by IDL's Convert_Coord function is
-;                                   also accepted for keyword inheritance.
-;-
-function MrContour::ConvertCoord, x, y, z, $
-_REF_EXTRA=extra
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return, -1
-    endif
-    
-    ;Get the current P, X, Y system variables
-    P_current = !P
-    X_current = !X
-    Y_current = !Y
-    
-    ;Load the syetem variable states as they relate to this plot
-    !P = self.p_sysvar
-    !X = self.x_sysvar
-    !Y = self.y_sysvar
-    
-    ;Convert coordinates
-    case n_params() of
-        1: coords = convert_coord(x, _STRICT_EXTRA=extra)
-        2: coords = convert_coord(x, y, _STRICT_EXTRA=extra)
-        3: coords = convert_coord(x, y, z, _STRICT_EXTRA=extra)
-        else: message, 'Incorrect number of parameters.'
-    endcase
-    
-    ;Reset the system variables
-    !P = P_current
-    !X = X_current
-    !Y = Y_current
-    
-    return, coords
-end
-
-
 ;+
 ;   The purpose of this method is to draw the plot in the draw window. The plot is
 ;   first buffered into the pixmap for smoother opteration (by allowing motion events
 ;   to copy from the pixmap instead of redrawing the plot, the image does not flicker).
 ;-
 pro MrContour::Draw, $
+NOERASE=noerase, $
 OLEVELS=oLevels, $
 PATH_INFO=path_info, $
 PATH_XY=path_xy
@@ -164,11 +112,13 @@ PATH_XY=path_xy
 
     ;Now draw the plot to the pixmap
     if GetPath_Info || GetPath_XY then begin
-        self -> doPlot, OLEVELS=oLevels, $
+        self -> doPlot, NOERASE=noerase, $
+                        OLEVELS=oLevels, $
                         PATH_INFO=path_info, $
                         PATH_XY=path_xy
     endif else begin
-        self -> doPlot, OLEVELS=oLevels
+        self -> doPlot, NOERASE=noerase, $
+                        OLEVELS=oLevels
     endelse
     
     ;Save the system variables
@@ -187,6 +137,7 @@ end
 ;   merely to saves space in the Draw method.
 ;-
 pro MrContour::doPlot, $
+NOERASE=noerase, $
 OLEVELS=oLevels, $
 PATH_INFO=path_info, $
 PATH_XY=path_xy
@@ -203,6 +154,8 @@ PATH_XY=path_xy
 
     GetPath_Info = Arg_Present(path_info)
     GetPath_XY = Arg_Present(path_xy)
+
+    if n_elements(noerase) eq 0 then noerase = *self.noerase
 
 ;-----------------------------------------------------
 ;Draw the Contour Plot \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -273,7 +226,7 @@ PATH_XY=path_xy
                    FONT          = *self.font, $
                    NOCLIP        = *self.noclip, $
                    NODATA        = *self.nodata, $
-                   NOERASE       = *self.noerase, $
+                   NOERASE       = noerase, $
                    POSITION      = *self.position, $
 ;                   PSYM          = *self.psym, $
                    SUBTITLE      = *self.subtitle, $
@@ -695,13 +648,33 @@ end
 ;                           is allowed in the program.
 ;-
 pro MrContour::GetProperty, $
+;MrContour Properties
 C_DATA=c_data, $
 XCOORDS=xcoords, $
 YCOORDS=ycoords, $
+P_SYSVAR=p_sysvar, $
+X_SYSVAR=x_sysvar, $
+Y_SYSVAR=y_sysvar, $
+
+;cgContour Properties
 ASPECT=aspect, $
 AXISCOLOR=axiscolor, $
 AXESCOLOR=axescolor, $
 BACKGROUND=sbackground, $
+LABEL=label, $
+LAYOUT=layout, $
+MAP_OBJECT=map_object, $
+MISSINGVALUE=missingvalue, $
+OLEVELS=olevels, $
+ONIMAGE=onImage, $
+OUTCOLOR=outcolor, $
+OUTFILENAME=outfilename, $
+OUTLINE=outline, $
+OUTPUT=output, $
+PALETTE=palette, $
+TRADITIONAL=traditional, $
+
+;Contour Properties
 C_ANNOTATION=c_annotation, $
 C_CHARSIZE=c_charsize, $
 C_CHARTHICK=c_charthick, $
@@ -713,35 +686,22 @@ C_SPACING=c_spacing, $
 C_THICK=c_thick, $
 CELL_FILL=cell_fill, $
 CLOSED=closed, $
-COLOR=color, $
 DOWNHILL=downhill, $
 FILL=fill, $
 FOLLOW=follow, $
 IRREGULAR=irregular, $
 ISOTROPIC=isotropic, $
-LABEL=label, $
-LAYOUT=layout, $
 LEVELS=levels, $
 NLEVELS=nlevels, $
-MAP_OBJECT=map_object, $
 MAX_VALUE=max_value, $
 MIN_VALUE=min_value, $
-MISSINGVALUE=missingvalue, $
-OLEVELS=olevels, $
-ONIMAGE=onImage, $
-OUTCOLOR=outcolor, $
-OUTFILENAME=outfilename, $
-OUTLINE=outline, $
-OUTPUT=output, $
 OVERPLOT=overplot, $
-PALETTE=palette, $
 PATH_DATA_COORDS=path_data_coords, $
 PATH_DOUBLE=path_double, $
 PATH_FILENAME=path_filename, $
 PATH_INFO=path_info, $
 PATH_XY=path_xy, $
 RESOLUTION=resolution, $
-TRADITIONAL=traditional, $
 TRIANGULATION=triangulation, $
 XLOG=xlog, $
 YLOG=ylog, $
@@ -756,14 +716,31 @@ _REF_EXTRA=extra
         return
     endif
 
-    ;Get Object Properties
+    ;MrContour Properties
     if arg_present(c_data)        ne 0 then c_data        = *self.c_data
     if arg_present(xcoords)       ne 0 then xcoords       = *self.xcoords
     if arg_present(ycoords)       ne 0 then ycoords       = *self.ycoords
+    if arg_present(p_sysvar)      ne 0 then p_sysvar      =  self.p_sysvar
+    if arg_present(x_sysvar)      ne 0 then x_sysvar      =  self.x_sysvar
+    if arg_present(y_sysvar)      ne 0 then y_sysvar      =  self.y_sysvar
+    
+    ;cgContour Properties
     if arg_present(aspect)        ne 0 then aspect        = *self.aspect
     if arg_present(axiscolor)     ne 0 then axiscolor     = *self.axiscolor
     if arg_present(axescolor)     ne 0 then axescolor     = *self.axiscolor
     if arg_present(background)    ne 0 then background    = *self.background
+    if arg_present(label)         ne 0 then label         =  self.label
+    if arg_present(layout)        ne 0 then layout        = *self.layout
+    if arg_present(olevels)       ne 0 then olevels       = *self.olevels
+    if arg_present(onimage)       ne 0 then onimage       =  self.onimage
+    if arg_present(outcolor)      ne 0 then outcolor      = *self.outcolor
+    if arg_present(outfilename)   ne 0 then outfilename   =  self.outfilename
+    if arg_present(outline)       ne 0 then outline       =  self.outline
+    if arg_present(output)        ne 0 then output        =  self.output
+    if arg_present(palette)       ne 0 then palette       = *self.palette
+    if arg_present(traditional)   ne 0 then traditional   =  self.traditional
+    
+    ;Contour Properties
     if arg_present(c_annotation)  ne 0 then c_annotation  = *self.c_annotation
     if arg_present(c_charsize)    ne 0 then c_charsize    = *self.c_charsize
     if arg_present(c_charthick)   ne 0 then c_charthick   = *self.c_charthick
@@ -776,34 +753,22 @@ _REF_EXTRA=extra
     if arg_present(cell_fill)     ne 0 then cell_fill     = *self.cell_fill
     if arg_present(fill)          ne 0 then fill          = *self.fill
     if arg_present(closed)        ne 0 then closed        = *self.closed
-    if arg_present(color)         ne 0 then color         = *self.color
     if arg_present(downhill)      ne 0 then downhill      = *self.downhill
     if arg_present(follow)        ne 0 then follow        = *self.follow
     if arg_present(irregular)     ne 0 then irregular     = *self.irregular
     if arg_present(isotropic)     ne 0 then isotropic     = *self.isotropic
-    if arg_present(label)         ne 0 then label         =  self.label
-    if arg_present(layout)        ne 0 then layout        = *self.layout
     if arg_present(levels)        ne 0 then levels        = *self.levels
     if arg_present(max_value)     ne 0 then max_value     = *self.max_value
     if arg_present(min_value)     ne 0 then min_value     = *self.min_value
     if arg_present(missingvalue)  ne 0 then missingvalue  = *self.missingvalue
     if arg_present(nlevels)       ne 0 then nlevels       = *self.nlevels
-    if arg_present(nlevels)       ne 0 then nlevels       = *self.nlevels
-    if arg_present(olevels)       ne 0 then olevels       = *self.olevels
-    if arg_present(onimage)       ne 0 then onimage       =  self.onimage
-    if arg_present(outcolor)      ne 0 then outcolor      = *self.outcolor
-    if arg_present(outfilename)   ne 0 then outfilename   =  self.outfilename
-    if arg_present(outline)       ne 0 then outline       =  self.outline
-    if arg_present(output)        ne 0 then output        =  self.output
     if arg_present(overplot)      ne 0 then overplot      =  self.overplot
     if arg_present(path_filename) ne 0 then path_filename = *self.path_filename
     if arg_present(path_info)     ne 0 then path_info     = *self.path_info
     if arg_present(path_xy)       ne 0 then path_xy       = *self.path_xy
     if arg_present(triangulation) ne 0 then triangulation = *self.triangulation
     if arg_present(path_double)   ne 0 then path_double   = *self.path_double
-    if arg_present(palette)       ne 0 then palette       = *self.palette
     if arg_present(resolution)    ne 0 then resolution    = *self.resolution
-    if arg_present(traditional)   ne 0 then traditional   =  self.traditional
     if arg_present(xlog)          ne 0 then xlog          =  self.xlog
     if arg_present(ylog)          ne 0 then ylog          =  self.ylog
     if arg_present(path_data_coords)   ne 0 then path_data_coords = *self.path_data_coords
@@ -989,10 +954,28 @@ pro MrContour::SetProperty, $
 C_DATA=c_data, $
 XCOORDS=xcoords, $
 YCOORDS=ycoords, $
+P_SYSVAR=p_sysvar, $
+X_SYSVAR=x_sysvar, $
+Y_SYSVAR=y_sysvar, $
+
+;cgContour Properties
 ASPECT=aspect, $
 AXISCOLOR=axiscolor, $
 AXESCOLOR=axescolor, $
 BACKGROUND=background, $
+LABEL=label, $
+LAYOUT=layout, $
+MAP_OBJECT=map_object, $
+MISSINGVALUE=missingvalue, $
+ONIMAGE=onImage, $
+OUTCOLOR=outcolor, $
+OUTFILENAME=outfilename, $
+OUTLINE=outline, $
+OUTPUT=output, $
+PALETTE=palette, $
+TRADITIONAL=traditional, $
+
+;Contour Properties
 C_ANNOTATION=c_annotation, $
 C_CHARSIZE=c_charsize, $
 C_CHARTHICK=c_charthick, $
@@ -1004,35 +987,27 @@ C_SPACING=c_spacing, $
 C_THICK=c_thick, $
 CELL_FILL=cell_fill, $
 CLOSED=closed, $
-COLOR=color, $
 DOWNHILL=downhill, $
 FILL=fill, $
 FOLLOW=follow, $
 IRREGULAR=irregular, $
 ISOTROPIC=isotropic, $
-LABEL=label, $
-LAYOUT=layout, $
 LEVELS=levels, $
 NLEVELS=nlevels, $
-MAP_OBJECT=map_object, $
 MAX_VALUE=max_value, $
 MIN_VALUE=min_value, $
-MISSINGVALUE=missingvalue, $
-ONIMAGE=onImage, $
-OUTCOLOR=outcolor, $
-OUTFILENAME=outfilename, $
-OUTLINE=outline, $
-OUTPUT=output, $
 OVERPLOT=overplot, $
-PALETTE=palette, $
 PATH_DATA_COORDS=path_data_coords, $
 PATH_DOUBLE=path_double, $
 PATH_FILENAME=path_filename, $
 RESOLUTION=resolution, $
-TRADITIONAL=traditional, $
 TRIANGULATION=triangulation, $
 XLOG=xlog, $
 YLOG=ylog, $
+
+;Graphics Keywords
+XSTYLE = xstyle, $
+YSTYLE = ystyle, $
 _REF_EXTRA=extra
     compile_opt strictarr
     
@@ -1047,52 +1022,58 @@ _REF_EXTRA=extra
     ;Bad spellers...
     if n_elements(axesColor) ne 0 && n_elements(axisColor) eq 0 then axisColor = axesColor
 
-    ;Set Object Properties
-    if n_elements(c_data)        ne 0 then *self.c_data = c_data
-    if n_elements(xcoords)       ne 0 then *self.xcoords = xcoords
-    if n_elements(ycoords)       ne 0 then *self.ycoords = ycoords
-    if n_elements(aspect)        ne 0 then *self.aspect = aspect
-    if n_elements(axiscolor)     ne 0 then *self.axiscolor = axiscolor
-    if n_elements(background)    ne 0 then *self.background = background
-    if n_elements(c_annotation)  ne 0 then *self.c_annotation = c_annotation
-    if n_elements(c_charsize)    ne 0 then *self.c_charsize = c_charsize
-    if n_elements(c_charthick)   ne 0 then *self.c_charthick = c_charthick
-    if n_elements(c_colors)      ne 0 then *self.c_colors = c_colors
-    if n_elements(c_labels)      ne 0 then *self.c_labels = c_labels
-    if n_elements(c_linestyle)   ne 0 then *self.c_linestyle = c_linestyle
+    ;MrContour Properties
+    if n_elements(c_data)        ne 0 then *self.c_data        = c_data
+    if n_elements(xcoords)       ne 0 then *self.xcoords       = xcoords
+    if n_elements(ycoords)       ne 0 then *self.ycoords       = ycoords
+    if n_elements(p_sysvar)      ne 0 then p_sysvar            = self.p_sysvar
+    if n_elements(x_sysvar)      ne 0 then x_sysvar            = self.x_sysvar
+    if n_elements(y_sysvar)      ne 0 then y_sysvar            = self.y_sysvar
+    
+    ;cgContour Properties
+    if n_elements(aspect)        ne 0 then *self.aspect        = aspect
+    if n_elements(axiscolor)     ne 0 then *self.axiscolor     = axiscolor
+    if n_elements(background)    ne 0 then *self.background    = background
+    if n_elements(label)         ne 0 then  self.label         = label
+    if n_elements(layout)        ne 0 then *self.layout        = layout
+    if n_elements(missingvalue)  ne 0 then *self.missingvalue  = missingvalue
+    if n_elements(onimage)       ne 0 then  self.onimage       = onimage
+    if n_elements(outcolor)      ne 0 then *self.outcolor      = outcolor
+    if n_elements(outfilename)   ne 0 then  self.outfilename   = outfilename
+    if n_elements(outline)       ne 0 then  self.outline       = outline
+    if n_elements(output)        ne 0 then  self.output        = output
+    if n_elements(overplot)      ne 0 then  self.overplot      = overplot
+    if n_elements(palette)       ne 0 then *self.palette       = palette
+    if n_elements(traditional)   ne 0 then  self.traditional   = traditional
+    
+    ;Contour Properties
+    if n_elements(c_annotation)  ne 0 then *self.c_annotation  = c_annotation
+    if n_elements(c_charsize)    ne 0 then *self.c_charsize    = c_charsize
+    if n_elements(c_charthick)   ne 0 then *self.c_charthick   = c_charthick
+    if n_elements(c_colors)      ne 0 then *self.c_colors      = c_colors
+    if n_elements(c_labels)      ne 0 then *self.c_labels      = c_labels
+    if n_elements(c_linestyle)   ne 0 then *self.c_linestyle   = c_linestyle
     if n_elements(c_orientation) ne 0 then *self.c_orientation = c_orientation
-    if n_elements(c_spacing)     ne 0 then *self.c_spacing = c_spacing
-    if n_elements(c_thick)       ne 0 then *self.c_thick = c_thick
-    if n_elements(cell_fill)     ne 0 then *self.cell_fill = cell_fill
-    if n_elements(fill)          ne 0 then *self.fill = fill
-    if n_elements(closed)        ne 0 then *self.closed = closed
-    if n_elements(color)         ne 0 then *self.color = color
-    if n_elements(downhill)      ne 0 then *self.downhill = downhill
-    if n_elements(follow)        ne 0 then *self.follow = follow
-    if n_elements(irregular)     ne 0 then *self.irregular = irregular
-    if n_elements(isotropic)     ne 0 then *self.isotropic = isotropic
-    if n_elements(label)         ne 0 then  self.label = label
-    if n_elements(layout)        ne 0 then *self.layout = layout
-    if n_elements(levels)        ne 0 then *self.levels = levels
-    if n_elements(max_value)     ne 0 then *self.max_value = max_value
-    if n_elements(min_value)     ne 0 then *self.min_value = min_value
-    if n_elements(missingvalue)  ne 0 then *self.missingvalue = missingvalue
-    if n_elements(nlevels)       ne 0 then *self.nlevels = nlevels
-    if n_elements(nlevels)       ne 0 then *self.nlevels = nlevels
-    if n_elements(onimage)       ne 0 then  self.onimage = onimage
-    if n_elements(outcolor)      ne 0 then *self.outcolor = outcolor
-    if n_elements(outfilename)   ne 0 then  self.outfilename = outfilename
-    if n_elements(outline)       ne 0 then  self.outline = outline
-    if n_elements(output)        ne 0 then  self.output = output
-    if n_elements(overplot)      ne 0 then  self.overplot = overplot
+    if n_elements(c_spacing)     ne 0 then *self.c_spacing     = c_spacing
+    if n_elements(c_thick)       ne 0 then *self.c_thick       = c_thick
+    if n_elements(cell_fill)     ne 0 then *self.cell_fill     = cell_fill
+    if n_elements(fill)          ne 0 then *self.fill          = fill
+    if n_elements(closed)        ne 0 then *self.closed        = closed
+    if n_elements(downhill)      ne 0 then *self.downhill      = downhill
+    if n_elements(follow)        ne 0 then *self.follow        = follow
+    if n_elements(irregular)     ne 0 then *self.irregular     = irregular
+    if n_elements(isotropic)     ne 0 then *self.isotropic     = isotropic
+    if n_elements(levels)        ne 0 then *self.levels        = levels
+    if n_elements(max_value)     ne 0 then *self.max_value     = max_value
+    if n_elements(min_value)     ne 0 then *self.min_value     = min_value
+    if n_elements(nlevels)       ne 0 then *self.nlevels       = nlevels
+    if n_elements(nlevels)       ne 0 then *self.nlevels       = nlevels
     if n_elements(path_filename) ne 0 then *self.path_filename = path_filename
     if n_elements(triangulation) ne 0 then *self.triangulation = triangulation
-    if n_elements(path_double)   ne 0 then *self.path_double = path_double
-    if n_elements(palette)       ne 0 then *self.palette = palette
-    if n_elements(resolution)    ne 0 then *self.resolution = resolution
-    if n_elements(traditional)   ne 0 then  self.traditional = traditional
-    if n_elements(xlog)          ne 0 then  self.xlog = xlog
-    if n_elements(ylog)          ne 0 then  self.ylog = ylog
+    if n_elements(path_double)   ne 0 then *self.path_double   = path_double
+    if n_elements(resolution)    ne 0 then *self.resolution    = resolution
+    if n_elements(xlog)          ne 0 then  self.xlog          = xlog
+    if n_elements(ylog)          ne 0 then  self.ylog          = ylog
     if n_elements(path_data_coords)   ne 0 then *self.path_data_coords = path_data_coords
 
     ;Objects
@@ -1102,7 +1083,9 @@ _REF_EXTRA=extra
     endif
 
     ;Superclass properties
-    if n_elements(extra) ne 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra
+    if n_elements(xstyle) ne 0 then *self.xstyle = ~(xstyle and 1) + xstyle
+    if n_elements(ystyle) ne 0 then *self.ystyle = ~(ystyle and 1) + ystyle
+    if n_elements(extra)  ne 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra
 end
 
 
@@ -1420,6 +1403,10 @@ _REF_EXTRA=extra
         return, 0
     endif
     
+;---------------------------------------------------------------------
+;Defaults ////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
     ;Superclass initialization methods
     if self -> MrIDL_Container::Init() eq 0 then return, 0
     if self -> weGraphicsKeywords::Init(_STRICT_EXTRA=extra) eq 0 then return, 0
@@ -1440,6 +1427,28 @@ _REF_EXTRA=extra
     SetDefaultValue, output, ''
     SetDefaultValue, overplot, 0B, /BOOLEAN
     SetDefaultValue, traditional, 0B, /BOOLEAN
+    
+;---------------------------------------------------------------------
+;Define Data /////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;If X and Y and not defined, plot DATA against its subscripts.
+    nx = n_elements(x)
+    ny = n_elements(y)
+    if nx eq 0 && ny eq 0 then begin
+        dims = size(data, /DIMENSIONS)
+        xcoords = lindgen(dims[0])
+        ycoords = lindgen(dims[1])
+            
+     endif else if nx gt 0 && ny gt 0 then begin   
+        xcoords = x
+        ycoords = y
+
+    endif else message, 'Incorrect number of parameters.'
+
+;---------------------------------------------------------------------
+;Initialize Object Properties ////////////////////////////////////////
+;---------------------------------------------------------------------
     
     ;Validate Pointers
     self.c_data           = Ptr_New(/ALLOCATE_HEAP)
@@ -1486,10 +1495,14 @@ _REF_EXTRA=extra
     ;Initialize Objects
     self.map_object       = Obj_New()
     
+;---------------------------------------------------------------------
+;Set Object Properties ///////////////////////////////////////////////
+;---------------------------------------------------------------------
+
     ;Set the object properties
     self -> SetProperty, C_DATA=data, $
-                         XCOORDS=x, $
-                         YCOORDS=y, $
+                         XCOORDS=xcoords, $
+                         YCOORDS=ycoords, $
                          
                          ;cgContour Keywords
                          ASPECT=aspect, $
@@ -1538,8 +1551,29 @@ _REF_EXTRA=extra
                          TRIANGULATION=triangulation, $
                          XLOG=xlog, $
                          YLOG=ylog
+;---------------------------------------------------------------------
+;Set Ranges and Styles ///////////////////////////////////////////////
+;---------------------------------------------------------------------
 
-    ;Draw?
+    ;For zooming purposes, [XY]STYLE must have the 2^0 bit set
+    if n_elements(*self.xstyle) eq 0 $
+        then *self.xstyle = 1 $
+        else *self.xstyle += ~(*self.xstyle and 1)
+        
+    if n_elements(*self.ystyle) eq 0 $
+        then *self.ystyle = 1 $
+        else *self.ystyle += ~(*self.ystyle and 1)
+
+    ;Make sure the [XY]RANGE is set.
+    if n_elements(*self.xrange) eq 0 then *self.xrange = [min(xcoords, max=XMax), XMax]
+    if n_elements(*self.yrange) eq 0 then *self.yrange = [min(ycoords, max=YMax), YMax]
+    self.init_xrange = *self.xrange
+    self.init_yrange = *self.yrange
+
+;---------------------------------------------------------------------
+;Draw ////////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
     if keyword_set(draw) then begin
         if GetPath_Info || GetPath_XY then begin
             self -> draw, OLEVELS=oLevels, $
@@ -1566,8 +1600,9 @@ pro MrContour__define, class
     on_error, 2
     
     class = { MrContour, $
-              inherits weGraphicsKeywords, $
               inherits MrIDL_Container, $
+              inherits MrGraphicAtom, $
+              inherits weGraphicsKeywords, $
               
               ;Data properties
               c_data: Ptr_New(), $
@@ -1575,6 +1610,8 @@ pro MrContour__define, class
               ycoords: Ptr_New(), $
               
               ;MrContour Properties
+              init_xrange: fltarr(2), $
+              init_yrange: fltarr(2), $
               p_sysvar: !P, $
               x_sysvar: !X, $
               y_sysvar: !Y, $

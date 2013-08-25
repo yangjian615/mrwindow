@@ -62,72 +62,17 @@
 ;                           the IMAXES keyword back to AXES. - MRA
 ;       08/01/2013  -   Added the ConvertCoord method. - MRA
 ;       08/03/2013  -   Added the PALETTE property. - MRA
+;       08/23/2013  -   Added the LAYOUT keyword, removed the COLORBARS and ADDCOLORBAR
+;                           keywords. Inherit MrIDL_Container. - MRA
 ;-
 ;*****************************************************************************************
-;+
-;   Convert between data, normal, and device coordinates.
-;
-; :Params:
-;       X:                      in, required, type=numeric scalar/array
-;                               X components of the input coordinates. If only one argument
-;                                   is specified, then X[0,*] represents the X-coordinates,
-;                                   X[1,*] represents the Y-coordinates, and X[2,*]
-;                                   represents the Z-coordinates (if present).
-;       Y:                      in, optional, type=numeric scalar/array
-;                               Y components of the input coordinates.
-;       Z:                      in, optional, type=numeric scalar/array
-;                               Z components of the input coordinates.
-;
-; :Keywords:
-;       _REF_EXTRA:             in, optional, type=any
-;                               Any keyword accepted by IDL's Convert_Coord function is
-;                                   also accepted for keyword inheritance.
-;-
-function MrImageObject::ConvertCoord, x, y, z, $
-_REF_EXTRA=extra
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return, -1
-    endif
-    
-    ;Get the current P, X, Y system variables
-    P_current = !P
-    X_current = !X
-    Y_current = !Y
-    
-    ;Load the syetem variable states as they relate to this plot
-    !P = self.p_sysvar
-    !X = self.x_sysvar
-    !Y = self.y_sysvar
-    
-    ;Convert coordinates
-    case n_params() of
-        1: coords = convert_coord(x, _STRICT_EXTRA=extra)
-        2: coords = convert_coord(x, y, _STRICT_EXTRA=extra)
-        3: coords = convert_coord(x, y, z, _STRICT_EXTRA=extra)
-        else: message, 'Incorrect number of parameters.'
-    endcase
-    
-    ;Reset the system variables
-    !P = P_current
-    !X = X_current
-    !Y = Y_current
-    
-    return, coords
-end
-
-
 ;+
 ;   The purpose of this method is to draw the plot in the draw window. The plot is
 ;   first buffered into the pixmap for smoother opteration (by allowing motion events
 ;   to copy from the pixmap instead of redrawing the plot, the image does not flicker).
 ;-
-pro MrImageObject::Draw
+pro MrImageObject::Draw, $
+NOERASE=noerase
     compile_opt idl2
     
     ;Error handling
@@ -139,8 +84,7 @@ pro MrImageObject::Draw
     endif
     
     ;Now draw the plot to the pixmap
-    self -> doPlot
-    for i = 0, n_elements(*self.colorbars) - 1 do (*self.colorbars)[i] -> Draw
+    self -> doPlot, NOERASE=noerase
 
     ;Save the system variables
     self.x_sysvar = !X
@@ -156,7 +100,8 @@ end
 ;   Modification History::
 ;       05/04/2013  -   Do not allow zooming outside of the data range. - MRA
 ;-
-pro MrImageObject::doPlot
+pro MrImageObject::doPlot, $
+NOERASE=noerase
     compile_opt idl2
     
     ;Error handling
@@ -172,6 +117,8 @@ pro MrImageObject::doPlot
         image_plots, *self.image, *self.x_pos, *self.y_pos
         return
     endif
+
+    if n_elements(noerase) eq 0 then noerase = *self.noerase
 
 ;---------------------------------------------------------------------
 ;Keep Zoom within Data Range /////////////////////////////////////////
@@ -234,7 +181,7 @@ pro MrImageObject::doPlot
                 FONT=*self.font, $
                 NOCLIP=*self.noclip, $
                 NODATA=*self.nodata, $
-                NOERASE=*self.noerase, $
+                NOERASE=noerase, $
                 POSITION=*self.position, $
                 PSYM=*self.psym, $
                 SUBTITLE=*self.subtitle, $
@@ -324,6 +271,12 @@ end
 ;       INIT_YRANGE:        out, optional, type=fltarr(2)
 ;                           The initial state of the YRANGE keyword. This is used to reset
 ;                               the zoom to its original state.
+;       LAYOUT:             out, optional, type=intarr(3)/intarr(4)
+;                           A vector specifying [# columns, # rows, index], or
+;                               [# columns, # rows, column, row] of the plot layout and
+;                               plot position. "index" increases first across then down.
+;                               All numbers start with 1. If `POSITION` is also specified,
+;                               this keyword is ignored.
 ;       MAX_VALUE:          out, optional, type=float
 ;                           The maximum value plotted. Any values larger than this are
 ;                               treated as missing.
@@ -381,17 +334,16 @@ X_POS = x_pos, $
 Y_POS = y_pos, $
 
 ;MrImageObject Keywords
-COLORBARS = colorbars, $
 IDISPLAY = iDisplay, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
+LAYOUT = layout, $
 TV = tv, $
 P_SYSVAR = p_sysvar, $
 X_SYSVAR = x_sysvar, $
 Y_SYSVAR = y_sysvar, $
 
 ;IMAGE_PLOTS Keywords
-ADDCOLORBAR = addcolorbar, $
 BOTTOM = bottom, $
 CTINDEX = ctindex, $
 AXES = axes, $
@@ -427,13 +379,13 @@ _REF_EXTRA = extra
     if arg_present(INDEP) and n_elements(*self.INDEP) ne 0 then indep = *self.indep
 
     ;MrImageObject Properties
-    if arg_present(colorbars) and n_elements(*self.colorbars) gt 0 then colorbars = *self.colorbars
-    if arg_present(iDisplay)    then iDisplay = self.iDisplay
-    if arg_present(INIT_XRANGE) then init_xrange = self.init_xrange
-    if arg_present(INIT_YRANGE) then init_yrange = self.init_yrange
-    if arg_present(p_sysvar)    then p_sysvar = self.p_sysvar
-    if arg_present(x_sysvar)    then x_sysvar = self.x_sysvar
-    if arg_present(y_sysvar)    then y_sysvar = self.y_sysvar
+    if arg_present(iDisplay)    then iDisplay    =  self.iDisplay
+    if arg_present(INIT_XRANGE) then init_xrange =  self.init_xrange
+    if arg_present(INIT_YRANGE) then init_yrange =  self.init_yrange
+    if arg_present(layout)      then layout      = *self.layout
+    if arg_present(p_sysvar)    then p_sysvar    =  self.p_sysvar
+    if arg_present(x_sysvar)    then x_sysvar    =  self.x_sysvar
+    if arg_present(y_sysvar)    then y_sysvar    =  self.y_sysvar
     
     ;Graphics Properties
     if arg_present(MAX_VALUE) and n_elements(*self.MAX_VALUE) ne 0 then max_value = *self.max_value
@@ -490,6 +442,12 @@ end
 ;       INIT_YRANGE:        in, optional, type=fltarr(2)
 ;                           The initial state of the YRANGE keyword. This is used to reset
 ;                               the zoom to its original state.
+;       LAYOUT:             in, optional, type=intarr(3)/intarr(4)
+;                           A vector specifying [# columns, # rows, index], or
+;                               [# columns, # rows, column, row] of the plot layout and
+;                               plot position. "index" increases first across then down.
+;                               All numbers start with 1. If `POSITION` is also specified,
+;                               this keyword is ignored.
 ;       MAX_VALUE:          in, optional, type=float
 ;                           The maximum value plotted. Any values larger than this are
 ;                               treated as missing.
@@ -541,7 +499,6 @@ pro MrImageObject::SetProperty, $
 DRAW = draw, $
 
 ;Data keywords
-COLORBARS = colorbars, $
 DEP = dep, $
 IMAGE = image, $
 INDEP = indep, $
@@ -552,6 +509,7 @@ Y_POS = y_pos, $
 IDISPLAY = iDisplay, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
+LAYOUT = layout, $
 TV = tv, $
 P_SYSVAR = p_sysvar, $
 X_SYSVAR = x_sysvar, $
@@ -600,6 +558,10 @@ _REF_EXTRA = extra
     if n_elements(X_SYSVAR)    ne 0 then self.x_sysvar = x_sysvar
     if n_elements(Y_SYSVAR)    ne 0 then self.y_sysvar = y_sysvar
     if n_elements(TV)          ne 0 then self.tv = keyword_set(tv)
+    if n_elements(LAYOUT)      ne 0 then begin
+        *self.layout = layout
+        *self.position = MrPlotLayout(layout)
+    endif
 
     ;IMAGE_PLOTS.PRO Properties
     if n_elements(BOTTOM)       ne 0 then *self.bottom = bottom
@@ -619,23 +581,6 @@ _REF_EXTRA = extra
     if n_elements(XLOG)      ne 0 then *self.xlog = keyword_set(xlog)
     if n_elements(YLOG)      ne 0 then *self.ylog = keyword_set(ylog)
     
-    ;Colorbars
-    if n_elements(colorbars) ne 0 then begin
-        ;Remove the old colorbars
-        for i = 0, n_elements(*self.colorbars) - 1 do begin
-            obj_destroy, (*self.colorbars)[i]
-        endfor
-        ptr_free, self.colorbars
-        self.colorbars = ptr_new(/ALLOCATE_HEAP)
-        
-        ;Add the new colorbars
-        for i = 0, n_elements(colorbars) - 1 do begin
-            if obj_valid(colorbars[i]) then $
-                if i eq 0 then *self.colorbars = colorbars[i] $
-                          else *self.colorbars = [*self.colorbars, colorbars[i]]
-        endfor
-    endif
-
     ;weGraphicsKeywords Properties
     if n_elements(EXTRA) ne 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra
         
@@ -666,18 +611,22 @@ pro MrImageObject::cleanup
     ptr_free, self.axes
     ptr_free, self.bottom
     ptr_free, self.ctindex
-    ptr_free, self.range
-    ptr_free, self.nan
+    ptr_free, self.layout
     ptr_free, self.max_value
     ptr_free, self.min_value
     ptr_free, self.missing_color
     ptr_free, self.missing_value
+    ptr_free, self.nan
     ptr_free, self.palette
+    ptr_free, self.range
     ptr_free, self.scale
     ptr_free, self.top
     ptr_free, self.xlog
     ptr_free, self.ylog
-    for i = 0, n_elements(*self.colorbars) - 1 do obj_destroy, (*self.colorbars)[i]
+    
+    ;Superclasses
+    self -> MrIDL_Container::Cleanup
+    self -> weGraphicsKeywords::Cleanup
 end
 
 
@@ -717,6 +666,15 @@ end
 ;                               2D image will be displayed.
 ;       AXES:               in, optional, type=boolean, default=0
 ;                           Draw a set of axes around the image.
+;       LAYOUT:             in, optional, type=intarr(3)/intarr(4)
+;                           The location of the plot in a 2D plotting grid. The first two
+;                               elements specify the total number of columns and rows in
+;                               the 2D layout. If 3-elements exist, the third specifies
+;                               the overall position of the plot: [ncols, nrows, index].
+;                               If 4-elements, the column and row in which the plot is to
+;                               be placed: [ncols, nrows, col, row]. "index" begins at 1
+;                               the with plot in the upper-left corner, then increases
+;                               first down, then right.
 ;       MIN_VALUE:          in, optional, type=float
 ;                           The minimum value plotted. Any values smaller than this are
 ;                               treated as missing.
@@ -791,10 +749,10 @@ end
 ;-
 function MrImageObject::init, image, x, y, $
 ;MrImageObject Keywords
-COLORBARS = colorbars, $
 DRAW = draw, $
 IDISPLAY = idisplay, $
 KEEP_ASPECT = keep_aspect, $
+LAYOUT = layout, $
 TV = tv, $
       
 ;IMAGE_PLOTS Keywords
@@ -923,27 +881,27 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     
     ;IMAGE_PLOTS Properties
-    self.image = ptr_new(/ALLOCATE_HEAP)
-    self.indep = ptr_new(/ALLOCATE_HEAP)
-    self.dep = ptr_new(/ALLOCATE_HEAP)
-    self.bottom = ptr_new(/ALLOCATE_HEAP)
-    self.ctindex = ptr_new(/ALLOCATE_HEAP)
-    self.colorbars = ptr_new(/ALLOCATE_HEAP)
-    self.axes = ptr_new(/ALLOCATE_HEAP)
-    self.range = ptr_new(/ALLOCATE_HEAP)
-    self.min_value = ptr_new(/ALLOCATE_HEAP)
+    self.image         = ptr_new(/ALLOCATE_HEAP)
+    self.indep         = ptr_new(/ALLOCATE_HEAP)
+    self.dep           = ptr_new(/ALLOCATE_HEAP)
+    self.bottom        = ptr_new(/ALLOCATE_HEAP)
+    self.ctindex       = ptr_new(/ALLOCATE_HEAP)
+    self.axes          = ptr_new(/ALLOCATE_HEAP)
+    self.range         = ptr_new(/ALLOCATE_HEAP)
+    self.layout        = ptr_new(/ALLOCATE_HEAP)
+    self.min_value     = ptr_new(/ALLOCATE_HEAP)
     self.missing_value = ptr_new(/ALLOCATE_HEAP)
     self.missing_color = ptr_new(/ALLOCATE_HEAP)
-    self.max_value = ptr_new(/ALLOCATE_HEAP)
-    self.nan = ptr_new(/ALLOCATE_HEAP)
-    self.palette = ptr_new(/ALLOCATE_HEAP)
-    self.scale = ptr_new(/ALLOCATE_HEAP)
-    self.top = ptr_new(/ALLOCATE_HEAP)
+    self.max_value     = ptr_new(/ALLOCATE_HEAP)
+    self.nan           = ptr_new(/ALLOCATE_HEAP)
+    self.palette       = ptr_new(/ALLOCATE_HEAP)
+    self.scale         = ptr_new(/ALLOCATE_HEAP)
+    self.top           = ptr_new(/ALLOCATE_HEAP)
     
     ;LINE_PLOTS properties
-    self.xlog = ptr_new(/ALLOCATE_HEAP)
+    self.xlog   = ptr_new(/ALLOCATE_HEAP)
     self.xrange = ptr_new(/ALLOCATE_HEAP)
-    self.ylog = ptr_new(/ALLOCATE_HEAP)
+    self.ylog   = ptr_new(/ALLOCATE_HEAP)
     self.yrange = ptr_new(/ALLOCATE_HEAP)
     
     ;Image range
@@ -955,9 +913,9 @@ _REF_EXTRA = extra
                          INDEP = indep, $
                          AXES = axes, $
                          BOTTOM = bottom, $
-                         COLORBARS = colorbars, $
                          CTINDEX = ctindex, $
                          IDISPLAY = iDisplay, $
+                         LAYOUT = layout, $
                          MAX_VALUE = max_value, $
                          MIN_VALUE = min_value, $
                          MISSING_VALUE = missing_value, $
@@ -1000,6 +958,8 @@ pro MrImageObject__define
     compile_opt idl2
     
     define = {MrImageObject, $
+              inherits MrIDL_Container, $
+              inherits MrGraphicAtom, $
               inherits weGraphicsKeywords, $
               
               ;Data
@@ -1015,10 +975,10 @@ pro MrImageObject__define
               init_range: dblarr(2), $          ;Initial image range
               init_xrange: dblarr(2), $         ;Initial x-range
               init_yrange: dblarr(2), $         ;Initial y-range
-              colorbars: ptr_new(), $           ;Colorbar objects
+              layout: ptr_new(), $              ;Location of image in 2D layout
+              p_sysvar: !P, $                   ;Save the P system variable
               x_sysvar: !X, $                   ;Save the X system variable
               y_sysvar: !Y, $                   ;Save the Y system variable
-              p_sysvar: !P, $                   ;Save the P system variable
               
               ;IMAGE_PLOTS Keywords
               axes: ptr_new(), $                ;Draw axes around the image?

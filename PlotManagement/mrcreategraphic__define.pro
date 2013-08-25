@@ -33,7 +33,8 @@
 ;
 ;+
 ;   The purpose of this class is provide a means of having the capability to create any
-;   type of graphic via a method call.
+;   type of graphic via a method call. This is an abstract method and should be inherited.
+;   It also assumes that the superclass also inherits IDL_Container or MrIDL_Container.
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -49,6 +50,8 @@
 ; :History:
 ;	Modification History::
 ;       08/15/2013  -   Written by Matthew Argall.
+;       08/23/2013  -   Draw and Add by default. If not adding, call the particular
+;                           object's draw method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -176,7 +179,7 @@ end
 ;                           An object reference to the colorbar.
 ;   
 ;-
-function MrCreateGraphic::ColorBar, $
+function MrCreateGraphic::Colorbar, $
 ADD = add, $
 DRAW = draw, $
 _REF_EXTRA = extra
@@ -191,17 +194,16 @@ _REF_EXTRA = extra
     endif
 
     ;Set Defaults
-    add = keyword_set(add)
-    draw = keyword_set(draw)
+    SetDefaultValue, add, 1, /BOOLEAN
+    SetDefaultValue, draw, 1, /BOOLEAN
 
     ;Create the color bar
-    theColorBar = obj_new('weColorBar', _STRICT_EXTRA=extra)
+    theColorBar = obj_new('weColorBar', _STRICT_EXTRA=extra, DRAW=0)
     
     ;Add the image
-    if keyword_set(add) then self -> Add, theColorBar
-    
-    ;Draw    
-    if keyword_set(draw) then self -> Draw
+    if keyword_set(add) $
+        then self -> Add, theColorBar, DRAW=draw $
+        else if keyword_set(draw) then theColorbar -> Draw
     
     return, theColorBar
 end
@@ -212,11 +214,11 @@ end
 ;   added to the container
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
+;       ADD:                in, optional, type=boolean, default=1
 ;                           Add the coutour object to the container. This assumes that the
 ;                               IDL_Container class or MrIDL_Container class is also a
 ;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
+;       DRAW:               in, optional, type=boolean, default=1
 ;                           Call the Draw method after adding the image to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrImagePlot__define.
@@ -241,17 +243,16 @@ _REF_EXTRA = extra
     endif
 
     ;Set Defaults
-    add = keyword_set(add)
-    draw = keyword_set(draw)
+    SetDefaultValue, add, 1, /BOOLEAN
+    SetDefaultValue, draw, 1, /BOOLEAN
 
     ;Create the color bar
-    theContour = obj_new('MrContour', data, x, y, _STRICT_EXTRA=extra)
+    theContour = obj_new('MrContour', data, x, y, _STRICT_EXTRA=extra, DRAW=0)
     
     ;Add the image
-    if keyword_set(add) then self -> Add, theContour
-    
-    ;Draw    
-    if keyword_set(draw) then self -> Draw
+    if keyword_set(add) $
+        then self -> Add, theContour, DRAW=draw $
+        else if keyword_set(draw) then theContour -> Draw
     
     return, theContour
 end
@@ -262,11 +263,11 @@ end
 ;   added to the container
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
+;       ADD:                in, optional, type=boolean, default=1
 ;                           Add the image object to the container. This assumes that the
 ;                               IDL_Container class or MrIDL_Container class is also a
 ;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
+;       DRAW:               in, optional, type=boolean, default=1
 ;                           Call the Draw method after adding the image to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrImagePlot__define.
@@ -291,17 +292,18 @@ _REF_EXTRA = extra
     endif
 
     ;Set Defaults
-    add = keyword_set(add)
-    draw = keyword_set(draw)
+    SetDefaultValue, add, 1, /BOOLEAN
+    SetDefaultValue, draw, 1, /BOOLEAN
 
     ;Create the color bar
-    theImage = obj_new('MrImagePlot', image, x, y, _STRICT_EXTRA=extra)
+    theImage = obj_new('MrImageObject', image, x, y, _STRICT_EXTRA=extra, DRAW=0)
     
     ;Add the image
     if keyword_set(add) then self -> Add, theImage
     
     ;Draw    
-    if keyword_set(draw) then self -> Draw
+    if keyword_set(draw) then $
+        if (add eq 1) then self -> Draw else theImage -> Draw
     
     return, theImage
 end
@@ -312,11 +314,11 @@ end
 ;   added to the container
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
+;       ADD:                in, optional, type=boolean, default=1
 ;                           Add the legend object to the container. This assumes that the
 ;                               IDL_Container class or MrIDL_Container class is also a
 ;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
+;       DRAW:               in, optional, type=boolean, default=1
 ;                           Call the Draw method after adding the legend to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by weLegendItem.
@@ -334,6 +336,10 @@ _REF_EXTRA = extra
         void = error_message()
         return, obj_new()
     endif
+
+    ;Set Defaults
+    SetDefaultValue, add, 1, /BOOLEAN
+    SetDefaultValue, draw, 1, /BOOLEAN
     
     ;Create the legend
     theLegend = obj_new('weLegendItem', _STRICT_EXTRA=extra)
@@ -408,11 +414,11 @@ end
 ;   added to the container
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
+;       ADD:                in, optional, type=boolean, default=1
 ;                           Add the plot object to the container. This assumes that the
 ;                               IDL_Container class or MrIDL_Container class is also a
 ;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
+;       DRAW:               in, optional, type=boolean, default=1
 ;                           Call the Draw method after adding the plot to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrPlotObject__define.
@@ -437,17 +443,18 @@ _REF_EXTRA = extra
     endif
 
     ;Set Defaults
-    add = keyword_set(add)
-    draw = keyword_set(draw)
+    SetDefaultValue, add, 1, /BOOLEAN
+    SetDefaultValue, draw, 1, /BOOLEAN
 
     ;Create the plot
-    thePlot = obj_new('MrPlotObject', x, y, _STRICT_EXTRA=extra)
+    thePlot = obj_new('MrPlotObject', x, y, _STRICT_EXTRA=extra, DRAW=0)
     
     ;Add the plot
-    if keyword_set(add) then self -> Add, thePlot
+    if (add eq 1) then self -> Add, thePlot
     
     ;Draw    
-    if keyword_set(draw) then self -> Draw
+    if keyword_set(draw) then $
+        if (add eq 1) then self -> Draw else thePlot -> Draw
     
     return, thePlot
 end
@@ -525,15 +532,7 @@ end
 ;   Clean up after the object is destroy
 ;-
 pro MrCreateGraphic::cleanup
-    compile_opt idl2
-    
-    ;Destroy all weLegendItem objects
-    if ptr_valid(self.plotObjects) then begin
-        for i = 0, n_elements(*self.plotObjects)-1 do begin
-            obj_destroy, (*self.plotObjects)[i]
-        endfor
-        ptr_free, self.plotObjects
-    endif
+    ;Nothing to cleanup
 end
 
 
@@ -568,5 +567,6 @@ pro MrCreateGraphic__define, class
     compile_opt idl2
     
     class = {MrCreateGraphic, $
-             plotObjects: ptr_new()}
+              _CreateGraphic: 0 $       ;Not used, but cannot create empty classes.
+            }
 end

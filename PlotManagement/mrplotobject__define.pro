@@ -69,66 +69,9 @@
 ;       08/10/2013  -   Added the LAYOUT keyword. - MRA
 ;       08/22/2013  -   Added the NOERASE keyword to Draw. Was forgetting to set the
 ;                           position property in SetProperty. Fixed. - MRA
+;       08/23/2013  -   Added the IsInside method. - MRA
 ;-
 ;*****************************************************************************************
-;+
-;   Convert between data, normal, and device coordinates.
-;
-; :Params:
-;       X:                      in, required, type=numeric scalar/array
-;                               X components of the input coordinates. If only one argument
-;                                   is specified, then X[0,*] represents the X-coordinates,
-;                                   X[1,*] represents the Y-coordinates, and X[2,*]
-;                                   represents the Z-coordinates (if present).
-;       Y:                      in, optional, type=numeric scalar/array
-;                               Y components of the input coordinates.
-;       Z:                      in, optional, type=numeric scalar/array
-;                               Z components of the input coordinates.
-;
-; :Keywords:
-;       _REF_EXTRA:             in, optional, type=any
-;                               Any keyword accepted by IDL's Convert_Coord function is
-;                                   also accepted for keyword inheritance.
-;-
-function MrPlotObject::ConvertCoord, x, y, z, $
-_REF_EXTRA=extra
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return, -1
-    endif
-    
-    ;Get the current P, X, Y system variables
-    P_current = !P
-    X_current = !X
-    Y_current = !Y
-    
-    ;Load the syetem variable states as they relate to this plot
-    !P = self.p_sysvar
-    !X = self.x_sysvar
-    !Y = self.y_sysvar
-    
-    ;Convert coordinates
-    case n_params() of
-        1: coords = convert_coord(x, _STRICT_EXTRA=extra)
-        2: coords = convert_coord(x, y, _STRICT_EXTRA=extra)
-        3: coords = convert_coord(x, y, z, _STRICT_EXTRA=extra)
-        else: message, 'Incorrect number of parameters.'
-    endcase
-    
-    ;Reset the system variables
-    !P = P_current
-    !X = X_current
-    !Y = Y_current
-    
-    return, coords
-end
-
-
 ;+
 ;   The purpose of this method is to draw the plot in the draw window. The plot is
 ;   first buffered into the pixmap for smoother opteration (by allowing motion events
@@ -461,7 +404,7 @@ end
 ;       LAYOUT:             in, optional, type=intarr(3)/intarr(4)
 ;                           A vector specifying [# columns, # rows, index], or
 ;                               [# columns, # rows, column, row] of the plot layout and
-;                               plot position. "index" increases first down then accross.
+;                               plot position. "index" increases first across then down.
 ;                               All numbers start with 1. If `POSITION` is also specified,
 ;                               this keyword is ignored.
 ;       LABEL:              in, optional, type=string
@@ -528,6 +471,10 @@ POLAR = polar, $
 XLOG = xlog, $
 YLOG = ylog, $
 YNOZERO = ynozero, $
+
+;weGraphics Properties
+XSTYLE = xstyle, $
+YSTYLE = ystyle, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -569,6 +516,8 @@ _REF_EXTRA = extra
     if n_elements(YNOZERO)   ne 0 then *self.ynozero = keyword_set(ynozero)
         
     ;weGraphicsKeywords Properties
+    if n_elements(xstyle) ne 0 then *self.xstyle = ~(xstyle and 1) + xstyle
+    if n_elements(ystyle) ne 0 then *self.ystyle = ~(ystyle and 1) + ystyle
     if n_elements(EXTRA) ne 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra
     
     if keyword_set(draw) then self -> draw
@@ -846,8 +795,9 @@ pro MrPlotObject__define, class
     compile_opt idl2
     
     class = {MrPlotObject, $
-             inherits weGraphicsKeywords, $
              inherits MrIDL_Container, $
+             inherits MrGraphicAtom, $
+             inherits weGraphicsKeywords, $
              
              ;Data Properties
              indep: ptr_new(), $               ;independent variable
