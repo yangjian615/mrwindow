@@ -110,7 +110,7 @@
 ;       NORMAL:         in, optional, tyep=boolean
 ;                       Indicate that `POSITION` are provided in normal coordinates.
 ;-
-function MrManipulate::ClickedInside, x, y, position $
+function MrManipulate::ClickedInside, x, y, position, $
 DATA = data, $
 DEVICE = device, $
 NORMAL = normal
@@ -143,7 +143,7 @@ NORMAL = normal
                                         DATA=data, NORMAL=normal, $
                                         /TO_DEVICE)
             pos = [pos[0,0], pos[1,0], pos[1,0], pos[1,1]]
-        else begin
+        endif else begin
             pos = position
         endelse
     endelse
@@ -155,7 +155,7 @@ NORMAL = normal
         ;is [x,y] fall within the position provided?
         if x ge pos[0,i] and x le pos[2,i] and $
            y gt pos[1,i] and y le pos[3,i] $
-            then tf_clicked[i] = 1
+            then tf_clicked[i] = 1 $
             else tf_clicked[i] = 0
     endfor
     
@@ -230,9 +230,9 @@ NORMAL = normal
     endif else begin
     
         ;Get the points around which to draw boxes
-        pts = self -> GetPointsToBox, TRANSLATE=translate, $
-                                      ROTATE=rotate, $
-                                      STRETCH=stretch
+        pts = self -> GetPointsToBox(TRANSLATE=translate, $
+                                     ROTATE=rotate, $
+                                     STRETCH=stretch)
     endelse
     
     ;Draw 4x4 pixel boxes centered on each coordinate in PTS
@@ -430,7 +430,7 @@ STRETCH = stretch
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return
+        return, !Null
     endif
 
 ;---------------------------------------------------------------------
@@ -447,7 +447,7 @@ STRETCH = stretch
         message, 'One and only one of {ROTATE | STRETCH | TRANSLATE} must be set.'
     
     ;Return if TRANSLATE is set
-    if translate then return
+    if translate then return, !Null
 
 ;---------------------------------------------------------------------
 ;Convert Position to Device Coordinates \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -497,8 +497,9 @@ STRETCH = stretch
 ;---------------------------------------------------------------------
     endif else if translate eq 1 then begin
         ;Do nothing
-    endelse
+    endif
     
+    return, pointsToBox
 end
 
 
@@ -724,8 +725,8 @@ pro MrManipulate::Translate, event
             self -> GetProperty, DEVICE=device, DATA=data, NORMAL=normal
             if keyword_set(device) + keyword_set(data) + keyword_set(normal) eq 0 then data = 1
             
-            self -> ConvertCoords((*self.boxes)[[0,2]], (*self.boxes)[[1,3]], $
-                                  TO_DATA=data, TO_DEVICE=device, TO_NORMAL=normal)
+            xy = self -> ConvertCoords((*self.boxes)[[0,2]], (*self.boxes)[[1,3]], $
+                                       TO_DATA=data, TO_DEVICE=device, TO_NORMAL=normal)
                                   
             self -> SetProperty, POSITION=position
             

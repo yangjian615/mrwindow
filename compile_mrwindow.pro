@@ -3,32 +3,40 @@
 .comp ./mrwindow.pro
 
 ;Abstract Classes
+.comp ./AbstractClasses/mrabstractanalysis__define.pro
 .comp ./AbstractClasses/mrabstractarrow__define.pro
 .comp ./AbstractClasses/mrabstractaxis__define.pro
 .comp ./AbstractClasses/mrabstractcdf__define.pro
 .comp ./AbstractClasses/mrabstractcolorbar__define.pro
-.comp ./AbstractClasses/mrabstractcursor__define.pro
 .comp ./AbstractClasses/mrabstractimage__define.pro
 .comp ./AbstractClasses/mrabstractlegend__define.pro
 .comp ./AbstractClasses/mrabstractoverplot__define.pro
 .comp ./AbstractClasses/mrabstractplot__define.pro
 .comp ./AbstractClasses/mrabstractsaveas__define.pro
 .comp ./AbstractClasses/mrabstracttext__define.pro
-.comp ./AbstractClasses/mrabstractzoom__define.pro
+.comp ./AbstractClasses/mrmanipulate__define.pro
+.comp ./AbstractClasses/mrcursor__define.pro
+.comp ./AbstractClasses/mrzoom__define.pro
 
 ;CDF Reader
-.comp ./CDFReader/cdf_info__define.pro
-.comp ./CDFReader/cdf_read__define.pro
-.comp ./CDFReader/utilities/convert_time.pro
-.comp ./CDFReader/utilities/datetime_to_epoch.pro
-.comp ./CDFReader/utilities/dissectdatetime.pro
-.comp ./CDFReader/utilities/dissectdate.pro
-.comp ./CDFReader/utilities/dissecttime.pro
-.comp ./CDFReader/utilities/has_tag.pro
-.comp ./CDFReader/utilities/isnumeric.pro
-.comp ./CDFReader/utilities/type_to_format_code.pro
+.comp ./cdf-reader/cdf_info__define.pro
+.comp ./cdf-reader/cdf_plot__define.pro
+.comp ./cdf-reader/cdf_read__define.pro
+.comp ./cdf-reader/cdf_read.pro
+.comp ./cdf-reader/utilities/convert_time.pro
+.comp ./cdf-reader/utilities/datetime_to_epoch.pro
+.comp ./cdf-reader/utilities/dissectdatetime.pro
+.comp ./cdf-reader/utilities/dissectdate.pro
+.comp ./cdf-reader/utilities/dissecttime.pro
+.comp ./cdf-reader/utilities/has_tag.pro
+.comp ./cdf-reader/utilities/isnumeric.pro
+.comp ./cdf-reader/utilities/type_to_format_code.pro
 
 ;Plot Management
+.comp ./PlotManagement/mrcontour__define.pro
+.comp ./PlotManagement/mrcreategraphic__define.pro
+.comp ./PlotManagement/mrgraphicatom__define.pro
+.comp ./PlotManagement/mridl_container__define.pro
 .comp ./PlotManagement/mrimageobject__define.pro
 .comp ./PlotManagement/mrplotlayout__define.pro
 .comp ./PlotManagement/mrplotmanager__define.pro
@@ -58,11 +66,11 @@
 .comp ./utilities/load_color.pro
 .comp ./utilities/mrgetwindow.pro
 .comp ./utilities/mrplotlayout.pro
+.comp ./utilities/time_select.pro   ;Must be before mva.pro to compile correctly
 .comp ./utilities/mva.pro
 .comp ./utilities/pwd.pro
 .comp ./utilities/rotate_vector.pro
 .comp ./utilities/ssm_to_hms.pro
 .comp ./utilities/text_gui.pro
 .comp ./utilities/time_labels.pro
-.comp ./utilities/time_select.pro
 .comp ./utilities/twod_to_oned_index.pro
