@@ -83,12 +83,17 @@
 ;                           Added the Plot, Image, and Contour methods. The Remove
 ;                           method now works. - MRA
 ;       08/24/2013  -   Added the FillHoles and TrimLayout methods. Inherit CDF_Plot.- MRA
+;       08/27/2013  -   Added the Get method. - MRA
 ;                                   
 ;-
 ;*****************************************************************************************
 ;+
-;   Add an object to the master list. This method SHOULD NOT be used directly. Instead,
-;   use AddPlots, AddImages, etc.
+;   Add an object to the container and layout. It provides additional functionality to
+;   the MrIDL_Container::Add method.
+;       - Provide a default position for plots
+;       - Plots are automatically stacked vertically without having to specify a position
+;       - If a LAYOUT is specified and a collision occurs, other plots will be moved
+;           out of the way
 ;
 ; :Params:
 ;       THEOBJECTS:            in, optional, type=object/obj_arr(N)
@@ -350,6 +355,113 @@ end
 
 
 ;+
+;   This method gets objects from the container. It provides additional functionality
+;   to the MrIDL_Container::Get method::
+;       - Filter objects based on their location in the 2D plotting grid.
+;
+; :Params:
+;       THEOBJECTS:            in, optional, type=object/obj_arr(N)
+;                               The plot object(s) to add to the display.
+;
+;   :Keywords:
+;       DRAW:                   in, optional, type=boolean, default=0
+;                               Call the Draw method after adding.
+;       POSITION:               in, optional, type=int/intarr, default=[last]
+;                               The index location(s) into the container at which to add
+;                                   the object(s). The default is to put the objects at
+;                                   the end of the container.
+;       PLOT_POSITION:          out, optional, type=fltarr(4\,N)
+;                               The standard 4-element plot position for each object in
+;                                   `THEOBJECTS`. If an object is not a "data" object,
+;                                   then the position will be [0,0,0,0].
+;       PLOT_LOCATION:          out, optional, type=intarr(2\,N)
+;                               The [col, row] location of each object in `THEOBJECTS`
+;                                   where each plot will be placed in the 2D plotting grid.
+;                                   If the object is not a "data" object, then its location
+;                                   will be [0,0]
+;-
+function MrPlotManager::Get, $
+ALL = All, $
+ISA = IsA, $
+LOCATION = location, $
+PLOT_INDEX = plot_index, $
+POSITION = index, $
+COUNT = count
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        Count = 0
+        return, !Null
+    endif
+
+;---------------------------------------------------------------------
+;Find by Location ////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if n_elements(location) gt 0 then begin
+        ;Convert LOCATION to plot indices, if necessary
+        if keyword_set(plot_index) $
+            then allPIndex = location $
+            else allPIndex = self -> ConvertLocation(location, /TO_PLOT_INDEX)
+        
+        ;Get all of the objects
+        AllObj = self -> MrIDL_Container::Get(/ALL, COUNT=nObj)
+        Result = objarr(nObj)
+        count = 0
+        
+        ;Loop through each object
+        for i = 0, nObj - 1 do begin
+            skip = 0
+        
+            ;Get the layout and position
+            AllObj[i] -> GetProperty, LAYOUT=layout, POSITION=position
+            
+            ;Find the plot index of the object
+            nLayout = n_elements(layout)
+            case nLayout of
+                0: if n_elements(position) eq 0 $
+                    then location = FindFixedLocation(position) $
+                    else skip = 1
+                3: pIndex = layout[2]
+                4: pIndex = self -> ConvertLocation(layout[2:3], /TO_PLOT_INDEX)
+                else: skip = 1
+            endcase
+            
+            ;If no valid layout or position was provided, then go to the next object.
+            if skip eq 1 then continue
+            
+            ;Return this object?
+            tf_get = isMember(allPIndex, pIndex, N_MATCHES=nGet)
+            if nGet eq 0 || tf_get eq 0 $
+                then continue $
+                else Result[count] = AllObj[i]
+            
+            ;If we get to here, increase the object count
+            count += 1
+        endfor
+        
+        ;Trim the unused elements
+        case count of
+            0: return, !Null
+            1: Result = Result[0]
+            else: Result = Result[0:count-1]
+        endcase
+
+;---------------------------------------------------------------------
+;Normal Get //////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    endif else begin
+        Result = self -> MrIDL_Container::Get(ALL=All, ISA=IsA, POSITION=index, COUNT=count)
+    endelse
+    
+    return, Result
+end
+
+
+;+
 ;   Remove a Plot or Image object from the list of objects being displayed.
 ;
 ; :Params:
@@ -501,6 +613,71 @@ TYPE = type
     if keyword_set(draw) then self -> Draw
  
  end
+
+
+;+
+;   The purpose of this method is to change/replace the position and/or location of a
+;   plot that already exists within the 2D plotting grid.
+;
+; :Params:
+;       LOCATION:           in, optional, type=long
+;                           The [col, row] location of the plot to replace.
+;
+; :Keywords:
+;       TOFIXED:            in, optional, type=boolean, default=0
+;                           Indicate that an Auto-Updating position is to be replaced
+;                               by a fixed position.
+;       OUTPOSITION:        out, optional, type=fltarr(4)
+;                           The position indicated by `LOCATION` after it has been replaced.
+;       OUTLOCATION:        out, optional, type=intarr(2)
+;                           The new position, after the one indicated by `LOCATION` has
+;                               been replaced.
+;       SETLOCATION:        in, optional, type=lonarr(2)
+;                           Use this kewyord to set the new [col, row] location of the
+;                               plot indicated by `LOCATION`. To replace an Auto-Updating
+;                               position with a Fixed position, use the `TOFIXED` keyword.
+;       SETPOSITION:        in, optional, type=fltarr(4)
+;                           A four-element vector in the form [x0, y0, x1, y1] specifying
+;                               the location of the lower-right [x0, y0] and upper-left
+;                               [x1, y1] corners of a plot. If set, then the plot given
+;                               by `LOCATION` will have its position changed to SETPOSITION.
+;                               If `LOCATION` is that of an auto-updating plot, it will
+;                               become fixed.
+;
+; :Uses:
+;   Uses the following external programs::
+;       MrPlotLayout.pro
+;-
+pro MrPlotManager::SetPosition, position, theObject, $
+LOCATION=Location, $
+PLOT_INDEX=plot_index, $
+INDEX=index, $
+TOFIXED=toFixed
+    compile_opt idl2
+
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    toFixed = keyword_set(toFixed)
+    
+    ;If no object was given, get it
+    if n_elements(theObject) eq 0 then begin
+    
+        ;Find the location of the plot whose position is being set
+        case n_elements(position) of
+            2: new_loc = position
+            4: new_loc = self -> FindFixedLocation(position)
+        endcase
+        
+        ;Get the object
+        theObject = self -> Get(LOCATION=old_loc)
+    endif
+end
 
 
 ;+

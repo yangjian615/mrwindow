@@ -250,7 +250,10 @@ pro MrPlotLayout::CalcLayoutPositions
         return
     endif
     
-    if self.layout[0] eq 0 || self.layout[1] eq 0 $
+    ;Return if nothing has been added to the layout.
+    if array_equal(self.layout, [0,0]) then return
+    
+    if self.layout[0] eq 0 xor self.layout[1] eq 0 $
         then message, 'Cannot calculate position. Layout must have at least ' + $
                       'one column and one row.'
 
@@ -1385,7 +1388,7 @@ YGAP = ygap
     if n_elements(xmargin) ne 0 then self.xmargin = xmargin
     if n_elements(ygap)    ne 0 then self.ygap = ygap
     if n_elements(ymargin) ne 0 then self.ymargin = ymargin
-    
+
     ;Make sure plot locations are invariant to changes in the layout
     if n_elements(layout) ne 0 then begin
         ;Make sure the new layout will be valid.
@@ -1512,10 +1515,10 @@ pro MrPlotLayout::whichLayout
     print, FORMAT='(%"  nPlots:    %i")', self.nPlots
     print, FORMAT='(%"  nFixed:    %i")', self.nFixed
     if n_elements(*self.aspect) ne 0 then print, FORMAT='(%"  Aspect:     %f")', *self.aspect
-    print, FORMAT='(%"  XMargins:  [%i, %i]")', self.xmargin
-    print, FORMAT='(%"  YMargins:  [%i, %i]")', self.ymargin
-    print, FORMAT='(%"  XGaps:     %i")', self.xgap
-    print, FORMAT='(%"  YGaps:     %i")', self.ygap
+    print, FORMAT='(%"  XMargin:   [%i, %i]")', self.xmargin
+    print, FORMAT='(%"  YMargin:   [%i, %i]")', self.ymargin
+    print, FORMAT='(%"  XGap:      %i")', self.xgap
+    print, FORMAT='(%"  YGap:      %i")', self.ygap
 
 ;---------------------------------------------------------------------
 ;LAYOUT POSITIONS & LOCATIONS ////////////////////////////////////////

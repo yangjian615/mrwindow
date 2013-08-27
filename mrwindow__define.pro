@@ -765,7 +765,7 @@ _REF_EXTRA = extra
     if nExtra gt 0 then begin
         void = isMember(['CMODE'], extra, $
                         iCursor, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
-                        N_NOMEMBERS=nExtra, /FOLD_CASE)
+                        N_NONMEMBERS=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrCursor::GetProperty, _STRICT_EXTRA=extra[iCursor]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
@@ -792,7 +792,7 @@ _REF_EXTRA = extra
     if nExtra gt 0 then begin
         void = isMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
                         iZoom, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
-                        N_NOMEMBERS=nExtra, /FOLD_CASE)
+                        N_NONMEMBERS=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrZoom::GetProperty, _STRICT_EXTRA=extra[iZoom]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
@@ -1062,8 +1062,10 @@ DRAW = draw
     self.xsize = xsize
     self.ysize = ysize
 
-    ;Recalculate the normalized positions based on the new window size.
-    self -> MrPlotLayout::SetProperty
+    ;Recalculate and apply positions in resized window. MrWindow::SetProperty redirects
+    ;to hear, so be sure to call the superclass method explicitly.
+    self -> MrPlotLayout::SetProperty, XSIZE=xsize, YSIZE=ysize
+    self -> ApplyPositions
     
     ;Draw the plot to the new size
     if keyword_set(draw) then self -> Draw
@@ -1229,10 +1231,9 @@ pro MrWindow::TLB_Resize_Events, event
     
     ;Recalculate the normalized positions based on the new window size.
     ;Draw the plot to the new size
-    if self.layout[0] ne 0 && self.layout[1] ne 1 then begin
-        self -> CalcLayoutPositions
-        self -> ApplyPositions
-    endif
+    self -> CalcLayoutPositions
+    self -> ApplyPositions
+
     self -> Draw
 end
 
@@ -1595,6 +1596,8 @@ _REF_EXTRA = extra
     self.savedir = savedir
     self.xsize = xsize
     self.ysize = ysize
+    
+    self -> SetProperty, _EXTRA=extra
         
     ;Add objects
     if n_elements(arrows)       gt 0 then self -> Add, arrows

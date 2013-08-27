@@ -687,19 +687,9 @@ pro MrManipulate::Translate, event
     case event.type of
         0: begin    ;button down
             ;Return if not clicked
-            isInside = self -> ClickedInside(event.x, event.y, *self.position)
+            theObj = self -> Get(self.iFocus)
+            isInside = theObj -> IsInside(event.x, event.y)
             if isInside eq 0 then return
-            
-            ;Convert position to device coordinates
-            pos = self -> ConvertCoords((*self.position)[[0,2]], (*self.position)[[1,3]], $
-                                         DATA=*self.data, $
-                                         DEVICE=*self.device, $
-                                         NORMAL=*self.normal, $
-                                         /TO_DEVICE)
-            pos = [pos[0,0], pos[1,0], pos[0,1], pos[1,1]]
-            if ptr_valid(self.boxes) eq 0 $
-                then self.boxes = ptr_new(pos) $
-                else *self.boxes = pos
         
             ;Make modition events active
             self.mMode[1] = 1
@@ -717,17 +707,19 @@ pro MrManipulate::Translate, event
             delta_x = event.x - self.x0
             delta_y = event.y - self.y0
             
-            ;Calculate the new position in device coordinates
-            *self.boxes += [delta_x, delta_y, delta_x, delta_y]
+            ;Get the object being translated
+            theObj = self -> Get(self.iFocus)
             
-            ;Convert to whichever coordinates are begin used. Default for Direct Graphics
-            ;is DATA.
-            self -> GetProperty, DEVICE=device, DATA=data, NORMAL=normal
-            if keyword_set(device) + keyword_set(data) + keyword_set(normal) eq 0 then data = 1
+            ;Convert the clicked points from device to normal coordinates.
+            theObj -> GetProperty, DEVICE=device, DATA=data, NORMAL=normal
+            xy = theObj -> ConvertCoords([event.x, self.x0], [event.y, self.y0], /DEVICE, $
+                                         TO_DATA=data, TO_DEVICE=device, TO_NORMAL=normal)
             
-            xy = self -> ConvertCoords((*self.boxes)[[0,2]], (*self.boxes)[[1,3]], $
-                                       TO_DATA=data, TO_DEVICE=device, TO_NORMAL=normal)
-                                  
+            ;Amount to shift
+            delta_x = xy[1,0] - xy[0,0]
+            delta_y = xy[1,1] - xy[0,1]
+            
+            
             self -> SetProperty, POSITION=position
             
             ;Draw the plot in the new position
