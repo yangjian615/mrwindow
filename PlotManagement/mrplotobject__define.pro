@@ -502,8 +502,13 @@ _REF_EXTRA = extra
     if n_elements(X_SYSVAR)    ne 0 then  self.x_sysvar = x_sysvar
     if n_elements(Y_SYSVAR)    ne 0 then  self.y_sysvar = y_sysvar
     if n_elements(LAYOUT)      ne 0 then  begin
-        *self.layout = layout
-        *self.position = MrPlotLayout(layout[0:1], layout[2:*])
+        if array_equal(layout[0:1], [0,0]) then begin
+            ptr_free, self.layout
+            self.layout = ptr_new(/ALLOCATE_HEAP)
+        endif else begin
+            *self.layout = layout
+            *self.position = MrPlotLayout(layout[0:1], layout[2:*])
+        endelse
     endif
     
     ;Graphics Properties

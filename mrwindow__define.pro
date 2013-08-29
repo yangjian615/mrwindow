@@ -1103,6 +1103,7 @@ end
 pro MrWindow::SetProperty, index, $
 AMODE = amode, $
 DRAW = draw, $
+POSITION = position, $
 SAVEDIR = savedir, $
 XSIZE = xsize, $
 YSIZE = ysize, $
@@ -1124,6 +1125,7 @@ _REF_EXTRA = extra
     if n_elements(index) ne 0 then begin
         theObj = self -> Get(POSITION=index)
         theObj -> SetProperty, _EXTRA=extra
+        if n_elements(position) gt 0 then self -> SetPosition, theObj, position
         if keyword_set(draw) then self -> Draw
         return
     endif
@@ -1133,10 +1135,10 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     
     ;Set Properties
-    if n_elements(amode)      ne 0 then self.amode = amode
-    if n_elements(xsize)      ne 0 then self -> ResizeDrawWidget, xsize, self.ysize
-    if n_elements(ysize)      ne 0 then self -> ResizeDrawWidget, self.xsize, ysize
-    if n_elements(savedir)    ne 0 then self.savedir = savedir
+    if n_elements(amode)   ne 0 then self.amode = amode
+    if n_elements(xsize)   ne 0 then self -> ResizeDrawWidget, xsize, self.ysize
+    if n_elements(ysize)   ne 0 then self -> ResizeDrawWidget, self.xsize, ysize
+    if n_elements(savedir) ne 0 then self.savedir = savedir
         
     nExtra = n_elements(extra)
     
@@ -1353,9 +1355,9 @@ pro MrWindow::whichObjects
         
         ;If no layout exists, find its fixed position
         if n_elements(layout) eq 0 $
-            then location = self -> FindFixedLocation(position) $
+            then location = self -> FindLocation(position) $
             else location = layout[2:3]
-        
+
         ;Print the type-name, location, and position
         sIndex    = string(index[i], FORMAT='(i2)')
         sLocation = string(location, FORMAT='(%"[ %i, %i]")')
