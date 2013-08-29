@@ -38,6 +38,36 @@
 ;
 ;   If a plot object 
 ;
+; :Examples:
+;   Example 1: Creating and Moving plots
+;       ;At any point in this example, call the methods
+;       ;   MyObj -> WhichLayout
+;       ;   MyObj -> WhichObjects
+;       ;To see how the layouts and graphics objects are being updated.
+;
+;       ;Make the data
+;       x = findgen(100)/99.0
+;       y = sin(2*!pi*x)
+;       z = cos(2*!pi*x)
+;
+;       ;Create the MrWindow widget and add a plot of Sine and Cosine to locations [1,2] and [3,3]
+;       MyObj = obj_new('MrWindow')
+;       p1 = MyObj -> Plot(x, y, TITLE='Sin(x)', XTITLE='Time', YTITLE='Amplitude', LAYOUT=[2,2,1,2])
+;       p2 = MyObj -> Plot(x, z, TITLE='Cos(x)', XTITLE='Time', YTITLE='Amplitude', LAYOUT=[3,3,3,3])
+;
+;       ;Move Sin(x) from location [1,2] to [2,2]. Return new position.
+;       MyObj -> SetPosition, [1,2], [2,2], OUTPOSITION=position, /DRAW
+;
+;       ;Remove Sin(x) at [2,2] from the layout into a fixed position, making [2,2] avaialble.
+;       MyObj -> SetPosition, [2,2], /TOFIXED, OUTPOSITION=outPos, OUTLOCATION=outLoc, /DRAW
+;
+;       ;Move a fixed position into the layout at location [1,1]
+;       MyObj -> SetPosition, [-1,1], [1,1], OUTPOSITION=outPos, /DRAW
+;
+;       ;Move location [1,1] to a specific, fixed location, making [1,1] available
+;       SetPosition = [0.25, 0.25, 0.75, 0.75]
+;       MyObj -> SetPosition, [1,1], SetPosition, OUTLOCATION=outLoc, /DRAW
+;
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
@@ -84,6 +114,7 @@
 ;                           method now works. - MRA
 ;       08/24/2013  -   Added the FillHoles and TrimLayout methods. Inherit CDF_Plot.- MRA
 ;       08/27/2013  -   Added the Get method. - MRA
+;       08/29/2013  -   The SetPosition method works. - MRA
 ;                                   
 ;-
 ;*****************************************************************************************
@@ -396,28 +427,33 @@ COUNT = count
         catch, /cancel
         void = error_message()
         Count = 0
-        return, !Null
+        return, obj_new()
     endif
     
     ;Defaults
-    fixed      = keyword_set(fixed)
+    SetDefaultValue, fixed, 0
     plot_index = keyword_set(plot_index)
 
     ;Make sure at most one of these keywords is set.
     if fixed + plot_index gt 1 then message, 'FIXED and PLOT_INDEX are mutually exclusive.'
-    if min(location[0,*] lt 0) then message, 'Invalid LOCATION. Use /FIXED with 4-elements position.'
 
 ;---------------------------------------------------------------------
 ;Find by Location ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if n_elements(location) gt 0 then begin
+        if min(location[0,*] lt 0) then $
+            message, 'Invalid LOCATION. Use /FIXED with 4-elements position.'
+        
         ;Determine what LOCATION means.
         if keyword_set(plot_index) then begin
-            allPIndex = location
+            PIndex_in = location
+            nIn = n_elements(PIndex_in)
         endif else if keyword_set(fixed) then begin
-            allPos = location
+            pos_in = location
+            nIn = n_elements(pos_in[0,*])
         endif else begin
-            allPIndex = self -> ConvertLocation(location, /TO_PLOT_INDEX)
+            PIndex_in = self -> ConvertLocation(location, /TO_PLOT_INDEX)
+            nIn = n_elements(PIndex_in)
         endelse
 
         ;Get all of the data objects
@@ -432,7 +468,7 @@ COUNT = count
             skip = 0
         
             ;Get the layout and position
-            AllObj[i] -> GetProperty, LAYOUT=layout, POSITION=position
+            AllObj[i] -> GetProperty, LAYOUT=oLayout, POSITION=oPosition
 
         ;---------------------------------------------------------------------
         ;Find a Objects at Fixed Positions ///////////////////////////////////
@@ -440,8 +476,8 @@ COUNT = count
             
             if fixed eq 1 then begin
                 ;See if the current graphic matches any of the positions given
-                delta = min(mean(allPos - replicate(location, 4, nObj), DIMENSION=1))
-                
+                delta = min(abs(mean(pos_in - rebin(oPosition, 4, nIn), DIMENSION=1)))
+
                 ;If it does, return the graphic. If not, continue to the next one.
                 if delta lt 1e-5 $
                     then Result[count] = allObj[i] $
@@ -458,23 +494,22 @@ COUNT = count
         ;---------------------------------------------------------------------
             
             ;Find the plot index of the object
-            nLayout = n_elements(layout)
+            nLayout = n_elements(oLayout)
             case nLayout of
-                0: if n_elements(position) eq 0 $
+                0: if n_elements(oPosition) eq 0 $
                        then skip = 1 $
-                       else location = self -> FindLocation(position, /FIXED)
-                3: pIndex = layout[2]
-                4: pIndex = self -> ConvertLocation(layout[2:3], /TO_PLOT_INDEX)
+                       else location = self -> FindLocation(oPosition, /FIXED)
+                3: pIndex = oLayout[2]
+                4: pIndex = self -> ConvertLocation(oLayout[2:3], /TO_PLOT_INDEX)
                 else: skip = 1
             endcase
             
             ;If no valid layout or position was provided, then go to the next object.
             if skip eq 1 then continue
 
-            ;Return this object? ALLPINDEX are the plot-indices of the graphics we want to
-            ;find. PINDEX is the plot-index of the current graphic. If PINDEX is in
-            ;ALLPINDEX, then we want to return the current graphic.
-            tf_get = isMember(allPIndex, pIndex, N_MATCHES=nGet)
+            ;Return this object? If the plot-index of the current graphic matches any
+            ;of the inputs plot-indices, then yes.
+            tf_get = isMember(pIndex_in, pIndex, N_MATCHES=nGet)
             if nGet eq 0 || tf_get eq 0 $
                 then continue $
                 else Result[count] = AllObj[i]
@@ -734,32 +769,33 @@ TOFIXED = toFixed
     endif else begin
 
         case n_elements(old_position) of
-            1: theObj = self -> Get(LOCATION=old_position, COUNT=count, /PLOT_INDEX)
+            1: oldColRow = self -> ConvertLocation(old_position, /PLOT_INDEX, /TO_COL_ROW)
             2: begin
-                if old_position[0] lt 0 then begin
-                    oldPos = (*self.fixed_positions)[*,old_position[1]-1]
+                oldColRow = old_position
+                if oldColRow[0] eq -1 then begin
+                    oldColRow = self -> GetPosition(oldColRow)
                     fixed = 1
-                endif else begin
-                    oldPos = old_position
-                    fixed = 0
-                endelse
-                
-                theObj = self -> Get(LOCATION=oldPos, COUNT=count, FIXED=fixed)
+                endif
             endcase
-            4: theObj = self -> Get(LOCATION=old_position, COUNT=count, /FIXED)
+            4: begin
+                oldColRow = self -> FindLocation(old_position)
+                if count eq 0 then message, 'No object found at OLD_LOCATION. Cannot set position.'
+                if count gt 1 then message, 'More than one graphic found. Supply [col, row] instead.'
+            endcase
             else: message, 'OLD_POSITION: Incorrect number of elements.'
         endcase
-
-        if count eq 0 then message, 'No object found at OLD_LOCATION. Cannot set position.'
         
-        ;Get its layout and position.
-        theObj -> GetProperty, LAYOUT=layout, POSITION=position
+        ;Get the object
+        theObj = self -> Get(LOCATION=oldColRow, FIXED=fixed)
     endelse
             
-    
+
     ;If toFixed is set, then the actual position will not change. The plot will simply
     ;be removed from the layout and put into a fixed location.
-    if toFixed eq 1 then new_position = position
+    if toFixed eq 1 then begin
+        theObj -> GetProperty, POSITION=position
+        new_position = position
+    endif
         
 ;---------------------------------------------------------------------
 ;Update the Layout ///////////////////////////////////////////////////

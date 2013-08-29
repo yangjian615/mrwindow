@@ -92,7 +92,7 @@
 ;
 ;       ;Move location [1,1] to a specific, fixed location, making [1,1] available
 ;           SetPosition = [0.25, 0.25, 0.75, 0.75]
-;           MyObj -> SetPosition, [1,1], SETPOSITION=SetPosition, OUTLOCATION=outLoc
+;           MyObj -> SetPosition, [1,1], SetPosition, OUTLOCATION=outLoc
 ;
 ;       ;Destroy the object
 ;           Obj_Destroy, MyObj
@@ -639,11 +639,55 @@ NFOUND = nFound
         nLayout = self.nPlots - self.nFixed
         if fixed ne 1 and nLayout gt 0 then begin
             delta_layout = (*self.layout_positions) - rebin(position, 4, self.nPlots-self.nFixed)
-            void = IsAvailable(ITAKEN=iTaken, NTAKEN=nTaken)
+            void = self -> IsAvailable(ITAKEN=iTaken, NTAKEN=nTaken)
         endif
     endif
     
     return, location[*,nFound-1]
+end
+
+
+;+
+;   The purpose of this method is to change/replace the position and/or location of a
+;   plot that already exists within the 2D plotting grid.
+;
+; :Params:
+;       LOCATION:           in, required, type=integer/intarr(2)
+;                           Either the 2-element [col, row] or, if the location is within
+;                               the auto-updating layout, the scalar plot-index location
+;                               of the plot whose position is to be returned.
+;
+; :Keywords:
+;       POSITION:           The position of the plot at `LOCATION`.
+;-
+function MrPlotLayout::GetPosition, location
+    compile_opt idl2
+
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, !Null
+    endif
+
+    ;Get the [col, row] location.
+    case n_elements(location) of
+        1: colrow = self -> ConvertLocation(location, /PLOT_INDEX, /TO_COLROW)
+        2: colrow = location
+        else: message, 'LOCATION: Incorrect number of elements.'
+    endcase
+    
+    ;Make sure it exists.
+    exists = self -> PlotExists(colrow)
+    if exists eq 0 then message, 'LOCATION does not exist. Cannot get its position.'
+    
+    ;Get the position
+    if location[0] lt 0 $
+        then position = (*self.fixed_positions)[*,location[1]-1] $
+        else position = (*self.layout_positions)[*, colrow[0]-1, colrow[1]-1]
+    
+    return, position
 end
 
 

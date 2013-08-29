@@ -510,6 +510,10 @@ _REF_EXTRA = extra
         void = error_message()
         return, obj_new()
     endif
+
+    ;Set Defaults
+    SetDefaultValue, add, 1, /BOOLEAN
+    SetDefaultValue, draw, 1, /BOOLEAN
     
     ;If PLACE is set, then no location was given. Shuffle
     if keyword_set(place) then text = temporary(xloc)

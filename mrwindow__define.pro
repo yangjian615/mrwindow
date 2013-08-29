@@ -262,6 +262,9 @@ YSIZE = ysize
     ;Create the Analysis Menu
 ;    self -> Create_Analysis_Menu, menuID
 
+    ;Create manipulation menu
+    self -> Create_Manipulate_Menu, menuID
+
     ;Create the Arrow and Text Menus
 ;    annotateID = widget_button(menuID, VALUE='Annotate', /MENU)
 ;    self -> Create_Arrow_Menu, annotateID
@@ -561,6 +564,8 @@ pro MrWindow::Focus, event
     ;Find the Objects that Were Clicked //////////////////////////////////
     ;---------------------------------------------------------------------
         dataObj = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nObj)
+        if nObj eq 0 then return
+        
         tf_clicked = bytarr(nObj)
         delta = fltarr(nObj)
         for i = 0, nObj - 1 do begin
@@ -1360,7 +1365,7 @@ pro MrWindow::whichObjects
 
         ;Print the type-name, location, and position
         sIndex    = string(index[i], FORMAT='(i2)')
-        sLocation = string(location, FORMAT='(%"[ %i, %i]")')
+        sLocation = string(location, FORMAT='(%"[%3i,%3i]")')
         sPosition = string(position, FORMAT='(%"[%6.4f, %6.4f, %6.4f, %6.4f]")')
 
         print, FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0, 5x, a32)', $
@@ -1700,6 +1705,7 @@ pro MrWindow__define, class
               inherits MrAbstractSaveAs, $      ;SaveAs menu
               inherits MrZoom, $                ;Zoom events and menu
               inherits MrCursor, $              ;Cursor events and menu
+              inherits MrManipulate, $          ;Manipulation events and menu
               inherits MrAbstractText, $        ;Text events and menu
               inherits MrAbstractArrow, $       ;Arrow events and menu
               inherits MrAbstractAnalysis, $    ;Analysis events and menu
