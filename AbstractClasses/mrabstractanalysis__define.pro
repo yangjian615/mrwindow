@@ -222,9 +222,6 @@ end
 ;                               rotated (i.e. the one indexed by self.ifocus).
 ;
 ; :Keywords:
-;       LIST_INDEX              in, optional, type=boolean, default=0
-;                               If set, then `LOCATION` is actually the index within at
-;                                   which the plot is stored.
 ;       PLOT_INDEX:             in, optional, type=int, default=0
 ;                               If set, then `LOCATION` is actually the 1D plot index of
 ;                                   the plot. The upper-left-most plot has a plot index of
@@ -232,7 +229,6 @@ end
 ;                                   column, then across the row.
 ;-
 pro MrAbstractAnalysis::Average, xrange, location, $
-LIST_INDEX = list_index, $
 PLOT_INDEX = plot_index
     compile_opt idl2
     
@@ -253,27 +249,21 @@ PLOT_INDEX = plot_index
     list_index = keyword_set(list_index)
     plot_index = keyword_set(plot_index)
 
-    ;Use the selected plot
-    if n_elements(location) eq 0 then begin
-        index = self.ifocus
-
-    ;Check if the given location exists
-    endif else begin
-        exists = self -> plotExists(location, index, $
-                                    PLOT_INDEX=plot_index, LIST_INDEX=list_index, $
-                                    /TO_LIST_INDEX)
-        if exists eq 0 then message, 'No plot exists at LOCATION. Returning.'
-    endelse
+    ;Get the object whose data is being analyzed
+    if n_elements(location) eq 0 $
+        then theObj = self -> Get(POSITION=self.iFocus) $
+        else theObj = self -> Get(LOCATION=location, PLOT_INDEX=plot_index)
     
 ;---------------------------------------------------------------------
 ;Get Data and Compute Average ////////////////////////////////////////
 ;---------------------------------------------------------------------
     
     ;Get the data interval
+    index = self -> GetIndex(theObj)
     !Null = self -> Data_Range(xrange, index, IRANGE=iRange)
 
     ;Retrieve the data and the dimension over which to take the mean
-    (*self.allObjects)[index] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
+    theObj -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
     if n_elements(dimension) eq 0 then dimension = 0
     if dimension eq 2 && iRange[1] - iRange[0] + 1 eq 1 then dimension = 0
 
@@ -339,6 +329,7 @@ NONE = none
         return
     endif
     
+    ;Set Defaults
     setDefaultValue, menu, 1, /BOOLEAN
     setDefaultValue, get_data_value, 1, /BOOLEAN
     setDefaultValue, get_interval, 1, /BOOLEAN
@@ -354,11 +345,11 @@ NONE = none
     
     ;Create the menu
     if keyword_set(get_data_value) then button = widget_button(cursorID, VALUE='Get Data Value', UNAME='GET_DATA_VALUE', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
-    if keyword_set(get_interval) then button = widget_button(cursorID, VALUE='Get Interval', UNAME='GET_INTERVAL', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
-    if keyword_set(average) then button = widget_button(cursorID, VALUE='Average', UNAME='AVERAGE', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
-    if keyword_set(mvab) then button = widget_button(cursorID, VALUE='MVAB', UNAME='MVAB', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
-    if keyword_set(vHT) then button = widget_button(cursorID, VALUE='vHT', UNAME='VHT', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
-    if keyword_set(none) then button = widget_button(cursorID, VALUE='None', UNAME='ANONE', UVALUE={object: self, method: 'Analysis_Menu_Events'})
+    if keyword_set(get_interval)   then button = widget_button(cursorID, VALUE='Get Interval',   UNAME='GET_INTERVAL',   /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
+    if keyword_set(average)        then button = widget_button(cursorID, VALUE='Average',        UNAME='AVERAGE',        /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
+    if keyword_set(mvab)           then button = widget_button(cursorID, VALUE='MVAB',           UNAME='MVAB',           /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
+    if keyword_set(vHT)            then button = widget_button(cursorID, VALUE='vHT',            UNAME='VHT',            /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
+    if keyword_set(none)           then button = widget_button(cursorID, VALUE='None',           UNAME='ANONE',                         UVALUE={object: self, method: 'Analysis_Menu_Events'})
 end
 
 
@@ -401,7 +392,8 @@ IRANGE = iRange
     setDefaultValue, index, self.ifocus
     
     ;Retrieve the data and the dimension over which to take the mean
-    (*self.allObjects)[index] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
+    theObj = self -> Get(POSITION=index)
+    theObj -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
     if n_elements(dimension) eq 0 then dimension = 0
     
     ;Find the closest data point
@@ -697,16 +689,14 @@ end
 ;                               rotated (i.e. the one indexed by self.ifocus).
 ;
 ; :Keywords:
-;       LIST_INDEX              in, optional, type=boolean, default=0
-;                               If set, then `LOCATION` is actually the index within at
-;                                   which the plot is stored.
 ;       PLOT_INDEX:             in, optional, type=int, default=0
 ;                               If set, then `LOCATION` is actually the 1D plot index of
 ;                                   the plot. The upper-left-most plot has a plot index of
 ;                                   1, and the plot index increases as you go down the
 ;                                   column, then across the row.
 ;-
-pro MrAbstractAnalysis::MVAB, xrange, location
+pro MrAbstractAnalysis::MVAB, xrange, location, $
+PLOT_INDEX=plot_index
     compile_opt idl2
     
     ;Error handling
@@ -723,30 +713,23 @@ pro MrAbstractAnalysis::MVAB, xrange, location
 ;---------------------------------------------------------------------
 
     ;Defaults
-    list_index = keyword_set(list_index)
     plot_index = keyword_set(plot_index)
 
     ;Use the selected plot
-    if n_elements(location) eq 0 then begin
-        index = self.ifocus
-
-    ;Check if the given location exists
-    endif else begin
-        exists = self -> plotExists(location, index, $
-                                    PLOT_INDEX=plot_index, LIST_INDEX=list_index, $
-                                    /TO_LIST_INDEX)
-        if exists eq 0 then message, 'No plot exists at LOCATION. Returning.'
-    endelse
+    if n_elements(location) eq 0 $
+        then theObj = self -> Get(POSITION=self.iFocus) $
+        else theObj = self -> Get(LOCATION=location, PLOT_INDEX=plot_index)
     
 ;---------------------------------------------------------------------
 ;Get Data and Perform MVAB ///////////////////////////////////////////
 ;---------------------------------------------------------------------
     
     ;Get the data interval
-    xy_data = self -> Data_Range(xrange, IRANGE=iRange)
+    index = self -> GetIndex(theObj)
+    xy_data = self -> Data_Range(xrange, index, IRANGE=iRange)
 
     ;Retrieve the data and the dimension over which to take the mean
-    (*self.allObjects)[index] -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
+    theObj -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
     if n_elements(dimension) eq 0 then begin
         dims = size(dep, /DIMENSIONS)
         dimension = where(dims eq 3, count) + 1
@@ -905,9 +888,6 @@ end
 ;                               rotated (i.e. the one indexed by self.ifocus).
 ;
 ; :Keywords:
-;       LIST_INDEX              in, optional, type=boolean, default=0
-;                               If set, then `LOCATION` is actually the index within at
-;                                   which the plot is stored.
 ;       PLOT_INDEX:             in, optional, type=int, default=0
 ;                               If set, then `LOCATION` is actually the 1D plot index of
 ;                                   the plot. The upper-left-most plot has a plot index of
@@ -915,8 +895,7 @@ end
 ;                                   column, then across the row.
 ;-
 pro MrAbstractAnalysis::Rotate, rotmat, location, $
-PLOT_INDEX = plot_index, $
-LIST_INDEX = list_index
+PLOT_INDEX = plot_index
     compile_opt idl2
     
     ;Error handling
@@ -933,22 +912,14 @@ LIST_INDEX = list_index
 ;---------------------------------------------------------------------
     
     setDefaultValue, plot_index, 0, /BOOLEAN
-    setDefaultValue, list_index, 0, /BOOLEAN
 
     if n_params() eq 1 then $
         if n_elements(rotmat) eq 2 then location = rotmat
 
-    ;Use the selected plot
-    if n_elements(location) eq 0 then begin
-        index = self.ifocus
-
-    ;Check if the location exists
-    endif else begin
-        exists = self -> plotExists(location, index, $
-                                    PLOT_INDEX=plot_index, LIST_INDEX=list_index, $
-                                    /TO_LIST_INDEX)
-        if exists eq 0 then message, 'No plot exists at LOCATION. Returning.'
-    endelse
+    ;Get the graphic object
+    if n_elements(location) eq 0 $
+        then theObj = self -> Get(POSITION=self.iFocus) $
+        else theObj = self -> Get(LOCATION=location, PLOT_INDEX=plot_index)
     
     ;Get the rotation matrix
     if n_elements(rotmat) ne 9 then begin
@@ -962,7 +933,6 @@ LIST_INDEX = list_index
 ;Rotate the Data /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    theObject = (*self.allObjects)[index]
     theObject -> GetProperty, DEP=dep
     
     dep = rotate_vector(rotmat, dep)
@@ -1024,8 +994,11 @@ pro MrAbstractAnalysis::vHT, xrange, yrange
 ;---------------------------------------------------------------------
 
     ;Retrieve the data and the dimension over which to take the mean
-    (*self.allObjects)[(*self.intervals)[2]] -> GetProperty, INDEP=t_v, DEP=v, DIMENSION=v_dim
-    (*self.allObjects)[self.ifocus] -> GetProperty, INDEP=t_B, DEP=B, DIMENSION=B_dim
+    velObj = self -> Get(POSITION=(*self.intervals)[2])
+    magObj = self -> Get(POSITION=self.iFocus)
+    
+    velObj -> GetProperty, INDEP=t_v, DEP=v, DIMENSION=v_dim
+    magObj -> GetProperty, INDEP=t_B, DEP=B, DIMENSION=B_dim
     
     ;Get the index range for magnetic field data.
     iRange = (*self.intervals)[0:1]

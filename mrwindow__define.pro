@@ -260,7 +260,7 @@ YSIZE = ysize
     self -> Create_Cursor_Menu, menuID, /MENU, /NONE, /CROSS_HAIRS, /GET_POINT, /SHOW_XY
     
     ;Create the Analysis Menu
-;    self -> Create_Analysis_Menu, menuID
+    self -> Create_Analysis_Menu, menuID
 
     ;Create the Arrow and Text Menus
 ;    annotateID = widget_button(menuID, VALUE='Annotate', /MENU)
