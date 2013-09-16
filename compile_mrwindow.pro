@@ -23,6 +23,7 @@
 .comp ./cdf-reader/cdf_plot__define.pro
 .comp ./cdf-reader/cdf_read__define.pro
 .comp ./cdf-reader/cdf_read.pro
+.comp ./cdf-reader/cdf_varselect__define.pro
 .comp ./cdf-reader/utilities/convert_time.pro
 .comp ./cdf-reader/utilities/datetime_to_epoch.pro
 .comp ./cdf-reader/utilities/dissectdatetime.pro
@@ -30,6 +31,7 @@
 .comp ./cdf-reader/utilities/dissecttime.pro
 .comp ./cdf-reader/utilities/has_tag.pro
 .comp ./cdf-reader/utilities/isnumeric.pro
+.comp ./cdf-reader/utilities/mrisa.pro
 .comp ./cdf-reader/utilities/type_to_format_code.pro
 
 ;Plot Management

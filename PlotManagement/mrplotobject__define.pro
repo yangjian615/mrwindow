@@ -70,12 +70,15 @@
 ;       08/22/2013  -   Added the NOERASE keyword to Draw. Was forgetting to set the
 ;                           position property in SetProperty. Fixed. - MRA
 ;       08/23/2013  -   Added the IsInside method. - MRA
+;       08/30/2013  -   Missed the SYMCOLOR keyword. Now included. - MRA
+;       09/08/2013  -   Number of default colors now matches the number of dimensions
+;                           being plotted. - MRA
 ;-
 ;*****************************************************************************************
 ;+
 ;   The purpose of this method is to draw the plot in the draw window. The plot is
-;   first buffered into the pixmap for smoother opteration (by allowing motion events
-;   to copy from the pixmap instead of redrawing the plot, the image does not flicker).
+;   first buffered into the pixmap for smoother opteration. (By allowing motion events
+;   to copy from the pixmap instead of redrawing the plot, the image does not flicker.)
 ;-
 pro MrPlotObject::Draw, $
 NOERASE = noerase
@@ -133,6 +136,9 @@ NOERASE=noerase
             XLOG=*self.xlog, $
             YLOG=*self.ylog, $
             YNOZERO=*self.ynozero, $
+            
+            ;cgPlot Keywords
+            SYMCOLOR = *self.symcolor, $
                
             ;weGraphicsKeywords
             AXISCOLOR=*self.axiscolor, $
@@ -271,7 +277,7 @@ pro MrPlotObject::GetProperty, $
 INDEP = indep, $
 DEP = dep, $
 
-;MrLinePlot Keywords
+;MrLinePlot Properties
 DIMENSION = dimension, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
@@ -283,7 +289,10 @@ P_SYSVAR = p_sysvar, $
 X_SYSVAR = x_sysvar, $
 Y_SYSVAR = y_sysvar, $
 
-;Graphics keywords
+;cgPlot Properties
+SYMCOLOR = symcolor, $
+
+;Graphics Properties
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
 NSUM = nsum, $
@@ -292,7 +301,7 @@ XLOG = xlog, $
 YLOG = ylog, $
 YNOZERO = ynozero, $
 
-;LINE_PLOTS keywords
+;weGraphicsKeywords Properties
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -333,6 +342,9 @@ _REF_EXTRA = extra
     if arg_present(p_sysvar)    then p_sysvar    =  self.p_sysvar
     if arg_present(x_sysvar)    then x_sysvar    =  self.x_sysvar
     if arg_present(y_sysvar)    then y_sysvar    =  self.y_sysvar
+    
+    ;cgPlot Properties
+    if arg_present(symcolor)  and n_elements(*self.symcolor)  ne 0 then symcolor = *self.symcolor
     
     ;Graphics Properties
     if arg_present(MAX_VALUE) and n_elements(*self.MAX_VALUE) ne 0 then max_value = *self.max_value
@@ -463,6 +475,9 @@ P_SYSVAR = p_sysvar, $
 X_SYSVAR = x_sysvar, $
 Y_SYSVAR = y_sysvar, $
 
+;cgPlot Properties
+SYMCOLOR = symcolor, $
+
 ;Graphics Properties
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
@@ -506,6 +521,9 @@ _REF_EXTRA = extra
         *self.position = MrPlotLayout(layout[0:1], layout[2:*])
     endif
     
+    ;cgPlot Properties
+    if n_elements(SYMCOLOR) ne 0 then *self.symcolor = symcolor
+    
     ;Graphics Properties
     if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
     if n_elements(MIN_VALUE) ne 0 then *self.min_value = min_value
@@ -547,6 +565,7 @@ pro MrPlotObject::cleanup
     ptr_free, self.xlog
     ptr_free, self.ylog
     ptr_free, self.polar
+    ptr_free, self.symcolor
     
     ;Cleanup the superclass.
     self -> weGraphicsKeywords::CLEANUP
@@ -641,6 +660,9 @@ LAYOUT = layout, $
 LEGENDS = legends, $
 OPLOTS = oplots, $
 
+;cgPlot Keywords
+SYMCOLOR = symcolor, $
+
 ;Graphics Keywords
 COLOR = color, $
 MAX_VALUE = max_value, $
@@ -727,6 +749,7 @@ _REF_EXTRA = extra
     self.xlog = ptr_new(/ALLOCATE_HEAP)
     self.ylog = ptr_new(/ALLOCATE_HEAP)
     self.polar = ptr_new(/ALLOCATE_HEAP)
+    self.symcolor = ptr_new(/ALLOCATE_HEAP)
     self.ynozero = ptr_new(/ALLOCATE_HEAP)
     
     ;Add overplots and legends. Serves as an Init method.
@@ -740,12 +763,16 @@ _REF_EXTRA = extra
 
     ;Set the initial x- and y-range
     if n_elements(xrange) eq 0 then xrange = [min(indep, max=maxIndep), maxIndep]
-    if n_elements(yrange) eq 0 then yrange = [min(dep, max=maxdep), maxdep]*1.05
+    if n_elements(yrange) eq 0 then begin
+        yrange = [min(dep, max=maxdep), maxdep]
+        yrange += [-abs(yrange[0]), abs(yrange[1])]*0.05
+    endif
     self.init_xrange = xrange
     self.init_yrange = yrange
 
     ;Pick a set of default colors so not everything is the same color.
     default_colors = ['opposite', 'Blue', 'Forest_Green', 'Red', 'Magenta', 'Orange']
+    if nDefaults gt 5 then default_colors = [default_colors, replicate('opposite', nDefaults-5)]
     if nDefaults eq 1 then d_color = default_colors[0] else d_color = default_colors[1:nDefaults]
     setDefaultValue, color, d_color
 
@@ -811,6 +838,9 @@ pro MrPlotObject__define, class
              polar: ptr_new(), $               ;create a polar plot?
              ynozero: ptr_new(), $             ;do not make ymin=0
              nsum: ptr_new(), $                ;*number of points to average when plotting
+             
+             ;cgPlot Properties
+             symcolor: ptr_new(), $            ;color of each symbol
              
              ;MrPlotObject Properties
              dimension: 0, $                   ;The over which plots will be made

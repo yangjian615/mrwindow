@@ -920,7 +920,7 @@ PLOT_INDEX = plot_index
     if n_elements(location) eq 0 $
         then theObj = self -> Get(POSITION=self.iFocus) $
         else theObj = self -> Get(LOCATION=location, PLOT_INDEX=plot_index)
-    
+
     ;Get the rotation matrix
     if n_elements(rotmat) ne 9 then begin
         if ptr_valid(self.tmatrix) $
@@ -933,11 +933,11 @@ PLOT_INDEX = plot_index
 ;Rotate the Data /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    theObject -> GetProperty, DEP=dep
+    theObj -> GetProperty, DEP=dep
     
     dep = rotate_vector(rotmat, dep)
     dMin = min(dep, max=dMax)
-    theObject -> SetProperty, DEP=dep, YRANGE=[dMin, dMax]
+    theObj -> SetProperty, DEP=dep, YRANGE=[dMin, dMax]
     
     self -> Draw
 end

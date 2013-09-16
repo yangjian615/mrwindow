@@ -198,6 +198,9 @@
 ;       08/24/2013  -   Focus was saving the index of a subarray of objects, not an
 ;                           index into the container. Fixed.  Inherit CDF_Plot instead
 ;                           of MrAbstractCDF. - MRA
+;       08/30/2013  -   Bindings are now applied when [XYC]Range are set via the
+;                           SetProperty method. - MRA
+;       09/15/2013  -   Focus simply returns if there are no objects in the container. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -317,7 +320,7 @@ pro MrWindow::Draw
     allObj = self -> Get(/ALL, COUNT=nObj)
     
     ;Create an empty plot if none exists.
-    if nObj eq 0 then cgErase
+    cgErase, 'white'
 
     ;Draw all of the objects.
     for i = 0, nObj - 1 do begin
@@ -561,6 +564,8 @@ pro MrWindow::Focus, event
     ;Find the Objects that Were Clicked //////////////////////////////////
     ;---------------------------------------------------------------------
         dataObj = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nObj)
+        if nObj eq 0 then return
+        
         tf_clicked = bytarr(nObj)
         delta = fltarr(nObj)
         for i = 0, nObj - 1 do begin
@@ -642,6 +647,9 @@ pro MrWindow::File_Menu_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        if obj_valid(cdf_obj) then obj_destroy, cdf_obj
+        if (obj_valid(thePlot)     eq 1) && (self -> IsContained(thePlot)     eq 0) then obj_destroy, thePlot
+        if (obj_valid(theColorbar) eq 1) && (self -> IsContained(theColorbar) eq 0) then obj_destroy, theColorbar
         void = error_message()
         return
     endif
@@ -662,13 +670,15 @@ pro MrWindow::File_Menu_Events, event
             cdf_obj = obj_new('CDF_PLOT')
             thePlot = cdf_obj -> Plot(GROUP_LEADER=self.tlb, $
                                       DISPLAY_TYPE=display_type, $
-                                      OCOLORBAR=theColorbar)
+                                      COLORBAR=theColorbar)
             if obj_valid(thePlot) eq 0 then return
             
-            ;Add it to the proper lists.
-            case strupcase(display_type) of
-                'TIME_SERIES': self -> Add, thePlot, /DRAW
-                '3D_SPECTROGRAM': begin
+            ;Add Plots.
+            if strupcase(display_type) eq 'TIME_SERIES' then begin
+                self -> Add, thePlot, /DRAW
+            
+            ;Add Spectrograms
+            endif else if isMember(['3D_SPECTROGRAM', 'SPECTROGRAM'], display_type, /FOLD_CASE) then begin
                     ;Add the image and get its position
                     self -> Add, [thePlot, theColorbar]
                     
@@ -678,9 +688,8 @@ pro MrWindow::File_Menu_Events, event
                     ;Add the colorbar and bind it to the image.
                     self -> Bind, thePlot, theColorbar, /CAXIS
                     self -> Draw
-                endcase
-                else: message, 'Display type "' + display_type + '" not recognized.'
-            endcase
+            
+            endif else message, 'Display type "' + display_type + '" not recognized.'
             
             ;Destroy the object
             obj_destroy, cdf_obj
@@ -1064,7 +1073,7 @@ DRAW = draw
 
     ;Recalculate and apply positions in resized window. MrWindow::SetProperty redirects
     ;to hear, so be sure to call the superclass method explicitly.
-    self -> MrPlotLayout::SetProperty, XSIZE=xsize, YSIZE=ysize
+    self -> CalcLayoutPositions
     self -> ApplyPositions
     
     ;Draw the plot to the new size
@@ -1103,8 +1112,11 @@ end
 pro MrWindow::SetProperty, index, $
 AMODE = amode, $
 DRAW = draw, $
+RANGE = range, $
 SAVEDIR = savedir, $
 XSIZE = xsize, $
+XRANGE = xrange, $
+YRANGE = yrange, $
 YSIZE = ysize, $
 _REF_EXTRA = extra
     compile_opt idl2
@@ -1123,7 +1135,16 @@ _REF_EXTRA = extra
 
     if n_elements(index) ne 0 then begin
         theObj = self -> Get(POSITION=index)
-        theObj -> SetProperty, _EXTRA=extra
+        theObj -> SetProperty, XRANGE=xrange, YRANGE=yrange, _EXTRA=extra
+        
+        ;Apply axis bindings if ranges were set.
+        if n_elements(xrange) ne 0 then self -> Apply_Bindings, theOBj, /XAXIS
+        if n_elements(yrange) ne 0 then self -> Apply_Bindings, theObj, /YAXIS
+        if n_elements( range) ne 0 then begin
+            theObj -> SetProperty, RANGE=range
+            self -> Apply_Bindings, theObj, /CAXIS
+        endif
+        
         if keyword_set(draw) then self -> Draw
         return
     endif
@@ -1133,10 +1154,10 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     
     ;Set Properties
-    if n_elements(amode)      ne 0 then self.amode = amode
-    if n_elements(xsize)      ne 0 then self -> ResizeDrawWidget, xsize, self.ysize
-    if n_elements(ysize)      ne 0 then self -> ResizeDrawWidget, self.xsize, ysize
-    if n_elements(savedir)    ne 0 then self.savedir = savedir
+    if n_elements(amode)   ne 0 then self.amode = amode
+    if n_elements(xsize)   ne 0 then self -> ResizeDrawWidget, xsize, self.ysize
+    if n_elements(ysize)   ne 0 then self -> ResizeDrawWidget, self.xsize, ysize
+    if n_elements(savedir) ne 0 then self.savedir = savedir
         
     nExtra = n_elements(extra)
     

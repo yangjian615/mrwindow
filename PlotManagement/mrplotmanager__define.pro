@@ -38,6 +38,31 @@
 ;
 ;   If a plot object 
 ;
+; :Examples
+;   Example 1::
+;       ;Create a sine and cosine wave.
+;       x = findgen(100)/99.0
+;       y = sin(2*!pi*x)
+;       z = cos(2*!pi*x)
+;
+;       ;Create the object and add the next available position to the layout
+;       MyObj = obj_new('MrWindow')
+;       p1 = MyObj -> Plot(x, y, TITLE='Sin(x)', XTITLE='Time', YTITLE='Amplitude', LAYOUT=[2,2,1,2])
+;       p2 = MyObj -> Plot(x, z, TITLE='Cos(x)', XTITLE='Time', YTITLE='Amplitude', LAYOUT=[3,3,3,3])
+;
+;       ;Move Sin(x) from location [1,2] to [2,2]. Return new position.
+;       MyObj -> SetPosition, [1,2], [2,2], OUTPOSITION=position, /DRAW
+;
+;       ;Move location [2,2] from the layout into a fixed position, making [2,2] avaialble.
+;       MyObj -> SetPosition, [2,2], /TOFIXED, OUTPOSITION=outPos, OUTLOCATION=outLoc, /DRAW
+;
+;       ;Move a fixed position into the layout at location [1,1]
+;       MyObj -> SetPosition, [-1,1], [1,1], OUTPOSITION=outPos, /DRAW
+;
+;       ;Move location [1,1] to a specific, fixed location, making [1,1] available
+;       SetPosition = [0.25, 0.25, 0.75, 0.75]
+;       MyObj -> SetPosition, [1,1], SetPosition, OUTLOCATION=outLoc, /DRAW
+;
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
@@ -84,6 +109,7 @@
 ;                           method now works. - MRA
 ;       08/24/2013  -   Added the FillHoles and TrimLayout methods. Inherit CDF_Plot.- MRA
 ;       08/27/2013  -   Added the Get method. - MRA
+;       08/30/2013  -   Added QUIET keyword to the Add method. - MRA
 ;                                   
 ;-
 ;*****************************************************************************************
@@ -115,12 +141,16 @@
 ;                                   where each plot will be placed in the 2D plotting grid.
 ;                                   If the object is not a "data" object, then its location
 ;                                   will be [0,0]
+;       QUITE:                  in, optional, type=boolean, default=0
+;                               If set, no message will be printed if an object cannot be
+;                                   added to the continer.
 ;-
 pro MrPlotManager::Add, theObjects, $
 DRAW = draw, $
 POSITION = index, $
 PLOT_LOCATION = outPocation, $
-PLOT_POSITION = outPosition
+PLOT_POSITION = outPosition, $
+QUIET = quiet
     compile_opt idl2
     
     ;Error handling
@@ -157,8 +187,9 @@ PLOT_POSITION = outPosition
     ;Unknown Objects /////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
         if ImA eq '' then begin
-            print, FORMAT='(%"MrPlotManager::Add: Object \"%s\" at index %i is not recognized. Cannot add.")', $
-                   typename(theObjects[i]), i
+            if keyword_set(quiet) eq 0 then $
+                print, FORMAT='(%"MrPlotManager::Add: Object \"%s\" at index %i is not recognized.' + $
+                                  'Cannot add.")', typename(theObjects[i]), i
             continue
         endif
             
