@@ -103,9 +103,6 @@
 ;       Durham, NH, 03824
 ;       matthew.argall@wildcats.unh.edu
 ;
-; :Copyright:
-;       Matthew Argall 2013
-;
 ; :History:
 ;	Modification History::
 ;       07/07/2013  -   Written by Matthew Argall

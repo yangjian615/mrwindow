@@ -94,6 +94,9 @@
 ;           SetPosition = [0.25, 0.25, 0.75, 0.75]
 ;           MyObj -> SetPosition, [1,1], SetPosition, OUTLOCATION=outLoc
 ;
+;       ;Change the layout from [nCols,nRos]=[1,2] to [2,1]
+;           MyObj -> SetProperty, LAYOUT=[2,1]
+;
 ;       ;Destroy the object
 ;           Obj_Destroy, MyObj
 ;
@@ -160,6 +163,9 @@
 ;       08/28/2013  -   Moved the functionality of GetListIndexAvailability into
 ;                           IsAvailable. Removed the former. ReplacePositions has been
 ;                           re-written and renamed to SetPosition. - MRA
+;       09/24/2013  -   Calling SetProperty with the LAYOUT keyword now works. Check if
+;                           the new layout is large enough to fit all of the plots. The
+;                           PLOT_INDEX keyword in IsAvailable now works. - MRA
 ;                           
 ;-
 ;*****************************************************************************************
@@ -457,8 +463,9 @@ TO_COLROW=to_colrow
                 colrow = twoD_to_oneD_index(location-1, layout, /oneD_to_twoD)
                 result = twoD_to_oneD_index(colrow, layout, /COL_MAJOR)
             endcase
+            
             keyword_set(list_index): result = location
-            else                   : result = twoD_to_oneD_index(location-1, layout, /COL_MAJOR)
+            else:                    result = twoD_to_oneD_index(location-1, layout, /COL_MAJOR)
         endcase
     endif
     
@@ -833,21 +840,18 @@ PLOT_INDEX = plot_index
     
         ;Check if the list index is available.
         tf_available = ~*self.posIsTaken
-        if findIndex eq 1 then $
-            iFree = where(tf_available eq 1, nFree, COMPLEMENT=iTaken, NCOMPLEMENT=nTaken, /NULL)
+        iFree = where(tf_available eq 1, nFree, COMPLEMENT=iTaken, NCOMPLEMENT=nTaken, /NULL)
 
         ;Convert from array-index order to plot-index order.
         nLayout = n_elements(*self.posIsTaken)
         if plot_index eq 1 && nLayout gt 0 then begin
-            iArray = indgen(nLayout)
-            pIndex = self -> ConvertLocation(iArray, /LIST_INDEX, /TO_PLOT_INDEX)
-            tf_available = tf_available[pIndex-1]
-            
             ;Convert array indices to plot indices.
-            if findIndex eq 1 then begin
-                if nFree  gt 0 then pFree  = self -> ConvertLocation(iFree,  /LIST_INDEX, /TO_PLOT_INDEX)
-                if nTaken gt 0 then pTaken = self -> ConvertLocation(iTaken, /LIST_INDEX, /TO_PLOT_INDEX)
-            endif
+            if nFree  gt 0 then iFree  = self -> ConvertLocation(iFree,  /LIST_INDEX, /TO_PLOT_INDEX)
+            if nTaken gt 0 then iTaken = self -> ConvertLocation(iTaken, /LIST_INDEX, /TO_PLOT_INDEX)
+            
+            ;Convert TF_AVAILBLE to plot-index availability
+            tf_available = intarr(nLayout) + 1
+            if nFree gt 0 then tf_available[iFree-1] = 0
         endif
         
         return, tf_available
@@ -1403,9 +1407,10 @@ function MrPlotLayout::RePosition, old_layout, new_layout, plot_index
     ;If no positions were taken in the old layout, then none are taken in the new one.
     if nOldTaken eq 0 then return, newIsTaken
 
-    ;Convert the indices of the taken positions to [col, row] locations.
-    oldTaken_colrow = self -> ConvertLocation(iOldTaken, old_layout, /LIST_INDEX, /TO_COLROW)
-    iNewTaken = self -> ConvertLocation(oldTaken_colrow, new_layout)
+    ;Convert the indices of the taken positions to plot index locations. Plot index
+    ;locations are invariant under change of layout.
+    oldTaken_colrow = self -> ConvertLocation(iOldTaken, old_layout, /LIST_INDEX, /TO_PLOT_INDEX)
+    iNewTaken = self -> ConvertLocation(oldTaken_colrow, new_layout, /PLOT_INDEX, /TO_LIST_INDEX)
 
     ;Record which positions are taken in the new layout.
     newIsTaken[iNewTaken] = 1
@@ -1476,6 +1481,16 @@ YGAP = ygap
             ;Make sure the new layout will be valid.
             if layout[0] eq 0 xor layout[1] eq 0 then $
                 message, 'LAYOUT must have at least 1 column and 1 row.'
+
+            ;Make sure the new layout is big enough. Get the largest plot index and
+            ;compare it to the layout given.
+            void = self -> IsAvailable(ITAKEN=pTaken, NTAKE=nTaken, /PLOT_INDEX)
+            if nTaken gt 0 then begin
+                void = max(pTaken, imax)
+                if layout[0]*layout[1] lt pTaken[imax] then $
+                    message, 'LAYOUT is not big enough to contain the current set of plots. ' + $
+                             'Try theObj -> FillHoles, /TRIMLAYOUT, /DRAW first.'
+            endif
 
             ;Resposition all of the existing plots        
             *self.posIsTaken = self -> RePosition(self.layout, layout)
@@ -1551,18 +1566,12 @@ pro MrPlotLayout::TrimLayout
     endif
 
     ;Get plot availablility.
-    tf_free = self -> IsAvailable(/PLOT_INDEX)
-    if tf_free eq !Null then return
-    
-    ;Which plot indices are taken?
-    pTaken = where(tf_free eq 0, nTaken)
+    tf_free = self -> IsAvailable(/PLOT_INDEX, ITAKEN=pTaken, NTAKE=nTaken, NFREE=nFree)
+    if nFree  eq 0 then return
     if nTaken eq 0 then return
-        
-    ;Convert all plot indices to [col,row] locations
-    pIndex = indgen(self.layout[0]*self.layout[1])+1
-    ColRow = self -> ConvertLocation(pIndex, /PLOT_INDEX, /TO_COLROW)
     
     ;Find the maximum taken column and row
+    ColRow = self -> ConvertLocation(pTaken, /PLOT_INDEX, /TO_COLROW)
     maxCol = max(ColRow[0,pTaken])
     maxRow = max(ColRow[1,pTaken])
 

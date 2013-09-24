@@ -68,6 +68,10 @@
 ;       SetPosition = [0.25, 0.25, 0.75, 0.75]
 ;       MyObj -> SetPosition, [1,1], SetPosition, OUTLOCATION=outLoc, /DRAW
 ;
+;       ;Move Sin(x) back to [1,1], then remove and trim holes in the layout.
+;       MyObj -> SetPosition, [-1,1], [1,1], /DRAW
+;       MyObj -> FillHoles, /TRIMLAYOUT, /DRAW
+;
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
@@ -75,9 +79,6 @@
 ;       8 College Rd.
 ;       Durham, NH, 03824
 ;       matthew.argall@wildcats.unh.edu
-;
-; :Copyright:
-;       Matthew Argall 2013, All rights reserved
 ;
 ; :History:
 ;	Modification History::
@@ -118,9 +119,92 @@
 ;       08/30/2013  -   Added QUIET keyword to the Add method. - MRA
 ;       09/22/2013  -   Can now Get objects by graphic type. Had to rename PLOT_INDEX to
 ;                           PINDEX to remove ambiguous keyword abbreviation- MRA
+;       09/24/2013  -   Added TRIMLAYOUT keyword to FillHoles. ApplyPositions now adjust
+;                           plots properly when the layout is changed. Added the
+;                           AdjustLayout_* methods. - MRA
 ;                                   
 ;-
 ;*****************************************************************************************
+;+
+;   Event handler for the EDIT | Layout menu.
+;-
+pro MrPlotManager::AdjustLayout_Property, event
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Spawn a GUI to get user input about the layout
+    new_layout = plotpositions_gui(self.tlb, $
+                                   LAYOUT  = self.layout, $
+                                   XGAP    = self.xgap, $
+                                   XMARGIN = self.xmargin, $
+                                   YGAP    = self.ygap, $
+                                   YMARGIN = self.ymargin)
+    
+    ;Update the layout
+    self -> SetProperty, LAYOUT  = (*new_layout).layout, $
+                         XGAP    = (*new_layout).xgap, $
+                         XMARGIN = (*new_layout).xmargin, $
+                         YGAP    = (*new_layout).ygap, $
+                         YMARGIN = (*new_layout).ymargin
+    
+    ;Redraw
+    self -> Draw
+end
+
+;+
+;   Event handler for the EDIT | Move menu.
+;-
+pro MrPlotManager::AdjustLayout_Move, event
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Spawn a GUI to get user input about the old and new locations
+    colrow = moveplot_gui(self.tlb)
+    
+    ;Update the layout
+    self -> SetPosition, (*colrow).from, (*colrow).to
+    
+    ;Redraw
+    self -> Draw
+end
+
+
+;+
+;   Event handler for the EDIT | Remove menu.
+;-
+pro MrPlotManager::AdjustLayout_Remove, event
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Remove the current object
+    if obj_valid(self.focus) then self -> Remove, self.focus
+    
+    ;Redraw
+    self -> Draw
+end
+
+
 ;+
 ;   Add an object to the container and layout. It provides additional functionality to
 ;   the MrIDL_Container::Add method.
@@ -149,7 +233,7 @@
 ;                                   where each plot will be placed in the 2D plotting grid.
 ;                                   If the object is not a "data" object, then its location
 ;                                   will be [0,0]
-;       QUITE:                  in, optional, type=boolean, default=0
+;       QUIET:                  in, optional, type=boolean, default=0
 ;                               If set, no message will be printed if an object cannot be
 ;                                   added to the continer.
 ;-
@@ -303,10 +387,24 @@ pro MrPlotManager::ApplyPositions
         nLayout = n_elements(layout)
         if nLayout eq 0 then continue
         
-        ;Get the [col,row] location of the plot
+        ;Get the [col,row] location of the plot. Ensure that the object's layout matches
+        ;the current layout.
         case nLayout of
-            3: thisColRow = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
-            4: thisColRow = layout[2:3]
+            3: begin
+                if array_equal(self.layout, layout[0:1]) eq 0 then begin
+                    dataObjs[i] -> SetProperty, LAYOUT=[self.layout, layout[2]]
+                    thisColRow = self -> ConvertLocation(layout[2], self.layout, /PLOT_INDEX, /TO_COLROW)
+                endif else thisColRow = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
+            endcase
+            
+            4: begin
+                if array_equal(self.layout, layout[0:1]) eq 0 then begin
+                    thisPIndex = self -> ConvertLocation(layout[2:3], layout[0:1], /TO_PLOT_INDEX)
+                    thisColRow = self -> ConvertLocation(thisPIndex, self.layout, /PLOT_INDEX, /TO_COLROW)
+                    dataObjs[i] -> SetProperty, LAYOUT=[self.layout, thisColRow]
+                endif else thisColRow = layout[2:3]
+            endcase
+            
             else: message, 'Layout has incorrect format.'
         endcase
 
@@ -326,6 +424,7 @@ end
 ;                       If set, the draw method will be called after filling holes.
 ;-
 pro MrPlotManager::FillHoles, $
+TRIMLAYOUT=trimLayout, $
 DRAW=draw
     compile_opt idl2
     
@@ -388,6 +487,9 @@ DRAW=draw
     
     ;Fill layout holes
     self -> MrPlotLayout::FillHoles
+    
+    ;Trim extra rows and columns?
+    if keyword_set(trimLayout) then self -> TrimLayout
     
     if keyword_set(draw) then self -> Draw
 end
@@ -640,23 +742,10 @@ TYPE = type
         ;Get the objects being removed.
         removeThese = self -> Get(POSITION=index, COUNT=nRemove)
         
-        ;Step through all of the objects.
-        for i = 0, nRemove - 1 do begin
-            ;Get their position and layout.
-            removeThese[i] -> GetProperty, LAYOUT=layout, POSITION=position
-            
-            ;Get their [col, row] location.
-            case n_elements(layout) of
-                0: thisLoc = self -> FindFixedLocation(position)
-                3: thisLoc = self -> ConvertLocation(layout[2:3], layout, /PLOT_INDEX, /TO_COLROW)
-                4: thisLoc = layout[2:3]
-                else: message, 'Layout has incorrect format. Cannot be removed.'
-            endcase
-            
-            ;Remove from the container and from the layout.
-            self -> MrIDL_Container::Remove, removeThese[i], DESTROY=destroy
-            self -> RemoveFromLayout, thisLoc
-        endfor
+        ;Append the newly found objects to the input array
+        if nRemove gt 0 then if n_elements(Child_Object) eq 0 $
+            then Child_Object = [Child_Object, temporary(removeThese)] $
+            else Child_Object = temporary(removeThese)
     endif
         
 ;---------------------------------------------------------------------
@@ -667,23 +756,10 @@ TYPE = type
         ;Get the objects being removed.
         removeThese = self -> Get(ISA=type, COUNT=nRemove)
         
-        ;Step through all of the objects.
-        for i = 0, nRemove - 1 do begin
-            ;Get their position and layout.
-            removeThese[i] -> GetProperty, LAYOUT=layout, POSITION=position
-            
-            ;Get their [col, row] location.
-            case n_elements(layout) of
-                0: thisLoc = self -> FindFixedLocation(position)
-                3: thisLoc = self -> ConvertLocation(layout[2:3], layout, /PLOT_INDEX, /TO_COLROW)
-                4: thisLoc = layout[2:3]
-                else: message, 'Layout has incorrect format. Cannot be removed.'
-            endcase
-            
-            ;Remove from the container and from the layout.
-            self -> MrIDL_Container::Remove, removeThese[i], DESTROY=destroy
-            self -> RemoveFromLayout, thisLoc
-        endfor
+        ;Append the newly found objects to the input array
+        if nRemove gt 0 then if n_elements(Child_Object) eq 0 $
+            then Child_Object = [Child_Object, temporary(removeThese)] $
+            else Child_Object = temporary(removeThese)
     endif
         
 ;---------------------------------------------------------------------
@@ -693,22 +769,34 @@ TYPE = type
     if n_elements(Child_Object) gt 0 then begin
         nRemove = n_elements(Child_Object)
         
+        ;Objects that are of type "data" may fall into the auto-updating plot layout.
+        ;As such, when they are removed from the container, they also need to be removed
+        ;from the layout.
+        oTypes = typename(Child_Object)
+        tf_data = IsMember((*self.gTypes).data, oTypes)
+        
         ;Step through all of the objects.
         for i = 0, nRemove - 1 do begin
-            ;Get their position and layout.
-            Child_Object[i] -> GetProperty, LAYOUT=layout, POSITION=position
+        
+            ;Is it a data object?
+            if (tf_data[i] eq 1) then begin
+                ;Get their position and layout.
+                Child_Object[i] -> GetProperty, LAYOUT=layout, POSITION=position
             
-            ;Get their [col, row] location.
-            case n_elements(layout) of
-                0: thisLoc = self -> FindFixedLocation(position)
-                3: thisLoc = self -> ConvertLocation(layout[2:3], layout, /PLOT_INDEX, /TO_COLROW)
-                4: thisLoc = layout[2:3]
-                else: message, 'Layout has incorrect format. Cannot be removed.'
-            endcase
+                ;Get their [col, row] location.
+                case n_elements(layout) of
+                    0: thisLoc = self -> FindFixedLocation(position)
+                    3: thisLoc = self -> ConvertLocation(layout[2:3], layout, /PLOT_INDEX, /TO_COLROW)
+                    4: thisLoc = layout[2:3]
+                    else: message, 'Layout has incorrect format. Cannot be removed.'
+                endcase
+                
+                ;Remove from the layout
+                self -> RemoveFromLayout, thisLoc
+            endif
             
-            ;Remove from the container and from the layout.
+            ;Remove from the container.
             self -> MrIDL_Container::Remove, Child_Object[i], DESTROY=destroy
-            self -> RemoveFromLayout, thisLoc
         endfor
     endif
     

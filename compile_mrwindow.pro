@@ -70,6 +70,7 @@
 .comp ./utilities/mrplotlayout.pro
 .comp ./utilities/time_select.pro   ;Must be before mva.pro to compile correctly
 .comp ./utilities/mva.pro
+.comp ./utilities/plotpositions_gui.pro
 .comp ./utilities/pwd.pro
 .comp ./utilities/rotate_vector.pro
 .comp ./utilities/ssm_to_hms.pro

@@ -123,9 +123,6 @@
 ;       Durham, NH, 03824
 ;       matthew.argall@wildcats.unh.edu
 ;
-; :Copyright:
-;       Matthew Argall 2013
-;
 ; :History:
 ;	Modification History::
 ;       04/22/2013  -   Written by Matthew Argall
@@ -219,7 +216,7 @@
 ;       YSIZE:          in, optional, type=boolean, default=340
 ;                       If `BUILD` is set, then this is the height of the draw widget.
 ;-
-pro MrWindow::buildGUI, $
+pro MrWindow::BuildGUI, $
 XSIZE = xsize, $
 YSIZE = ysize
     compile_opt idl2
@@ -254,12 +251,12 @@ YSIZE = ysize
     self -> Create_SaveAs_Menu, menuID
 
     ;Make the edit menu in the menu bar
-    editID = widget_button(menuID, VALUE='Edit', SENSITIVE=0, /MENU)
-    button = widget_button(editID, VALUE='Layout', UVALUE={object: self, method: 'AdjustLayout'})
-    button = widget_button(editID, VALUE='Plot', UVALUE={object: self, method: 'AdjustLayout'})
-    button = widget_button(editID, VALUE='Move', UVALUE={object: self, method: 'AdjustLayout'})
-    button = widget_button(editID, VALUE='Copy', UVALUE={object: self, method: 'AdjustLayout'})
-    button = widget_button(editID, VALUE='Remove', UVALUE={object: self, method: 'Draw'})
+    editID = widget_button(menuID, VALUE='Edit', /MENU)
+    button = widget_button(editID, VALUE='Layout',            UVALUE={object: self, method: 'AdjustLayout_Property'})
+    button = widget_button(editID, VALUE='Move',              UVALUE={object: self, method: 'AdjustLayout_Move'})
+    button = widget_button(editID, VALUE='Remove',            UVALUE={object: self, method: 'AdjustLayout_Remove'})
+    button = widget_button(editID, VALUE='Plot', SENSITIVE=0, UVALUE={object: self, method: 'AdjustLayout'})
+    button = widget_button(editID, VALUE='Copy', SENSITIVE=0, UVALUE={object: self, method: 'AdjustLayout_Copy'})
 
     ;Create the Zoom Menu
     self -> Create_Zoom_Menu, menuID
@@ -271,7 +268,7 @@ YSIZE = ysize
     self -> Create_Analysis_Menu, menuID
 
     ;Create manipulation menu
-    self -> Create_Manipulate_Menu, menuID
+;    self -> Create_Manipulate_Menu, menuID
 
     ;Create the Arrow and Text Menus
 ;    annotateID = widget_button(menuID, VALUE='Annotate', /MENU)
@@ -1121,10 +1118,20 @@ end
 ;                           The analysis mode(s) to be enabled.
 ;       DRAW:               in, optional, type=boolean
 ;                           Call the Draw method after setting properties.
+;       POSITION:           in, optional, type=fltarr(4)
+;                           If `INDEX` is also provided, then this is the new position of
+;                               the object. POSITION can be a 2-element [col,row] location
+;                               or a standard 4-element position in normal coordinates.
+;       RANGE:              in, optional, type=fltarr(2)
+;                           The color range of an image, colorbar, etc.
 ;       SAVEDIR:            in, optional, type=string
 ;                           The directory in which plots will be saved.
+;       XRANGE:             in, optional, type=fltarr(2)
+;                           Range of the independent variable axis. Used with `INDEX`.
 ;       XSIZE:              in, optional, type=long, default=512
 ;                           The width of the draw window in pixels
+;       YRANGE:             in, optional, type=fltarr(2)
+;                           Range of the dependent variable axis. Used with `INDEX`.
 ;       YSIZE:              in, optional, type=long, default=512
 ;                           The height of the draw window in pixels
 ;
@@ -1176,12 +1183,21 @@ _REF_EXTRA = extra
         
         ;Set the object's position
         if n_elements(position) gt 0 then begin
-            old_colrow = self -> ConvertLocation(index, /LIST_INDEX, /TO_COLROW)
-            self -> SetPosition, old_colrow, position
+            theObj -> GetProperty, LAYOUT=layout, POSITION=position
+            
+            ;Check if the object is within the auto-updating layout
+            case n_elements(layout) of
+                0: old_position = position
+                3: old_position = self -> ConvertLocation(layout[2], /LIST_INDEX, /TO_COLROW)
+                4: old_position = layout[2:3]
+            endcase
+            
+            ;Set the position
+            self -> SetPosition, old_position, position
         endif
         
         ;Set additional properties
-        theObj -> SetProperty, _EXTRA=extra
+        if n_elements(extra) ne 0 then theObj -> SetProperty, _EXTRA=extra
 
         if keyword_set(draw) then self -> Draw
         return
