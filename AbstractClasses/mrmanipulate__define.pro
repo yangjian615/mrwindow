@@ -264,6 +264,7 @@ end
 ;                           The widget ID of the parent widget for the new SaveAs Menu.
 ;-
 pro MrManipulate::Create_Manipulate_Menu, parent, $
+MENU = menu, $
 ROTATE = rotate, $
 STRETCH = stretch, $
 TRANSLATE = translate
@@ -283,11 +284,12 @@ TRANSLATE = translate
     translate = keyword_set(translate)
 
     if rotate + translate + stretch eq 0 then begin
+        menu = 1
         rotate = 1
         stretch = 1
         translate = 1
     endif
-    
+
     ;Create the Menu
     if keyword_set(menu) $
         then manipID = widget_button(parent, VALUE='Manipulate', /MENU) $
@@ -298,7 +300,7 @@ TRANSLATE = translate
     button = widget_button(manipID, VALUE='Stretch', UNAME='STRETCH', /CHECKED_MENU, UVALUE={object: self, method: 'Manipulate_Menu_Events'})
     button = widget_button(manipID, VALUE='Rotate', UNAME='ROTATE', /CHECKED_MENU, UVALUE={object: self, method: 'Manipulate_Menu_Events'})
     
-    button = widget_button(zoomID, VALUE='None', UNAME='MNone', UVALUE={object: self, method: 'Manipulate_Menu_Events'})
+    button = widget_button(manipID, VALUE='None', UNAME='MNone', UVALUE={object: self, method: 'Manipulate_Menu_Events'})
 end
 
 
@@ -707,11 +709,11 @@ pro MrManipulate::Translate, event
             delta_x = event.x - self.x0
             delta_y = event.y - self.y0
             
-            ;Get the object being translated
+            ;Get the object being translated and some of its properties
             theObj = self -> Get(self.iFocus)
+            theObj -> GetProperty, XLOC=xloc, YLOC=yloc, DEVICE=device, DATA=data, NORMAL=normal
             
-            ;Convert the clicked points from device to normal coordinates.
-            theObj -> GetProperty, DEVICE=device, DATA=data, NORMAL=normal
+            ;Convert the clicked points into the coordinate system of the object.
             xy = theObj -> ConvertCoords([event.x, self.x0], [event.y, self.y0], /DEVICE, $
                                          TO_DATA=data, TO_DEVICE=device, TO_NORMAL=normal)
             
@@ -719,9 +721,9 @@ pro MrManipulate::Translate, event
             delta_x = xy[1,0] - xy[0,0]
             delta_y = xy[1,1] - xy[0,1]
             
-            
-            self -> SetProperty, POSITION=position
-            
+            ;Update the position
+            theObj -> SetProperty, XLOC=xloc + delta_x, YLOC=yloc + delta_y
+                        
             ;Draw the plot in the new position
             self -> Draw
         endcase

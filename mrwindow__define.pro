@@ -270,6 +270,9 @@ YSIZE = ysize
     ;Create the Analysis Menu
     self -> Create_Analysis_Menu, menuID
 
+    ;Create manipulation menu
+    self -> Create_Manipulate_Menu, menuID
+
     ;Create the Arrow and Text Menus
 ;    annotateID = widget_button(menuID, VALUE='Annotate', /MENU)
 ;    self -> Create_Arrow_Menu, annotateID
@@ -1135,6 +1138,7 @@ pro MrWindow::SetProperty, index, $
 AMODE = amode, $
 DRAW = draw, $
 RANGE = range, $
+POSITION = position, $
 SAVEDIR = savedir, $
 XSIZE = xsize, $
 XRANGE = xrange, $
@@ -1152,14 +1156,17 @@ _REF_EXTRA = extra
     endif
 
 ;---------------------------------------------------------------------
-;INHERITED OBJECTS ///////////////////////////////////////////////////
+;CONTAINER OBJECTS ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
     if n_elements(index) ne 0 then begin
+        ;Get object to be changed
         theObj = self -> Get(POSITION=index)
+        
+        ;Set the [XY]Range
         theObj -> SetProperty, XRANGE=xrange, YRANGE=yrange, _EXTRA=extra
         
-        ;Apply axis bindings if ranges were set.
+        ;Apply axis bindings if ranges were set. Set RANGE, if it was provided
         if n_elements(xrange) ne 0 then self -> Apply_Bindings, theOBj, /XAXIS
         if n_elements(yrange) ne 0 then self -> Apply_Bindings, theObj, /YAXIS
         if n_elements( range) ne 0 then begin
@@ -1167,6 +1174,15 @@ _REF_EXTRA = extra
             self -> Apply_Bindings, theObj, /CAXIS
         endif
         
+        ;Set the object's position
+        if n_elements(position) gt 0 then begin
+            old_colrow = self -> ConvertLocation(index, /LIST_INDEX, /TO_COLROW)
+            self -> SetPosition, old_colrow, position
+        endif
+        
+        ;Set additional properties
+        theObj -> SetProperty, _EXTRA=extra
+
         if keyword_set(draw) then self -> Draw
         return
     endif
@@ -1397,12 +1413,12 @@ pro MrWindow::whichObjects
         
         ;If no layout exists, find its fixed position
         if n_elements(layout) eq 0 $
-            then location = self -> FindFixedLocation(position) $
+            then location = self -> FindLocation(position) $
             else location = layout[2:3]
-        
+
         ;Print the type-name, location, and position
         sIndex    = string(index[i], FORMAT='(i2)')
-        sLocation = string(location, FORMAT='(%"[ %i, %i]")')
+        sLocation = string(location, FORMAT='(%"[%3i,%3i]")')
         sPosition = string(position, FORMAT='(%"[%6.4f, %6.4f, %6.4f, %6.4f]")')
 
         print, FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0, 5x, a32)', $
@@ -1756,6 +1772,7 @@ pro MrWindow__define, class
               inherits MrAbstractSaveAs, $      ;SaveAs menu
               inherits MrZoom, $                ;Zoom events and menu
               inherits MrCursor, $              ;Cursor events and menu
+              inherits MrManipulate, $          ;Manipulation events and menu
               inherits MrAbstractText, $        ;Text events and menu
               inherits MrAbstractArrow, $       ;Arrow events and menu
               inherits MrAbstractAnalysis, $    ;Analysis events and menu

@@ -38,14 +38,19 @@
 ;
 ;   If a plot object 
 ;
-; :Examples
-;   Example 1::
-;       ;Create a sine and cosine wave.
+; :Examples:
+;   Example 1: Creating and Moving plots
+;       ;At any point in this example, call the methods
+;       ;   MyObj -> WhichLayout
+;       ;   MyObj -> WhichObjects
+;       ;To see how the layouts and graphics objects are being updated.
+;
+;       ;Make the data
 ;       x = findgen(100)/99.0
 ;       y = sin(2*!pi*x)
 ;       z = cos(2*!pi*x)
 ;
-;       ;Create the object and add the next available position to the layout
+;       ;Create the MrWindow widget and add a plot of Sine and Cosine to locations [1,2] and [3,3]
 ;       MyObj = obj_new('MrWindow')
 ;       p1 = MyObj -> Plot(x, y, TITLE='Sin(x)', XTITLE='Time', YTITLE='Amplitude', LAYOUT=[2,2,1,2])
 ;       p2 = MyObj -> Plot(x, z, TITLE='Cos(x)', XTITLE='Time', YTITLE='Amplitude', LAYOUT=[3,3,3,3])
@@ -53,7 +58,7 @@
 ;       ;Move Sin(x) from location [1,2] to [2,2]. Return new position.
 ;       MyObj -> SetPosition, [1,2], [2,2], OUTPOSITION=position, /DRAW
 ;
-;       ;Move location [2,2] from the layout into a fixed position, making [2,2] avaialble.
+;       ;Remove Sin(x) at [2,2] from the layout into a fixed position, making [2,2] avaialble.
 ;       MyObj -> SetPosition, [2,2], /TOFIXED, OUTPOSITION=outPos, OUTLOCATION=outLoc, /DRAW
 ;
 ;       ;Move a fixed position into the layout at location [1,1]
@@ -109,6 +114,7 @@
 ;                           method now works. - MRA
 ;       08/24/2013  -   Added the FillHoles and TrimLayout methods. Inherit CDF_Plot.- MRA
 ;       08/27/2013  -   Added the Get method. - MRA
+;       08/29/2013  -   The SetPosition method works. - MRA
 ;       08/30/2013  -   Added QUIET keyword to the Add method. - MRA
 ;       09/22/2013  -   Can now Get objects by graphic type. Had to rename PLOT_INDEX to
 ;                           PINDEX to remove ambiguous keyword abbreviation- MRA
@@ -415,6 +421,7 @@ end
 ;-
 function MrPlotManager::Get, $
 ALL = All, $
+FIXED = fixed, $
 ISA = IsA, $
 LOCATION = location, $
 PINDEX = plot_index, $
@@ -440,46 +447,89 @@ TEXT = text
         catch, /cancel
         void = error_message()
         Count = 0
-        return, !Null
+        return, obj_new()
     endif
     
+    ;Defaults
+    SetDefaultValue, fixed, 0
+    plot_index = keyword_set(plot_index)
+
+    ;Make sure at most one of these keywords is set.
+    if fixed + plot_index gt 1 then message, 'FIXED and PLOT_INDEX are mutually exclusive.'
+
 ;---------------------------------------------------------------------
 ;Find by Location ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if n_elements(location) gt 0 then begin
-        ;Convert LOCATION to plot indices, if necessary
-        if keyword_set(plot_index) $
-            then allPIndex = location $
-            else allPIndex = self -> ConvertLocation(location, /TO_PLOT_INDEX)
+        if min(location[0,*] lt 0) then $
+            message, 'Invalid LOCATION. Use /FIXED with 4-elements position.'
         
-        ;Get all of the objects
-        AllObj = self -> MrIDL_Container::Get(/ALL, COUNT=nObj)
+        ;Determine what LOCATION means.
+        if keyword_set(plot_index) then begin
+            PIndex_in = location
+            nIn = n_elements(PIndex_in)
+        endif else if keyword_set(fixed) then begin
+            pos_in = location
+            nIn = n_elements(pos_in[0,*])
+        endif else begin
+            PIndex_in = self -> ConvertLocation(location, /TO_PLOT_INDEX)
+            nIn = n_elements(PIndex_in)
+        endelse
+
+        ;Get all of the data objects
+        AllObj = self -> MrIDL_Container::Get(/ALL, ISA=(*self.gTypes).data, COUNT=nObj)
         Result = objarr(nObj)
         count = 0
-        
-        ;Loop through each object
+
+    ;---------------------------------------------------------------------
+    ;Loop through All Objects in Container ///////////////////////////////
+    ;---------------------------------------------------------------------
         for i = 0, nObj - 1 do begin
             skip = 0
         
             ;Get the layout and position
-            AllObj[i] -> GetProperty, LAYOUT=layout, POSITION=position
+            AllObj[i] -> GetProperty, LAYOUT=oLayout, POSITION=oPosition
+
+        ;---------------------------------------------------------------------
+        ;Find a Objects at Fixed Positions ///////////////////////////////////
+        ;---------------------------------------------------------------------
+            
+            if fixed eq 1 then begin
+                ;See if the current graphic matches any of the positions given
+                delta = min(abs(mean(pos_in - rebin(oPosition, 4, nIn), DIMENSION=1)))
+
+                ;If it does, return the graphic. If not, continue to the next one.
+                if delta lt 1e-5 $
+                    then Result[count] = allObj[i] $
+                    else continue
+
+                ;If we get to here, a graphic was stored. Increase the count and
+                ;continue to the next graphic object.
+                count += 1
+                continue
+            endif
+
+        ;---------------------------------------------------------------------
+        ;Find a Objects in Layout Positions //////////////////////////////////
+        ;---------------------------------------------------------------------
             
             ;Find the plot index of the object
-            nLayout = n_elements(layout)
+            nLayout = n_elements(oLayout)
             case nLayout of
-                0: if n_elements(position) eq 0 $
-                    then location = FindFixedLocation(position) $
-                    else skip = 1
-                3: pIndex = layout[2]
-                4: pIndex = self -> ConvertLocation(layout[2:3], /TO_PLOT_INDEX)
+                0: if n_elements(oPosition) eq 0 $
+                       then skip = 1 $
+                       else location = self -> FindLocation(oPosition, /FIXED)
+                3: pIndex = oLayout[2]
+                4: pIndex = self -> ConvertLocation(oLayout[2:3], /TO_PLOT_INDEX)
                 else: skip = 1
             endcase
             
             ;If no valid layout or position was provided, then go to the next object.
             if skip eq 1 then continue
-            
-            ;Return this object?
-            tf_get = isMember(allPIndex, pIndex, N_MATCHES=nGet)
+
+            ;Return this object? If the plot-index of the current graphic matches any
+            ;of the inputs plot-indices, then yes.
+            tf_get = isMember(pIndex_in, pIndex, N_MATCHES=nGet)
             if nGet eq 0 || tf_get eq 0 $
                 then continue $
                 else Result[count] = AllObj[i]
@@ -487,8 +537,10 @@ TEXT = text
             ;If we get to here, increase the object count
             count += 1
         endfor
-        
-        ;Trim the unused elements
+
+    ;---------------------------------------------------------------------
+    ;Trim Results ////////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
         case count of
             0: return, !Null
             1: Result = Result[0]
@@ -681,39 +733,41 @@ TYPE = type
 ;   plot that already exists within the 2D plotting grid.
 ;
 ; :Params:
-;       LOCATION:           in, optional, type=long
-;                           The [col, row] location of the plot to replace.
+;       OLD_POSITION:       in, required, type=object/{1 | 2 | 4}-element vector
+;                           The plot-index, [col, row], or 4-element position of the plot
+;                               whose position is to be changed. If an object is provided,
+;                               then the old position will be take from it.
+;       NEW_POSITION:       in, required, type={1 | 2 | 4}-element vector
+;                           The plot-index, [col, row], or 4-element position to where the
+;                               plot indicated by `OLD_POSITION` is to be moved. If a
+;                               4-element position is provided, the plot will be placed
+;                               at a fixed position, outside of the automatically-updating
+;                               layout. If a plot-index is provided, it must lie within
+;                               the current layout. If a [col, row] location is provided,
+;                               the layout will be expanded, if need be, to accommodate
+;                               the new position. If "col" is negative, then the new
+;                               position will be fixed, outside of the layout.
 ;
 ; :Keywords:
-;       TOFIXED:            in, optional, type=boolean, default=0
-;                           Indicate that an Auto-Updating position is to be replaced
-;                               by a fixed position.
 ;       OUTPOSITION:        out, optional, type=fltarr(4)
-;                           The position indicated by `LOCATION` after it has been replaced.
+;                           The resulting position. If `NEW_POSITION` is a 4-element
+;                               position, then `OUTPOSITION` will equal `NEW_POSITION`.
 ;       OUTLOCATION:        out, optional, type=intarr(2)
-;                           The new position, after the one indicated by `LOCATION` has
-;                               been replaced.
-;       SETLOCATION:        in, optional, type=lonarr(2)
-;                           Use this kewyord to set the new [col, row] location of the
-;                               plot indicated by `LOCATION`. To replace an Auto-Updating
-;                               position with a Fixed position, use the `TOFIXED` keyword.
-;       SETPOSITION:        in, optional, type=fltarr(4)
-;                           A four-element vector in the form [x0, y0, x1, y1] specifying
-;                               the location of the lower-right [x0, y0] and upper-left
-;                               [x1, y1] corners of a plot. If set, then the plot given
-;                               by `LOCATION` will have its position changed to SETPOSITION.
-;                               If `LOCATION` is that of an auto-updating plot, it will
-;                               become fixed.
-;
-; :Uses:
-;   Uses the following external programs::
-;       MrPlotLayout.pro
+;                           The resulting [col, row] location. If `NEW_POSITION` is a 2-
+;                               element [col, row] location and "col" is positive, then
+;                               `OUTLOCATION` and `NEW_POSITION` will be equal. Under the
+;                               same conditions, but "col" being negative, the two may not
+;                               be equal.
+;       TOFIXED:            in, optional, type=boolean, default=0
+;                           If set, the plot indicated by `OLD_POSITION` will be removed
+;                               from the auto-updating layout and placed into a fixed
+;                               location. Its actual position will not change.
 ;-
-pro MrPlotManager::SetPosition, position, theObject, $
-LOCATION=Location, $
-PLOT_INDEX=plot_index, $
-INDEX=index, $
-TOFIXED=toFixed
+pro MrPlotManager::SetPosition, old_position, new_position, $
+DRAW = draw, $
+OUTPOSITION = outPosition, $
+OUTLOCATION = outLocation, $
+TOFIXED = toFixed
     compile_opt idl2
 
     ;Error handling
@@ -724,20 +778,87 @@ TOFIXED=toFixed
         return
     endif
 
+    ;Defaults
+    draw    = keyword_set(draw)
     toFixed = keyword_set(toFixed)
     
-    ;If no object was given, get it
-    if n_elements(theObject) eq 0 then begin
+    oldType = size(old_position, /TYPE)
     
-        ;Find the location of the plot whose position is being set
-        case n_elements(position) of
-            2: new_loc = position
-            4: new_loc = self -> FindFixedLocation(position)
+;---------------------------------------------------------------------
+;Was an Object Given? ////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if oldType eq 11 then begin
+        theObj = old_position
+        theObj -> GetProperty, LAYOUT=layout, POSITION=position
+        
+        ;Turn the layout position into a [col, row] location.
+        case n_elements(layout) of
+            0: oldColRow = self -> FindLocation(position, /FIXED)
+            3: oldColRow = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
+            4: oldColRow = layout[2:3]
+            else: message, 'LAYOUT has incorrect format of object provided.'
+        endcase
+        
+;---------------------------------------------------------------------
+;Get the Object? /////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    endif else begin
+
+        case n_elements(old_position) of
+            1: oldColRow = self -> ConvertLocation(old_position, /PLOT_INDEX, /TO_COL_ROW)
+            2: begin
+                oldColRow = old_position
+                if oldColRow[0] eq -1 then begin
+                    oldColRow = self -> GetPosition(oldColRow)
+                    fixed = 1
+                endif
+            endcase
+            4: begin
+                oldColRow = self -> FindLocation(old_position)
+                if count eq 0 then message, 'No object found at OLD_LOCATION. Cannot set position.'
+                if count gt 1 then message, 'More than one graphic found. Supply [col, row] instead.'
+            endcase
+            else: message, 'OLD_POSITION: Incorrect number of elements.'
         endcase
         
         ;Get the object
-        theObject = self -> Get(LOCATION=old_loc)
+        theObj = self -> Get(LOCATION=oldColRow, FIXED=fixed)
+    endelse
+            
+
+    ;If toFixed is set, then the actual position will not change. The plot will simply
+    ;be removed from the layout and put into a fixed location.
+    if toFixed eq 1 then begin
+        theObj -> GetProperty, POSITION=position
+        new_position = position
     endif
+        
+;---------------------------------------------------------------------
+;Update the Layout ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Use the superclass to set the position within the layout. An added benefit of
+    ;this is that it will check if the locations provided are legitimate. If the interface
+    ;between MrWindow and MrPlotLayout is sound, then this will also mean that the graphics
+    ;object that OLD_POSITION refers to is also legit.
+    self -> MrPlotLayout::SetPosition, oldColRow, new_position, $
+                                       OUTPOSITION = outPosition, $
+                                       OUTLOCATION = outLocation, $
+                                       TOFIXED = toFixed
+    
+    ;If there was an error, the outputs will not be defined.
+    if n_elements(outPosition) eq 0 then return
+        
+;---------------------------------------------------------------------
+;Set the Position ////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Update the position and layout    
+    if outLocation[0] lt 0 $
+        then theObj -> SetProperty, LAYOUT=[0,0,0,0], POSITION=outPosition $
+        else theObj -> SetProperty, LAYOUT=[self.layout, outLocation], POSITION=outPosition
+        
+    ;Draw?
+    If keyword_set(draw) then self -> Draw
 end
 
 
@@ -771,8 +892,7 @@ pro MrPlotManager::ShiftPlots, location
     pStartShift = self -> ConvertLocation(location, /TO_PLOT_INDEX)
     
     ;Get the available list indices
-    iFree = self -> GetListIndexAvailability(NFREE=nFree)
-    if nFree gt 0 then pFree = self -> ConvertLocation(iFree, /LIST_INDEX, /TO_PLOT_INDEX)
+    void = self -> IsAvailable(IFREE=pFree, NFREE=nFree, /PLOT_INDEX)
     
     ;Which interval is being shifted? If a new row needs to be added,
     ;re-calculate the starting plot index within the new layout.
@@ -992,9 +1112,9 @@ pro MrPlotManager__define, class
     compile_opt idl2
     
     define = { MrPlotManager, $
-               inherits MrIDL_Container, $      ;An object container
+               inherits MrIDL_Container, $      ;An object container.
                inherits MrCreateGraphic, $      ;Plots, Images, Colorbars, Text, Arrows, etc.
-               inherits MrPlotLayout, $         ;Manage plot layout
-               gTypes: ptr_new() $              ;Supported graphics types.
+               inherits MrPlotLayout, $         ;Manage plot layout.
+               gTypes: ptr_new() $             ;Supported graphics types.
              }
 end
