@@ -140,6 +140,8 @@
 ;                           Added the Turn_Everything_Off method. Use the ConvertCoord
 ;                           method of the object being zoomed to convert to data
 ;                           coordinates. - MRA
+;       09/23/2013  -   Index SELF.IFOCUS was changed to an object reference SELF.FOCUS.
+;                           Added COPY_PIX and DRAW keywords to the Draw_Events method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -433,7 +435,7 @@ ZAXIS = zaxis
                 iBound = where(thisBinding eq object2, count)
                 
                 if count ne 0 then begin
-                    iIsBound = where(bindingSet eq object1, isBound)
+                    iIsBound = where(thisBinding eq object1, isBound)
                     if isBound eq 0 then begin
                         thisBinding = [thisBinding, object1]
                         self.bind_y -> Replace_Item, thisBinding, i, /NO_COPY
@@ -479,7 +481,7 @@ ZAXIS = zaxis
                 iBound = where(thisBinding eq object2, count)
                 
                 if count ne 0 then begin
-                    iIsBound = where(bindingSet eq object1, isBound)
+                    iIsBound = where(thisBinding eq object1, isBound)
                     if isBound eq 0 then begin
                         thisBinding = [thisBinding, object1]
                         self.bind_z -> Replace_Item, thisBinding, i, /NO_COPY
@@ -525,7 +527,7 @@ ZAXIS = zaxis
                 iBound = where(thisBinding eq object2, count)
                 
                 if count ne 0 then begin
-                    iIsBound = where(bindingSet eq object1, isBound)
+                    iIsBound = where(thisBinding eq object1, isBound)
                     if isBound eq 0 then begin
                         thisBinding = [thisBinding, object1]
                         self.bind_c -> Replace_Item, thisBinding, i, /NO_COPY
@@ -697,8 +699,7 @@ pro MrZoom::Box_Zoom, event
             y = [self.y0 < event.y, self.y0 > event.y]
 
             ;Get the object of focus. Convert data coordinates
-            theObj = self -> Get(POSITION=self.iFocus)
-            xy = theObj -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
+            xy = self.focus -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
             xrange = reform(xy[0,*])
             yrange = reform(xy[1,*])
             
@@ -707,8 +708,8 @@ pro MrZoom::Box_Zoom, event
             if self.y0 eq event.y then void = temporary(yrange)
             
             ;Set the new range and apply any bindings
-            theObj -> SetProperty, XRANGE=xrange, YRANGE=yrange
-            self -> Apply_Bindings, theObj, /XAXIS, /YAXIS
+            self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
+            self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS
             self -> Draw
             
             ;reset initial click
@@ -979,8 +980,20 @@ end
 ; :Params:
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
+;
+; :Keywords:
+;       COPY_PIX:           in, optional, type=boolean, default=1
+;                           Some zoom events require the pixmap to be copied before an
+;                               action is performed (e.g. to erase the previous box when
+;                               box-zooming). Set `COPY_PIX`=0 to not copy the pixmap.
+;       DRAW:               in, optional, type=boolean, default=0
+;                           Some zoom events required the graphics to be redrawn after
+;                               an action is performed (e.g. after a pan event). Set
+;                               `DRAW`=0 to prevent the graphics from being re-drawn.
 ;-
-pro MrZoom::Draw_Events, event
+pro MrZoom::Draw_Events, event, $
+COPY_PIX = copy_pix, $
+DRAW = draw
     compile_opt idl2
     
     ;Error handling
@@ -991,6 +1004,9 @@ pro MrZoom::Draw_Events, event
         return
     endif
     
+    SetDefaultValue, copy_pix, 1, /BOOLEAN
+    SetDefaultValue, draw, 1, /BOOLEAN
+
 ;---------------------------------------------------------------------
 ;Button Press Events /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1014,14 +1030,14 @@ pro MrZoom::Draw_Events, event
 ;---------------------------------------------------------------------
     if event.type eq 2 then begin
         ;Do not compete for copying the pixmap
-        if (self.zmode eq 4) then self -> copyPixmap        ;Box Zoom
+        if (copy_pix eq 1) && (self.zmode eq 4) then self -> copyPixmap  ;Box Zoom
 
         ;Handle motion events
         if self.zmode eq 4 then self -> Box_Zoom, event     
         if self.zmode eq 8 then self -> Pan, event 
         
         ;Do not compete for drawing (Pan)
-        if self.zmode eq 8 then self -> Draw                ;Pan
+        if (draw eq 1) && self.zmode eq 8 then self -> Draw            ;Pan
     endif
 
 ;---------------------------------------------------------------------
@@ -1340,13 +1356,12 @@ pro MrZoom::Pan, event
         
         2: begin    ;motion event
             ;Get the object of focus
-            theObj = self -> Get(POSITION=self.iFocus)
-            theObj -> GetProperty, XRANGE=xrange, YRANGE=yrange
-            
+            self.focus -> GetProperty, XRANGE=xrange, YRANGE=yrange
+
             ;Convert to data coordinates.
             x = [self.x0, event.x]
             y = [self.y0, event.y]
-            xy = theObj -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
+            xy = self.focus -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
             
             ;How much did the mouse move?
             delta_x = xy[0,1] - xy[0,0]
@@ -1358,7 +1373,7 @@ pro MrZoom::Pan, event
             yrange = yrange - delta_y
             
             ;Set the new ranges
-            theObj -> SetProperty, XRANGE=xrange, YRANGE=yrange
+            self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
             
             self.x0 = event.x
             self.y0 = event.y
@@ -1374,13 +1389,11 @@ pro MrZoom::Pan, event
             self.y0 = -1
             
             ;Apply bindings. Need a Draw to update the bindings.
-            theObj = self -> Get(POSITION=self.iFocus)
-            self -> Apply_Bindings, theObj, /XAXIS, /YAXIS
+            self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS, /CAXIS
 
             self -> Draw
         endcase
     endcase
-    
 end
 
 
@@ -1686,12 +1699,11 @@ pro MrZoom::UnZoom, event
     endif
     
     ;Set the x- and y-range
-    theObj = self -> Get(POSITION=self.iFocus)
-    theObj -> getProperty, INIT_XRANGE=init_xrange, INIT_YRANGE=init_yrange
-    theObj -> setProperty, XRANGE=init_xrange, YRANGE=init_yrange
+    self.focus -> getProperty, INIT_XRANGE=init_xrange, INIT_YRANGE=init_yrange
+    self.focus -> setProperty, XRANGE=init_xrange, YRANGE=init_yrange
     
     ;Update Bindings
-    self -> Apply_Bindings, theObj, /XAXIS, /YAXIS
+    self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS
     
     ;Redraw
     self -> Draw
@@ -1792,8 +1804,7 @@ pro MrZoom::Wheel_Zoom_XY, event
     endif
 
     ;Get the current x- and y-range
-    theObj = self -> Get(POSITION=self.iFocus)
-    theObj -> getProperty, XRANGE=xrange, YRANGE=yrange
+    self.focus -> getProperty, XRANGE=xrange, YRANGE=yrange
 
     ;Zooming in and out is determined by the sign of events.clicks.
     ;   events.clicks < 0 if the scroll wheel is moved forward -- zoom in
@@ -1811,8 +1822,8 @@ pro MrZoom::Wheel_Zoom_XY, event
     if yrange[0] gt yrange[1] then yrange[0] = yrange[1] - delta_y
     
     ;Set the zoomed x- and y-range
-    theObj -> SetProperty, XRANGE=xrange, YRANGE=yrange
-    self -> Apply_Bindings, theObj, /XAXIS, /YAXIS
+    self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
+    self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS
 
     ;Redraw the plot
     self -> draw
@@ -1840,8 +1851,7 @@ pro MrZoom::Wheel_Zoom_Color, event
     endif
 
     ;Get the current x- and y-range
-    theObj = self -> Get(POSITION=self.iFocus)
-    theObj -> getProperty, RANGE=range
+    self.focus -> getProperty, RANGE=range
 
     ;Zooming in and out is determined by the sign of events.clicks.
     ;   events.clicks < 0 if the scroll wheel is moved forward -- zoom in
@@ -1853,8 +1863,8 @@ pro MrZoom::Wheel_Zoom_Color, event
     if range[0] gt range[1] then range[0] = range[1] - delta
     
     ;Set the zoomed x- and y-range
-    theObj -> SetProperty, RANGE=range
-    self -> Apply_Bindings, theObj, /CAXIS
+    self.focus -> SetProperty, RANGE=range
+    self -> Apply_Bindings, self.focus, /CAXIS
 
     ;Redraw
     self -> draw
@@ -1882,8 +1892,7 @@ pro MrZoom::Wheel_Zoom_Page, event
     endif
 
     ;Get the current x- and y-range
-    theObj = self -> Get(POSITION=self.iFocus)
-    theObj -> GetProperty, IMAGE=image, IDISPLAY=iDisplay
+    self.focus -> GetProperty, IMAGE=image, IDISPLAY=iDisplay
 
     ;Make sure the image has more than 2 dimensions
     ndims = n_elements(image)
@@ -1898,8 +1907,8 @@ pro MrZoom::Wheel_Zoom_Page, event
     if iDisplay ge nPages then iDisplay = nPages - 1
     
     ;Set the page being displayed
-    theObj -> SetProperty, IDISPLAY=iDisplay
-    self -> Apply_Bindings, theObj, /CAXIS
+    self.focus -> SetProperty, IDISPLAY=iDisplay
+    self -> Apply_Bindings, self.focus, /CAXIS
 
     ;Redraw
     self -> draw
@@ -1948,15 +1957,12 @@ pro MrZoom::XY_Zoom, event
         return
     endif
 
-    ;Get the object of focus
-    theObj = self -> Get(POSITION=self.iFocus)
-
     ;Order the clicks as [min, max]. Convert to data
     x = [self.x0 < event.x, self.x0 > event.x]
     y = [self.y0 < event.y, self.y0 > event.y]
 
     ;Convert from device to data coordinates
-    xy = theObj -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
+    xy = self.focus -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
     xrange = reform(xy[0,*])
     yrange = reform(xy[1,*])
     
@@ -1964,15 +1970,15 @@ pro MrZoom::XY_Zoom, event
     case self.zmode of
         1: begin
             if self.x0 ne event.x then begin
-                theObj -> SetProperty, XRANGE=xrange
-                self -> Apply_Bindings, theObj, /XAXIS
+                self.focus -> SetProperty, XRANGE=xrange
+                self -> Apply_Bindings, self.focus, /XAXIS
             endif
         endcase
         
         2: begin
             if self.y0 ne event.y then begin
-                theObj -> SetProperty, YRANGE=yrange
-                self -> Apply_Bindings, theObj, /YAXIS
+                self.focus -> SetProperty, YRANGE=yrange
+                self -> Apply_Bindings, self.focus, /YAXIS
             endif
         endcase
         

@@ -111,6 +111,7 @@
 ;                           are now being used. Superclass is now assumed to use either
 ;                           IDL_Container or MrIDL_Container. Removed the Focus method
 ;                           because it did not fit conceptually. Moved to MrWindow__Define. - MRA
+;       09/23/2013  -   Removed the IFOCUS property. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -645,7 +646,6 @@ pro MrCursor__define, class
     compile_opt idl2
     
     class = {MrCursor, $
-             cmode: 0, $            ;Currntly active cursor mode(s).
-             iFocus: 0 $            ;Index of the plot on which to focus.
+             cmode: 0 $             ;Currntly active cursor mode(s).
             }
 end

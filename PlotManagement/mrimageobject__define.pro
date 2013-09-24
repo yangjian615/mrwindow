@@ -68,6 +68,8 @@
 ;                           automatic zooming to go awry. - MRA
 ;       08/23/2013  -   Added the LAYOUT keyword, removed the COLORBARS and ADDCOLORBAR
 ;                           keywords. Inherit MrIDL_Container. - MRA
+;       09/21/2013  -   NAN keyword was not checked when finding default RANGE. Fixed.
+;                           RANGE is now exclusively an input. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -568,16 +570,16 @@ _REF_EXTRA = extra
     endif
 
     ;IMAGE_PLOTS.PRO Properties
-    if n_elements(AXES)         ne 0 then *self.axes = keyword_set(axes)
-    if n_elements(BOTTOM)       ne 0 then *self.bottom = bottom
-    if n_elements(CTINDEX)      ne 0 then *self.ctindex = ctindex
+    if n_elements(AXES)          ne 0 then *self.axes = keyword_set(axes)
+    if n_elements(BOTTOM)        ne 0 then *self.bottom = bottom
+    if n_elements(CTINDEX)       ne 0 then *self.ctindex = ctindex
     if n_elements(MISSING_VALUE) ne 0 then *self.missing_value = missing_value
     if n_elements(MISSING_COLOR) ne 0 then *self.missing_color = missing_color
-    if n_elements(NAN)          ne 0 then *self.nan = keyword_set(nan)
-    if n_elements(PALETTE)      ne 0 then *self.palette = palette
-    if n_elements(RANGE)        ne 0 then *self.range = range
-    if n_elements(SCALE)        ne 0 then *self.scale = keyword_set(scale)
-    if n_elements(TOP)          ne 0 then *self.top = top
+    if n_elements(NAN)           ne 0 then *self.nan = keyword_set(nan)
+    if n_elements(PALETTE)       ne 0 then *self.palette = palette
+    if n_elements(RANGE)         ne 0 then *self.range = range
+    if n_elements(SCALE)         ne 0 then *self.scale = keyword_set(scale)
+    if n_elements(TOP)           ne 0 then *self.top = top
     
     ;Graphics Properties
     if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
@@ -909,7 +911,9 @@ _REF_EXTRA = extra
     self.yrange = ptr_new(/ALLOCATE_HEAP)
     
     ;Image range
-    SetDefaultValue, range, [min(image, max=imMax), imMax]
+    if n_elements(range) eq 0 $
+        then imRange = [min(image, NAN=nan, max=imMax), imMax] $
+        else imRange = range
 
     ;Set the object properties
     self -> SetProperty, IMAGE = image, $
@@ -927,7 +931,7 @@ _REF_EXTRA = extra
                          NAN = nan, $
                          PALETTE = palette, $
                          POSITION = position, $
-                         RANGE = range, $
+                         RANGE = imRange, $
                          SCALE = scale, $
                          TOP = top, $
                          TV = tv, $
@@ -949,7 +953,7 @@ _REF_EXTRA = extra
     ;Set the initial x- and y-range
     self.init_xrange = xrange
     self.init_yrange = yrange
-    self.init_range = range
+    self.init_range = imRange
 
     return, 1
 end

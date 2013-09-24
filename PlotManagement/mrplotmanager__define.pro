@@ -110,6 +110,8 @@
 ;       08/24/2013  -   Added the FillHoles and TrimLayout methods. Inherit CDF_Plot.- MRA
 ;       08/27/2013  -   Added the Get method. - MRA
 ;       08/30/2013  -   Added QUIET keyword to the Add method. - MRA
+;       09/22/2013  -   Can now Get objects by graphic type. Had to rename PLOT_INDEX to
+;                           PINDEX to remove ambiguous keyword abbreviation- MRA
 ;                                   
 ;-
 ;*****************************************************************************************
@@ -415,11 +417,23 @@ function MrPlotManager::Get, $
 ALL = All, $
 ISA = IsA, $
 LOCATION = location, $
-PLOT_INDEX = plot_index, $
+PINDEX = plot_index, $
 POSITION = index, $
-COUNT = count
+COUNT = count, $
+;TYPE
+ANNOTATE = annotate, $
+ARROW = arrow, $
+AXIS = axis, $
+COLORBAR = colorbar, $
+CONTOUR = contour, $
+DATA = data, $
+IMAGE = image, $
+LEGEND = legend, $
+OVERPLOT = overplot, $
+PLOT = plot, $
+TEXT = text
     compile_opt idl2
-    
+
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
@@ -428,7 +442,7 @@ COUNT = count
         Count = 0
         return, !Null
     endif
-
+    
 ;---------------------------------------------------------------------
 ;Find by Location ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -485,6 +499,22 @@ COUNT = count
 ;Normal Get //////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     endif else begin
+        ;Get specific object types?
+        if keyword_set(annotate) then if n_elements(isa) eq 0 then isa = [(*self.gTypes).annotate] else isa = (*self.gTypes).annotate    
+        if keyword_set(arrow)    then if n_elements(isa) eq 0 then isa = [(*self.gTypes).arrow]    else isa = (*self.gTypes).arrow    
+        if keyword_set(axis)     then if n_elements(isa) eq 0 then isa = [(*self.gTypes).axis]     else isa = (*self.gTypes).axis    
+        if keyword_set(colorbar) then if n_elements(isa) eq 0 then isa = [(*self.gTypes).colorbar] else isa = (*self.gTypes).colorbar    
+        if keyword_set(contour)  then if n_elements(isa) eq 0 then isa = [(*self.gTypes).contour]  else isa = (*self.gTypes).contour    
+        if keyword_set(data)     then if n_elements(isa) eq 0 then isa = [(*self.gTypes).data]     else isa = (*self.gTypes).data    
+        if keyword_set(image)    then if n_elements(isa) eq 0 then isa = [(*self.gTypes).image]    else isa = (*self.gTypes).image    
+        if keyword_set(legend)   then if n_elements(isa) eq 0 then isa = [(*self.gTypes).legend]   else isa = (*self.gTypes).legend    
+        if keyword_set(overplot) then if n_elements(isa) eq 0 then isa = [(*self.gTypes).overplot] else isa = (*self.gTypes).overplot    
+        if keyword_set(plot)     then if n_elements(isa) eq 0 then isa = [(*self.gTypes).plot]     else isa = (*self.gTypes).plot    
+        if keyword_set(text)     then if n_elements(isa) eq 0 then isa = [(*self.gTypes).text]     else isa = (*self.gTypes).text
+        
+        ;Make sure All is used with IsA
+        if n_elements(IsA) gt 0 then All = 1
+        
         Result = self -> MrIDL_Container::Get(ALL=All, ISA=IsA, POSITION=index, COUNT=count)
     endelse
     

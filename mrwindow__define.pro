@@ -201,6 +201,11 @@
 ;       08/30/2013  -   Bindings are now applied when [XYC]Range are set via the
 ;                           SetProperty method. - MRA
 ;       09/15/2013  -   Focus simply returns if there are no objects in the container. - MRA
+;       09/23/2013  -   Cleanup checks if windows are still open before deleting them.
+;                           Added the IsZoomable method as a quick way of determining if
+;                           the current object is zoomable. IFOCUS changed from an object's
+;                           container index to the object's reference. Added the FOCUS
+;                           property. Zoom events are forwarded to MrZoom::Draw_Events - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -398,6 +403,8 @@ pro MrWindow::Draw_Events, event
         return
     endif
 
+    tf_zoomable = self -> isZoomable()
+
 ;---------------------------------------------------------------------
 ;Button Press Events /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -425,10 +432,7 @@ pro MrWindow::Draw_Events, event
         if self.textmode[0] eq 8 then self -> Remove_Text, event    ;Remove text
         
         ;Zoom Events
-        if self.lmode eq 1 || self.rmode eq 1 then self -> XY_Zoom, event     ;X Zoom
-        if self.lmode eq 2 || self.rmode eq 2 then self -> XY_Zoom, event     ;Y Zoom
-        if self.lmode eq 4 || self.rmode eq 4 then self -> Box_Zoom, event    ;Box Zoom
-        if self.lmode eq 8 || self.rmode eq 8 then self -> Pan, event         ;Pan
+        if tf_zoomable eq 1 then self -> MrZoom::Draw_Events, event
     endif
     
 ;---------------------------------------------------------------------
@@ -454,8 +458,7 @@ pro MrWindow::Draw_Events, event
         endif
         
         ;Zoom Events
-        if self.zmode eq 4 then self -> Box_Zoom, event   ;Box Zoom
-        if self.zmode eq 8 then self -> Pan, event        ;Pan
+        if tf_zoomable eq 1 then self -> MrZoom::Draw_Events, event
     endif
 
 ;---------------------------------------------------------------------
@@ -483,8 +486,7 @@ pro MrWindow::Draw_Events, event
         endif
 
         ;Zoom Events
-        if self.zmode eq 4 then self -> Box_Zoom, event     
-        if self.zmode eq 8 then self -> Pan, event 
+        if tf_zoomable eq 1 then self -> MrZoom::Draw_Events, event, COPY_PIX=0, DRAW=0
         
         ;Cursor Events
         if ((self.cmode and 2) gt 0) then self -> Cross_Hairs, event
@@ -510,7 +512,7 @@ pro MrWindow::Draw_Events, event
 ;---------------------------------------------------------------------
 ;Wheel Events ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if event.type eq 7 then self -> Wheel_Zoom, event
+    if event.type eq 7 then if (tf_zoomable eq 1) then self -> Wheel_Zoom, event
 end
 
 
@@ -535,7 +537,7 @@ end
 ; :Params:
 ;   EVENT:              in, optional, type=structure/int
 ;                       The event returned by the windows manager. If not given, the
-;                           plot indicated by SELF.IFOCUS will become the object of focus.
+;                           plot indicated by SELF.FOCUS will become the object of focus.
 ;                           If EVENT is an integer, then it is the index value of the
 ;                           object within the container on which to focus.
 ;-
@@ -563,7 +565,7 @@ pro MrWindow::Focus, event
     ;---------------------------------------------------------------------
     ;Find the Objects that Were Clicked //////////////////////////////////
     ;---------------------------------------------------------------------
-        dataObj = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nObj)
+        dataObj = self -> Get(/ALL, COUNT=nObj)
         if nObj eq 0 then return
         
         tf_clicked = bytarr(nObj)
@@ -578,22 +580,15 @@ pro MrWindow::Focus, event
     ;---------------------------------------------------------------------
         
         iClicked = where(tf_clicked eq 1, nClicked)
-        case nClicked of
-            0: begin
-                void = min(delta, imin)
-                iFocus = self -> GetIndex(dataObj[imin])        ;Take the closest one
-            endcase
-            1: iFocus = self -> GetIndex(dataObj[iClicked])
-            else: iFocus = GetIndex(dataObj[iClicked[0]])
-        endcase
-                
-        self.iFocus = iFocus
+        if nClicked eq 0 $
+            then self.focus = obj_new() $
+            else self.focus = dataObj[iClicked]
         
 ;---------------------------------------------------------------------
 ;Container Index Given? //////////////////////////////////////////////
 ;---------------------------------------------------------------------
     endif else if event_type ne 0 then begin
-        self.iFocus = event        
+        self.focus = self -> Get(POSITION=event)
     endif
 
 ;---------------------------------------------------------------------
@@ -601,12 +596,12 @@ pro MrWindow::Focus, event
 ;---------------------------------------------------------------------
 
     ;Set the system variables and synchronize.
-    theObj = self -> Get(POSITION=self.iFocus)
-
-    theObj -> getProperty, X_SYSVAR=x_sysvar, Y_SYSVAR=y_sysvar, P_SYSVAR=p_sysvar
-    !X = x_sysvar
-    !Y = y_sysvar
-    !P = p_sysvar
+    if isMember((*self.gTypes).data, typename(self.focus)) then begin
+        self.focus -> getProperty, X_SYSVAR=x_sysvar, Y_SYSVAR=y_sysvar, P_SYSVAR=p_sysvar
+        !X = x_sysvar
+        !Y = y_sysvar
+        !P = p_sysvar
+    endif
 end
 
 
@@ -817,6 +812,33 @@ end
 
 
 ;+
+;   Determines if the object indicated by self.focus is zoomable or not.
+;
+;   :Returns:
+;       TF_ZOOMABLE:            Returns true (1) if the object indicated by self.Focus
+;                                   is able to be zoomed, false (0) if not.
+;-
+function MrWindow::IsZoomable
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, 0
+    endif
+    
+    ;Get the object and determine if it is zoomable or not.
+    oType = typename(self.focus)
+    tf_zoomable = IsMember([(*self.gTypes).data, (*self.gTypes).colorbar], oType)
+    
+    return, tf_zoomable
+end
+
+
+
+;+
 ;   Because the draw widget can be added to an external GUI, we must know when that GUI
 ;   is realized in order to obtain the widget ID of the draw widget.
 ;-
@@ -967,11 +989,11 @@ end
 ;                       Any keyword accepted by the BUILD method is also excepted for
 ;                           keyword inheritance.
 ;-
-pro MrWindow::realizeGUI, $
+pro MrWindow::RealizeGUI, $
 BUILD = build, $
 _REF_EXTRA = extra
     compile_opt idl2
-    
+
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
@@ -1320,18 +1342,19 @@ pro MrWindow::Wheel_Zoom, event
     if event.type ne 7 || self.wmode eq 0 then return
     
     ;Figure out which type of object has the focus.
-    theObject = self -> Get(POSITION=self.ifocus)
-    oType = self -> WhatAmI(theObject)
+    oType = self -> WhatAmI(self.focus)
 
     ;Choose the zoom type
     case oType of
-        'PLOT': self -> MrZoom::Wheel_Zoom_XY, event
+        'PLOT': if self.wmode eq 1 then self -> MrZoom::Wheel_Zoom_XY, event
         
         'IMAGE': begin
             if self.wmode eq 1 then self -> MrZoom::Wheel_Zoom_XY, event
             if self.wmode eq 2 then self -> MrZoom::Wheel_Zoom_Color, event
             if self.wmode eq 4 then self -> MrZoom::Wheel_Zoom_Page, event
         endcase
+        
+        'COLORBAR': if self.wmode eq 2 then self -> MrZoom::Wheel_Zoom_Color, event
         
         else: ;do nothing
     endcase
@@ -1492,8 +1515,8 @@ pro MrWindow::cleanup
     self -> MrPlotManager::Cleanup
     
     ;Delete the windows.
-    wDelete, self.winID
-    wDelete, self.pixID
+    if windowavailable(self.winID) then wDelete, self.winID
+    if windowavailable(self.pixID) then wDelete, self.pixID
     
     ;If a widget is still active, destroy it
     if widget_info(self.tlb, /VALID_ID) then widget_control, self.tlb, /DESTROY
@@ -1572,7 +1595,7 @@ XSIZE = xsize, $
 YSIZE = ysize, $
 _REF_EXTRA = extra
     compile_opt idl2
-    
+
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
@@ -1709,6 +1732,20 @@ end
 ; :Params:
 ;       CLASS:          out, optional, type=structure
 ;                       The class definition structure.
+;
+; :Fields:
+;       TLB:            ;Widget ID of the top level base
+;       DISPLAY:        ;Display the graphics?
+;       DRAWID:         ;Widget ID of the draw widget
+;       FOCUS:          ;Object of focus
+;       PIXID:          ;Window ID of the pixmap
+;       MENUID:         ;Widget ID of the menu bar
+;       STATUSID:       ;Widget ID of the status bar
+;       WINID:          ;Window ID of the draw window
+;       X0:             ;First clicked x-coordinate
+;       Y0:             ;First clicked y-coordinate
+;       XSIZE:          ;x-size of the draw window
+;       YSIZE:          ;y-size of the draw window
 ;-
 pro MrWindow__define, class
     compile_opt idl2
@@ -1726,6 +1763,7 @@ pro MrWindow__define, class
               tlb: 0, $                         ;Widget ID of the top level base
               display: 0, $                     ;Display the graphics?
               drawID: 0, $                      ;Widget ID of the draw widget
+              focus: obj_new(), $               ;Object of focus
               pixID: 0, $                       ;Window ID of the pixmap
               menuID: 0, $                      ;Widget ID of the menu bar
               statusID: 0, $                    ;Widget ID of the status bar

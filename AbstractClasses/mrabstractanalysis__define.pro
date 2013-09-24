@@ -90,6 +90,11 @@
 ;       8+2     -   MVAB
 ;       16+2    -   vHT
 ;
+; Uses::
+;   Uses the following external programs::
+;       windowavailable.pro (Coyote Graphics)
+;       error_message.pro (Coyote Graphics)
+;
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
@@ -170,6 +175,7 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
             endelse
         endcase
         
+        ;GET_INTERVAL will be used
         'AVERAGE': begin
             if isSet then begin
                 self.amode = [4 + 2, 0, 0]
@@ -180,6 +186,7 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
             endelse
         endcase
         
+        ;GET_INTERVAL will be used
         'MVAB': begin
             if isSet then begin
                 self.amode = [8 + 2, 0, 0]
@@ -190,6 +197,7 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
             endelse
         endcase
         
+        ;GET_INTERVAL will be used
         'VHT': begin
             if isSet then begin
                 self.amode = [16 + 2, 0, 0]
@@ -197,6 +205,30 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
             endif else begin
                 self.amode = [0, 0, 0]
                 self -> On_Off_Button_Events, /OFF
+            endelse
+        endcase
+        
+        'VERTICAL_CUT': begin
+            if isSet then begin
+                self.amode = [32, 1, 0]
+                self -> On_Off_Button_Events, /ON
+                self -> On_Off_Motion_Events, /ON
+            endif else begin
+                self.amode = [0, 0, 0]
+                self -> On_Off_Button_Events, /OFF
+                self -> On_Off_Motion_Events, /OFF
+            endelse
+        endcase
+        
+        'HORIZONTAL_CUT': begin
+            if isSet then begin
+                self.amode = [64, 1, 0]
+                self -> On_Off_Button_Events, /ON
+                self -> On_Off_Motion_Events, /ON
+            endif else begin
+                self.amode = [0, 0, 0]
+                self -> On_Off_Button_Events, /OFF
+                self -> On_Off_Motion_Events, /OFF
             endelse
         endcase
                 
@@ -219,7 +251,7 @@ end
 ;       LOCATION:           in, optional, type=intarr(2)
 ;                           The [col, row] location of the plot whose data is to be averaged.
 ;                               If not provided, the currently selected plot will be
-;                               rotated (i.e. the one indexed by self.ifocus).
+;                               rotated (i.e. the one stored in self.focus).
 ;
 ; :Keywords:
 ;       PLOT_INDEX:             in, optional, type=int, default=0
@@ -251,7 +283,7 @@ PLOT_INDEX = plot_index
 
     ;Get the object whose data is being analyzed
     if n_elements(location) eq 0 $
-        then theObj = self -> Get(POSITION=self.iFocus) $
+        then theObj = self.focus $
         else theObj = self -> Get(LOCATION=location, PLOT_INDEX=plot_index)
     
 ;---------------------------------------------------------------------
@@ -314,11 +346,14 @@ end
 ;-
 pro MrAbstractAnalysis::Create_Analysis_Menu, parent, $
 AVERAGE = average, $
+GET_DATA_VALUE = get_data_value, $
 GET_INTERVAL = get_interval, $
+HORIZONTAL_CUT = horizontal_cut, $
 MENU = menu, $
 MVAB = mvab, $
-VHT = vHT, $
-NONE = none
+NONE = none, $
+VERTICAL_CUT = vertical_cut, $
+VHT = vHT
     compile_opt idl2
     
     ;Error handling
@@ -330,13 +365,30 @@ NONE = none
     endif
     
     ;Set Defaults
-    setDefaultValue, menu, 1, /BOOLEAN
-    setDefaultValue, get_data_value, 1, /BOOLEAN
-    setDefaultValue, get_interval, 1, /BOOLEAN
-    setDefaultValue, average, 1, /BOOLEAN
-    setDefaultValue, mvab, 1, /BOOLEAN
-    setDefaultValue, vHT, 1, /BOOLEAN
-    setDefaultValue, none, 1, /BOOLEAN
+    setDefaultValue, average,        0, /BOOLEAN
+    setDefaultValue, get_data_value, 0, /BOOLEAN
+    setDefaultValue, get_interval,   0, /BOOLEAN
+    setDefaultValue, horizontal_cut, 0, /BOOLEAN
+    setDefaultValue, menu,           0, /BOOLEAN
+    setDefaultValue, mvab,           0, /BOOLEAN
+    setDefaultValue, none,           0, /BOOLEAN
+    setDefaultValue, vertical_cut,   0, /BOOLEAN
+    setDefaultValue, vHT,            0, /BOOLEAN
+    
+    ;If no buttons were selected, select them all.
+    if (get_data_value + vertical_cut + horizontal_cut + get_interval + average + $
+        mvab + vHT eq 0) $
+    then begin
+        average        = 1
+        get_data_value = 1
+        get_interval   = 1
+        horizontal_cut = 1
+        menu           = 1
+        mvab           = 1
+        none           = 1
+        vertical_cut   = 1
+        vHT            = 1
+    endif
     
     ;Create the Menu
     if keyword_set(menu) $
@@ -347,6 +399,8 @@ NONE = none
     if keyword_set(get_data_value) then button = widget_button(cursorID, VALUE='Get Data Value', UNAME='GET_DATA_VALUE', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(get_interval)   then button = widget_button(cursorID, VALUE='Get Interval',   UNAME='GET_INTERVAL',   /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(average)        then button = widget_button(cursorID, VALUE='Average',        UNAME='AVERAGE',        /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
+    if keyword_set(vertical_cut)   then button = widget_button(cursorID, VALUE='Vertical Cut',   UNAME='VERTICAL_CUT',   /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
+    if keyword_set(horizontal_cut) then button = widget_button(cursorID, VALUE='Horizontal Cut', UNAME='HORIZONTAL_CUT', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(mvab)           then button = widget_button(cursorID, VALUE='MVAB',           UNAME='MVAB',           /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(vHT)            then button = widget_button(cursorID, VALUE='vHT',            UNAME='VHT',            /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(none)           then button = widget_button(cursorID, VALUE='None',           UNAME='ANONE',                         UVALUE={object: self, method: 'Analysis_Menu_Events'})
@@ -360,9 +414,10 @@ end
 ;       XRANGE:             in, required, type=numeric
 ;                           A range of coordinate on the abscissa for which the data
 ;                               interval is to be returned
-;       INDEX:              in, optional, type=int, default=self.ifocus
-;                           The index of the plot for which the data range is to be
-;                               determined.
+;       INDEX:              in, optional, type=int
+;                           The index into the IDL container of the plot for which the
+;                               data range is to be determined. If not provided, the
+;                               current object will be used (self.focus).
 ;
 ; :Keywords:
 ;       IRANGE:             out, optional, type=int
@@ -389,10 +444,11 @@ IRANGE = iRange
         return, !Null
     endif
     
-    setDefaultValue, index, self.ifocus
-    
     ;Retrieve the data and the dimension over which to take the mean
-    theObj = self -> Get(POSITION=index)
+    if n_elements(index) eq 0 $
+        then theObj = self.focus $
+        else theObj = self -> Get(POSITION=index)
+        
     theObj -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
     if n_elements(dimension) eq 0 then dimension = 0
     
@@ -479,12 +535,7 @@ pro MrAbstractAnalysis::Error_Handler
         return
     endif
 
-    self.amode = [0,0,0]
-    self -> On_Off_Button_Events, /OFF
-    self -> On_Off_Motion_Events, /OFf
-    self.x0 = -1
-    self.y0 = -1
-    ptr_free, self.intervals
+    self -> Turn_Everything_Off, self.tlb
 end
 
 
@@ -686,7 +737,7 @@ end
 ;       LOCATION:           in, optional, type=intarr(2)
 ;                           The [col, row] location of the plot whose data is to be averaged.
 ;                               If not provided, the currently selected plot will be
-;                               rotated (i.e. the one indexed by self.ifocus).
+;                               rotated (i.e. self.focus).
 ;
 ; :Keywords:
 ;       PLOT_INDEX:             in, optional, type=int, default=0
@@ -717,7 +768,7 @@ PLOT_INDEX=plot_index
 
     ;Use the selected plot
     if n_elements(location) eq 0 $
-        then theObj = self -> Get(POSITION=self.iFocus) $
+        then theObj = self.focus $
         else theObj = self -> Get(LOCATION=location, PLOT_INDEX=plot_index)
     
 ;---------------------------------------------------------------------
@@ -885,7 +936,7 @@ end
 ;       LOCATION:           in, optional, type=intarr(2)
 ;                           The [col, row] location of the plot whose data is to be rotated.
 ;                               If not provided, the currently selected plot will be
-;                               rotated (i.e. the one indexed by self.ifocus).
+;                               rotated (i.e. self.focus).
 ;
 ; :Keywords:
 ;       PLOT_INDEX:             in, optional, type=int, default=0
@@ -918,7 +969,7 @@ PLOT_INDEX = plot_index
 
     ;Get the graphic object
     if n_elements(location) eq 0 $
-        then theObj = self -> Get(POSITION=self.iFocus) $
+        then theObj = self.focus $
         else theObj = self -> Get(LOCATION=location, PLOT_INDEX=plot_index)
 
     ;Get the rotation matrix
@@ -941,6 +992,147 @@ PLOT_INDEX = plot_index
     
     self -> Draw
 end
+
+
+;+
+;   A method for turning off all zoom options and effects.
+;
+; :Params:
+;       TLB:        in, optional, type=int
+;                   The widget ID of the top level base.
+;-
+pro MrAbstractAnalysis::Turn_Everything_Off, tlb
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    ;Reset event processing
+    self.x0 = -1
+    self.y0 = -1
+    self.amode = [0,0,0]
+    self -> On_Off_Button_Events, /OFF
+    self -> On_Off_Motion_Events, /OFF
+    
+    ;Uncheck all menu buttons
+    if n_elements(tlb) gt 0 && widget_info(tlb, /VALID_ID) then begin
+        ;Get the widget IDs of the menu buttons
+        avgID   = widget_info(tlb, FIND_BY_UNAME='AVERAGE')
+        gdvID   = widget_info(tlb, FIND_BY_UNAME='GET_DATA_VALUE')
+        intID = widget_info(tlb, FIND_BY_UNAME='GET_INTERVAL')
+        horID  = widget_info(tlb, FIND_BY_UNAME='HORIZONTAL_CUT')
+        mvaID   = widget_info(tlb, FIND_BY_UNAME='MVAB')
+        verID    = widget_info(tlb, FIND_BY_UNAME='VERTICAL_CUT')
+        vhtID    = widget_info(tlb, FIND_BY_UNAME='VHT')
+        
+        ;Uncheck the buttons
+        if widget_info(avgID, /VALID_ID) then widget_control, avgID, SET_BUTTON=0
+        if widget_info(gdvID, /VALID_ID) then widget_control, gdvID, SET_BUTTON=0
+        if widget_info(intID, /VALID_ID) then widget_control, intID, SET_BUTTON=0
+        if widget_info(horID, /VALID_ID) then widget_control, horID, SET_BUTTON=0
+        if widget_info(mvaID, /VALID_ID) then widget_control, mvaID, SET_BUTTON=0
+        if widget_info(verID, /VALID_ID) then widget_control, verID, SET_BUTTON=0
+        if widget_info(vhtID, /VALID_ID) then widget_control, vhtID, SET_BUTTON=0
+    endif
+end
+
+
+;+
+;   Calculate the deHoffmann-Teller Velocity over a given interval.
+;
+;   Instructions::
+;       1. Make sure "Focus" is selected from the "Cursor" menu.
+;       2. Select "vHT" from the "Analysis" menu.
+;       3. Select an interval of velocity data for which vHT is to be calculated.
+;           a. Click + Hold/Drag + Release
+;       4. Do the same with magnetic field data.
+;           a. The intervals do not need to be the same. The first interval is the one
+;               used. The second interval is merely to know in which plot the magnetic
+;               field data is stored.
+;
+; :Params:
+;       XRANGE:             in, required, type=numeric
+;                           A range of coordinate on the abscissa for which the minimum
+;                               variance coordinate system is to be found.
+;       YRANGE:             in, required, type=numeric
+;                           A range of coordinate on the ordinate for which the minimum
+;                               variance coordinate system is to be found.
+;-
+pro MrAbstractAnalysis::VerticalCut, xrange, yrange
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = error_message()
+        return
+    endif
+
+    ;Only listen to motion events and only if we are making cuts.
+    if (event.type ne 2) and (self.amode[0] ne 32 or self.amode[0] ne 64) then return
+
+    case event.type of
+        0: begin    ;button down
+            ;Turn on Pan
+            self.amode[1] = 1
+        
+            ;Store the clicked coordinates
+            self.x0 = event.x
+            self.y0 = event.y
+        
+            ;Turn on motion events
+            self -> On_Off_Motion_Events, /ON
+        endcase
+        
+        2: begin    ;motion event
+            ;Get the object of focus
+            self.focus -> GetProperty, XRANGE=xrange, YRANGE=yrange
+            
+            ;Convert to data coordinates.
+            x = [self.x0, event.x]
+            y = [self.y0, event.y]
+            xy = self.focus -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
+            
+            ;How much did the mouse move?
+            delta_x = xy[0,1] - xy[0,0]
+            delta_y = xy[1,1] - xy[1,0]
+            
+            ;A drag to the right will have delta_x < 0. Subtracting will then add the
+            ;difference, panning more positive data into the window.
+            xrange = xrange - delta_x
+            yrange = yrange - delta_y
+            
+            ;Set the new ranges
+            self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
+            
+            self.x0 = event.x
+            self.y0 = event.y
+        endcase
+        
+        1: begin    ;button up
+            ;Turn off Pan
+            self.zmode = 0
+        
+            ;Turn motion events off right away (requires self.zmode = 0)
+            self -> On_Off_Motion_Events, /OFF
+            self.x0 = -1
+            self.y0 = -1
+            
+            ;Apply bindings. Need a Draw to update the bindings.
+            self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS
+
+            self -> Draw
+        endcase
+    endcase
+end
+
 
 
 ;+
@@ -985,7 +1177,7 @@ pro MrAbstractAnalysis::vHT, xrange, yrange
         xy_data = self -> Data_Range(xrange, iRange=vIndex)
 
         self.amode[2] += 1
-        self.intervals = ptr_new([vIndex, self.ifocus])      ;[sInterval, eInterval, iRef]
+        self.intervals = ptr_new({index: vIndex, object:self.focus})
         return
     endif
     
@@ -994,14 +1186,14 @@ pro MrAbstractAnalysis::vHT, xrange, yrange
 ;---------------------------------------------------------------------
 
     ;Retrieve the data and the dimension over which to take the mean
-    velObj = self -> Get(POSITION=(*self.intervals)[2])
-    magObj = self -> Get(POSITION=self.iFocus)
+    velObj = (*self.intervals).object
+    magObj = self.focus
     
     velObj -> GetProperty, INDEP=t_v, DEP=v, DIMENSION=v_dim
     magObj -> GetProperty, INDEP=t_B, DEP=B, DIMENSION=B_dim
     
     ;Get the index range for magnetic field data.
-    iRange = (*self.intervals)[0:1]
+    iRange = (*self.intervals).vIndex
     xrange = t_v[iRange]
     xy_data = self -> Data_Range(xrange, IRANGE=bIndex)
 
@@ -1071,6 +1263,7 @@ end
 pro MrAbstractAnalysis::cleanup
     ptr_free, self.intervals
     ptr_free, self.tmatrix
+    if windowavailable(self.cutwin) then wdelete, self.cutwin
 end
 
 
@@ -1107,6 +1300,7 @@ pro MrAbstractAnalysis__define, class
     class = {MrAbstractAnalysis, $
              amode: intarr(3), $            ;[text mode, active, npts]
              intervals: ptr_new(), $        ;[sInterval, eInterval, iRef]
-             tmatrix: ptr_new() $           ;Coordinate transformation matrix
+             tmatrix: ptr_new(), $          ;Coordinate transformation matrix
+             cutwin: 0 $                    ;Window for displaying vertical/horizontal cuts
             }
 end
