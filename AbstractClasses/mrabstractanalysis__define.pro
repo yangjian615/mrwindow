@@ -109,6 +109,8 @@
 ;       07/11/2013  -   Average, Data_Range, and MVA methods are now callable from the
 ;                           command-line, and are not just widget event handlers. - MRA
 ;       07/15/2013  -   Set the NaN flag when taking the MEAN. - MRA
+;       09/25/2013  -   Added MVA_CROSS capabilities. Added the AVERAGE parameter and
+;                           QUIET keyword to the Average method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -201,13 +203,26 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
                 self -> On_Off_Button_Events, /ON
             endif else begin
                 self.amode = [0, 0, 0]
+                if ptr_valid(self.intervals) then ptr_free, self.intervals
+                self -> On_Off_Button_Events, /OFF
+            endelse
+        endcase
+        
+        ;GET_INTERVAL will be used
+        'MVA_CROSS': begin
+            if isSet then begin
+                self.amode = [32 + 2, 0, 0]
+                self -> On_Off_Button_Events, /ON
+            endif else begin
+                self.amode = [0, 0, 0]
+                if ptr_valid(self.intervals) then ptr_free, self.intervals
                 self -> On_Off_Button_Events, /OFF
             endelse
         endcase
         
         'VERTICAL_CUT': begin
             if isSet then begin
-                self.amode = [32, 1, 0]
+                self.amode = [64, 1, 0]
                 self -> On_Off_Button_Events, /ON
                 self -> On_Off_Motion_Events, /ON
             endif else begin
@@ -219,7 +234,7 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
         
         'HORIZONTAL_CUT': begin
             if isSet then begin
-                self.amode = [64, 1, 0]
+                self.amode = [128, 1, 0]
                 self -> On_Off_Button_Events, /ON
                 self -> On_Off_Motion_Events, /ON
             endif else begin
@@ -249,16 +264,22 @@ end
 ;                           The [col, row] location of the plot whose data is to be averaged.
 ;                               If not provided, the currently selected plot will be
 ;                               rotated (i.e. the one stored in self.focus).
+;       AVERAGE:            out, optional, type=float
+;                           The average of the dependent variable over the interval given
+;                               by `XRANGE`.
 ;
 ; :Keywords:
-;       PLOT_INDEX:             in, optional, type=int, default=0
-;                               If set, then `LOCATION` is actually the 1D plot index of
-;                                   the plot. The upper-left-most plot has a plot index of
-;                                   1, and the plot index increases as you go down the
-;                                   column, then across the row.
+;       PLOT_INDEX:         in, optional, type=int, default=0
+;                           If set, then `LOCATION` is actually the 1D plot index of
+;                               the plot. The upper-left-most plot has a plot index of
+;                               1, and the plot index increases as you go down the
+;                               column, then across the row.
+;       QUIET:              in, optional, type=boolean, default=0
+;                           Do not print the results to the display.
 ;-
-pro MrAbstractAnalysis::Average, xrange, location, $
-PLOT_INDEX = plot_index
+pro MrAbstractAnalysis::Average, xrange, location, average, $
+PLOT_INDEX = plot_index, $
+QUIET = quiet
     compile_opt idl2
     
     ;Error handling
@@ -275,8 +296,8 @@ PLOT_INDEX = plot_index
 ;---------------------------------------------------------------------
 
     ;Defaults
-    list_index = keyword_set(list_index)
     plot_index = keyword_set(plot_index)
+    quiet = keyword_set(quiet)
 
     ;Get the object whose data is being analyzed
     if n_elements(location) eq 0 $
@@ -304,19 +325,21 @@ PLOT_INDEX = plot_index
         2: y_avg = mean(dep[*,iRange[0]:iRange[1]], DIMENSION=dimension, /NAN)
     endcase
     
+    average = y_avg
 ;---------------------------------------------------------------------
 ;Print Results ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;XRange are the data coordinates of the clicked points.
     ;[x0, x1] are the actual data values over which the average is taken
     ;Xavg and Yavg are the x- and y-averages over the interval [x0,x1].
-
-    x_avg = string(x_avg, FORMAT='(f0.4)')
-    y_avg = '[' + strjoin(string(y_avg, FORMAT='(f0.4)'), ', ') + ']'
-    print, FORMAT='(%"X Range  = [%0.4f, %0.4f]")', xrange
-    print, FORMAT='(%"[x0, x1] = [%0.4f, %0.4f]")', indep[iRange]
-    print, FORMAT='(%"  Xavg   = %s")', x_avg
-    print, FORMAT='(%"  Yavg   = %s")', y_avg
+    if quiet eq 0 then begin
+        x_avg = string(x_avg, FORMAT='(f0.4)')
+        y_avg = '[' + strjoin(string(y_avg, FORMAT='(f0.4)'), ', ') + ']'
+        print, FORMAT='(%"X Range  = [%0.4f, %0.4f]")', xrange
+        print, FORMAT='(%"[x0, x1] = [%0.4f, %0.4f]")', indep[iRange]
+        print, FORMAT='(%"  Xavg   = %s")', x_avg
+        print, FORMAT='(%"  Yavg   = %s")', y_avg
+    endif
 end
 
 
@@ -348,6 +371,7 @@ GET_INTERVAL = get_interval, $
 HORIZONTAL_CUT = horizontal_cut, $
 MENU = menu, $
 MVAB = mvab, $
+MVA_CROSS = mva_cross, $
 NONE = none, $
 VERTICAL_CUT = vertical_cut, $
 VHT = vHT
@@ -368,13 +392,14 @@ VHT = vHT
     setDefaultValue, horizontal_cut, 0, /BOOLEAN
     setDefaultValue, menu,           0, /BOOLEAN
     setDefaultValue, mvab,           0, /BOOLEAN
+    setDefaultValue, mva_cross,      0, /BOOLEAN
     setDefaultValue, none,           0, /BOOLEAN
     setDefaultValue, vertical_cut,   0, /BOOLEAN
     setDefaultValue, vHT,            0, /BOOLEAN
     
     ;If no buttons were selected, select them all.
     if (get_data_value + vertical_cut + horizontal_cut + get_interval + average + $
-        mvab + vHT eq 0) $
+        mvab + mva_cross + vHT eq 0) $
     then begin
         average        = 1
         get_data_value = 1
@@ -382,6 +407,7 @@ VHT = vHT
         horizontal_cut = 1
         menu           = 1
         mvab           = 1
+        mva_cross      = 1
         none           = 1
         vertical_cut   = 1
         vHT            = 1
@@ -399,6 +425,7 @@ VHT = vHT
 ;    if keyword_set(vertical_cut)   then button = widget_button(cursorID, VALUE='Vertical Cut',   UNAME='VERTICAL_CUT',   /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
 ;    if keyword_set(horizontal_cut) then button = widget_button(cursorID, VALUE='Horizontal Cut', UNAME='HORIZONTAL_CUT', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(mvab)           then button = widget_button(cursorID, VALUE='MVAB',           UNAME='MVAB',           /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
+    if keyword_set(mva_cross)      then button = widget_button(cursorID, VALUE='MVA_CROSS',      UNAME='MVAB',           /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(vHT)            then button = widget_button(cursorID, VALUE='vHT',            UNAME='VHT',            /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(none)           then button = widget_button(cursorID, VALUE='None',           UNAME='ANONE',                         UVALUE={object: self, method: 'Analysis_Menu_Events'})
 end
@@ -621,10 +648,14 @@ pro MrAbstractAnalysis::Get_Interval, event
             yrange = reform(xy[1,*])
 
             ;Forward results to proper analysis method
-            if self.amode[0] eq 2 then self -> Interval, xrange, yrange
+            if  (self.amode[0] eq   2)       then self -> Interval, xrange, yrange
             if ((self.amode[0] and  4) gt 0) then self -> Average, xrange
             if ((self.amode[0] and  8) gt 0) then self -> MVAB, xrange
             if ((self.amode[0] and 16) gt 0) then self -> vHT, xrange, yrange
+            if ((self.amode[0] and 32) gt 0) then begin
+                self -> Average, xrange, location, avg, /QUIET
+                self -> MVA_Cross, xrange, avg
+            endif
             
             ;reset initial click
             self.x0 = -1
@@ -825,6 +856,129 @@ PLOT_INDEX=plot_index
 end
 
 
+;+
+;   The average value in a given interval.
+;
+; :Params:
+;       XRANGE:             in, required, type=fltarr(3,3)
+;                           The data range along the abscissa axis over which the average
+;                               is to be taken.
+;       LOCATION:           in, optional, type=intarr(2)
+;                           The [col, row] location of the plot whose data is to be averaged.
+;                               If not provided, the currently selected plot will be
+;                               rotated (i.e. self.focus).
+;
+; :Keywords:
+;       PLOT_INDEX:             in, optional, type=int, default=0
+;                               If set, then `LOCATION` is actually the 1D plot index of
+;                                   the plot. The upper-left-most plot has a plot index of
+;                                   1, and the plot index increases as you go down the
+;                                   column, then across the row.
+;-
+pro MrAbstractAnalysis::MVA_Cross, xrange, average, $
+PLOT_INDEX=plot_index
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = error_message()
+        return
+    endif
+    
+;---------------------------------------------------------------------
+;Check Inputs ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Defaults
+    plot_index = keyword_set(plot_index)
+    
+;---------------------------------------------------------------------
+;Keep the First Averaged Interval ////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Check if an average has already been calculated. If not, store the first.
+    if ptr_valid(self.intervals) eq 0 then begin
+        self.intervals = ptr_new({xrange: xrange, average: average})
+        return
+    endif
+    
+;---------------------------------------------------------------------
+;Compute the Normal Direction ////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Turn the averages into normal vectors
+    avg1 = normalize((*self.intervals).average)
+    avg2 = normalize(average)
+    
+    ;Compute the angle between the fields -- Bad normal vector if this angle ~ 0
+    angle = acos(dot_product(avg1, avg2)) * !radeg
+    
+    ;Cross the field directions to get the normal component
+    ;    Make sure the x-component of the normal is pointing in the +X GSE direction
+    n_hat = normalize(cross_product(avg1, avg2))
+    if n_hat[0] lt 0 then n_hat = -n_hat
+    
+    ;M is computed by taking the maximum field and crossing it with n_hat
+    void = max([magnitude_vec((*self.intervals).average), magnitude_vec(average)], iMax)
+    if iMax eq 0 $
+        then m_hat = normalize(cross_product(n_hat, avg1)) $
+        else m_hat = normalize(cross_product(n_hat, avg2))
+    
+    ;L is obtained by crossing M with N
+    ;    Make sure the z-component of L-hat is in the +Z GSE direction
+    l_hat = normalize(cross_product(n_hat, m_hat))
+    if l_hat[2] lt 0 then l_hat = -l_hat
+    
+    ;Build the eigenvector matrix
+    eigvecs = [[n_hat], [m_hat], [l_hat]]
+    
+    ;Make sure it is a right-handed system. If not, reverse M-hat
+    if determ(eigvecs) lt 0 then eigvecs[*,1] = -eigvecs[*,1]
+    
+;---------------------------------------------------------------------
+;Print the Results ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;print the results of MVAB to the command window
+    nml = ['N', 'M', 'L']
+    print, '________________________________________________________________'
+    print, 'MVAB eigenvalues and eigenvectors'
+
+    print, FORMAT='(%"Start Time: %s     Start Time: %s")', ssm_to_hms((*self.intervals).xrange)
+    print, FORMAT='(%"  End Time: %s       End Time: %s")', ssm_to_hms(xrange)
+    print, FORMAT='(%" B1 dot B2: %7.2f (Deg)")', angle
+    print, 'x', 'y', 'z', format='(3(9x, a1))'
+    for i=0, 2 do print, FORMAT='(%"%s  %7.4f  %7.4f  %7.4f")', nml[i], eigvecs[*,i]
+    
+    ;print again in idl format easy copy and paste
+    print, '________________________________________________________________'
+    print, 'IDL Format for Copy + Paste'
+    print, FORMAT='(%"sTime1    = %s")', ssm_to_hms((*self.intervals).xrange[0])
+    print, FORMAT='(%"eTime1    = %s")', ssm_to_hms((*self.intervals).xrange[1])
+    print, FORMAT='(%"sTime2    = %s")', ssm_to_hms(xrange[0])
+    print, FORMAT='(%"eTime2    = %s")', ssm_to_hms(xrange[1])
+    print, FORMAT='(%"B1_dot_B2 = %7.2f")', angle
+    print, FORMAT='(3(a0, f7.4), a0)', $
+           'eigvecs = [[', eigvecs[0,0], ', ', eigvecs[1,0], ', ', eigvecs[2,0], '], $', $
+           '           [', eigvecs[0,1], ', ', eigvecs[1,1], ', ', eigvecs[2,1], '], $', $
+           '           [', eigvecs[0,2], ', ', eigvecs[1,2], ', ', eigvecs[2,2], ']]'
+    
+;---------------------------------------------------------------------
+;Store Matrix, Free Pointer //////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;reset the draw widget's user value
+    if ptr_valid(self.tmatrix) $
+        then *self.tmatrix = eigvecs $
+        else self.tmatrix = ptr_new(eigvecs)
+    
+    ptr_free, self.intervals
+end
+
+
 
 ;+
 ;   Turn DRAW_BUTTON_EVENTS on or off.
@@ -978,9 +1132,9 @@ INVERSE = inverse
             then rotmat = *self.tmatrix $
             else message, 'A rotation matrix must be provided.'
     endif
-    
+
     ;Inverse transformation
-    if keyword_set(inverse) then rotmat = transpose(rotate)
+    if keyword_set(inverse) then rotmat = transpose(rotmat)
     
 ;---------------------------------------------------------------------
 ;Rotate the Data /////////////////////////////////////////////////////
@@ -1021,16 +1175,20 @@ pro MrAbstractAnalysis::Turn_Everything_Off, tlb
     self -> On_Off_Button_Events, /OFF
     self -> On_Off_Motion_Events, /OFF
     
+    ;Free the intervals pointer.
+    if ptr_valid(self.intervals) then ptr_free, self.intervals
+    
     ;Uncheck all menu buttons
     if n_elements(tlb) gt 0 && widget_info(tlb, /VALID_ID) then begin
         ;Get the widget IDs of the menu buttons
-        avgID   = widget_info(tlb, FIND_BY_UNAME='AVERAGE')
-        gdvID   = widget_info(tlb, FIND_BY_UNAME='GET_DATA_VALUE')
+        avgID = widget_info(tlb, FIND_BY_UNAME='AVERAGE')
+        gdvID = widget_info(tlb, FIND_BY_UNAME='GET_DATA_VALUE')
         intID = widget_info(tlb, FIND_BY_UNAME='GET_INTERVAL')
-        horID  = widget_info(tlb, FIND_BY_UNAME='HORIZONTAL_CUT')
-        mvaID   = widget_info(tlb, FIND_BY_UNAME='MVAB')
-        verID    = widget_info(tlb, FIND_BY_UNAME='VERTICAL_CUT')
-        vhtID    = widget_info(tlb, FIND_BY_UNAME='VHT')
+        horID = widget_info(tlb, FIND_BY_UNAME='HORIZONTAL_CUT')
+        mvaID = widget_info(tlb, FIND_BY_UNAME='MVAB')
+        mvxID = widget_info(tlb, FIND_BY_UNAME='MVA_CROSS')
+        verID = widget_info(tlb, FIND_BY_UNAME='VERTICAL_CUT')
+        vhtID = widget_info(tlb, FIND_BY_UNAME='VHT')
         
         ;Uncheck the buttons
         if widget_info(avgID, /VALID_ID) then widget_control, avgID, SET_BUTTON=0
@@ -1038,6 +1196,7 @@ pro MrAbstractAnalysis::Turn_Everything_Off, tlb
         if widget_info(intID, /VALID_ID) then widget_control, intID, SET_BUTTON=0
         if widget_info(horID, /VALID_ID) then widget_control, horID, SET_BUTTON=0
         if widget_info(mvaID, /VALID_ID) then widget_control, mvaID, SET_BUTTON=0
+        if widget_info(mvxID, /VALID_ID) then widget_control, mvxID, SET_BUTTON=0
         if widget_info(verID, /VALID_ID) then widget_control, verID, SET_BUTTON=0
         if widget_info(vhtID, /VALID_ID) then widget_control, vhtID, SET_BUTTON=0
     endif
