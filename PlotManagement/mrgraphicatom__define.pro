@@ -71,6 +71,7 @@
 ; :History:
 ;   Modification History::
 ;       08/23/2013  -   Written by Matthew Argall
+;       09/24/2013  -   Added the POSITION parameter to IsInside. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -82,13 +83,15 @@ end
 
 
 ;+
-;   Determine if the coordate made by X and Y lies within the object.
+;   Determine if the coordate made by X and Y lies within the object's position.
 ;
 ; :Params:
 ;       X:              in, required, type=numeric scalar
 ;                       X coordinate 
 ;       Y:              in, optional, type=numeric scalar/array
 ;                       Y coordinate
+;       POSITION:       in, optional, type=fltarr(4), default=*self.position
+;                       Determine if [`X`,`Y`] is inside this POSITION.
 ;
 ; :Keywords:
 ;       DATA:           in, optional, type=boolean, default=0
@@ -101,8 +104,11 @@ end
 ;                           as Delta = Sqrt((x0-x1)^2 + (y0-y1)^2).
 ;       NORMAL:         in, optional, type=boolean, default=0
 ;                       If set, X and Y are provided in normal coordinates.
+;
+; :Returns:
+;       TF_INSIDE:      Returns true (1) if [x,y] lies within POSITION. False (0) otherwise.
 ;-
-function MrGraphicAtom::IsInside, x, y, $
+function MrGraphicAtom::IsInside, x, y, position, $
 DATA = data, $
 DELTA = delta, $
 NORMAL = normal
@@ -117,8 +123,10 @@ NORMAL = normal
     endif
     
     ;If no position was provided, return false
-    if n_elements(*self.position) eq 0 then return, 0
-    
+    if n_elements(position) eq 0 then if n_elements(*self.position) gt 0 $
+        then position = *self.position $
+        else return, -1
+        
     ;Defaults
     SetDefaultValue, data, 0, /BOOLEAN
     SetDefaultValue, normal, 0, /BOOLEAN
@@ -134,14 +142,14 @@ NORMAL = normal
         else coord = [x, y]
     
     ;Is the coordinate inside the plot?
-    if coord[0] ge (*self.position)[0] && coord[0] le (*self.position)[2] && $
-       coord[1] gt (*self.position)[1] && coord[1] le (*self.position)[3] $
+    if coord[0] ge position[0] && coord[0] le position[2] && $
+       coord[1] gt position[1] && coord[1] le position[3] $
         then tf_inside = 1 $
         else tf_inside = 0
         
     ;Determine how far from the center the coordinate lies
     if arg_present(delta) then begin
-        center = [mean((*self.position)[[0,2]]), mean((*self.position)[[1,3]])]
+        center = [mean(position[[0,2]]), mean(position[[1,3]])]
         delta = sqrt((coord[0] - center[0])^2 + (coord[1] - center[1])^2)
     endif
     

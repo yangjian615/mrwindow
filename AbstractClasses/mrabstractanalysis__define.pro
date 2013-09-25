@@ -396,8 +396,8 @@ VHT = vHT
     if keyword_set(get_data_value) then button = widget_button(cursorID, VALUE='Get Data Value', UNAME='GET_DATA_VALUE', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(get_interval)   then button = widget_button(cursorID, VALUE='Get Interval',   UNAME='GET_INTERVAL',   /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(average)        then button = widget_button(cursorID, VALUE='Average',        UNAME='AVERAGE',        /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
-    if keyword_set(vertical_cut)   then button = widget_button(cursorID, VALUE='Vertical Cut',   UNAME='VERTICAL_CUT',   /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
-    if keyword_set(horizontal_cut) then button = widget_button(cursorID, VALUE='Horizontal Cut', UNAME='HORIZONTAL_CUT', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
+;    if keyword_set(vertical_cut)   then button = widget_button(cursorID, VALUE='Vertical Cut',   UNAME='VERTICAL_CUT',   /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
+;    if keyword_set(horizontal_cut) then button = widget_button(cursorID, VALUE='Horizontal Cut', UNAME='HORIZONTAL_CUT', /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(mvab)           then button = widget_button(cursorID, VALUE='MVAB',           UNAME='MVAB',           /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(vHT)            then button = widget_button(cursorID, VALUE='vHT',            UNAME='VHT',            /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(none)           then button = widget_button(cursorID, VALUE='None',           UNAME='ANONE',                         UVALUE={object: self, method: 'Analysis_Menu_Events'})
@@ -619,7 +619,7 @@ pro MrAbstractAnalysis::Get_Interval, event
             xy = convert_coord(x, y, /DEVICE, /TO_DATA)
             xrange = reform(xy[0,*])
             yrange = reform(xy[1,*])
-            
+
             ;Forward results to proper analysis method
             if self.amode[0] eq 2 then self -> Interval, xrange, yrange
             if ((self.amode[0] and  4) gt 0) then self -> Average, xrange
@@ -925,7 +925,7 @@ end
 
 
 ;+
-;   Rotate 3-component time series data.
+;   Transform 3-component time series data from one coordinate system to anoteh.
 ;
 ; :Params:
 ;       ROTMAT:             in, required, type=fltarr(3,3)
@@ -936,14 +936,17 @@ end
 ;                               rotated (i.e. self.focus).
 ;
 ; :Keywords:
-;       PLOT_INDEX:             in, optional, type=int, default=0
-;                               If set, then `LOCATION` is actually the 1D plot index of
-;                                   the plot. The upper-left-most plot has a plot index of
-;                                   1, and the plot index increases as you go down the
-;                                   column, then across the row.
+;       PLOT_INDEX:         in, optional, type=int, default=0
+;                           If set, then `LOCATION` is actually the 1D plot index of
+;                               the plot. The upper-left-most plot has a plot index of
+;                               1, and the plot index increases as you go down the
+;                               column, then across the row.
+;       INVERSE:            in, optional, type=boolean, default=0
+;                           Perform the inverse tranformation.
 ;-
 pro MrAbstractAnalysis::Rotate, rotmat, location, $
-PLOT_INDEX = plot_index
+PLOT_INDEX = plot_index, $
+INVERSE = inverse
     compile_opt idl2
     
     ;Error handling
@@ -976,6 +979,8 @@ PLOT_INDEX = plot_index
             else message, 'A rotation matrix must be provided.'
     endif
     
+    ;Inverse transformation
+    if keyword_set(inverse) then rotmat = transpose(rotate)
     
 ;---------------------------------------------------------------------
 ;Rotate the Data /////////////////////////////////////////////////////

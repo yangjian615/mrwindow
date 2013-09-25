@@ -255,8 +255,8 @@ YSIZE = ysize
     button = widget_button(editID, VALUE='Layout',            UVALUE={object: self, method: 'AdjustLayout_Property'})
     button = widget_button(editID, VALUE='Move',              UVALUE={object: self, method: 'AdjustLayout_Move'})
     button = widget_button(editID, VALUE='Remove',            UVALUE={object: self, method: 'AdjustLayout_Remove'})
-    button = widget_button(editID, VALUE='Plot', SENSITIVE=0, UVALUE={object: self, method: 'AdjustLayout'})
-    button = widget_button(editID, VALUE='Copy', SENSITIVE=0, UVALUE={object: self, method: 'AdjustLayout_Copy'})
+;    button = widget_button(editID, VALUE='Plot', SENSITIVE=0, UVALUE={object: self, method: 'AdjustLayout'})
+;    button = widget_button(editID, VALUE='Copy', SENSITIVE=0, UVALUE={object: self, method: 'AdjustLayout_Copy'})
 
     ;Create the Zoom Menu
     self -> Create_Zoom_Menu, menuID

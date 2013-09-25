@@ -158,6 +158,7 @@ pro MrPlotManager::AdjustLayout_Property, event
     self -> Draw
 end
 
+
 ;+
 ;   Event handler for the EDIT | Move menu.
 ;-
