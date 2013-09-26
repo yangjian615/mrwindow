@@ -38,7 +38,7 @@
 ; :Restrictions:
 ;   Inheriting object must have the following properties::
 ;       - Position
-;           Used In:            IsInside
+;           Used In:            IsInside, SetProperty
 ;           Description:        The typical 4-element position accepted by IDL's PLOT
 ;                               command. Though this in not an inherent requirement for
 ;                               certain Direct Graphics procedures, they have been built
@@ -72,8 +72,44 @@
 ;   Modification History::
 ;       08/23/2013  -   Written by Matthew Argall
 ;       09/24/2013  -   Added the POSITION parameter to IsInside. - MRA
+;       09/25/2013  -   Added the layout-related object properties and the Get/SetProperty
+;                           and CalcPositions methods. - MRA
 ;-
 ;*****************************************************************************************
+;+
+;   Calculate a position based on the layout properties.
+;-
+function MrGraphicAtom::CalcPosition
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, intarr(4)-1
+    endif
+    
+    ;Return if nothing has been added to the layout.
+    if array_equal((*self.layout)[0:1], [0,0]) then return
+    
+    ;Make sure the layout is valid.
+    if self.layout[0] eq 0 xor self.layout[1] eq 0 $
+        then message, 'Cannot calculate position. Layout must have at least ' + $
+                      'one column and one row.'
+
+    ;Calculate positions
+    position = MrPlotLayout(*self.layout, $
+                            ASPECT = *self.aspect, $
+                            XGAP = self.xgap, $
+                            XMARGIN = self.xmargin, $
+                            YGAP = self.ygap, $
+                            YMARGIN = self.ymargin)
+
+    return, position    
+end
+
+
 ;+
 ;   Destroy the object.
 ;-
@@ -216,19 +252,159 @@ end
 
 
 ;+
-;   Clean up after the object is destroy
+;   Set properties of the object.
+;
+; :Params:
+;       ASPECT:         out, optional, type=float
+;                       Aspect ratio of the plot.
+;       LAYOUT:         out, optional, type=intarr(3)/intarr(4)
+;                       [nCols, nRows, col, row] or [nCols, nRows, index]. [nCols,nRows]
+;                           is the number of columns and rows in the display. [col,row]
+;                           is the column and row in which to place the plot. "index" is
+;                           the plot index at which to place the plot. [col,row] locations
+;                           begin at [1,1], "index" 0-based plot index, with 0 being the
+;                           upper-left corner, then incrementing first down, then right.
+;       XMARGIN:        out, optional, type=intarr(2)
+;                       Width of the left and right margins in character units.
+;       XGAP:           out, optional, type=integer
+;                       Horizontal space between plots, in character units.
+;       YMARGIN:        out, optional, type=intarr(2)
+;                       Height of the top and bottom margins in character units.
+;       YGAP:           out, optional, type=integer
+;                       Vertical space between plots in character units.
 ;-
-pro MrGraphicAtom::cleanup
-    ;Nothing to clean up
+pro MrGraphicAtom::GetProperty, $
+ASPECT=aspect, $
+LAYOUT=layout, $
+XMARGIN=xmargin, $
+XGAP=xgap, $
+YMARGIN=ymargin, $
+YGAP=ygap
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, 0
+    endif
+    
+    ;Default to updating the position
+    SetDefaultValue, updatePosition, 1, /BOOLEAN
+    
+    ;Set GraphicAtom properties
+    if arg_present(layout)  then layout = *self.layout
+    if arg_present(aspect)  then aspect = *self.aspect
+    if arg_present(xmargin) then xmargin = self.xmargin
+    if arg_present(xgap)    then xgap = self.xgap
+    if arg_present(ymargin) then ymargin = self.ymargin
+    if arg_present(ygap)    then ygap = self.ygap
+    
+    ;Update the position to fit the new layout?
+    if updatePosition eq 1 then *self.position = self -> CalcPosition()
 end
 
 
 ;+
-;   The initialization method. Because MrGraphicAtom is an abstract class, it must
-;   be inherited. Any attempts to instantiate a MrAbstractPlot object will result
-;   in an error.
+;   Set properties of the object.
+;
+; :Params:
+;       ASPECT:         in, optional, type=float
+;                       Aspect ratio of the plot.
+;       LAYOUT:         in, optional, type=intarr(3)/intarr(4)
+;                       [nCols, nRows, col, row] or [nCols, nRows, index]. [nCols,nRows]
+;                           is the number of columns and rows in the display. [col,row]
+;                           is the column and row in which to place the plot. "index" is
+;                           the plot index at which to place the plot. [col,row] locations
+;                           begin at [1,1], "index" 0-based plot index, with 0 being the
+;                           upper-left corner, then incrementing first down, then right.
+;       UPDATEPOSITION: in, optional, type=boolean, default=1
+;                       If set, the position will be updated based on the new layout.
+;       XMARGIN:        in, optional, type=intarr(2)
+;                       Width of the left and right margins in character units.
+;       XGAP:           in, optional, type=integer
+;                       Horizontal space between plots, in character units.
+;       YMARGIN:        in, optional, type=intarr(2)
+;                       Height of the top and bottom margins in character units.
+;       YGAP:           in, optional, type=integer
+;                       Vertical space between plots in character units.
 ;-
-function MrGraphicAtom::init
+pro MrGraphicAtom::SetProperty, $
+ASPECT=aspect, $
+LAYOUT=layout, $
+UPDATEPOSITION=updatePosition, $
+XMARGIN=xmargin, $
+XGAP=xgap, $
+YMARGIN=ymargin, $
+YGAP=ygap
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, 0
+    endif
+    
+    ;Default to updating the position
+    SetDefaultValue, updatePosition, 1, /BOOLEAN
+    
+    ;Set GraphicAtom properties
+    if n_elements(layout)  ne 0 then *self.layout = layout
+    if n_elements(aspect)  ne 0 then *self.aspect = aspect
+    if n_elements(xmargin) ne 0 then  self.xmargin = xmargin
+    if n_elements(xgap)    ne 0 then  self.xgap = xgap
+    if n_elements(ymargin) ne 0 then  self.ymargin = ymargin
+    if n_elements(ygap)    ne 0 then  self.ygap = ygap
+    
+    ;Update the position to fit the new layout?
+    if updatePosition eq 1 then begin
+        new_position = self -> CalcPosition()
+        if array_equal(new_position, [-1,-1,-1,-1]) eq 0 then *self.position = new_position
+    endif
+end
+
+
+;+
+;   Clean up after the object is destroy
+;-
+pro MrGraphicAtom::cleanup
+    ptr_free, self.layout
+    ptr_free, self.aspect
+end
+
+
+;+
+;   The initialization method.
+;
+; :Params:
+;       ASPECT:         in, optional, type=float
+;                       Aspect ratio of the plot.
+;       LAYOUT:         in, optional, type=intarr(3)/intarr(4), default=[1,1,1,1]
+;                       [nCols, nRows, col, row] or [nCols, nRows, index]. [nCols,nRows]
+;                           is the number of columns and rows in the display. [col,row]
+;                           is the column and row in which to place the plot. "index" is
+;                           the plot index at which to place the plot. [col,row] locations
+;                           begin at [1,1], "index" 0-based plot index, with 0 being the
+;                           upper-left corner, then incrementing first down, then right.
+;       XMARGIN:        in, optional, type=intarr(2), default=[10,3]
+;                       Width of the left and right margins in character units.
+;       XGAP:           in, optional, type=integer, default=14
+;                       Horizontal space between plots, in character units.
+;       YMARGIN:        in, optional, type=intarr(2), default=[4,2]
+;                       Height of the top and bottom margins in character units.
+;       YGAP:           in, optional, type=integer, default=6
+;                       Vertical space between plots in character units.
+;-
+function MrGraphicAtom::init, $
+ASPECT=aspect, $
+LAYOUT=layout, $
+XMARGIN=xmargin, $
+XGAP=xgap, $
+YMARGIN=ymargin, $
+YGAP=ygap
     compile_opt idl2
     
     ;Error handling
@@ -239,10 +415,26 @@ function MrGraphicAtom::init
         return, 0
     endif
 
-    ;Cause an error
-    message, 'This is an abstract class and does not have an INIT method.'
+    ;Default Values
+    SetDefaultValue, layout, [1,1,1,1]
+    SetDefaultValue, xmargin, [10, 3]
+    SetDefaultValue, xgap, 14
+    SetDefaultValue, ymargin, [4,2]
+    SetDefaultValue, ygap, 6
     
-    return, 0
+    ;Define pointers
+    self.layout = ptr_new()
+    self.aspect = ptr_new()
+    
+    ;Set the object properties
+    self -> SetProperty, LAYOUT=layout, $
+                         ASPECT=aspect, $
+                         XMARGIN=xmargin, $
+                         XGAP=xgap, $
+                         YMARGIN=ymargin, $
+                         YGAP=ygap
+    
+    return, 1
 end
 
 
@@ -252,11 +444,29 @@ end
 ; :Params:
 ;       CLASS:          out, optional, type=structure
 ;                       The class definition structure.
+;
+; :Fields:
+;       LAYOUT:         [nCols, nRows, col, row] or [nCols, nRows, index]. [nCols,nRows]
+;                           is the number of columns and rows in the display. [col,row]
+;                           is the column and row in which to place the plot. "index" is
+;                           the plot index at which to place the plot. [col,row] locations
+;                           begin at [1,1], "index" 0-based plot index, with 0 being the
+;                           upper-left corner, then incrementing first down, then right.
+;       ASPECT:         Aspect ratio of the plot.
+;       XMARGIN:        Width of the left and right margins in character units.
+;       XGAP:           Horizontal space between plots, in character units.
+;       YMARGIN:        Height of the top and bottom margins in character units.
+;       YGAP:           Vertical space between plots in character units.
 ;-
 pro MrGraphicAtom__define, class
     compile_opt idl2
     
     define = { MrGraphicAtom, $
-               _GraphicAtom: 0 $         ;Not used, but cannot have empty class
+               layout: ptr_new(), $
+               aspect: ptr_new(), $
+               xmargin: [0, 0], $
+               xgap: 0, $
+               ymargin: [0, 0], $
+               ygap: 0 $
              }
 end

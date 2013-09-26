@@ -84,6 +84,7 @@
 ;                           coordinates, if not provided, are made to index the dimensions
 ;                           of DATA. [XY]RANGE is defined and [XY]STYLE is made to have
 ;                           the 2^0 bit set. - MRA
+;       09/26/2013  -   Added the GRAPHIC keyword. Removed the contour method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -156,6 +157,22 @@ PATH_XY=path_xy
     GetPath_XY = Arg_Present(path_xy)
 
     if n_elements(noerase) eq 0 then noerase = *self.noerase
+
+    ;Was a graphic provided?
+    if obj_valid(self.graphic) then begin
+        ;Copy its location and coordinates.
+        self.graphic -> GetProperty, INDEP=xcoords, DEP=ycoords, POSITION=position, $
+                                     XRANGE=xrange, YRANGE=yrange
+
+        ;Set object properties and mimic OVERPLOT functionality
+        self -> SetProperty, XCOORDS=xcoords, YCOORDS=ycoords, $
+                             POSITION=position, $
+                             XRANGE=xrange, $
+                             XSTYLE=4, $
+                             YRANGE=yrange, $
+                             YSTYLE=4, $
+                             OVERPLOT=0
+    endif
 
 ;-----------------------------------------------------
 ;Draw the Contour Plot \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -425,51 +442,6 @@ end
 
 
 ;+
-;   Create a MrContour object to be drawn in the device window.
-;
-; :Params:
-;       DATA:           in, required, type=any
-;                       A one- or two-dimensional array containing the values that make 
-;                           up the contour surface.
-;       X:              in, optional, type=any
-;                       A vector or two-dimensional array specifying the X coordinates for
-;                           the contour surface.
-;       Y:              in, optional, type=any
-;                       A vector or two-dimensional array specifying the Y coordinates for
-;                           the contour surface.
-;
-; :Keywords:
-;       DRAW:               in, optional, type=boolean, default=0
-;                           Call the Draw method after adding the plot to the list.
-;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by MrContour__define.
-;   
-;-
-pro MrContour::Contour, data, x, y, $
-DRAW = draw, $
-_REF_EXTRA = extra
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return
-    endif
-
-    ;Create the plot
-    theContour = obj_new('MrContour', data, x, y, _EXTRA=extra)
-    
-    ;Add the plot
-    self -> Add, theContour
-    
-    ;Draw    
-    if keyword_set(draw) then self -> Draw
-end
-
-
-;+
 ;   The purpose of this method is to set object properties. 
 ;
 ; :Keywords:
@@ -648,10 +620,12 @@ end
 ;                           is allowed in the program.
 ;-
 pro MrContour::GetProperty, $
-;MrContour Properties
 C_DATA=c_data, $
 XCOORDS=xcoords, $
 YCOORDS=ycoords, $
+
+;MrContour Properties
+GRAPHIC=graphic, $
 P_SYSVAR=p_sysvar, $
 X_SYSVAR=x_sysvar, $
 Y_SYSVAR=y_sysvar, $
@@ -954,6 +928,9 @@ pro MrContour::SetProperty, $
 C_DATA=c_data, $
 XCOORDS=xcoords, $
 YCOORDS=ycoords, $
+
+;MrContour Keywords
+GRAPHIC=graphic, $
 P_SYSVAR=p_sysvar, $
 X_SYSVAR=x_sysvar, $
 Y_SYSVAR=y_sysvar, $
@@ -1006,8 +983,8 @@ XLOG=xlog, $
 YLOG=ylog, $
 
 ;Graphics Keywords
-XSTYLE = xstyle, $
-YSTYLE = ystyle, $
+XSTYLE   = xstyle, $
+YSTYLE   = ystyle, $
 _REF_EXTRA=extra
     compile_opt strictarr
     
@@ -1021,6 +998,29 @@ _REF_EXTRA=extra
     
     ;Bad spellers...
     if n_elements(axesColor) ne 0 && n_elements(axisColor) eq 0 then axisColor = axesColor
+    
+    ;Graphic
+    if n_elements(graphic) ne 0 and obj_valid(graphic) then begin
+        ;Make sure it is a MrImageObject.
+        if (typename(graphic) ne 'MRIMAGEOBJECT') then $
+            message, 'GRAPHIC must be a MrImageObject class. Cannot use.', /INFORMATIONAL
+            
+        ;Copy its location and coordinates.
+        graphic -> GetProperty, INDEP=xcoords, $
+                                DEP=ycoords, $
+                                POSITION=position, $
+                                XRANGE=xrange, $
+                                YRANGE=yrange
+        
+        ;Mimic overplotting
+        xstyle   = 4
+        ystyle   = 4
+        overplot = 0
+        *self.position = position
+        
+        ;Store the graphic
+        self.graphic = graphic
+    endif
 
     ;MrContour Properties
     if n_elements(c_data)        ne 0 then *self.c_data        = c_data
@@ -1076,7 +1076,7 @@ _REF_EXTRA=extra
     if n_elements(ylog)          ne 0 then  self.ylog          = ylog
     if n_elements(path_data_coords)   ne 0 then *self.path_data_coords = path_data_coords
 
-    ;Objects
+    ;Map Object
     if n_elements(map_object) ne 0 and obj_valid(map_object) then begin
         if obj_valid(self.map_object) then obj_destroy, self.map_object
         self.map_object = map_object
@@ -1228,6 +1228,10 @@ end
 ;                           Otherwise, the keyword is assumed to be a color index into the current color table.
 ;       FILL:           in, optional, type=boolean, default=0
 ;                       Set to indicate filled contours should be created.
+;       GRAPHIC:        in, optional, type=object, default=obj_new()
+;                       If this keyword is set equal to a MrImageObject object, then the
+;                           contour plot will determine the location of the image in
+;                           display window and overplot itself onto that image.
 ;       IRREGULAR:      in, optional, type=boolean
 ;                       If this keyword is set, the data, x, and y input parameters are taken to be
 ;                           irregularly gridded data, the the data is gridded for use in the contour plot
@@ -1341,6 +1345,9 @@ end
 ;                           is allowed in the program.
 ;-
 FUNCTION MrContour::Init, data, x, y, $
+;MrContour Keywords
+GRAPHIC=graphic, $
+
 ;CONTOUR KEYWORDS
 C_ANNOTATION=c_annotation, $
 C_CHARSIZE=c_charsize, $
@@ -1408,6 +1415,7 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
     
     ;Superclass initialization methods
+    if self -> IDL_Object::Init()      eq 0 then return, 0
     if self -> MrIDL_Container::Init() eq 0 then return, 0
     if self -> weGraphicsKeywords::Init(_STRICT_EXTRA=extra) eq 0 then return, 0
     
@@ -1493,6 +1501,7 @@ _REF_EXTRA=extra
     self.ylog             = Ptr_New(/ALLOCATE_HEAP)
     
     ;Initialize Objects
+    self.graphic          = Obj_New()
     self.map_object       = Obj_New()
     
 ;---------------------------------------------------------------------
@@ -1503,6 +1512,9 @@ _REF_EXTRA=extra
     self -> SetProperty, C_DATA=data, $
                          XCOORDS=xcoords, $
                          YCOORDS=ycoords, $
+                         
+                         ;MrContour Keywords
+                         GRAPHIC=graphic, $
                          
                          ;cgContour Keywords
                          ASPECT=aspect, $
@@ -1551,6 +1563,7 @@ _REF_EXTRA=extra
                          TRIANGULATION=triangulation, $
                          XLOG=xlog, $
                          YLOG=ylog
+
 ;---------------------------------------------------------------------
 ;Set Ranges and Styles ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1600,6 +1613,7 @@ pro MrContour__define, class
     on_error, 2
     
     class = { MrContour, $
+              inherits IDL_Object, $
               inherits MrIDL_Container, $
               inherits MrGraphicAtom, $
               inherits weGraphicsKeywords, $
@@ -1610,6 +1624,7 @@ pro MrContour__define, class
               ycoords: Ptr_New(), $
               
               ;MrContour Properties
+              graphic: obj_new(), $
               init_xrange: fltarr(2), $
               init_yrange: fltarr(2), $
               p_sysvar: !P, $

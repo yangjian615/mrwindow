@@ -53,7 +53,7 @@
 ;   For details concerning zooming, cursor, annotation, and save options, see::
 ;       MrAbstractArrow__define.pro
 ;       MrCursor__define.pro
-;       MrAbstractSaveAs__define.pro
+;       MrSaveAs__define.pro
 ;       MrAbstractText__define.pro
 ;       MrZoom__define.pro
 ;
@@ -182,7 +182,7 @@
 ;                           property to the class definition. Renamed the Resize_Events to
 ;                           TLB_Resize_Events, added the ResizeDrawWidget method. - MRA
 ;       07/21/2013  -   Added the WMODE and DISPLAY keywords. Previously, when BUILD=0 or
-;                           and the MrAbstractSaveAs::Output method was called, an error
+;                           and the MrSaveAs::Output method was called, an error
 ;                           REALIZE=0 would occur because self.winID would be an invalid
 ;                           window ID. Furthermore, to do a screen capture, something had
 ;                           to have first been drawn in a window. This could not happen
@@ -786,7 +786,7 @@ _REF_EXTRA = extra
                          extra, iSaveAs, N_MATCHES=nmatches, NONMEMBER_INDS=iExtra, $
                          N_NONMEMBERS=nExtra, /FOLD_CASE)
         
-        if nmatches gt 0 then self -> MrAbstractSaveAs::GetProperty, _STRICT_EXTRA=extra[iSaveAs]
+        if nmatches gt 0 then self -> MrSaveAs::GetProperty, _STRICT_EXTRA=extra[iSaveAs]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
     endif
     
@@ -1238,7 +1238,7 @@ _REF_EXTRA = extra
                          extra, iSaveAs, N_MATCHES=nmatches, NONMEMBER_INDS=iExtra, $
                          N_NONMEMBERS=nExtra, /FOLD_CASE)
         
-        if nmatches gt 0 then self -> MrAbstractSaveAs::SetProperty, _STRICT_EXTRA=extra[iSaveAs]
+        if nmatches gt 0 then self -> MrSaveAs::SetProperty, _STRICT_EXTRA=extra[iSaveAs]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
     endif
     
@@ -1542,7 +1542,7 @@ pro MrWindow::cleanup
     self -> MrAbstractArrow::Cleanup
     self -> MrCursor::Cleanup
     self -> MrAbstractText::Cleanup
-    self -> MrAbstractSaveAs::Cleanup
+    self -> MrSaveAs::Cleanup
     self -> MrZoom::Cleanup
     self -> MrPlotManager::Cleanup
     
@@ -1601,7 +1601,7 @@ end
 ;                           The height of the draw window in pixels
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrPlotLayout__Define and 
-;                               MrAbstractSaveAs__Define is also accepted for keyword
+;                               MrSaveAs__Define is also accepted for keyword
 ;                               inheritance.
 ;
 ; :Uses:
@@ -1637,9 +1637,10 @@ _REF_EXTRA = extra
     endif
 
     ;Superclasses
-    if self -> MrPlotManager::Init() eq 0 then return, 0
-    if self -> MrAbstractSaveAs::Init() eq 0 then return, 0
-    if self -> MrZoom::Init() eq 0 then return, 0
+    if self -> IDL_Object::Init()      eq 0 then return, 0
+    if self -> MrPlotManager::Init()   eq 0 then return, 0
+    if self -> MrSaveAs::Init()        eq 0 then return, 0
+    if self -> MrZoom::Init()          eq 0 then return, 0
     if self -> MrCursor::Init(CMODE=8) eq 0 then return, 0
 
 ;---------------------------------------------------------------------
@@ -1659,6 +1660,9 @@ _REF_EXTRA = extra
     
     ;If nothing is to be displayed, do not create the GUI.
     if display eq 0 then createGUI = 0
+    
+    ;Do not realize the GUI if we are not building it.
+    if build eq 0 then realize = 0
     
     ;If not creating a GUI, then do not build or realize.
     if createGUI eq 0 then begin
@@ -1692,7 +1696,7 @@ _REF_EXTRA = extra
     ;---------------------------------------------------------------------
     ;IDL Window //////////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
-	    
+
 	    ;Is a GUI being built or realized? If not...
 	    if keyword_set(createGUI) eq 0 then begin
 	    

@@ -302,7 +302,7 @@ QUIET = quiet
     ;Get the object whose data is being analyzed
     if n_elements(location) eq 0 $
         then theObj = self.focus $
-        else theObj = self -> Get(LOCATION=location, PLOT_INDEX=plot_index)
+        else theObj = self -> Get(LOCATION=location, PINDEX=plot_index)
     
 ;---------------------------------------------------------------------
 ;Get Data and Compute Average ////////////////////////////////////////

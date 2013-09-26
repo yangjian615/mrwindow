@@ -814,7 +814,7 @@ DIRECTORY=directory
         ;Open to the previously chosen directory or the present working directory
         if n_elements(directory) eq 0 then $
             if self.saveDir eq '' $
-                then directory = pwd() $
+                then MrPWD, directory, /PATH_SEP $
                 else directory = self.saveDir
         
         ;Initial file name
