@@ -1784,8 +1784,9 @@ pro MrWindow__define, class
     
     class = { MrWindow, $
               ;In order of importance.
+              inherits IDL_Object, $            ;For dot-referencing in IDL 8.0
               inherits MrPlotManager, $         ;Manage plot layout
-              inherits MrAbstractSaveAs, $      ;SaveAs menu
+              inherits MrSaveAs, $              ;SaveAs menu
               inherits MrZoom, $                ;Zoom events and menu
               inherits MrCursor, $              ;Cursor events and menu
               inherits MrManipulate, $          ;Manipulation events and menu

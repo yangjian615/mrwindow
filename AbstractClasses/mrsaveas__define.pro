@@ -1,7 +1,7 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;       MrAbstractSaveAs__Define
+;       MrSaveAs__Define
 ;
 ;*****************************************************************************************
 ;   Copyright (c) 2013, Matthew Argall                                                   ;
@@ -74,6 +74,7 @@
 ;       05/20/2013  -   In the AutoRasterFile method, if winID is not currently open, 
 ;                           then do not use WSet to make the window current. This prevents
 ;                           a new, blank window from being created. - MRA
+;       09/26/2013  -   Renamed from MrAbstractSaveAs to MrSaveAs. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -84,7 +85,7 @@
 ;     filename:  in, required, type=string
 ;         The name of the PostScript file to generate.
 ;-
-PRO MrAbstractSaveAs::AutoPostScriptFile, filename
+PRO MrSaveAs::AutoPostScriptFile, filename
 
     Compile_Opt idl2
     
@@ -146,7 +147,7 @@ END
 ;     filename:  in, required, type=string
 ;         The name of the output file.
 ;-
-PRO MrAbstractSaveAs::AutoRasterFile, filetype, filename
+PRO MrSaveAs::AutoRasterFile, filetype, filename
 
     Compile_Opt idl2
     
@@ -294,7 +295,7 @@ END
 ;       PARENT:             in, required, type=integer
 ;                           The widget ID of the parent widget for the new SaveAs Menu.
 ;-
-pro MrAbstractSaveAs::Create_SaveAs_Menu, parent
+pro MrSaveAs::Create_SaveAs_Menu, parent
 	compile_opt idl2
 	
 	catch, theError
@@ -306,32 +307,32 @@ pro MrAbstractSaveAs::Create_SaveAs_Menu, parent
 
     ;Make the save menu in the menu bar
     saveID = widget_button(parent, VALUE='Save As', /MENU)
-    button = widget_button(saveID, VALUE='JPEG', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
-    button = widget_button(saveID, VALUE='TIFF', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
-    button = widget_button(saveID, VALUE='PNG', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
-    button = widget_button(saveID, VALUE='GIF', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+    button = widget_button(saveID, VALUE='JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+    button = widget_button(saveID, VALUE='TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+    button = widget_button(saveID, VALUE='PNG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+    button = widget_button(saveID, VALUE='GIF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
 
     ;Make the Coyote Graphics save menu in the menu bar
     cgSaveID = widget_button(saveID, VALUE='cgSaveAs', /MENU)
-    button = Widget_Button(cgSaveID, Value='PostScript File', UNAME='POSTSCRIPT', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'CreatePostscriptFile'})
-    button = Widget_Button(cgSaveID, Value='PDF File', UNAME='PDF', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+    button = Widget_Button(cgSaveID, Value='PostScript File', UNAME='POSTSCRIPT', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'CreatePostscriptFile'})
+    button = Widget_Button(cgSaveID, Value='PDF File', UNAME='PDF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
     raster = Widget_Button(cgSaveID, Value='Raster Image File', /MENU)
     
-    button = Widget_Button(raster, Value='BMP', UNAME='RASTER_BMP', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-    button = Widget_Button(raster, Value='GIF', UNAME='RASTER_GIF', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-    button = Widget_Button(raster, Value='JPEG', UNAME='RASTER_JPEG', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-    button = Widget_Button(raster, Value='PNG', UNAME='RASTER_PNG', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-    button = Widget_Button(raster, Value='TIFF', UNAME='RASTER_TIFF', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+    button = Widget_Button(raster, Value='BMP', UNAME='RASTER_BMP', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+    button = Widget_Button(raster, Value='GIF', UNAME='RASTER_GIF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+    button = Widget_Button(raster, Value='JPEG', UNAME='RASTER_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+    button = Widget_Button(raster, Value='PNG', UNAME='RASTER_PNG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+    button = Widget_Button(raster, Value='TIFF', UNAME='RASTER_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
         
     ; If you can find ImageMagick on this machine, you can convert to better
     ; looking raster files.
     IF cgHasImageMagick() EQ 1 THEN BEGIN
         imraster = Widget_Button(cgSaveID, Value='Raster Image File via ImageMagick', /MENU)
-        button = Widget_Button(imraster, Value='BMP', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imraster, Value='GIF', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imraster, Value='JPEG', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imraster, Value='PNG', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imraster, Value='TIFF', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrAbstractSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(imraster, Value='BMP', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(imraster, Value='GIF', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(imraster, Value='JPEG', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(imraster, Value='PNG', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(imraster, Value='TIFF', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
     ENDIF
 
 end
@@ -399,7 +400,7 @@ end
 ;                               Set this keyword to the name of a true-type font to use in
 ;                                   creating PostScript output.
 ;-
-PRO MrAbstractSaveAs::GetProperty, $
+PRO MrSaveAs::GetProperty, $
 ADJUSTSIZE=adjustsize, $
 IM_DENSITY=im_density, $                      ; Sets the density parameter on ImageMagick convert command.
 IM_RESIZE=im_resize, $                        ; Sets the resize parameter on ImageMagick convert command.
@@ -462,7 +463,7 @@ END
 ;     event: in, required, type=structure
 ;         An event structure.
 ;-
-PRO MrAbstractSaveAs::CreatePostScriptFile, event
+PRO MrSaveAs::CreatePostScriptFile, event
 
     Compile_Opt idl2
     
@@ -538,7 +539,7 @@ END
 ;        The name of the output file. The type of file is determined from the
 ;        file name extension.
 ;-
-PRO MrAbstractSaveAs::Output, filename
+PRO MrSaveAs::Output, filename
     Compile_Opt idl2
     
     ; Error handling.
@@ -578,7 +579,7 @@ END
 ;     event: in, required, type=structure
 ;        The event structure.
 ;-
-PRO MrAbstractSaveAs::SaveAsRaster, event
+PRO MrSaveAs::SaveAsRaster, event
     Compile_Opt idl2
     
     ; Error handling.
@@ -780,7 +781,7 @@ END
 ;                       Name of file in which image is to be saved. This can also be
 ;                           an event structure returned by the windows manager.
 ;-
-pro MrAbstractSaveAs::Screen_Capture, filename, $
+pro MrSaveAs::Screen_Capture, filename, $
 DIRECTORY=directory
 	compile_opt idl2
 	
@@ -881,7 +882,7 @@ end
 ;     event: in, required, type=structure
 ;         An event structure.
 ;-
-PRO MrAbstractSaveAs_SaveAs_Events, event
+PRO MrSaveAs_SaveAs_Events, event
     Compile_Opt idl2
     
     ; Error handling.
@@ -962,7 +963,7 @@ END
 ;                               Set this keyword to the name of a true-type font to use in
 ;                                   creating PostScript output.
 ;-
-PRO MrAbstractSaveAs::SetProperty, $
+PRO MrSaveAs::SetProperty, $
 ADJUSTSIZE=adjustsize, $       ; Adjust the default charsize to match display size.
 IM_DENSITY=im_density, $                      ; Sets the density parameter on ImageMagick convert command.
 IM_OPTIONS=im_options, $                      ; Sets extra ImageMagick options on the ImageMagick convert command.
@@ -1016,17 +1017,17 @@ END
 ;+
 ;   Clean up after the object is destroyed -- destroy pointers and object references.
 ;-
-pro MrAbstractSaveAs::cleanup
+pro MrSaveAs::cleanup
     ;Do nothing
 end
 
 
 ;+
-;   The initialization method. Because MrAbstractSaveAs is an abstract class, it must
-;   be inherited. Any attempts to instantiate a MrAbstractSaveAs object will result
+;   The initialization method. Because MrSaveAs is an abstract class, it must
+;   be inherited. Any attempts to instantiate a MrSaveAs object will result
 ;   in an error.
 ;-
-function MrAbstractSaveAs::init
+function MrSaveAs::init
     compile_opt idl2
     
     ;Error handling
@@ -1104,10 +1105,10 @@ end
 ;       CLASS:          out, optional, type=structure
 ;                       The class definition structure.
 ;-
-pro MrAbstractSaveAs__define, class
+pro MrSaveAs__define, class
     compile_opt idl2
 
-    class = {MrAbstractSaveAs, $
+    class = {MrSaveAs, $
               
              ; PostScript options.
              ps_decomposed: 0L, $          ; Sets the PostScript color mode.

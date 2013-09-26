@@ -12,7 +12,7 @@
 .comp ./AbstractClasses/mrabstractlegend__define.pro
 .comp ./AbstractClasses/mrabstractoverplot__define.pro
 .comp ./AbstractClasses/mrabstractplot__define.pro
-.comp ./AbstractClasses/mrabstractsaveas__define.pro
+.comp ./AbstractClasses/mrsaveas__define.pro
 .comp ./AbstractClasses/mrabstracttext__define.pro
 .comp ./AbstractClasses/mrmanipulate__define.pro
 .comp ./AbstractClasses/mrcursor__define.pro

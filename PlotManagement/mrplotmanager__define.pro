@@ -135,6 +135,7 @@ pro MrPlotManager::AdjustLayout_Property, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        if ptr_valid(new_layout) then ptr_free, new_layout
         void = error_message()
         return
     endif
@@ -146,6 +147,7 @@ pro MrPlotManager::AdjustLayout_Property, event
                                    XMARGIN = self.xmargin, $
                                    YGAP    = self.ygap, $
                                    YMARGIN = self.ymargin)
+    if ptr_valid(new_layout) eq 0 then return
     
     ;Update the layout
     self -> SetProperty, LAYOUT  = (*new_layout).layout, $
@@ -156,6 +158,9 @@ pro MrPlotManager::AdjustLayout_Property, event
     
     ;Redraw
     self -> Draw
+    
+    ;Free the pointer
+    ptr_free, new_layout
 end
 
 
@@ -169,18 +174,23 @@ pro MrPlotManager::AdjustLayout_Move, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        if ptr_valid(colrow) then ptr_free, colrow
         void = error_message()
         return
     endif
     
     ;Spawn a GUI to get user input about the old and new locations
     colrow = moveplot_gui(self.tlb)
+    if ptr_valid(colrow) eq 0 then return
     
     ;Update the layout
     self -> SetPosition, (*colrow).from, (*colrow).to
     
     ;Redraw
     self -> Draw
+    
+    ;Free the pointer
+    ptr_free, colrow
 end
 
 
