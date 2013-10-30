@@ -32,6 +32,7 @@
 .comp ./cdf-reader/utilities/has_tag.pro
 .comp ./cdf-reader/utilities/isnumeric.pro
 .comp ./cdf-reader/utilities/mrisa.pro
+.comp ./cdf-reader/utilities/replace_fillval.pro
 .comp ./cdf-reader/utilities/type_to_format_code.pro
 
 ;Plot Management

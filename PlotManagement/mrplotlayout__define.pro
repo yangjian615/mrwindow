@@ -165,7 +165,6 @@
 ;                           re-written and renamed to SetPosition. - MRA
 ;       09/24/2013  -   Calling SetProperty with the LAYOUT keyword now works. Check if
 ;                           the new layout is large enough to fit all of the plots. The
-;                           PLOT_INDEX keyword in IsAvailable now works. - MRA
 ;                           
 ;-
 ;*****************************************************************************************
@@ -1013,7 +1012,7 @@ POSITION = position
             if location[1] gt self.layout[1] $
                 then nRows = location[1] - self.layout[1] $
                 else nRows = 0
-            
+
             ;Update the layout?
             if keyword_set(update_layout) $
                 then self -> ExpandLayout, nCols, nRows $

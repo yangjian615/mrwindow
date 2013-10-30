@@ -142,8 +142,54 @@
 ;                           coordinates. - MRA
 ;       09/23/2013  -   Index SELF.IFOCUS was changed to an object reference SELF.FOCUS.
 ;                           Added COPY_PIX and DRAW keywords to the Draw_Events method. - MRA
+;       10/05/2013  -   Bind now can accept a object arrays. Added the AddToBindingList
+;                           method. Eliminate a lot of effort by first creating a new set
+;                           of bindings, then by consolidating bindings. Removed the BindEm
+;                           method. - MRA
 ;-
 ;*****************************************************************************************
+;+
+;   Bind the axis of one object to the axis of another so that the zooms are synchronized.
+;
+; :Params:
+;       BINDINGLIST:        in, required, type=linked list
+;                           A linked list in which to add objects whose properties are
+;                               to be kept synchronized.
+;       THEOBJECTS:         in, required, type=objarr()
+;                           Add these objects to `BINDINGLIST`
+;-
+pro MrZoom::AddToBindingList, bindingList, theObjects
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+;---------------------------------------------------------------------
+;Check Inputs ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Number of objects to bind.
+    nToAdd = n_elements(theObjects)
+    if nToAdd lt 2 then message, 'At least two objects must be provided.'
+
+;---------------------------------------------------------------------
+;Create a Binding List? //////////////////////////////////////////////
+;---------------------------------------------------------------------
+    nSets = bindingList -> Get_Count()
+    
+    ;Create a new node
+    bindingList -> Add, theObjects
+
+    ;If bindings already exist, then consolidate
+    if nSets eq 0 then self -> Consolidate_Bindings
+end
+
+
 ;+
 ;   Bind the axis of one object to the axis of another so that the zooms are synchronized.
 ;
@@ -188,7 +234,6 @@ ZAXIS = zaxis
         yaxis = 1
         zaxis = 1
     endif
-
 
 ;---------------------------------------------------------------------
 ;UPDATE X-BINDINGS ///////////////////////////////////////////////////
@@ -301,10 +346,11 @@ end
 ;   Bind the axis of one object to the axis of another so that the zooms are synchronized.
 ;
 ; :Params:
-;       OBJECT1:            in, required, type=object
-;                           An object whose axis is to be bound to that of `OBJECT2`
-;       OBJECT2:            in, required, type=object
-;                           An object to which `OBJECT1`'s axis is to be bound.
+;       OBJECT1:            in, required, type=object/objarr()
+;                           The objects that will be bound together. If a scalar is given,
+;                               `OBJECT2` must contain at least 1 valid object.
+;       OBJECT2:            in, optional, type=object/objarr()
+;                           Objects to be bound with those in `OBJECT1`.
 ;
 ; :Keywords:
 ;       ALL:                in, optional, type=boolean, default=0
@@ -312,7 +358,10 @@ end
 ;       APPLY:              in, optional, type=boolean, default=1
 ;                           If set, once the bindings are created, they will be applied so
 ;                               that the axis ranges match. The ranges of `OBJECT2` will
-;                               be update to match those of `OBJECT1`.
+;                               be update to match those of `OBJECT1[0]`.
+;       REMOVE:             in, optional, type=boolean, default=0
+;                           If set, the given objects will be unbound from their current
+;                               binding set.
 ;       CAXIS:              in, optional, type=boolean, default=0
 ;                           Bind the color axis.
 ;       XAXIS:              in, optional, type=boolean, default=0
@@ -325,6 +374,7 @@ end
 pro MrZoom::Bind, object1, object2, $
 ALL=all, $
 APPLY = apply, $
+REMOVE = remove, $
 CAXIS = caxis, $
 XAXIS = xaxis, $
 YAXIS = yaxis, $
@@ -339,10 +389,23 @@ ZAXIS = zaxis
         return
     endif
     
+    ;Check input parameters
+    case n_params() of 
+        2: bindThese = [object1, object2]
+        1: bindThese = object1
+        else: message, 'Use syntax: myZoomObj -> Bind, Object1[, Object2]'
+    endcase
+    
     ;Apply bindings?
     if n_elements(apply) eq 0 $
         then apply = 1 $
         else apply = keyword_set(apply)
+    
+    ;Which axes will be bound?
+    caxis = keyword_set(caxis)
+    xaxis = keyword_set(xaxis)
+    yaxis = keyword_set(yaxis)
+    zaxis = keyword_set(zaxis)
     
     ;If ALL is set, then bind all axes.
     if keyword_set(all) then begin
@@ -351,279 +414,31 @@ ZAXIS = zaxis
         yaxis = 1
         zaxis = 1
     endif
+    
+    ;Make sure at least one axis is being bound.
+    if (caxis + xaxis + yaxis + zaxis eq 0) then message, 'Must choose an axis to bind: /[CXYZ]AXIS'
 
 ;---------------------------------------------------------------------
-;X-AXIS //////////////////////////////////////////////////////////////
+;Remove Bindings? ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if keyword_set(xaxis) then begin
+    if keyword_set(remove) then begin
+        if (xaxis eq 1) then self -> UnBind, self.bind_x, bindThese
+        if (yaxis eq 1) then self -> UnBind, self.bind_y, bindThese
+        if (zaxis eq 1) then self -> UnBind, self.bind_z, bindThese
+        if (caxis eq 1) then self -> UnBind, self.bind_c, bindThese
     
-        ;If no bindings are present, create a linked list
-        if obj_valid(self.bind_x) eq 0 then begin
-            self.bind_x = obj_new('linkedlist', [object1, object2])
-            
-        ;If bindings are present...
-        endif else begin
-            
-            ;See how many different bindings there are. Objects that are bound together
-            ;are stored in an object array within a single element of the linked list.
-            ;Different sets of bindings are stored in different nodes of the linked list.
-            nBindings = self.bind_x -> Get_Count()
-            count = 0
-            i = 0
-            
-            ;See if OBJECT2 is bound to anything.
-            while count eq 0 and i lt nBindings do begin
-
-                thisBinding = self.bind_x -> Get_Value(i)
-                iBound = where(thisBinding eq object2, count)
-                
-                ;If it is
-                if count ne 0 then begin
-                    ;Check if the binding already exists.
-                    iIsBound = where(thisBinding eq object1, isBound)
-                    
-                    ;If it does not, bind OBJECT1 to the group
-                    if isBound eq 0 then begin
-                        thisBinding = [thisBinding, object1]
-                        self.bind_x -> Replace_Item, thisBinding, i, /NO_COPY
-                    endif
-                endif
-                i++
-            endwhile
-            
-            ;If OBJECT2 is not yet bound to anything, then COUNT will still be 0. This
-            ;time, see if OBJECT1 is bound to anything.
-            i = 0
-            while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_x -> Get_Value(i)
-                iBound = where(thisBinding eq object1, count)
-                
-                ;If it is, bind OBJECT2 to the group.
-                if count ne 0 then begin
-                    thisBinding = [thisBinding, object2]
-                    self.bind_x -> Replace_Item, thisBinding, i, /NO_COPY
-                endif
-                i++
-            endwhile
-            
-            ;If neither OBJECT1 nor OBJECT2 are currently bound to anything, create
-            ;a new binding.
-            if count eq 0 then self.bind_x -> Add, [object1, object2]
-
-        endelse
-        
-        ;Consolidate Bindings
-        self -> Consolidate_Bindings, /XAXIS
-    endif
-            
 ;---------------------------------------------------------------------
-;Y-AXIS //////////////////////////////////////////////////////////////
+;Create Bindings? ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    ;Do the same thing for the y-axis
-    if keyword_set(yaxis) then begin
-    
-        if obj_valid(self.bind_y) eq 0 then begin
-            self.bind_y = obj_new('linkedlist', [object1, object2])
-            
-        endif else begin
-            nBindings = self.bind_y -> get_count()
-            count = 0
-            i = 0
-            
-            while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_y -> Get_Value(i)
-                iBound = where(thisBinding eq object2, count)
-                
-                if count ne 0 then begin
-                    iIsBound = where(thisBinding eq object1, isBound)
-                    if isBound eq 0 then begin
-                        thisBinding = [thisBinding, object1]
-                        self.bind_y -> Replace_Item, thisBinding, i, /NO_COPY
-                    endif
-                endif
-                i++
-            endwhile
-            
-            i = 0
-            while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_y -> Get_Value(i)
-                iBound = where(thisBinding eq object1, count)
-                
-                if count ne 0 then begin
-                    thisBinding = [thisBinding, object2]
-                    self.bind_y -> Replace_Item, thisBinding, i, /NO_COPY
-                endif
-                i++
-            endwhile
-            
-            if count eq 0 then self.bind_y -> Add, [object1, object2]
-        endelse
+    endif else begin
+        if (xaxis eq 1) then self -> AddToBindingList, self.bind_x, bindThese
+        if (yaxis eq 1) then self -> AddToBindingList, self.bind_y, bindThese
+        if (zaxis eq 1) then self -> AddToBindingList, self.bind_z, bindThese
+        if (caxis eq 1) then self -> AddToBindingList, self.bind_c, bindThese
+    endelse
         
-        self -> Consolidate_Bindings, /YAXIS
-    endif
-        
-;---------------------------------------------------------------------
-;Z-AXIS //////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Do the same thing for the z-axis
-    if keyword_set(zaxis) then begin
-    
-        if obj_valid(self.bind_z) eq 0 then begin
-            self.bind_z = obj_new('linkedlist', [object1, object2])
-            
-        endif else begin
-            nBindings = self.bind_z -> get_count()
-            count = 0
-            i = 0
-            
-            while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_z -> Get_Value(i)
-                iBound = where(thisBinding eq object2, count)
-                
-                if count ne 0 then begin
-                    iIsBound = where(thisBinding eq object1, isBound)
-                    if isBound eq 0 then begin
-                        thisBinding = [thisBinding, object1]
-                        self.bind_z -> Replace_Item, thisBinding, i, /NO_COPY
-                    endif
-                endif
-                i++
-            endwhile
-            
-            i = 0
-            while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_z -> Get_Value(i)
-                iBound = where(thisBinding eq object1, count)
-                
-                if count ne 0 then begin
-                    thisBinding = [thisBinding, object2]
-                    self.bind_z -> Replace_Item, thisBinding, i, /NO_COPY
-                endif
-                i++
-            endwhile
-            
-            if count eq 0 then self.bind_z -> Add, [object1, object2]
-        endelse
-        
-        self -> Consolidate_Bindings, /ZAXIS
-    endif
-        
-;---------------------------------------------------------------------
-;COLOR AXIS //////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Do the same thing for the color axis
-    if keyword_set(caxis) then begin
-    
-        if obj_valid(self.bind_c) eq 0 then begin
-            self.bind_c = obj_new('linkedlist', [object1, object2])
-            
-        endif else begin
-            nBindings = self.bind_c -> get_count()
-            count = 0
-            i = 0
-            
-            while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_c -> Get_Value(i)
-                iBound = where(thisBinding eq object2, count)
-                
-                if count ne 0 then begin
-                    iIsBound = where(thisBinding eq object1, isBound)
-                    if isBound eq 0 then begin
-                        thisBinding = [thisBinding, object1]
-                        self.bind_c -> Replace_Item, thisBinding, i, /NO_COPY
-                    endif
-                endif
-                i++
-            endwhile
-            
-            i = 0
-            while count eq 0 and i lt nBindings do begin
-                thisBinding = self.bind_c -> Get_Value(i)
-                iBound = where(thisBinding eq object1, count)
-                
-                if count ne 0 then begin
-                    thisBinding = [thisBinding, object2]
-                    self.bind_c -> Replace_Item, thisBinding, i, /NO_COPY
-                endif
-                i++
-            endwhile
-            
-            if count eq 0 then self.bind_c -> Add, [object1, object2]
-        endelse
-        
-        self -> Consolidate_Bindings, /CAXIS
-    endif
-    
     ;Apply Bindings?
-    if apply eq 1 then self -> Apply_Bindings, object1, ALL=all, CAXIS=caxis, $
-                                               XAXIS=xaxis, YAXIS=yaxis, ZAXIS=zaxis
-end
-
-
-;+
-;   Bind the axes of two or more objects together.
-;
-; :Params:
-;       theObjArr:          in, required, type=objarr
-;                           An array of 2 or more objects whose axes are to bound together.
-;
-; :Keywords:
-;       ALL:                in, optional, type=boolean, default=0
-;                           Bind all axes.
-;       APPLY:              in, optional, type=boolean, default=1
-;                           If set, once the bindings are created, they will be applied so
-;                               that the axis ranges match. The ranges of each object will
-;                               be update to match those of `theObjArr`[0].
-;       CAXIS:              in, optional, type=boolean, default=0
-;                           Bind the color axis.
-;       XAXIS:              in, optional, type=boolean, default=0
-;                           Bind the xaxis.
-;       YAXIS:              in, optional, type=boolean, default=0
-;                           Bind the yaxis.
-;       ZAXIS:              in, optional, type=boolean, default=0
-;                           Bind the zaxis.
-;-
-pro MrZoom::BindEm, theObjArr, $
-ALL=all, $
-APPLY = apply, $
-CAXIS = caxis, $
-XAXIS = xaxis, $
-YAXIS = yaxis, $
-ZAXIS = zaxis
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return
-    endif
-    
-    ;Make sure there are two or more objects.
-    nObjs = n_elements(theObjArr)
-    if nObjs lt 2 then message, 'theObjArr must consist of two or more objects.'
-    
-    ;Apply bindings?
-    if n_elements(apply) eq 0 $
-        then apply = 1 $
-        else apply = keyword_set(apply)
-    
-    ;If ALL is set, then bind all axes.
-    if keyword_set(all) then begin
-        caxis = 1
-        xaxis = 1
-        yaxis = 1
-        zaxis = 1
-    endif
-
-    ;Bind the axes.
-    for i = 1, nObjs - 1 do $
-        self -> Bind, theObjArr[0], theObjArr[i], ALL=all, APPLY=0, CAXIS=caxes, $
-                      XAXIS=xaxis, YAXIS=yaxis, ZAXIS=zaxis
-                      
-    ;Apply the bindings
-    if apply eq 1 then self -> Apply_Bindings, theObjArr[0], ALL=all, CAXIS=caxis, $
+    if apply eq 1 then self -> Apply_Bindings, bindThese[0], ALL=all, CAXIS=caxis, $
                                                XAXIS=xaxis, YAXIS=yaxis, ZAXIS=zaxis
 end
 
@@ -741,7 +556,7 @@ end
 ;       error_message.pro (Coyote Graphics)
 ;       MrUniq.pro
 ;-
-pro MrZoom::Consolidate_Bindings, $
+pro MrZoom::Consolidate_Bindings, bindingList, $
 ALL=all, $
 CAXIS = caxis, $
 XAXIS = xaxis, $
@@ -757,88 +572,78 @@ ZAXIS = zaxis
         return
     endif
     
-    ;If ALL is set, then consolidate all axes.
-    if keyword_set(all) then begin
-        caxis = 1
-        xaxis = 1
-        yaxis = 1
-        zaxis = 1
-    endif
-    
+    if obj_valid(bindingList) eq 0 then return
+    nBindings = bindingList -> Get_Count()
+
 ;---------------------------------------------------------------------
-;Consolidate X-Bindings //////////////////////////////////////////////
+;One Set of Bindings /////////////////////////////////////////////////
+;---------------------------------------------------------------------    
+    if nBindings eq 1 then begin
+        ;Select only the unique bindings
+        thisBinding = bindingList -> Get_Item(0)
+        thisBinding = thisBinding[MrUniq(thisBinding, /SORT)]
+        
+        ;If only one object is left, remove the binding set from the list
+        if n_elements(thisBinding) le 1 then bindingList -> Delete, 0, DESTROY=0
+
 ;---------------------------------------------------------------------
-    if keyword_set(xaxis) and ptr_valid(self.bind_x) then begin
-        nBindings = self.bind_x -> Get_Count()
-            
+;Many Sets of Bindings ///////////////////////////////////////////////
+;---------------------------------------------------------------------  
+    endif else begin
+        ;Make an array of all of the objects in all of the different sets of bindings.
+        allObjects = bindingList -> Get_Item(0)
+        for i = 1, nBindings - 1 do allObjects = [allObjects, bindingList -> Get_Item(i)]
+        
+        ;Find duplicates
+        void = MrUniq(allObjects, /SORT, NCOMPLEMENT=ncopies, COMPLEMENT=icopies)
+
     ;---------------------------------------------------------------------
-    ;One Set of Bindings /////////////////////////////////////////////////
-    ;---------------------------------------------------------------------    
-        if nBindings eq 1 then begin
-            ;Select only the unique bindings
-            thisBinding = self.bind_x -> Get_Item(0)
-            thisBinding = thisBinding[MrUniq(thisBinding, /SORT)]
-            
-            ;If only one object is left, destroy the binding list
-            if n_elements(thisBinding) le 1 then obj_destroy, self.bind_x
-    
+    ;Deal With Duplicates ////////////////////////////////////////////////
     ;---------------------------------------------------------------------
-    ;Many Sets of Bindings ///////////////////////////////////////////////
-    ;---------------------------------------------------------------------  
-        endif else begin
-            ;Make an array of all of the objects
-            allObjects = self.bind_x -> Get_Item(0)
-            for i = 1, nBindings - 1 do allObjects = [allObjects, self.bind_x -> Get_Item(i)]
+        if ncopies gt 0 then begin
+            objToConsolicate = allObjects[icopies[0]]
             
-            ;Find duplicates
-            void = MrUniq(allObjects, /SORT, NCOMPLEMENT=ncopies, COMPLEMENT=icopies)
-    
-        ;---------------------------------------------------------------------
-        ;Deal With Duplicates ////////////////////////////////////////////////
-        ;---------------------------------------------------------------------
-            if ncopies gt 0 then begin
-                objToConsolicate = allObjects[icopies[0]]
-                
-                ;Step through all of the bindings
-                i = 0
-                iKeep = -1
-                while i lt nBindings do begin
-                    thisBinding = self.bind_x -> Get_Item(i)
-                
-                    ;Find the first instance of the duplicate object
-                    if iKeep eq -1 then begin
-                        void = where(thisBinding eq objToConsolidate, count)
-                        if count ne 0 then iKeep = i
-                        i += 1
+            ;Step through all of the binding sets
+            i = 0
+            iKeep = -1
+            while i lt nBindings do begin
+                thisBinding = bindingList -> Get_Item(i)
+            
+                ;Find the first instance of the duplicate object
+                if iKeep eq -1 then begin
+                    void = where(thisBinding eq objToConsolidate, count)
+                    
+                    ;Store the index of the binding set in which the duplicate was found.
+                    ;Go to the next bindings set.
+                    if count ne 0 then iKeep = i
+                    i += 1
+                    
+                ;Find other instances of the duplicate object
+                endif else begin
+                    void = where(thisBinding eq objToConsolidate, count)
+                    
+                    ;When found
+                    if count ne 0 then begin
+                        ;Concatenate the two rows. Do not keep the duplicate.
+                        thatBinding = bindingList -> Get_Item(iKeep)
+                        thatBinding = [thatBinding, thisBinding]
+                        thatBinding = thatBinding[MrUniq(thatBinding, /SORT)]
+                        self.bind_x -> Replace_Item, thatBinding, iKeep
                         
-                    ;Find the second instance of the duplicate object
-                    endif else begin
-                        void = where(thisBinding eq objToConsolidate, count)
+                        ;Remove the binding set containing the duplicate from list of bindings
+                        bindingList -> Delete, i, DESTROY=0
                         
-                        ;When found
-                        if count ne 0 then begin
-                            ;Concatenate the two rows. Do not keep the duplicate.
-                            thatBinding = self.bind_x -> Get_Item(iKeep)
-                            thatBinding = [thatBinding, thisBinding]
-                            thatBinding = thatBinding[MrUniq(thatBinding, /SORT)]
-                            self.bind_x -> Replace_Item, thatBinding, iKeep
-                            
-                            ;Remove the duplicate from the concatenated row
-                            self.bind_x -> Delete_Item, i, DESTROY=0
-                            
-                            ;Decrease the total number of bindings. Do not increase "i"
-                            ;because the i-th binding was removed.
-                            nBindings = self.bind_x -> Get_Count()
-                        endif
-                    endelse
-                endwhile
-                
-                ;Now that one copy is gone, consolidate again to remove those that remain
-                self -> Consolidate_Bindings, /XAXIS
-            endif        
-        endelse
-    endif
-    
+                        ;Decrease the total number of bindings. Do not increase "i"
+                        ;because the i-th binding was removed.
+                        nBindings = bindingList -> Get_Count()
+                    endif
+                endelse
+            endwhile
+            
+            ;Now that one copy is gone, consolidate again to remove those that remain
+            self -> Consolidate_Bindings, bindingList
+        endif        
+    endelse    
 end
 
 
@@ -1103,7 +908,7 @@ pro MrZoom::Error_Handler
         return
     endif
 
-    self -> Turn_Everything_Off, self.tlb
+    self -> Turn_Zoom_Off, self.tlb
 end
 
 
@@ -1268,7 +1073,7 @@ end
 ;       TLB:        in, optional, type=int
 ;                   The widget ID of the top level base.
 ;-
-pro MrZoom::Turn_Everything_Off, tlb
+pro MrZoom::Turn_Zoom_Off, tlb
     compile_opt idl2
     
     ;Error handling
@@ -1349,6 +1154,10 @@ pro MrZoom::Pan, event
             ;Store the clicked coordinates
             self.x0 = event.x
             self.y0 = event.y
+            
+            ;Hide the plot being panned, then draw everything else
+            self.focus -> SetProperty, HIDE=1   ;;;;;;;;;;;;;
+            self -> Draw                        ;;;;;;;;;;;;;
         
             ;Turn on motion events
             self -> On_Off_Motion_Events, /ON
@@ -1371,9 +1180,12 @@ pro MrZoom::Pan, event
             ;difference, panning more positive data into the window.
             xrange = xrange - delta_x
             yrange = yrange - delta_y
-            
+
             ;Set the new ranges
-            self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
+;            self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
+            self.focus -> SetProperty, HIDE=0, XRANGE=xrange, YRANGE=yrange
+            self -> CopyPixmap
+            self.focus -> Draw, /NOERASE
             
             self.x0 = event.x
             self.y0 = event.y
@@ -1398,36 +1210,17 @@ end
 
 
 ;+
-;   Unbind one set of axes from all others.
+;   Unbind one set of objects from all others. This method is private. Call the Bind
+;   method with the /REMOVE keyword set.
 ;
 ; :Params:
-;       THEOBJECT:          in, optional, type=object
-;                           The object whose axes are to be unbound. If not given, all
-;                               sets of axes will be unbound. Which axes are unbound is
-;                               determined by the keywords.
-;
-; :Keywords:
-;       ALL:                in, optional, type=boolean, default=0
-;                           Unbind all of `THEOBJECTS`'s from all other axes.
-;       CAXIS:              in, optional, type=boolean, default=0
-;                           Unbind all of the `THEOBJECT`'s color axis from all others
-;                               sets of color axes.
-;       XAXIS:              in, optional, type=boolean, default=0
-;                           Unbind all of the `THEOBJECT`'s x-axis from all others sets
-;                               of x-axes.
-;       YAXIS:              in, optional, type=boolean, default=0
-;                           Unbind all of the `THEOBJECT`'s y-axis from all others sets
-;                               of x-axes.
-;       ZAXIS:              in, optional, type=boolean, default=0
-;                           Unbind all of the `THEOBJECT`'s z-axis from all others sets
-;                               of x-axes.
+;       BINDINGLIST:        in, required, type=linked list
+;                           A linked list of various sets of object bindings from which
+;                               `THEOBJECTS` will be removed.
+;       THEOBJECTS:         in, required, type=objarr()
+;                           The objects whose axes are to be unbound.
 ;-
-pro MrZoom::UnBind, theObject, $
-ALL=all, $
-CAXIS = caxis, $
-XAXIS = xaxis, $
-YAXIS = yaxis, $
-ZAXIS = zaxis
+pro MrZoom::UnBind, bindingList, theObjects
     compile_opt idl2
     
     ;Error handling
@@ -1438,249 +1231,22 @@ ZAXIS = zaxis
         return
     endif
     
-;---------------------------------------------------------------------
-;Unbind All Axes /////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    if keyword_set(all) then begin
-        caxis = 1
-        xaxis = 1
-        yaxis = 1
-        zaxis = 1
-    endif
+    if obj_valid(bindingList) eq 0 then return
+            
+    ;See how many different sets of bindings there are.
+    nBindings = bindingList -> Get_Count()
     
-;---------------------------------------------------------------------
-;Unbind From X-Axis //////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    if keyword_set(xaxis) and obj_valid(self.bind_x) then begin
-            
-    ;---------------------------------------------------------------------
-    ;Destroy All X-Bindings //////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-    
-        if n_params() eq 0 then begin
-            obj_destroy, self.bind_x
-            
-    ;---------------------------------------------------------------------
-    ;Unbind theObject ////////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-        endif else begin
-            
-            ;See how many different sets bindings there are.
-            nBindings = self.bind_x -> Get_Count()
-            
-        ;---------------------------------------------------------------------
-        ;One Set of Bindings /////////////////////////////////////////////////
-        ;---------------------------------------------------------------------
-            if nBindings eq 1 then begin
-            
-                ;Count how many objects are bound
-                thisBinding = self.bind_x -> Get_Item(0)
-                nSet = n_elements(thisBinding)
-                iBound = where(thisBinding eq theObject, count)
-                
-                ;If only a pair is bound together
-                if count ne 0 and nSet le 2 then begin
-                    obj_destroy, self.bind_x
-                    
-                ;If multiple objects are bound together
-                endif else if count ne 0 and nSet gt 2 then begin
-                    ;Truncate theObject
-                    thisBinding = shift(thisBinding, -thisBinding)
-                    self.bind_x -> Replace_Item, thisBinding[1:*], 0, /NO_COPY
-                endif
-            
-        ;---------------------------------------------------------------------
-        ;Several Sets of Bindings ////////////////////////////////////////////
-        ;---------------------------------------------------------------------
-            endif else begin
-                    
-                count = 0
-                i = 0
-                ;See if theObject is bound to anything.
-                while count eq 0 and i lt nBindings do begin
-                    thisBinding = self.bind_x -> Get_Item(i)
-                    iBound = where(thisBinding eq theObject, count)
-                    
-                    ;if theObject was not found, skip to the next iteration
-                    if count eq 0 then begin
-                        i++
-                        continue
-                    endif
-                
-                    ;If a single pair of objects are bound together
-                    if n_elements(thisBinding) le 2 then begin
-                        ;Remove the binding from the list
-                        self.bind_x -> Remove_Item, i, DESTROY=0
-                        
-                    ;If a group of objects are bound together
-                    endif else begin
-                        ;Shift the binding to the end of the row and truncate it
-                        thisBinding = shift(thisBinding, -theBinding)
-                        self.bind_x -> Replace_Item, thisBinding[1:*], i, /NO_COPY
-                    endelse
-                
-                    i++
-                endwhile
-            endelse
-        endelse
-    endif
+    ;Step through each binding set
+    for i = 0, nBindings - 1 do begin
+        thisBinding = bindingList -> Get_Item(i)
+        void = ismember(theObjects, thisBinding, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
         
-;---------------------------------------------------------------------
-;Unbind From Y-Axis //////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Do the same for the y-axis
-    if keyword_set(yaxis) and obj_valid(self.bind_y) then begin    
-        if n_params() eq 0 then begin
-            if ptr_valid(self.bind_y) then obj_destroy, self.bind_y
-            
-        endif else begin
-            nBindings = self.bind_y -> Get_Count()
-            
-            if nBindings eq 1 then begin
-            
-                thisBinding = self.bind_y -> Get_Item(0)
-                nSet = n_elements(thisBinding)
-                iBound = where(thisBinding eq theObject, count)
-                
-                if count ne 0 and nSet le 2 then begin
-                    obj_destroy, self.bind_y
-                    
-                endif else if count ne 0 and nSet gt 2 then begin
-                    thisBinding = shift(thisBinding, -thisBinding)
-                    self.bind_y -> Replace_Item, thisBinding[1:*], 0, /NO_COPY
-                endif
-            
-            endif else begin
-                    
-                count = 0
-                i = 0
-                while count eq 0 and i lt nBindings do begin
-                    thisBinding = self.bind_y -> Get_Item(i)
-                    iBound = where(thisBinding eq theObject, count)
-                    
-                    if count eq 0 then begin
-                        i++
-                        continue
-                    endif
-                
-                    if n_elements(thisBinding) le 2 then begin
-                        self.bind_y -> Remove_Item, i, DESTROY=0
-                        
-                    endif else begin
-                        thisBinding = shift(thisBinding, -theBinding)
-                        self.bind_y -> Replace_Item, thisBinding[1:*], i, /NO_COPY
-                    endelse
-                
-                    i++
-                endwhile
-            endelse
-        endelse
-    endif
-    
-;---------------------------------------------------------------------
-;Unbind From Z-Axis //////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Do the same for the z-axis
-    if keyword_set(zaxis) and obj_valid(self.bind_z) then begin    
-        if n_params() eq 0 then begin
-            if ptr_valid(self.bind_z) then obj_destroy, self.bind_z
-            
-        endif else begin
-            nBindings = self.bind_z -> Get_Count()
-            
-            if nBindings eq 1 then begin
-            
-                thisBinding = self.bind_z -> Get_Item(0)
-                nSet = n_elements(thisBinding)
-                iBound = where(thisBinding eq theObject, count)
-                
-                if count ne 0 and nSet le 2 then begin
-                    obj_destroy, self.bind_z
-                    
-                endif else if count ne 0 and nSet gt 2 then begin
-                    thisBinding = shift(thisBinding, -thisBinding)
-                    self.bind_z -> Replace_Item, thisBinding[1:*], 0, /NO_COPY
-                endif
-            
-            endif else begin
-                    
-                count = 0
-                i = 0
-                while count eq 0 and i lt nBindings do begin
-                    thisBinding = self.bind_z -> Get_Item(i)
-                    iBound = where(thisBinding eq theObject, count)
-                    
-                    if count eq 0 then begin
-                        i++
-                        continue
-                    endif
-                
-                    if n_elements(thisBinding) le 2 then begin
-                        self.bind_z -> Remove_Item, i, DESTROY=0
-                        
-                    endif else begin
-                        thisBinding = shift(thisBinding, -theBinding)
-                        self.bind_z -> Replace_Item, thisBinding[1:*], i, /NO_COPY
-                    endelse
-                
-                    i++
-                endwhile
-            endelse
-        endelse
-    endif
-    
-;---------------------------------------------------------------------
-;Unbind From Color Axis //////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Do the same for the color axis
-    if keyword_set(caxis) and obj_valid(self.bind_c) then begin    
-        if n_params() eq 0 then begin
-            if ptr_valid(self.bind_c) then obj_destroy, self.bind_c
-            
-        endif else begin
-            nBindings = self.bind_c -> Get_Count()
-            
-            if nBindings eq 1 then begin
-            
-                thisBinding = self.bind_c -> Get_Item(0)
-                nSet = n_elements(thisBinding)
-                iBound = where(thisBinding eq theObject, count)
-                
-                if count ne 0 and nSet le 2 then begin
-                    obj_destroy, self.bind_c
-                    
-                endif else if count ne 0 and nSet gt 2 then begin
-                    thisBinding = shift(thisBinding, -thisBinding)
-                    self.bind_c -> Replace_Item, thisBinding[1:*], 0, /NO_COPY
-                endif
-            
-            endif else begin
-                    
-                count = 0
-                i = 0
-                while count eq 0 and i lt nBindings do begin
-                    thisBinding = self.bind_c -> Get_Item(i)
-                    iBound = where(thisBinding eq theObject, count)
-                    
-                    if count eq 0 then begin
-                        i++
-                        continue
-                    endif
-                
-                    if n_elements(thisBinding) le 2 then begin
-                        self.bind_c -> Remove_Item, i, DESTROY=0
-                        
-                    endif else begin
-                        thisBinding = shift(thisBinding, -theBinding)
-                        self.bind_c -> Replace_Item, thisBinding[1:*], i, /NO_COPY
-                    endelse
-                
-                    i++
-                endwhile
-            endelse
-        endelse
-    endif
+        ;If only one object will be left in this set of bindings, remove the entire set.
+        ;Otherwise, trim out the unwanted bindings.
+        if nKeep le 1 $
+            then bindingList -> Delete, i $
+            else bindingList -> Replace, thisBinding[iKeep], i
+    endfor
 end
 
 
@@ -2022,8 +1588,17 @@ pro MrZoom::Zoom_Menu_Events, event
     widget_control, event.id, GET_VALUE=zoom_type
     zoom_type = strupcase(zoom_type)
     
-    ;Determine if the button is set or not, then toggle it
+    ;Determine if the button is set or not
     isSet = widget_info(event.id, /BUTTON_SET)
+    
+    ;Temporarily turn off zooming
+    if strpos(zoom_type, 'WHEEL') ge 0 then self.wmode=0 else self.lmode=0
+
+    ;If the button is set, we need to toggle it off and return
+    if isSet then begin
+        widget_control, event.id, SET_BUTTON=0
+        return
+    endif
 
     ;
     ;Because Wheel Zoom buttons are in a submenu within the Zoom menu, the setting and
@@ -2037,11 +1612,11 @@ pro MrZoom::Zoom_Menu_Events, event
     parent = widget_info(event.id, /PARENT)
     kids = widget_info(parent, /ALL_CHILDREN)
     for i = 0, n_elements(kids) - 1 do widget_control, kids[i], SET_BUTTON=0
-    
+
     ;Set the zoom mode, set the event handling method, and indicate which type
     ;of events to listen for.
     case zoom_type of
-        'NONE': self -> Turn_Everything_Off, self.tlb
+        'NONE': self -> Turn_Zoom_Off, self.tlb
         'ZOOM X': self.lmode = 1
         'ZOOM Y': self.lmode = 2
         'BOX ZOOM': self.lmode = 4
@@ -2051,10 +1626,10 @@ pro MrZoom::Zoom_Menu_Events, event
         'WHEEL ZOOM: PAGE': self.wmode = 4
         else: message, 'Button "' + analysis_type + '" unknown.'
     endcase
-    
+
     ;Check the button in the menu
     widget_control, event.id, /SET_BUTTON
-    
+
     ;Turn on button events.
     if zoom_type ne 'NONE' then self -> On_Off_Button_Events, /ON
 end
@@ -2119,6 +1694,12 @@ ZOOMFACTOR = zoomfactor
     SetDefaultValue, wmode, 0
     SetDefaultValue, zmode, 0
     SetDefaultValue, zoomfactor, [0.05, 0.05]
+    
+    ;Linked lists
+    self.bind_x = obj_new('linkedlist')
+    self.bind_y = obj_new('linkedlist')
+    self.bind_z = obj_new('linkedlist')
+    self.bind_c = obj_new('linkedlist')
     
     ;Set the property
     Self -> SetProperty, LMODE = lmode, $

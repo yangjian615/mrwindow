@@ -87,24 +87,28 @@ function MrGraphicAtom::CalcPosition
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, intarr(4)-1
+        return, fltarr(4)
     endif
     
-    ;Return if nothing has been added to the layout.
-    if array_equal((*self.layout)[0:1], [0,0]) then return
+    nLay = n_elements(layout)
+    
+    ;If the [nCols,nRows] <= [0,0] or [col,row] <= [0,0] then return current position.
+    ;This means the layout or the location within that layout has not be defined.
+    if ((*self.layout)[0] le 0 and (*self.layout)[1]      le 0) || $
+       ((*self.layout)[2] le 0 and (*self.layout)[nLay-1] le 0) then return, self.position
     
     ;Make sure the layout is valid.
-    if self.layout[0] eq 0 xor self.layout[1] eq 0 $
+    if ((*self.layout)[0] le 0) xor ((*self.layout)[1] le 0) $
         then message, 'Cannot calculate position. Layout must have at least ' + $
                       'one column and one row.'
-
+help, /tr
     ;Calculate positions
     position = MrPlotLayout(*self.layout, $
-                            ASPECT = *self.aspect, $
-                            XGAP = self.xgap, $
-                            XMARGIN = self.xmargin, $
-                            YGAP = self.ygap, $
-                            YMARGIN = self.ymargin)
+                            ASPECT  = *self.aspect, $
+                            XGAP    =  self.xgap, $
+                            XMARGIN =  self.xmargin, $
+                            YGAP    =  self.ygap, $
+                            YMARGIN =  self.ymargin)
 
     return, position    
 end
@@ -155,13 +159,14 @@ NORMAL = normal
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, -1
+        return, 0
     endif
-    
-    ;If no position was provided, return false
-    if n_elements(position) eq 0 then if n_elements(*self.position) gt 0 $
-        then position = *self.position $
-        else return, -1
+
+    ;If a position was not given then  use self.position, but only if it is not equal
+    ;to [0,0,0,0]. In the latter case, return false.
+    if n_elements(position) eq 0 then if (array_equal(self.position, fltarr(4)) eq 0) $
+        then position = self.position $
+        else return, 0
         
     ;Defaults
     SetDefaultValue, data, 0, /BOOLEAN
@@ -258,12 +263,12 @@ end
 ;       ASPECT:         out, optional, type=float
 ;                       Aspect ratio of the plot.
 ;       LAYOUT:         out, optional, type=intarr(3)/intarr(4)
-;                       [nCols, nRows, col, row] or [nCols, nRows, index]. [nCols,nRows]
-;                           is the number of columns and rows in the display. [col,row]
-;                           is the column and row in which to place the plot. "index" is
-;                           the plot index at which to place the plot. [col,row] locations
-;                           begin at [1,1], "index" 0-based plot index, with 0 being the
-;                           upper-left corner, then incrementing first down, then right.
+;                       [nCols, nRows, col, row]: The layout of the display and the
+;                           graphic's location within that layout. OR [nCols,nRows,index]:
+;                           Here "index" is the plot index location, where 0 indicates
+;                           the upper-left plot and increases first down the right.
+;       POSITION:       out, optional, type=intarr(4), default=[1,1,1,1]
+;                       The normalized position of the graphic on the display.
 ;       XMARGIN:        out, optional, type=intarr(2)
 ;                       Width of the left and right margins in character units.
 ;       XGAP:           out, optional, type=integer
@@ -276,6 +281,7 @@ end
 pro MrGraphicAtom::GetProperty, $
 ASPECT=aspect, $
 LAYOUT=layout, $
+POSITION=position, $
 XMARGIN=xmargin, $
 XGAP=xgap, $
 YMARGIN=ymargin, $
@@ -287,22 +293,20 @@ YGAP=ygap
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, 0
+        return
     endif
     
     ;Default to updating the position
     SetDefaultValue, updatePosition, 1, /BOOLEAN
     
     ;Set GraphicAtom properties
-    if arg_present(layout)  then layout = *self.layout
-    if arg_present(aspect)  then aspect = *self.aspect
-    if arg_present(xmargin) then xmargin = self.xmargin
-    if arg_present(xgap)    then xgap = self.xgap
-    if arg_present(ymargin) then ymargin = self.ymargin
-    if arg_present(ygap)    then ygap = self.ygap
-    
-    ;Update the position to fit the new layout?
-    if updatePosition eq 1 then *self.position = self -> CalcPosition()
+    if arg_present(layout)   then layout   = *self.layout
+    if arg_present(aspect)   then aspect   = *self.aspect
+    if arg_present(position) then position =  self.position
+    if arg_present(xmargin)  then xmargin  =  self.xmargin
+    if arg_present(xgap)     then xgap     =  self.xgap
+    if arg_present(ymargin)  then ymargin  =  self.ymargin
+    if arg_present(ygap)     then ygap     =  self.ygap
 end
 
 
@@ -313,14 +317,19 @@ end
 ;       ASPECT:         in, optional, type=float
 ;                       Aspect ratio of the plot.
 ;       LAYOUT:         in, optional, type=intarr(3)/intarr(4)
-;                       [nCols, nRows, col, row] or [nCols, nRows, index]. [nCols,nRows]
-;                           is the number of columns and rows in the display. [col,row]
-;                           is the column and row in which to place the plot. "index" is
-;                           the plot index at which to place the plot. [col,row] locations
-;                           begin at [1,1], "index" 0-based plot index, with 0 being the
-;                           upper-left corner, then incrementing first down, then right.
-;       UPDATEPOSITION: in, optional, type=boolean, default=1
-;                       If set, the position will be updated based on the new layout.
+;                       [nCols, nRows, col, row]: The layout of the display and the
+;                           graphic's location within that layout. OR [nCols,nRows,index]:
+;                           Here "index" is the plot index location, where 0 indicates
+;                           the upper-left plot and increases first down the right. If
+;                           proveded, then `POSITION` will be calculated, unless
+;                           `UPDATEPOSITION`=0.
+;       POSITION:       in, optional, type=intarr(4), default=[1,1,1,1]
+;                       The normalized position at which to place the graphic on the
+;                           display. If provided, then `LAYOUT` will be reset.
+;       UPDATE_LAYOUT:  in, optional, type=boolean, default=1
+;                       If set, the position will be updated based on the new layout. If
+;                           `POSITION` was provided, then `LAYOUT`[2:3]=0 to reflect a
+;                           user-defined position.
 ;       XMARGIN:        in, optional, type=intarr(2)
 ;                       Width of the left and right margins in character units.
 ;       XGAP:           in, optional, type=integer
@@ -333,7 +342,8 @@ end
 pro MrGraphicAtom::SetProperty, $
 ASPECT=aspect, $
 LAYOUT=layout, $
-UPDATEPOSITION=updatePosition, $
+POSITION=position, $
+UPDATE_LAYOUT=update_layout, $
 XMARGIN=xmargin, $
 XGAP=xgap, $
 YMARGIN=ymargin, $
@@ -345,24 +355,34 @@ YGAP=ygap
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, 0
+        return
     endif
     
     ;Default to updating the position
-    SetDefaultValue, updatePosition, 1, /BOOLEAN
+    SetDefaultValue, update_layout, 1, /BOOLEAN
     
-    ;Set GraphicAtom properties
-    if n_elements(layout)  ne 0 then *self.layout = layout
-    if n_elements(aspect)  ne 0 then *self.aspect = aspect
+    ;Set Properties. Make sure layout elements are always >= 0.
+    if n_elements(layout)  ne 0 then *self.layout  = layout
+    if n_elements(aspect)  ne 0 then *self.aspect  = aspect
     if n_elements(xmargin) ne 0 then  self.xmargin = xmargin
-    if n_elements(xgap)    ne 0 then  self.xgap = xgap
+    if n_elements(xgap)    ne 0 then  self.xgap    = xgap
     if n_elements(ymargin) ne 0 then  self.ymargin = ymargin
-    if n_elements(ygap)    ne 0 then  self.ygap = ygap
+    if n_elements(ygap)    ne 0 then  self.ygap    = ygap
     
     ;Update the position to fit the new layout?
-    if updatePosition eq 1 then begin
+    if update_layout eq 1 then begin
         new_position = self -> CalcPosition()
-        if array_equal(new_position, [-1,-1,-1,-1]) eq 0 then *self.position = new_position
+        if array_equal(new_position, fltarr(4)) eq 0 $
+            then self.position = new_position
+    endif
+
+    ;If a position was given, then reset the layout
+    if n_elements(position) ne 0 then begin
+        ;Update the layout to reflect a user-defined position has been given. 
+        if update_layout eq 1 then *self.layout = [(*self.layout)[0:1],0,0]
+        
+        ;Update the position.
+        self.position = position
     endif
 end
 
@@ -389,6 +409,11 @@ end
 ;                           the plot index at which to place the plot. [col,row] locations
 ;                           begin at [1,1], "index" 0-based plot index, with 0 being the
 ;                           upper-left corner, then incrementing first down, then right.
+;       POSITION:       in, optional, type=intarr(4), default=[1,1,1,1]
+;                       The position at which the plot is located. An array of the form
+;                           [x0,y0,x1,y1], where (x0,y0) are the normalized coordinates
+;                           of the lower-left corner and (x1,y1) are the coordinates of
+;                           the upper-right corner fo the plot.
 ;       XMARGIN:        in, optional, type=intarr(2), default=[10,3]
 ;                       Width of the left and right margins in character units.
 ;       XGAP:           in, optional, type=integer, default=14
@@ -401,6 +426,7 @@ end
 function MrGraphicAtom::init, $
 ASPECT=aspect, $
 LAYOUT=layout, $
+POSITION=position, $
 XMARGIN=xmargin, $
 XGAP=xgap, $
 YMARGIN=ymargin, $
@@ -416,23 +442,31 @@ YGAP=ygap
     endif
 
     ;Default Values
-    SetDefaultValue, layout, [1,1,1,1]
+    SetDefaultValue, layout, [0,0,0,0]
     SetDefaultValue, xmargin, [10, 3]
     SetDefaultValue, xgap, 14
     SetDefaultValue, ymargin, [4,2]
     SetDefaultValue, ygap, 6
     
-    ;Define pointers
-    self.layout = ptr_new()
-    self.aspect = ptr_new()
+    ;Define a default position
+    if array_equal(layout, [0,0,0,0]) and n_elements(position) eq 0 then begin
+        position = [0.125, 0.125, 0.925, 0.9]
+        update_layout = 0
+    endif
     
-    ;Set the object properties
-    self -> SetProperty, LAYOUT=layout, $
-                         ASPECT=aspect, $
-                         XMARGIN=xmargin, $
-                         XGAP=xgap, $
-                         YMARGIN=ymargin, $
-                         YGAP=ygap
+    ;Define pointers
+    self.aspect   = ptr_new(/ALLOCATE_HEAP)
+    self.layout   = ptr_new(/ALLOCATE_HEAP)
+
+    ;Set the object properties. Because this class is meant to be inherited, call
+    ;MrGraphicAtom::SetProperty explicitly to skip the subclass.
+    self -> MrGraphicAtom::SetProperty, LAYOUT=layout, $
+                                        ASPECT=aspect, $
+                                        POSITION=position, $
+                                        XMARGIN=xmargin, $
+                                        XGAP=xgap, $
+                                        YMARGIN=ymargin, $
+                                        YGAP=ygap
     
     return, 1
 end
@@ -446,13 +480,17 @@ end
 ;                       The class definition structure.
 ;
 ; :Fields:
+;       ASPECT:         Aspect ratio of the plot.
 ;       LAYOUT:         [nCols, nRows, col, row] or [nCols, nRows, index]. [nCols,nRows]
 ;                           is the number of columns and rows in the display. [col,row]
 ;                           is the column and row in which to place the plot. "index" is
 ;                           the plot index at which to place the plot. [col,row] locations
 ;                           begin at [1,1], "index" 0-based plot index, with 0 being the
 ;                           upper-left corner, then incrementing first down, then right.
-;       ASPECT:         Aspect ratio of the plot.
+;       POSITION:       The position at which the plot is located. An array of the form
+;                           [x0,y0,x1,y1], where (x0,y0) are the normalized coordinates
+;                           of the lower-left corner and (x1,y1) are the coordinates of
+;                           the upper-right corner fo the plot.
 ;       XMARGIN:        Width of the left and right margins in character units.
 ;       XGAP:           Horizontal space between plots, in character units.
 ;       YMARGIN:        Height of the top and bottom margins in character units.
@@ -462,8 +500,9 @@ pro MrGraphicAtom__define, class
     compile_opt idl2
     
     define = { MrGraphicAtom, $
-               layout: ptr_new(), $
                aspect: ptr_new(), $
+               layout: ptr_new(), $
+               position: fltarr(4), $
                xmargin: [0, 0], $
                xgap: 0, $
                ymargin: [0, 0], $

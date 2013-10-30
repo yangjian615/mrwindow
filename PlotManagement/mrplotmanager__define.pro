@@ -122,7 +122,11 @@
 ;       09/24/2013  -   Added TRIMLAYOUT keyword to FillHoles. ApplyPositions now adjust
 ;                           plots properly when the layout is changed. Added the
 ;                           AdjustLayout_* methods. - MRA
-;                                   
+;       09/27/2013  -   Layout and position are now always defined for graphics objects,
+;                           with the MrGraphicAtom class. Had to take this into account
+;                           in Add and AdjustLayout. Essentially, this entailed setting
+;                           UPDATE_LAYOUT=0 while setting the graphic's layout or position. - MRA
+;       09/29/2013  -   Get method was only retrieving one type of graphic, not all. Fixed. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -291,7 +295,7 @@ QUIET = quiet
     ;---------------------------------------------------------------------
         if ImA eq '' then begin
             if keyword_set(quiet) eq 0 then $
-                print, FORMAT='(%"MrPlotManager::Add: Object \"%s\" at index %i is not recognized.' + $
+                print, FORMAT='(%"MrPlotManager::Add: Object \"%s\" at index %i is not recognized. ' + $
                                   'Cannot add.")', typename(theObjects[i]), i
             continue
         endif
@@ -317,21 +321,47 @@ QUIET = quiet
             then pos_init = !Null $
             else pos_init = pos
         
-        ;Get the "location" part of the layout. Check for default Coyote Graphics position.
-        case n_elements(layout) of
-            0: if n_elements(pos) gt 0 && array_equal(pos, [0.125, 0.125, 0.925, 0.9]) $
-                    then void = temporary(pos)
-            3: loc = layout[2]
-            4: loc = layout[2:3]
-            else: begin
-                print, FOMRAT='(%"Cannot add object %s at index %i". Improper layout)', $
-                       typename(theObjects[i]), i
-                print, 'Layout = ', layout
-                skip = 1
-            endelse
-        endcase
-        if skip then continue
+    ;---------------------------------------------------------------------
+    ;Check Location //////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        
+        ;If LAYOUT[0:1]=[0,0], then no layout has been established. In this case, check
+        ;the position of the graphic.
+        if total(layout[0:1]) eq 0 then begin
+            
+            ;Check for the default Coyote Graphics location (see MrGraphicAtom__Define).
+            if (n_elements(pos) gt 0) && (array_equal(pos, [0.125, 0.125, 0.925, 0.9]) || $
+                (total(pos) eq 0)) then void = temporary(pos)
+        
+        ;If the [col,row] location was not specified, but a position was given,
+        ;make LOC undefined to indicate that the graphic will be placed at a fixed
+        ;position.
+        endif else if (total(layout[2:*]) eq 0) and n_elements(pos) gt 0 then begin
+            void = temporary(loc)
 
+        ;Otherwise, a layout has been establed. Check LAYOUT[3] for a plot index number.
+        ;If it is non-zero, then that is the location of the plot. Otherwise, we need to
+        ;generate a location.
+        endif else if n_elements(layout) eq 3 then begin
+            if  layout[2] gt 0 then loc = layout[2]
+        
+        ;If a layout has been established and LAYOUT[2:3] is a [col,row] location, then
+        ;use it. Otherwise, a location will be generated later.
+        endif else if n_elements(layout) eq 4 then begin
+            if (layout[2] gt 0) and (layout[3] gt 0) then loc = layout[2:3]
+            
+        ;If none of the above are true, then the position is ill defined.
+        endif else begin
+            print, FOMRAT='(%"Cannot add object %s at index %i". Improper layout)', $
+                   typename(theObjects[i]), i
+            print, 'Layout = ', layout
+            continue
+        endelse
+
+    ;---------------------------------------------------------------------
+    ;Generate Location ///////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        ;
         ;Set the location and position of the new plot.
         ;   If LOC is undefined, it will be returned either as an auto-updating location
         ;       (if POS is undefined) or as a fixed location (if POS is defined). If LOC
@@ -339,14 +369,18 @@ QUIET = quiet
         ;       plots will be shifted out of the way to make room.
         ;
         ;   If POS is undefined, then Auto-Updating position and location will be returned.
-        ;       If defined and LOC is undefined, 
+        ;       If POS is defined and LOC is undefined, then the location of the graphic
+        ;       will be fixed and placed exactly as specified without adjusting any of the
+        ;       other plots.
+        ;
         self -> AddToLayout, loc, pos
-        
-        ;Set the location and position as object properties
 
-        if loc[0] gt 0 then theObjects[i] -> SetProperty, LAYOUT=[self.layout[0:1], loc]
-        theObjects[i] -> SetProperty, POSITION=pos
-        
+        ;Set the location and position as object properties. Set UPDATE_LAYOUT=0 to
+        ;prevent the graphic from trying to calculate a new position for itself.
+        theObjects[i] -> SetProperty, LAYOUT=[self.layout[0:1], loc],  $
+                                      POSITION=pos, $
+                                      UPDATE_LAYOUT=0
+
         ;Store the location and position if they were created.
         outLocation[*,i] = temporary(loc)
         outPosition[*,i] = temporary(pos)
@@ -403,16 +437,16 @@ pro MrPlotManager::ApplyPositions
         case nLayout of
             3: begin
                 if array_equal(self.layout, layout[0:1]) eq 0 then begin
-                    dataObjs[i] -> SetProperty, LAYOUT=[self.layout, layout[2]]
+                    dataObjs[i] -> SetProperty, LAYOUT=[self.layout, layout[2]], UPDATE_LAYOUT=0
                     thisColRow = self -> ConvertLocation(layout[2], self.layout, /PLOT_INDEX, /TO_COLROW)
                 endif else thisColRow = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
             endcase
             
             4: begin
-                if array_equal(self.layout, layout[0:1]) eq 0 then begin
+                if (array_equal(self.layout, layout[0:1]) eq 0) and (total(layout[2:*]) gt 0) then begin
                     thisPIndex = self -> ConvertLocation(layout[2:3], layout[0:1], /TO_PLOT_INDEX)
                     thisColRow = self -> ConvertLocation(thisPIndex, self.layout, /PLOT_INDEX, /TO_COLROW)
-                    dataObjs[i] -> SetProperty, LAYOUT=[self.layout, thisColRow]
+                    dataObjs[i] -> SetProperty, LAYOUT=[self.layout, thisColRow], UPDATE_LAYOUT=0
                 endif else thisColRow = layout[2:3]
             endcase
             
@@ -421,7 +455,7 @@ pro MrPlotManager::ApplyPositions
 
         ;Update the positions of each plot.
         position = (*self.layout_positions)[*, thisColRow[0]-1, thisColRow[1]-1]
-        dataObjs[i] -> SetProperty, POSITION=position
+        dataObjs[i] -> SetProperty, POSITION=position, UPDATE_LAYOUT=0
     endfor
 end
 
@@ -485,7 +519,7 @@ DRAW=draw
         ;If we make it to here, fill a hole.
         newLocation = self -> ConvertLocation(pHoles[0], /PLOT_INDEX, /TO_COLROW)
         newPosition = (*self.layout_positions)[*, newLocation[0]-1, newLocation[1]-1]
-        theseObj[i] -> SetProperty, LAYOUT=[self.layout, newLocation], POSITION=newPosition
+        theseObj[i] -> SetProperty, LAYOUT=[self.layout, newLocation], POSITION=newPosition, UPDATE_LAYOUT=0
         
         ;Now there is a hole in the old location
         pHoles[0] = thisPIndex
@@ -665,17 +699,17 @@ TEXT = text
 ;---------------------------------------------------------------------
     endif else begin
         ;Get specific object types?
-        if keyword_set(annotate) then if n_elements(isa) eq 0 then isa = [(*self.gTypes).annotate] else isa = (*self.gTypes).annotate    
-        if keyword_set(arrow)    then if n_elements(isa) eq 0 then isa = [(*self.gTypes).arrow]    else isa = (*self.gTypes).arrow    
-        if keyword_set(axis)     then if n_elements(isa) eq 0 then isa = [(*self.gTypes).axis]     else isa = (*self.gTypes).axis    
-        if keyword_set(colorbar) then if n_elements(isa) eq 0 then isa = [(*self.gTypes).colorbar] else isa = (*self.gTypes).colorbar    
-        if keyword_set(contour)  then if n_elements(isa) eq 0 then isa = [(*self.gTypes).contour]  else isa = (*self.gTypes).contour    
-        if keyword_set(data)     then if n_elements(isa) eq 0 then isa = [(*self.gTypes).data]     else isa = (*self.gTypes).data    
-        if keyword_set(image)    then if n_elements(isa) eq 0 then isa = [(*self.gTypes).image]    else isa = (*self.gTypes).image    
-        if keyword_set(legend)   then if n_elements(isa) eq 0 then isa = [(*self.gTypes).legend]   else isa = (*self.gTypes).legend    
-        if keyword_set(overplot) then if n_elements(isa) eq 0 then isa = [(*self.gTypes).overplot] else isa = (*self.gTypes).overplot    
-        if keyword_set(plot)     then if n_elements(isa) eq 0 then isa = [(*self.gTypes).plot]     else isa = (*self.gTypes).plot    
-        if keyword_set(text)     then if n_elements(isa) eq 0 then isa = [(*self.gTypes).text]     else isa = (*self.gTypes).text
+        if keyword_set(annotate) then if n_elements(isa) eq 0 then isa = (*self.gTypes).annotate else isa = [isa, (*self.gTypes).annotate]
+        if keyword_set(arrow)    then if n_elements(isa) eq 0 then isa = (*self.gTypes).arrow    else isa = [isa, (*self.gTypes).arrow]
+        if keyword_set(axis)     then if n_elements(isa) eq 0 then isa = (*self.gTypes).axis     else isa = [isa, (*self.gTypes).axis]
+        if keyword_set(colorbar) then if n_elements(isa) eq 0 then isa = (*self.gTypes).colorbar else isa = [isa, (*self.gTypes).colorbar]
+        if keyword_set(contour)  then if n_elements(isa) eq 0 then isa = (*self.gTypes).contour  else isa = [isa, (*self.gTypes).contour]
+        if keyword_set(data)     then if n_elements(isa) eq 0 then isa = (*self.gTypes).data     else isa = [isa, (*self.gTypes).data]
+        if keyword_set(image)    then if n_elements(isa) eq 0 then isa = (*self.gTypes).image    else isa = [isa, (*self.gTypes).image]
+        if keyword_set(legend)   then if n_elements(isa) eq 0 then isa = (*self.gTypes).legend   else isa = [isa, (*self.gTypes).legend]
+        if keyword_set(overplot) then if n_elements(isa) eq 0 then isa = (*self.gTypes).overplot else isa = [isa, (*self.gTypes).overplot]
+        if keyword_set(plot)     then if n_elements(isa) eq 0 then isa = (*self.gTypes).plot     else isa = [isa, (*self.gTypes).plot]
+        if keyword_set(text)     then if n_elements(isa) eq 0 then isa = (*self.gTypes).text     else isa = [isa, (*self.gTypes).text]
         
         ;Make sure All is used with IsA
         if n_elements(IsA) gt 0 then All = 1
@@ -742,6 +776,7 @@ TYPE = type
     if keyword_set(all) then begin
         self -> MrIDL_Container::Remove, /ALL, DESTROY=destroy
         self -> ClearLayout
+        if keyword_set(draw) then self -> Draw
         return
     endif
         
@@ -952,9 +987,7 @@ TOFIXED = toFixed
 ;Set the Position ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;Update the position and layout    
-    if outLocation[0] lt 0 $
-        then theObj -> SetProperty, LAYOUT=[0,0,0,0], POSITION=outPosition $
-        else theObj -> SetProperty, LAYOUT=[self.layout, outLocation], POSITION=outPosition
+    theObj -> SetProperty, LAYOUT=[self.layout, outLocation], POSITION=outPosition, UPDATE_LAYOUT=0
         
     ;Draw?
     If keyword_set(draw) then self -> Draw
@@ -1037,7 +1070,7 @@ pro MrPlotManager::ShiftPlots, location
         thisPIndex += 1
         newLocation = self -> ConvertLocation(thisPIndex, layout, /PLOT_INDEX, /TO_COLROW)
         newPosition = (*self.layout_positions)[*, newLocation[0]-1, newLocation[1]-1]
-        theseObj[i] -> SetProperty, LAYOUT=[layout, newLocation], POSITION=newPosition
+        theseObj[i] -> SetProperty, LAYOUT=[layout, newLocation], POSITION=newPosition, UPDATE_LAYOUT=0
     endfor
 end
 
@@ -1101,16 +1134,16 @@ function MrPlotManager::WhatAmI, objRef
     ;What type of object is it?
     className = typename(objRef)
     case className of
-        'MRPLOTOBJECT':  ImA = 'PLOT'
-        'MRIMAGEOBJECT': ImA = 'IMAGE'
-        'MRCONTOUR':     ImA = 'CONTOUR'
-        'WECOLORBAR':    ImA = 'COLORBAR'
-        'WETEXT':        ImA = 'TEXT'
-        'WEARROW':       ImA = 'ARROW'
-        'WEOVERPLOT':    ImA = 'OVERPLOT'
-        'WELEGENDITEM':  ImA = 'LEGEND'
-        'WEAXIS':        ImA = 'AXIS'
-        else:            ImA = ''
+        'MRPLOT':       ImA = 'PLOT'
+        'MRIMAGE':      ImA = 'IMAGE'
+        'MRCONTOUR':    ImA = 'CONTOUR'
+        'WECOLORBAR':   ImA = 'COLORBAR'
+        'WETEXT':       ImA = 'TEXT'
+        'WEARROW':      ImA = 'ARROW'
+        'WEOVERPLOT':   ImA = 'OVERPLOT'
+        'WELEGENDITEM': ImA = 'LEGEND'
+        'WEAXIS':       ImA = 'AXIS'
+        else:           ImA = ''
     endcase
     
     return, ImA
@@ -1133,8 +1166,8 @@ pro MrPlotManager::Config
     endif
     
     ;Class names of the supported graphics types
-    types = { plot: ['PLOT', 'MRPLOTOBJECT'], $
-              image: ['IMAGE', 'MRIMAGEOBJECT'], $
+    types = { plot: ['PLOT', 'MRPLOT'], $
+              image: ['IMAGE', 'MRIMAGE'], $
               contour: ['CONTOUR', 'MRCONTOUR'], $
               colorbar: ['WECOLORBAR'], $
               axis: ['WEAXIS'], $
@@ -1142,9 +1175,10 @@ pro MrPlotManager::Config
               arrow: ['WEARROW'], $
               text: ['WETEXT'], $
               overplot: ['WEOVERPLOT'], $
+              plots: ['MRPLOTS'], $
               ImAData: ['PLOT', 'IMAGE', 'CONTOUR'], $     ;TO BE USED WITH ::WHATAMI
-              data: ['PLOT', 'MRPLOTOBJECT', 'IMAGE', 'MRIMAGEOBJECT', 'CONTOUR', 'MRCONTOUR'], $
-              annotate: ['WECOLORBAR', 'WEAXIS', 'WELEGENDITEM', 'WEARROW', 'WETEXT'], $
+              data: ['PLOT', 'MRPLOT', 'IMAGE', 'MRIMAGE', 'CONTOUR', 'MRCONTOUR'], $
+              annotate: ['WECOLORBAR', 'WEAXIS', 'WELEGENDITEM', 'WEARROW', 'WETEXT', 'MRPLOTS', 'WEOVERPLOT'], $
               files: ['CDF_PLOT'] $
             }
     

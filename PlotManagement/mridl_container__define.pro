@@ -228,9 +228,9 @@ TYPE = type
 ;--------------------------------------------------------------------- 
     ;Remove all objects?
     if keyword_set(all) then begin
-        if destroy then allObj = self -> Get(/ALL)
+        if destroy then allObj = self -> Get(/ALL, COUNT=nObj)
         self -> IDL_Container::Remove, /ALL
-        if destroy then obj_destroy, allObj
+        if destroy then for i = 0, nObj-1 do obj_destroy, allObj[i]
         return
     endif
         

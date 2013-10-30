@@ -110,6 +110,19 @@ PATH_XY=path_xy
     GetOLevels = Arg_Present(oLevels)
     GetPath_Info = Arg_Present(path_info)
     GetPath_XY = Arg_Present(path_xy)
+    
+    ;If a graphic is provided, sync properties
+    if obj_valid(self.graphic) then begin
+        self.graphic -> GetProperty, POSITION=position, $
+                                     LAYOUT=layout, $
+                                     XRANGE=xrange, $
+                                     YRANGE=yrange
+        
+        self.position = position
+        *self.layout = layout
+        *self.xrange = xrange
+        *self.yrange = yrange
+    endif
 
     ;Now draw the plot to the pixmap
     if GetPath_Info || GetPath_XY then begin
@@ -129,7 +142,7 @@ PATH_XY=path_xy
     
     ;Draw the other items
     oContained = self -> Get(/ALL, COUNT=count)
-    for i = 0, count - 1 do oContained[i] -> Draw
+    if count gt 0 then for i = 0, count - 1 do oContained[i] -> Draw
 end
 
 
@@ -162,11 +175,13 @@ PATH_XY=path_xy
     if obj_valid(self.graphic) then begin
         ;Copy its location and coordinates.
         self.graphic -> GetProperty, INDEP=xcoords, DEP=ycoords, POSITION=position, $
-                                     XRANGE=xrange, YRANGE=yrange
+                                     LAYOUT=layout, XRANGE=xrange, YRANGE=yrange
 
         ;Set object properties and mimic OVERPLOT functionality
         self -> SetProperty, XCOORDS=xcoords, YCOORDS=ycoords, $
+                             LAYOUT=layout, $
                              POSITION=position, $
+                             UPDATE_LAYOUT=0, $
                              XRANGE=xrange, $
                              XSTYLE=4, $
                              YRANGE=yrange, $
@@ -186,9 +201,9 @@ PATH_XY=path_xy
         cgContour, *self.c_data, *self.xcoords, *self.ycoords, $
                 
                    ;cgContour Keywords
-                   ASPECT           = *self.aspect, $
+;                   ASPECT           = *self.aspect, $
                    LABEL            =  self.label, $
-                   LAYOUT           = *self.layout, $
+;                   LAYOUT           = *self.layout, $
                    MAP_OBJECT       =  self.map_object, $
                    OLEVELS          =       oLevels, $
                    ONIMAGE          =  self.onImage, $
@@ -227,8 +242,11 @@ PATH_XY=path_xy
                    PATH_FILENAME    = *self.path_filename, $
                    RESOLUTION       = *self.resolution, $
                    TRIANGULATION    = *self.triangulation, $
-                   XLOG      = *self.xlog, $
-                   YLOG      = *self.ylog, $
+                   XLOG             = *self.xlog, $
+                   YLOG             = *self.ylog, $
+                   
+                   ;MrGraphicsAtom Keywords
+                   POSITION      = self.position, $
               
                    ;weGraphicsKeywords
                    AXISCOLOR     = *self.axiscolor, $
@@ -244,7 +262,6 @@ PATH_XY=path_xy
                    NOCLIP        = *self.noclip, $
                    NODATA        = *self.nodata, $
                    NOERASE       = noerase, $
-                   POSITION      = *self.position, $
 ;                   PSYM          = *self.psym, $
                    SUBTITLE      = *self.subtitle, $
 ;                   SYMSIZE       = *self.symsize, $
@@ -274,8 +291,8 @@ PATH_XY=path_xy
                    YRANGE        = *self.yrange, $
                    YSTYLE        = *self.ystyle, $
                    YTHICK        = *self.ythick, $
-                   YTICK_GET     = *self.ytick_get, $
-                   YTICKFORMAT   = *self.ytickformat;, $
+    ;               YTICK_GET     = *self.ytick_get, $
+                   YTICKFORMAT   = *self.ytickformat, $
     ;               YTICKINTERVAL = *self.ytickinterval, $
     ;               YTICKLAYOUT   = *self.yticklayout, $
     ;               YTICKLEN      = *self.yticklen, $
@@ -283,7 +300,7 @@ PATH_XY=path_xy
     ;               YTICKS        = *self.yticks, $
     ;               YTICKUNITS    = *self.ytickunits, $
     ;               YTICKV        = *self.ytickv, $
-    ;               YTITLE        = *self.ytitle, $
+                   YTITLE        = *self.ytitle;, $
     ;               ZCHARSIZE     = *self.zcharsize, $
     ;               ZGRIDSTYLE    = *self.zgridstyle, $
     ;               ZMARGIN       = *self.zmargin, $
@@ -630,13 +647,20 @@ P_SYSVAR=p_sysvar, $
 X_SYSVAR=x_sysvar, $
 Y_SYSVAR=y_sysvar, $
 
-;cgContour Properties
+;MrGraphicAtom Keywords
 ASPECT=aspect, $
+LAYOUT=layout, $
+POSITION=position, $
+XMARGIN=xmargin, $
+XGAP=xgap, $
+YMARGIN=ymargin, $
+YGAP=ygap, $
+
+;cgContour Properties
 AXISCOLOR=axiscolor, $
 AXESCOLOR=axescolor, $
 BACKGROUND=sbackground, $
 LABEL=label, $
-LAYOUT=layout, $
 MAP_OBJECT=map_object, $
 MISSINGVALUE=missingvalue, $
 OLEVELS=olevels, $
@@ -699,12 +723,10 @@ _REF_EXTRA=extra
     if arg_present(y_sysvar)      ne 0 then y_sysvar      =  self.y_sysvar
     
     ;cgContour Properties
-    if arg_present(aspect)        ne 0 then aspect        = *self.aspect
     if arg_present(axiscolor)     ne 0 then axiscolor     = *self.axiscolor
     if arg_present(axescolor)     ne 0 then axescolor     = *self.axiscolor
     if arg_present(background)    ne 0 then background    = *self.background
     if arg_present(label)         ne 0 then label         =  self.label
-    if arg_present(layout)        ne 0 then layout        = *self.layout
     if arg_present(olevels)       ne 0 then olevels       = *self.olevels
     if arg_present(onimage)       ne 0 then onimage       =  self.onimage
     if arg_present(outcolor)      ne 0 then outcolor      = *self.outcolor
@@ -751,6 +773,11 @@ _REF_EXTRA=extra
     if arg_present(map_object) ne 0 then if obj_valid(self.map_object) $
         then map_object = self.map_object $
         else map_object = obj_new()
+    
+    ;Graphic Atom
+    self -> MrGraphicAtom::GetProperty, ASPECT=aspect, LAYOUT=layout, POSITION=position, $
+                                        XMARGIN=xmargin, XGAP=xgap, $
+                                        YMARGIN=ymarin, YGAP=ygap
 
     ;Superclass properties
     if n_elements(extra) ne 0 then self -> weGraphicsKeywords::GetProperty, _STRICT_EXTRA=extra
@@ -936,12 +963,10 @@ X_SYSVAR=x_sysvar, $
 Y_SYSVAR=y_sysvar, $
 
 ;cgContour Properties
-ASPECT=aspect, $
 AXISCOLOR=axiscolor, $
 AXESCOLOR=axescolor, $
 BACKGROUND=background, $
 LABEL=label, $
-LAYOUT=layout, $
 MAP_OBJECT=map_object, $
 MISSINGVALUE=missingvalue, $
 ONIMAGE=onImage, $
@@ -983,6 +1008,8 @@ XLOG=xlog, $
 YLOG=ylog, $
 
 ;Graphics Keywords
+POSITION = position, $
+LAYOUT   = layout, $
 XSTYLE   = xstyle, $
 YSTYLE   = ystyle, $
 _REF_EXTRA=extra
@@ -996,31 +1023,45 @@ _REF_EXTRA=extra
         return
     endif
     
-    ;Bad spellers...
-    if n_elements(axesColor) ne 0 && n_elements(axisColor) eq 0 then axisColor = axesColor
-    
     ;Graphic
     if n_elements(graphic) ne 0 and obj_valid(graphic) then begin
         ;Make sure it is a MrImageObject.
-        if (typename(graphic) ne 'MRIMAGEOBJECT') then $
-            message, 'GRAPHIC must be a MrImageObject class. Cannot use.', /INFORMATIONAL
+        if (typename(graphic) ne 'MRIMAGE') then $
+            message, 'GRAPHIC must be a MrImage class. Cannot use.', /INFORMATIONAL
             
-        ;Copy its location and coordinates.
+        ;Copy its location and coordinates. They will be set below.
         graphic -> GetProperty, INDEP=xcoords, $
                                 DEP=ycoords, $
+                                LAYOUT=layout, $
                                 POSITION=position, $
                                 XRANGE=xrange, $
                                 YRANGE=yrange
         
+        ;Make sure the position is defined.
+        if n_elements(position) eq 0 then $
+            message, 'GRAPHIC does not have a specified POSITION. Cannot overplot.'
+
         ;Mimic overplotting
         xstyle   = 4
         ystyle   = 4
         overplot = 0
-        *self.position = position
+        update_layout = 0
         
+        ;Set position and layout here. Make sure they become undefined so that they
+        ;are not set again later. Leave the last two elements of layout [0,0] to
+        ;indicate that the position is being used.
+        self.position = temporary(position)
+        *self.layout = [layout[0:1], 0, 0]
+        *self.xrange = xrange
+        *self.yrange = yrange
+        void = temporary(layout)
+
         ;Store the graphic
         self.graphic = graphic
     endif
+    
+    ;Bad spellers...
+    if n_elements(axesColor) ne 0 && n_elements(axisColor) eq 0 then axisColor = axesColor
 
     ;MrContour Properties
     if n_elements(c_data)        ne 0 then *self.c_data        = c_data
@@ -1031,11 +1072,9 @@ _REF_EXTRA=extra
     if n_elements(y_sysvar)      ne 0 then y_sysvar            = self.y_sysvar
     
     ;cgContour Properties
-    if n_elements(aspect)        ne 0 then *self.aspect        = aspect
     if n_elements(axiscolor)     ne 0 then *self.axiscolor     = axiscolor
     if n_elements(background)    ne 0 then *self.background    = background
     if n_elements(label)         ne 0 then  self.label         = label
-    if n_elements(layout)        ne 0 then *self.layout        = layout
     if n_elements(missingvalue)  ne 0 then *self.missingvalue  = missingvalue
     if n_elements(onimage)       ne 0 then  self.onimage       = onimage
     if n_elements(outcolor)      ne 0 then *self.outcolor      = outcolor
@@ -1081,11 +1120,20 @@ _REF_EXTRA=extra
         if obj_valid(self.map_object) then obj_destroy, self.map_object
         self.map_object = map_object
     endif
-
+    
     ;Superclass properties
+    if n_elements(extra) gt 0 || n_elements(position) gt 0 || n_elements(layout) gt 0 then begin
+        ;Graphic Atom
+        atom_kwds = ['ASPECT', 'LAYOUT', 'POSITION', 'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
+        void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
+        if nAtom gt 0 then self -> MrGraphicAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
+
+        ;weGraphicsKeywords properties
+        if nExtra gt 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
+    endif
+    
     if n_elements(xstyle) ne 0 then *self.xstyle = ~(xstyle and 1) + xstyle
     if n_elements(ystyle) ne 0 then *self.ystyle = ~(ystyle and 1) + ystyle
-    if n_elements(extra)  ne 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra
 end
 
 
@@ -1107,7 +1155,6 @@ pro MrContour::cleanup
     ptr_free, self.c_data
     ptr_free, self.xcoords
     ptr_free, self.ycoords
-    ptr_free, self.aspect
     ptr_free, self.axiscolor
     ptr_free, self.background
     ptr_free, self.c_annotation
@@ -1126,7 +1173,6 @@ pro MrContour::cleanup
     ptr_free, self.follow
     ptr_free, self.irregular
     ptr_free, self.isotropic
-    ptr_free, self.layout
     ptr_free, self.levels
     ptr_free, self.nlevels
     ptr_free, self.max_value
@@ -1151,6 +1197,7 @@ pro MrContour::cleanup
     ;the superclasses method has been over-ridden here.
     self -> weGraphicsKeywords::Cleanup
     self -> MrIDL_Container::Cleanup
+    self -> MrGraphicAtom::Cleanup
 end
 
 
@@ -1383,12 +1430,10 @@ XLOG=xlog, $
 YLOG=ylog, $
 
 ;cgContour Keywords
-ASPECT=aspect, $
 AXISCOLOR=axiscolor, $
 AXESCOLOR=axescolor, $
 BACKGROUND=sbackground, $
 LABEL=label, $
-LAYOUT=layout, $
 MAP_OBJECT=map_object, $
 MISSINGVALUE=missingvalue, $
 OLEVELS=olevels, $
@@ -1399,6 +1444,17 @@ OUTLINE=outline, $
 OUTPUT=output, $
 PALETTE=palette, $
 TRADITIONAL=traditional, $
+
+;MrGraphicAtom Keywords
+ASPECT=aspect, $
+LAYOUT=layout, $
+POSITION=position, $
+XMARGIN=xmargin, $
+XGAP=xgap, $
+YMARGIN=ymargin, $
+YGAP=ygap, $
+
+;weGraphicsKeywords
 _REF_EXTRA=extra
     
     Compile_Opt idl2
@@ -1411,13 +1467,22 @@ _REF_EXTRA=extra
     endif
     
 ;---------------------------------------------------------------------
-;Defaults ////////////////////////////////////////////////////////////
+;Superclasses ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
     ;Superclass initialization methods
     if self -> IDL_Object::Init()      eq 0 then return, 0
     if self -> MrIDL_Container::Init() eq 0 then return, 0
-    if self -> weGraphicsKeywords::Init(_STRICT_EXTRA=extra) eq 0 then return, 0
+    if self -> weGraphicsKeywords::Init(CHARSIZE=1.0, _STRICT_EXTRA=extra) eq 0 then return, 0
+
+    ;Graphic Atom
+    if self -> MrGraphicAtom::INIT(ASPECT=aspect, LAYOUT=layout, POSITION=position, $
+                                   XMARGIN=xmargin, XGAP=xgap, $
+                                   YMARGIN=ymargin, YGAP=ygap) eq 0 then return, 0
+
+;---------------------------------------------------------------------
+;Defaults ////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     
     ;Provision for bad spellers
     if n_elements(axisColor) eq 0 and n_elements(axesColor) ne 0 then axisColor = axesColor
@@ -1462,7 +1527,6 @@ _REF_EXTRA=extra
     self.c_data           = Ptr_New(/ALLOCATE_HEAP)
     self.xcoords          = Ptr_New(/ALLOCATE_HEAP)
     self.ycoords          = Ptr_New(/ALLOCATE_HEAP)
-    self.aspect           = Ptr_New(/ALLOCATE_HEAP)
     self.axiscolor        = Ptr_New(/ALLOCATE_HEAP)
     self.background       = Ptr_New(/ALLOCATE_HEAP)
     self.c_annotation     = Ptr_New(/ALLOCATE_HEAP)
@@ -1481,7 +1545,6 @@ _REF_EXTRA=extra
     self.follow           = Ptr_New(/ALLOCATE_HEAP)
     self.irregular        = Ptr_New(/ALLOCATE_HEAP)
     self.isotropic        = Ptr_New(/ALLOCATE_HEAP)
-    self.layout           = Ptr_New(/ALLOCATE_HEAP)
     self.levels           = Ptr_New(/ALLOCATE_HEAP)
     self.nlevels          = Ptr_New(/ALLOCATE_HEAP)
     self.max_value        = Ptr_New(/ALLOCATE_HEAP)
@@ -1517,13 +1580,11 @@ _REF_EXTRA=extra
                          GRAPHIC=graphic, $
                          
                          ;cgContour Keywords
-                         ASPECT=aspect, $
                          AXISCOLOR=axiscolor, $
                          AXESCOLOR=axescolor, $
                          BACKGROUND=background, $
                          COLOR=color, $
                          LABEL=label, $
-                         LAYOUT=layout, $
                          MAP_OBJECT=map_object, $
                          ONIMAGE=onImage, $
                          OUTCOLOR=outcolor, $
@@ -1632,10 +1693,10 @@ pro MrContour__define, class
               y_sysvar: !Y, $
               
               ;cgContour Properties
-              aspect: Ptr_New(), $
+;              aspect: Ptr_New(), $
+;              layout: Ptr_New(), $
               label: 0, $
-              layout: Ptr_New(), $
-              map_object: obj_new(), $
+              map_object: Obj_New(), $
               missingvalue: Ptr_New(), $
               olevels: Ptr_New(), $
               onImage: 0B, $

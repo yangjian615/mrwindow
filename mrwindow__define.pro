@@ -403,7 +403,9 @@ pro MrWindow::Draw_Events, event
         return
     endif
 
-    tf_zoomable = self -> isZoomable()
+    ;If a button press happened, we need to focus first. If anything else happened,
+    ;we need to know if the object of focus is zoomable right away.
+    if event.type ne 0 then tf_zoomable = self -> isZoomable()
 
 ;---------------------------------------------------------------------
 ;Button Press Events /////////////////////////////////////////////////
@@ -411,6 +413,7 @@ pro MrWindow::Draw_Events, event
 
     if event.type eq 0 then begin
         self -> Focus, event      ; Always Focus
+        tf_zoomable = self -> isZoomable()
         
         ;Cursor Events
         if ((self.cmode and 1) gt 0) then self -> Get_Point, event  ;Get Point
@@ -504,9 +507,9 @@ pro MrWindow::Draw_Events, event
             if self.arrowmode[0] eq 2 then self -> Adjust_Arrow, event    ;Move arrow
             if self.arrowmode[0] eq 4 then self -> Adjust_Arrow, event    ;Stretch/Rotate arrow
         endif
-        
+
         ;Do not compete for drawing (Pan)
-        if self.zmode eq 8 then self -> Draw                            ;Pan
+;        if self.zmode eq 8 then self -> Draw                            ;Pan
     endif
 
 ;---------------------------------------------------------------------
@@ -565,9 +568,10 @@ pro MrWindow::Focus, event
     ;---------------------------------------------------------------------
     ;Find the Objects that Were Clicked //////////////////////////////////
     ;---------------------------------------------------------------------
-        dataObj = self -> Get(/ALL, COUNT=nObj)
+        ;Get all of the objects that are selectable
+        dataObj = self -> Get(/PLOT, /IMAGE, /COLORBAR, /CONTOUR, COUNT=nObj)
         if nObj eq 0 then return
-        
+
         tf_clicked = bytarr(nObj)
         delta = fltarr(nObj)
         for i = 0, nObj - 1 do begin
@@ -583,7 +587,7 @@ pro MrWindow::Focus, event
         if nClicked eq 0 $
             then self.focus = obj_new() $
             else self.focus = dataObj[iClicked]
-        
+
 ;---------------------------------------------------------------------
 ;Container Index Given? //////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1048,6 +1052,10 @@ DRAW = draw
         return
     endif
 
+    ;Make sure the dimensions of the new window are >= 0. Ambiguous error results otherwise:
+    ;"integer parameter out of range for operation"
+    if xsize le 0 or ysize le 0 then message, 'XSIZE and YSIZE must be = 0.'
+
 ;---------------------------------------------------------------------
 ;Check Windows ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1064,7 +1072,7 @@ DRAW = draw
 ;---------------------------------------------------------------------
 ;Pixmap //////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    
+
     ;Delete the pixmap, then create a new pixmap window at the new size
     wdelete, self.pixID
     self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, /PIXMAP)
@@ -1093,8 +1101,7 @@ DRAW = draw
     self.xsize = xsize
     self.ysize = ysize
 
-    ;Recalculate and apply positions in resized window. MrWindow::SetProperty redirects
-    ;to hear, so be sure to call the superclass method explicitly.
+    ;Recalculate and apply positions in resized window.
     self -> CalcLayoutPositions
     self -> ApplyPositions
     
@@ -1169,13 +1176,18 @@ _REF_EXTRA = extra
     if n_elements(index) ne 0 then begin
         ;Get object to be changed
         theObj = self -> Get(POSITION=index)
-        
-        ;Set the [XY]Range
-        theObj -> SetProperty, XRANGE=xrange, YRANGE=yrange, _EXTRA=extra
-        
+                
         ;Apply axis bindings if ranges were set. Set RANGE, if it was provided
-        if n_elements(xrange) ne 0 then self -> Apply_Bindings, theOBj, /XAXIS
-        if n_elements(yrange) ne 0 then self -> Apply_Bindings, theObj, /YAXIS
+        if n_elements(xrange) ne 0 then begin
+            theObj -> SetProperty, XRANGE=xrange
+            self -> Apply_Bindings, theOBj, /XAXIS
+        endif
+        
+        if n_elements(yrange) ne 0 then begin
+            theObj -> SetProperty, YRANGE=yrange
+            self -> Apply_Bindings, theObj, /YAXIS
+        endif
+        
         if n_elements( range) ne 0 then begin
             theObj -> SetProperty, RANGE=range
             self -> Apply_Bindings, theObj, /CAXIS
@@ -1348,7 +1360,7 @@ pro MrWindow::Turn_Everything_Off, tlb
     self -> MrCursor::Turn_Everything_Off, tlb
     
     ;ZOOM
-    self -> MrZoom::Turn_Everything_Off, tlb
+    self -> MrZoom::Turn_Zoom_Off, tlb
 end
 
 
@@ -1413,7 +1425,9 @@ pro MrWindow::whichObjects
     
     ;Get all of the data objects
     dataObj = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nData)
-    index = self -> GetIndex(dataObj)
+    if nData gt 0 $
+        then index = self -> GetIndex(dataObj) $
+        else print, 'None'
     
     ;The string length of the longest type
     typeLen = string(max(strlen((*self.gTypes).data)), FORMAT='(i0)')
@@ -1461,14 +1475,14 @@ pro MrWindow::whichObjects
                               FORMAT='(a9, 4x, a' + typeLen + ', 4x, a12)'
                               
         ;Get the object's position and layout
-        dataObj[i] -> GetProperty, POSITION=position
+;        annObj[i] -> GetProperty, POSITION=position
         
         ;Print the type-name, location, and position
         sIndex    = string(index[i], FORMAT='(i2)')
-        sPosition = string(position, FORMAT='(%"[%6.4f, %6.4f, %6.4f, %6.4f]")')
+;        sPosition = string(position, FORMAT='(%"[%6.4f, %6.4f, %6.4f, %6.4f]")')
 
-        print, FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a32)', $
-               sIndex, typename(annObj[i]), sPosition
+        print, FORMAT='(4x, a2, 7x, a' + typeLen + ')', $;, 5x, a32)', $
+               sIndex, typename(annObj[i]);, sPosition
     
     endfor
     print, ''

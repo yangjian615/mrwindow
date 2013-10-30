@@ -52,6 +52,7 @@
 ;       08/15/2013  -   Written by Matthew Argall.
 ;       08/23/2013  -   Draw and Add by default. If not adding, call the particular
 ;                           object's draw method. - MRA
+;       08/27/2013  -   Legend and overplots are now drawn and added by default.
 ;-
 ;*****************************************************************************************
 ;+
@@ -296,7 +297,7 @@ _REF_EXTRA = extra
     SetDefaultValue, draw, 1, /BOOLEAN
 
     ;Create the color bar
-    theImage = obj_new('MrImageObject', image, x, y, _STRICT_EXTRA=extra, DRAW=0)
+    theImage = obj_new('MrImage', image, x, y, _STRICT_EXTRA=extra, DRAW=0)
     
     ;Add the image
     if keyword_set(add) then self -> Add, theImage
@@ -344,11 +345,12 @@ _REF_EXTRA = extra
     ;Create the legend
     theLegend = obj_new('weLegendItem', _STRICT_EXTRA=extra)
     
-    ;Add the legend?
+    ;Add the legend
     if keyword_set(add) then self -> Add, theLegend
     
-    ;Draw?
-    if keyword_set(draw) then self -> Draw
+    ;Draw    
+    if keyword_set(draw) then $
+        if (add eq 1) then self -> Draw else theLegend -> Draw
     
     return, theLegend
 end
@@ -396,14 +398,19 @@ _REF_EXTRA = extra
         return, obj_new()
     endif
 
+    ;Set Defaults
+    SetDefaultValue, add, 1, /BOOLEAN
+    SetDefaultValue, draw, 1, /BOOLEAN
+
     ;Create a cgOverPlot object
     theOverplot = obj_new('weOverPlot', x, y, _STRICT_EXTRA=extra)
-
-    ;Add the overplot to the array of overplots
+    
+    ;Add the OverPlot
     if keyword_set(add) then self -> Add, theOverplot
     
-    ;Re-Draw
-    if keyword_set(draw) then self -> Draw
+    ;Draw    
+    if keyword_set(draw) then $
+        if (add eq 1) then self -> Draw else theOverplot -> Draw
     
     return, theOverplot
 end
@@ -447,7 +454,7 @@ _REF_EXTRA = extra
     SetDefaultValue, draw, 1, /BOOLEAN
 
     ;Create the plot
-    thePlot = obj_new('MrPlotObject', x, y, _STRICT_EXTRA=extra, DRAW=0)
+    thePlot = obj_new('MrPlot', x, y, _STRICT_EXTRA=extra, DRAW=0)
     
     ;Add the plot
     if (add eq 1) then self -> Add, thePlot
@@ -458,6 +465,58 @@ _REF_EXTRA = extra
     
     return, thePlot
 end
+
+
+;+
+;   Create a MrPlotObject object. It can be drawn to the display and/or
+;   added to the container
+;
+; :Keywords:
+;       ADD:                in, optional, type=boolean, default=1
+;                           Add the plot object to the container. This assumes that the
+;                               IDL_Container class or MrIDL_Container class is also a
+;                               subclass.
+;       DRAW:               in, optional, type=boolean, default=1
+;                           Call the Draw method after adding the plot to the list.
+;       _REF_EXTRA:         in, optional, type=structure
+;                           Any keyword accepted by MrPlotObject__define.
+;
+; :Returns:
+;       THEPLOTS:           out, required, type=object
+;                           A reference to the PlotS object.
+;   
+;-
+function MrCreateGraphic::PlotS, x, y, z, $
+ADD = add, $
+DRAW = draw, $
+_REF_EXTRA = extra
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, obj_new()
+    endif
+
+    ;Set Defaults
+    SetDefaultValue, add, 1, /BOOLEAN
+    SetDefaultValue, draw, 1, /BOOLEAN
+
+    ;Create the plot
+    thePlotS = obj_new('MrPlotS', x, y, z, _STRICT_EXTRA=extra, DRAW=0)
+    
+    ;Add the plot
+    if (add eq 1) then self -> Add, thePlotS
+    
+    ;Draw    
+    if keyword_set(draw) then $
+        if (add eq 1) then self -> Draw else thePlotS -> Draw
+    
+    return, thePlotS
+end
+
 
 
 ;+
