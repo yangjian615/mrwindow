@@ -64,10 +64,13 @@
 .comp ./utilities/epoch_to_ssm.pro
 .comp ./utilities/file_extension.pro
 .comp ./utilities/ht_velocity.pro
-.comp ./utilities/image_plots.pro
 .comp ./utilities/ismember.pro
 .comp ./utilities/load_color.pro
 .comp ./utilities/mrgetwindow.pro
+.comp ./utilities/mrimage.pro
+.comp ./utilities/mrpixelcorners.pro
+.comp ./utilities/mrpixeldeltas.pro
+.comp ./utilities/mrpixelpoints.pro
 .comp ./utilities/mrplotlayout.pro
 .comp ./utilities/time_select.pro   ;Must be before mva.pro to compile correctly
 .comp ./utilities/mva.pro

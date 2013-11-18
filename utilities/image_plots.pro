@@ -1,1 +1,0 @@
-/Users/argall/Documents/Work/Programs/MyLibraryIDL/plot_utils/image_plots.pro

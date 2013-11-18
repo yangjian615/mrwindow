@@ -165,6 +165,7 @@
 ;                           re-written and renamed to SetPosition. - MRA
 ;       09/24/2013  -   Calling SetProperty with the LAYOUT keyword now works. Check if
 ;                           the new layout is large enough to fit all of the plots. The
+;       2013/11/17  -   Added the CHARSIZE property. - MRA
 ;                           
 ;-
 ;*****************************************************************************************
@@ -275,6 +276,7 @@ pro MrPlotLayout::CalcLayoutPositions
     ;Calculate positions
     *self.layout_positions = MrPlotLayout(self.layout, $
                                           ASPECT = *self.aspect, $
+                                          CHARSIZE = self.charsize, $
                                           XGAP = self.xgap, $
                                           XMARGIN = self.xmargin, $
                                           YGAP = self.ygap, $
@@ -705,6 +707,8 @@ end
 ;                       The aspect ratio (plot height/plot width) of each plot. For square
 ;                           plots, ASPECT=1.0, for plots that are twice as wide as the are
 ;                           long, ASPECT=0.5.
+;       CHARSIZE:       out, optional, type=float, default=1.5
+;                       Fraction of IDL's default character size.
 ;       LAYOUT:         out, required, type=intarr(2)
 ;                       A 2 element vector specifying the number of plots in the vertical
 ;                           and horizontal directions, [ncols, nrows].
@@ -729,6 +733,7 @@ end
 ;-
 pro MrPlotLayout::GetProperty, $
 ASPECT = aspect, $
+CHARSIZE = charsize, $
 LAYOUT = layout, $
 LOCATION = location, $
 NPLOTS = nplots, $
@@ -749,12 +754,13 @@ YGAP = ygap
     
     ;Get Properties
     if arg_present(aspect)   and n_elements(*self.aspect) ne 0 then aspect = *self.aspect
-    if arg_present(layout)   then layout  = self.layout
-    if arg_present(nplots)   then nplots  = self.nplots
-    if arg_present(xgap)     then xgap    = self.xgap
-    if arg_present(xmargin)  then xmargin = self.xmargin
-    if arg_present(ygap)     then ygap    = self.ygap
-    if arg_present(ymargin)  then ymargin = self.ymargin 
+    if arg_present(charsize) then charsize = self.charsize
+    if arg_present(layout)   then layout   = self.layout
+    if arg_present(nplots)   then nplots   = self.nplots
+    if arg_present(xgap)     then xgap     = self.xgap
+    if arg_present(xmargin)  then xmargin  = self.xmargin
+    if arg_present(ygap)     then ygap     = self.ygap
+    if arg_present(ymargin)  then ymargin  = self.ymargin 
     if arg_present(location) then $
         if n_elements(thisLocation) ne 0 and n_elements(*self.layout_positions) ne 0 $
             then location = (*self.layout_positions)[*, location[0]-1, location[1]-1]
@@ -1080,6 +1086,7 @@ POSITION = position
             position = (*self.layout_positions)[*, location[0]-1, location[1]-1]
         endif else begin
             position = MrPlotLayout(layout, location, $
+                                    ASPECT=*self.aspect, CHARSIZE=self.charsize, $
                                     XMARGIN=self.xmargin, XGAP=self.xgap, $
                                     YMARGIN=self.ymargin, YGAP=self.ygap)
         endelse
@@ -1426,6 +1433,8 @@ end
 ;                       The aspect ratio (plot height/plot width) of each plot. For square
 ;                           plots, ASPECT=1.0, for plots that are twice as wide as the are
 ;                           long, ASPECT=0.5.
+;       CHARSIZE:       in, optional, type=float, default=1.5
+;                       Fraction of IDL's default character size.
 ;       LAYOUT:         in, required, type=intarr(2)
 ;                       A 2 element vector specifying the number of plots in the vertical
 ;                           and horizontal directions, [ncols, nrows].
@@ -1444,6 +1453,7 @@ end
 ;-
 pro MrPlotLayout::SetProperty, $
 ASPECT = aspect, $
+CHARSIZE = charsize, $
 DRAW = draw, $
 LAYOUT = layout, $
 XMARGIN = xmargin, $
@@ -1461,11 +1471,12 @@ YGAP = ygap
     endif
 
     ;Set Properties
-    if n_elements(aspect)  ne 0 then *self.aspect = aspect
-    if n_elements(xgap)    ne 0 then self.xgap = xgap
-    if n_elements(xmargin) ne 0 then self.xmargin = xmargin
-    if n_elements(ygap)    ne 0 then self.ygap = ygap
-    if n_elements(ymargin) ne 0 then self.ymargin = ymargin
+    if n_elements(aspect)   gt 0 then *self.aspect = aspect
+    if n_elements(charsize) gt 0 then  self.charsize = charsize
+    if n_elements(xgap)     gt 0 then  self.xgap = xgap
+    if n_elements(xmargin)  gt 0 then  self.xmargin = xmargin
+    if n_elements(ygap)     gt 0 then  self.ygap = ygap
+    if n_elements(ymargin)  gt 0 then  self.ymargin = ymargin
 
     ;Make sure plot locations are invariant to changes in the layout
     if n_elements(layout) ne 0 then begin
@@ -1687,6 +1698,9 @@ end
 ;                           long, ASPECT=0.5.
 ;       CALCULATE:      in, optional, type=boolean, default=0
 ;                       If set, recalculate the plot positions after updating the layout.
+;       CHARSIZE:       in, optional, type=float, default=1.5
+;                       Fraction of IDL's default character size. Used to determine size
+;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
 ;       LAYOUT:         in, required, type=intarr(2)
 ;                       A 2 element vector specifying the number of plots in the vertical
 ;                           and horizontal directions, [ncols, nrows].
@@ -1723,6 +1737,7 @@ YGAP = ygap
 
     ;Set default values
     setDefaultValue, calculate, 1, /BOOLEAN
+    setDefaultValue, charsize, 1.5
     setDefaultValue, layout, [0, 0]
     setDefaultValue, xmargin, [10, 3]
     setDefaultValue, ymargin, [4, 2]
@@ -1730,6 +1745,7 @@ YGAP = ygap
     setDefaultValue, ygap, 6
     
     ;Set object Properties
+    self.charsize = charsize
     self.layout = layout
     self.xmargin = xmargin
     self.ymargin = ymargin
@@ -1759,6 +1775,7 @@ pro MrPlotLayout__define
     
     class = {mrplotlayout, $
              aspect: ptr_new(), $           ;Aspect ratio of the plots.
+             charsize: 0.0, $               ;Character size
              fixed_positions: ptr_new(), $  ;Fixed, non-layout-related positions.
              layout: [0,0], $               ;Layout of the plot area [ncols, nrows].
              layout_positions: ptr_new(), $ ;Positions outlined by the 2D plot-layout grid.

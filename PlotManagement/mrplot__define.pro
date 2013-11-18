@@ -80,6 +80,9 @@
 ;       09/29/2013  -   Ensure that the layout is updated only when a layout keyword is
 ;                           passed in. - MRA
 ;       10/07/2013  -   Added the HIDE keyword. - MRA
+;       2013/11/17  -   CHARSIZE is now a MrGraphicAtom property. Use _EXTRA instead of
+;                           _STRICT_EXTRA in some cases to make setting and getting
+;                           properties easier and to reduce list of keywords. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -87,7 +90,7 @@
 ;-
 pro MrPlot::Draw, $
 NOERASE = noerase
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -153,7 +156,7 @@ NOERASE=noerase
             ;weGraphicsKeywords
             AXISCOLOR     = *self.axiscolor, $
             BACKGROUND    = *self.background, $
-            CHARSIZE      = *self.charsize, $
+            CHARSIZE      =  self.charsize, $
             CHARTHICK     = *self.charthick, $
             CLIP          = *self.clip, $
             COLOR         = *self.color, $
@@ -272,7 +275,8 @@ end
 ;                           Inhibit setting the y  axis value to zero when all Y > 0 and
 ;                               no explicit minimum is set.
 ;       _REF_EXTRA:         out, optional, type=any
-;                           Any keyword accepted by IDL's Plot procedure or MrLinePlot
+;                           Keyword accepted by the superclasses are also accepted for
+;                               keyword inheritance.
 ;-
 pro MrPlot::GetProperty, $
 INDEP = indep, $
@@ -287,15 +291,6 @@ LABEL = label, $
 P_SYSVAR = p_sysvar, $
 X_SYSVAR = x_sysvar, $
 Y_SYSVAR = y_sysvar, $
-
-;MrGraphicAtom Keywords
-ASPECT=aspect, $
-LAYOUT=layout, $
-POSITION=position, $
-XMARGIN=xmargin, $
-XGAP=xgap, $
-YMARGIN=ymargin, $
-YGAP=ygap, $
 
 ;cgPlot Properties
 SYMCOLOR = symcolor, $
@@ -347,14 +342,11 @@ _REF_EXTRA = extra
     if arg_present(POLAR)     and n_elements(*self.POLAR)     ne 0 then polar = *self.polar
     if arg_present(YNOZERO)   and n_elements(*self.YNOZERO)   ne 0 then ynozero = *self.ynozero
     
-    ;Graphic Atom
-    self -> MrGraphicAtom::GetProperty, ASPECT=aspect, LAYOUT=layout, POSITION=position, $
-                                        XMARGIN=xmargin, XGAP=xgap, $
-                                        YMARGIN=ymarin, YGAP=ygap
-
     ;Get all of the remaining keywords from weGraphicsKeywords
-    if n_elements(EXTRA) ne 0 $
-        then self -> weGraphicsKeywords::GetProperty, _STRICT_EXTRA=extra
+    if n_elements(EXTRA) gt 0 then begin
+        self -> MrGraphicAtom::GetProperty, _EXTRA=extra
+        self -> weGraphicsKeywords::GetProperty, _EXTRA=extra
+    endif
 end
 
 
@@ -442,7 +434,8 @@ end
 ;                           Inhibit setting the y  axis value to zero when all Y > 0 and
 ;                               no explicit minimum is set.
 ;       _REF_EXTRA:         in, optional, type=any
-;                           Any keyword accepted by IDL's Plot procedure or MrLinePlot
+;                           Keyword accepted by the superclasses are also accepted for
+;                               keyword inheritance.
 ;-
 pro MrPlot::SetProperty, $
 DRAW = draw, $
@@ -515,8 +508,10 @@ _REF_EXTRA = extra
     
     ;Superclass properties
     if n_elements(extra) gt 0 then begin
-        ;Graphic Atom
-        atom_kwds = ['ASPECT', 'LAYOUT', 'POSITION', 'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
+        ;MrGraphicAtom -- We must pick out each keyword here to prevent MrGraphicAtom
+        ;                 from updating the position every time (i.e. when the layout
+        ;                 remains unchanged).
+        atom_kwds = ['ASPECT', 'CHARSIZE', 'LAYOUT', 'POSITION', 'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
         void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
         if nAtom gt 0 then self -> MrGraphicAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
     
@@ -623,7 +618,8 @@ end
 ;       YRANGE:             in, optional, type=fltarr(2), default=[min(`X`)\, max(`X`)]
 ;                           The y-axis range over which the data will be displayed.
 ;       _REF_EXTRA:         in, optional, type=any
-;                           Any keyword accepted by IDL's Plot procedure or MrPlot
+;                           Keywords accepted by the any of the superclasses are also
+;                               accepted for keyword inheritcance.
 ;
 ; :Uses:
 ;   Uses the following external programs::
@@ -641,15 +637,6 @@ DRAW = draw, $
 HIDE = hide, $
 LEGENDS = legends, $
 OPLOTS = oplots, $
-
-;MrGraphicAtom Keywords
-ASPECT=aspect, $
-LAYOUT=layout, $
-POSITION=position, $
-XMARGIN=xmargin, $
-XGAP=xgap, $
-YMARGIN=ymargin, $
-YGAP=ygap, $
 
 ;cgPlot Keywords
 SYMCOLOR = symcolor, $
@@ -690,19 +677,19 @@ _REF_EXTRA = extra
 ;Superclass Properties ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
-    if self -> MrIDL_Container::Init() eq 0 then return, 0
+    if self -> MrIDL_Container::Init() eq 0 then $
+        message, 'Unable to initialize MrIDL_Container.'
 
     ;Call the superclass init method. Prevent some Coyote Graphics
     ;defaults from taking effect. The EXTRA structure has precedence over
-    ;the keywords, so if AXISCOLOR, COLOR, or CHARSIZE are supplied by the user,
-    ;the ones shown in the call will be ignored.
-    if self -> weGraphicsKeywords::INIT(AXISCOLOR='black', CHARSIZE=1.0, $
-                                        _STRICT_EXTRA=extra) eq 0 then return, 0
+    ;the keywords, so if AXISCOLOR is supplied by the user,
+    ;the one shown in the call will be ignored.
+    if self -> weGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrGraphicsKeywords.'
     
     ;Graphic Atom
-    if self -> MrGraphicAtom::INIT(ASPECT=aspect, LAYOUT=layout, POSITION=position, $
-                                   XMARGIN=xmargin, XGAP=xgap, $
-                                   YMARGIN=ymargin, YGAP=ygap) eq 0 then return, 0
+    if self -> MrGraphicAtom::INIT(_EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrGraphicAtom.'
 
 ;---------------------------------------------------------------------
 ;Dependent and Independent Variables /////////////////////////////////

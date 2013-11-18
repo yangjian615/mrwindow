@@ -74,6 +74,8 @@
 ;       09/24/2013  -   Added the POSITION parameter to IsInside. - MRA
 ;       09/25/2013  -   Added the layout-related object properties and the Get/SetProperty
 ;                           and CalcPositions methods. - MRA
+;       2013/11/17  -   Added the CHARSIZE keyword. LAYOUT is no longer a pointer. Default
+;                           character size is now 1.5. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -98,17 +100,18 @@ function MrGraphicAtom::CalcPosition
        ((*self.layout)[2] le 0 and (*self.layout)[nLay-1] le 0) then return, self.position
     
     ;Make sure the layout is valid.
-    if ((*self.layout)[0] le 0) xor ((*self.layout)[1] le 0) $
+    if (self.layout[0] le 0) xor (self.layout[1] le 0) $
         then message, 'Cannot calculate position. Layout must have at least ' + $
                       'one column and one row.'
-help, /tr
+
     ;Calculate positions
     position = MrPlotLayout(*self.layout, $
-                            ASPECT  = *self.aspect, $
-                            XGAP    =  self.xgap, $
-                            XMARGIN =  self.xmargin, $
-                            YGAP    =  self.ygap, $
-                            YMARGIN =  self.ymargin)
+                            ASPECT   = *self.aspect, $
+                            CHARSIZE =  self.charsize, $
+                            XGAP     =  self.xgap, $
+                            XMARGIN  =  self.xmargin, $
+                            YGAP     =  self.ygap, $
+                            YMARGIN  =  self.ymargin)
 
     return, position    
 end
@@ -296,12 +299,10 @@ YGAP=ygap
         return
     endif
     
-    ;Default to updating the position
-    SetDefaultValue, updatePosition, 1, /BOOLEAN
-    
     ;Set GraphicAtom properties
-    if arg_present(layout)   then layout   = *self.layout
     if arg_present(aspect)   then aspect   = *self.aspect
+    if arg_present(charsize) then charsize =  self.charsize
+    if arg_present(layout)   then layout   = *self.layout
     if arg_present(position) then position =  self.position
     if arg_present(xmargin)  then xmargin  =  self.xmargin
     if arg_present(xgap)     then xgap     =  self.xgap
@@ -316,6 +317,9 @@ end
 ; :Params:
 ;       ASPECT:         in, optional, type=float
 ;                       Aspect ratio of the plot.
+;       CHARSIZE:       in, optional, type=float
+;                       Fraction of IDL's default character size. Used to determine size
+;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
 ;       LAYOUT:         in, optional, type=intarr(3)/intarr(4)
 ;                       [nCols, nRows, col, row]: The layout of the display and the
 ;                           graphic's location within that layout. OR [nCols,nRows,index]:
@@ -341,6 +345,7 @@ end
 ;-
 pro MrGraphicAtom::SetProperty, $
 ASPECT=aspect, $
+CHARSIZE=charsize, $
 LAYOUT=layout, $
 POSITION=position, $
 UPDATE_LAYOUT=update_layout, $
@@ -362,12 +367,13 @@ YGAP=ygap
     SetDefaultValue, update_layout, 1, /BOOLEAN
     
     ;Set Properties. Make sure layout elements are always >= 0.
-    if n_elements(layout)  ne 0 then *self.layout  = layout
-    if n_elements(aspect)  ne 0 then *self.aspect  = aspect
-    if n_elements(xmargin) ne 0 then  self.xmargin = xmargin
-    if n_elements(xgap)    ne 0 then  self.xgap    = xgap
-    if n_elements(ymargin) ne 0 then  self.ymargin = ymargin
-    if n_elements(ygap)    ne 0 then  self.ygap    = ygap
+    if n_elements(aspect)   ne 0 then *self.aspect   = aspect
+    if n_elements(charsize) gt 0 then  self.charsize = charsize
+    if n_elements(layout)   ne 0 then *self.layout   = layout
+    if n_elements(xmargin)  ne 0 then  self.xmargin  = xmargin
+    if n_elements(xgap)     ne 0 then  self.xgap     = xgap
+    if n_elements(ymargin)  ne 0 then  self.ymargin  = ymargin
+    if n_elements(ygap)     ne 0 then  self.ygap     = ygap
     
     ;Update the position to fit the new layout?
     if update_layout eq 1 then begin
@@ -391,8 +397,8 @@ end
 ;   Clean up after the object is destroy
 ;-
 pro MrGraphicAtom::cleanup
-    ptr_free, self.layout
     ptr_free, self.aspect
+    ptr_free, self.layout
 end
 
 
@@ -402,6 +408,9 @@ end
 ; :Params:
 ;       ASPECT:         in, optional, type=float
 ;                       Aspect ratio of the plot.
+;       CHARSIZE:       in, optional, type=float, default=1.5
+;                       Fraction of IDL's default character size. Used to determine size
+;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
 ;       LAYOUT:         in, optional, type=intarr(3)/intarr(4), default=[1,1,1,1]
 ;                       [nCols, nRows, col, row] or [nCols, nRows, index]. [nCols,nRows]
 ;                           is the number of columns and rows in the display. [col,row]
@@ -425,13 +434,14 @@ end
 ;-
 function MrGraphicAtom::init, $
 ASPECT=aspect, $
+CHARSIZE=charsize, $
 LAYOUT=layout, $
 POSITION=position, $
 XMARGIN=xmargin, $
 XGAP=xgap, $
 YMARGIN=ymargin, $
 YGAP=ygap
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -442,6 +452,7 @@ YGAP=ygap
     endif
 
     ;Default Values
+    SetDefaultValue, charsize, 1.5
     SetDefaultValue, layout, [0,0,0,0]
     SetDefaultValue, xmargin, [10, 3]
     SetDefaultValue, xgap, 14
@@ -462,6 +473,7 @@ YGAP=ygap
     ;MrGraphicAtom::SetProperty explicitly to skip the subclass.
     self -> MrGraphicAtom::SetProperty, LAYOUT=layout, $
                                         ASPECT=aspect, $
+                                        CHARSIZE=charsize, $
                                         POSITION=position, $
                                         XMARGIN=xmargin, $
                                         XGAP=xgap, $
@@ -481,6 +493,8 @@ end
 ;
 ; :Fields:
 ;       ASPECT:         Aspect ratio of the plot.
+;       CHARSIZE:       Fraction of IDL's default character size. Used to determine size
+;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
 ;       LAYOUT:         [nCols, nRows, col, row] or [nCols, nRows, index]. [nCols,nRows]
 ;                           is the number of columns and rows in the display. [col,row]
 ;                           is the column and row in which to place the plot. "index" is
@@ -497,10 +511,11 @@ end
 ;       YGAP:           Vertical space between plots in character units.
 ;-
 pro MrGraphicAtom__define, class
-    compile_opt idl2
+    compile_opt strictarr
     
     define = { MrGraphicAtom, $
                aspect: ptr_new(), $
+               charsize: 0.0, $
                layout: ptr_new(), $
                position: fltarr(4), $
                xmargin: [0, 0], $

@@ -127,6 +127,8 @@
 ;                           in Add and AdjustLayout. Essentially, this entailed setting
 ;                           UPDATE_LAYOUT=0 while setting the graphic's layout or position. - MRA
 ;       09/29/2013  -   Get method was only retrieving one type of graphic, not all. Fixed. - MRA
+;       2013/11/17  -   ApplyPosition and Add method now set ASPECT, CHARSIZE, XMARGIN,
+;                           XGAP, YMARGIN and YGAP so that they layout is uniform. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -377,8 +379,10 @@ QUIET = quiet
 
         ;Set the location and position as object properties. Set UPDATE_LAYOUT=0 to
         ;prevent the graphic from trying to calculate a new position for itself.
-        theObjects[i] -> SetProperty, LAYOUT=[self.layout[0:1], loc],  $
-                                      POSITION=pos, $
+        theObjects[i] -> SetProperty, LAYOUT=[self.layout[0:1], loc], POSITION=pos, $
+                                      ASPECT=*self.aspect, CHARSIZE=self.charsize, $
+                                      XMARGIN=self.xmargin, XGAP=self.xgap, $
+                                      YMARGIN=self.ymargin, YGAP=self.ygap, $
                                       UPDATE_LAYOUT=0
 
         ;Store the location and position if they were created.
@@ -455,7 +459,10 @@ pro MrPlotManager::ApplyPositions
 
         ;Update the positions of each plot.
         position = (*self.layout_positions)[*, thisColRow[0]-1, thisColRow[1]-1]
-        dataObjs[i] -> SetProperty, POSITION=position, UPDATE_LAYOUT=0
+        dataObjs[i] -> SetProperty, POSITION=position, UPDATE_LAYOUT=0, $
+                                    ASPECT=*self.aspect, CHARSIZE=self.charsize, $
+                                    XMARGIN=self.xmargin, XGAP=self.xgap, $
+                                    YMARGIN=self.ymargin, YGAP=self.ygap
     endfor
 end
 

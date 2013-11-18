@@ -85,6 +85,10 @@
 ;                           of DATA. [XY]RANGE is defined and [XY]STYLE is made to have
 ;                           the 2^0 bit set. - MRA
 ;       09/26/2013  -   Added the GRAPHIC keyword. Removed the contour method. - MRA
+;       2013/11/17  -   CHARSIZE is now a MrGraphicAtom property. Use _EXTRA instead of
+;                           _STRICT_EXTRA in some cases to make setting and getting
+;                           properties easier and to reduce list of keywords. Renamed
+;                           GRAPHIC to TARGET to match IDL v8.0+ - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -112,11 +116,11 @@ PATH_XY=path_xy
     GetPath_XY = Arg_Present(path_xy)
     
     ;If a graphic is provided, sync properties
-    if obj_valid(self.graphic) then begin
-        self.graphic -> GetProperty, POSITION=position, $
-                                     LAYOUT=layout, $
-                                     XRANGE=xrange, $
-                                     YRANGE=yrange
+    if obj_valid(self.target) then begin
+        self.target -> GetProperty, POSITION=position, $
+                                    LAYOUT=layout, $
+                                    XRANGE=xrange, $
+                                    YRANGE=yrange
         
         self.position = position
         *self.layout = layout
@@ -126,13 +130,13 @@ PATH_XY=path_xy
 
     ;Now draw the plot to the pixmap
     if GetPath_Info || GetPath_XY then begin
-        self -> doPlot, NOERASE=noerase, $
-                        OLEVELS=oLevels, $
-                        PATH_INFO=path_info, $
-                        PATH_XY=path_xy
+        self -> doContour, NOERASE=noerase, $
+                           OLEVELS=oLevels, $
+                           PATH_INFO=path_info, $
+                           PATH_XY=path_xy
     endif else begin
-        self -> doPlot, NOERASE=noerase, $
-                        OLEVELS=oLevels
+        self -> doContour, NOERASE=noerase, $
+                           OLEVELS=oLevels
     endelse
     
     ;Save the system variables
@@ -150,7 +154,7 @@ end
 ;   The purpose of this method is to do the actual plotting. Basically, having this here
 ;   merely to saves space in the Draw method.
 ;-
-pro MrContour::doPlot, $
+pro MrContour::doContour, $
 NOERASE=noerase, $
 OLEVELS=oLevels, $
 PATH_INFO=path_info, $
@@ -171,10 +175,10 @@ PATH_XY=path_xy
 
     if n_elements(noerase) eq 0 then noerase = *self.noerase
 
-    ;Was a graphic provided?
-    if obj_valid(self.graphic) then begin
+    ;Was a target provided?
+    if obj_valid(self.target) then begin
         ;Copy its location and coordinates.
-        self.graphic -> GetProperty, INDEP=xcoords, DEP=ycoords, POSITION=position, $
+        self.target -> GetProperty, INDEP=xcoords, DEP=ycoords, POSITION=position, $
                                      LAYOUT=layout, XRANGE=xrange, YRANGE=yrange
 
         ;Set object properties and mimic OVERPLOT functionality
@@ -251,7 +255,7 @@ PATH_XY=path_xy
                    ;weGraphicsKeywords
                    AXISCOLOR     = *self.axiscolor, $
                    BACKGROUND    = *self.background, $
-                   CHARSIZE      = *self.charsize, $
+                   CHARSIZE      =  self.charsize, $
                    CHARTHICK     = *self.charthick, $
                    CLIP          = *self.clip, $
                    COLOR         = *self.color, $
@@ -630,11 +634,11 @@ end
 ;                           in a two element integer array of the final gridded data that is sent to the 
 ;                           contour plot.
 ;       TRADITIONAL:    out, optional, type=boolean
-;                        If this keyword is set, the traditional color scheme of a black background for
+;                       If this keyword is set, the traditional color scheme of a black background for
 ;                            graphics windows on the display is used and PostScript files always use a white background.
 ;       _REF_EXTRA:     out, optional, type=any
-;                       Any keyword appropriate for the `cgGraphicsKeywords class <http://www.idlcoyote.com/programs/cggraphicskeywords__define.pro>` 
-;                           is allowed in the program.
+;                       Keyword accepted by the superclasses are also accepted for
+;                           keyword inheritance.
 ;-
 pro MrContour::GetProperty, $
 C_DATA=c_data, $
@@ -642,7 +646,7 @@ XCOORDS=xcoords, $
 YCOORDS=ycoords, $
 
 ;MrContour Properties
-GRAPHIC=graphic, $
+TARGET=target, $
 P_SYSVAR=p_sysvar, $
 X_SYSVAR=x_sysvar, $
 Y_SYSVAR=y_sysvar, $
@@ -774,13 +778,11 @@ _REF_EXTRA=extra
         then map_object = self.map_object $
         else map_object = obj_new()
     
-    ;Graphic Atom
-    self -> MrGraphicAtom::GetProperty, ASPECT=aspect, LAYOUT=layout, POSITION=position, $
-                                        XMARGIN=xmargin, XGAP=xgap, $
-                                        YMARGIN=ymarin, YGAP=ygap
-
     ;Superclass properties
-    if n_elements(extra) ne 0 then self -> weGraphicsKeywords::GetProperty, _STRICT_EXTRA=extra
+    if n_elements(extra) ne 0 then begin    
+        self -> MrGraphicAtom::GetProperty, _EXTRA=extra
+        self -> weGraphicsKeywords::GetProperty, _EXTRA=extra
+    endif
 end
 
 
@@ -945,11 +947,11 @@ end
 ;                           in a two element integer array of the final gridded data that is sent to the 
 ;                           contour plot.
 ;       TRADITIONAL:    in, optional, type=boolean
-;                        If this keyword is set, the traditional color scheme of a black background for
-;                            graphics windows on the display is used and PostScript files always use a white background.
+;                       If this keyword is set, the traditional color scheme of a black background for
+;                           graphics windows on the display is used and PostScript files always use a white background.
 ;       _REF_EXTRA:     in, optional, type=any
-;                       Any keyword appropriate for the `cgGraphicsKeywords class <http://www.idlcoyote.com/programs/cggraphicskeywords__define.pro>` 
-;                           is allowed in the program.
+;                       Keyword accepted by the superclasses are also accepted for
+;                           keyword inheritance.
 ;-
 pro MrContour::SetProperty, $
 C_DATA=c_data, $
@@ -957,7 +959,7 @@ XCOORDS=xcoords, $
 YCOORDS=ycoords, $
 
 ;MrContour Keywords
-GRAPHIC=graphic, $
+TARGET=target, $
 P_SYSVAR=p_sysvar, $
 X_SYSVAR=x_sysvar, $
 Y_SYSVAR=y_sysvar, $
@@ -1023,14 +1025,14 @@ _REF_EXTRA=extra
         return
     endif
     
-    ;Graphic
-    if n_elements(graphic) ne 0 and obj_valid(graphic) then begin
+    ;Target
+    if n_elements(target) ne 0 and obj_valid(target) then begin
         ;Make sure it is a MrImageObject.
-        if (typename(graphic) ne 'MRIMAGE') then $
-            message, 'GRAPHIC must be a MrImage class. Cannot use.', /INFORMATIONAL
+        if (typename(target) ne 'MRIMAGE') then $
+            message, 'TARGET must be a MrImage class. Cannot use.', /INFORMATIONAL
             
         ;Copy its location and coordinates. They will be set below.
-        graphic -> GetProperty, INDEP=xcoords, $
+        target -> GetProperty, INDEP=xcoords, $
                                 DEP=ycoords, $
                                 LAYOUT=layout, $
                                 POSITION=position, $
@@ -1039,7 +1041,7 @@ _REF_EXTRA=extra
         
         ;Make sure the position is defined.
         if n_elements(position) eq 0 then $
-            message, 'GRAPHIC does not have a specified POSITION. Cannot overplot.'
+            message, 'TARGET does not have a specified POSITION. Cannot overplot.'
 
         ;Mimic overplotting
         xstyle   = 4
@@ -1056,8 +1058,8 @@ _REF_EXTRA=extra
         *self.yrange = yrange
         void = temporary(layout)
 
-        ;Store the graphic
-        self.graphic = graphic
+        ;Store the target
+        self.target = target
     endif
     
     ;Bad spellers...
@@ -1123,8 +1125,10 @@ _REF_EXTRA=extra
     
     ;Superclass properties
     if n_elements(extra) gt 0 || n_elements(position) gt 0 || n_elements(layout) gt 0 then begin
-        ;Graphic Atom
-        atom_kwds = ['ASPECT', 'LAYOUT', 'POSITION', 'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
+        ;MrGraphicAtom -- We must pick out each keyword here to prevent MrGraphicAtom
+        ;                 from updating the position every time (i.e. when the layout
+        ;                 remains unchanged).
+        atom_kwds = ['ASPECT', 'CHARSIZE', 'LAYOUT', 'POSITION', 'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
         void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
         if nAtom gt 0 then self -> MrGraphicAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
 
@@ -1275,9 +1279,9 @@ end
 ;                           Otherwise, the keyword is assumed to be a color index into the current color table.
 ;       FILL:           in, optional, type=boolean, default=0
 ;                       Set to indicate filled contours should be created.
-;       GRAPHIC:        in, optional, type=object, default=obj_new()
-;                       If this keyword is set equal to a MrImageObject object, then the
-;                           contour plot will determine the location of the image in
+;       TARGET:         in, optional, type=object, default=obj_new()
+;                       If this keyword is set equal to a graphics object, then the
+;                           contour plot will determine the location of the graphic in
 ;                           display window and overplot itself onto that image.
 ;       IRREGULAR:      in, optional, type=boolean
 ;                       If this keyword is set, the data, x, and y input parameters are taken to be
@@ -1393,7 +1397,7 @@ end
 ;-
 FUNCTION MrContour::Init, data, x, y, $
 ;MrContour Keywords
-GRAPHIC=graphic, $
+TARGET=target, $
 
 ;CONTOUR KEYWORDS
 C_ANNOTATION=c_annotation, $
@@ -1445,15 +1449,6 @@ OUTPUT=output, $
 PALETTE=palette, $
 TRADITIONAL=traditional, $
 
-;MrGraphicAtom Keywords
-ASPECT=aspect, $
-LAYOUT=layout, $
-POSITION=position, $
-XMARGIN=xmargin, $
-XGAP=xgap, $
-YMARGIN=ymargin, $
-YGAP=ygap, $
-
 ;weGraphicsKeywords
 _REF_EXTRA=extra
     
@@ -1471,14 +1466,14 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
     
     ;Superclass initialization methods
-    if self -> IDL_Object::Init()      eq 0 then return, 0
-    if self -> MrIDL_Container::Init() eq 0 then return, 0
-    if self -> weGraphicsKeywords::Init(CHARSIZE=1.0, _STRICT_EXTRA=extra) eq 0 then return, 0
-
-    ;Graphic Atom
-    if self -> MrGraphicAtom::INIT(ASPECT=aspect, LAYOUT=layout, POSITION=position, $
-                                   XMARGIN=xmargin, XGAP=xgap, $
-                                   YMARGIN=ymargin, YGAP=ygap) eq 0 then return, 0
+    if self -> MrIDL_Container::Init() eq 0 then $
+        message, 'Unable to initialize MrIDL_Container.'
+        
+    if self -> weGraphicsKeywords::Init(_EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize weGraphicsKeywords.'
+    
+    if self -> MrGraphicAtom::INIT(_EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrGraphicAtom.'
 
 ;---------------------------------------------------------------------
 ;Defaults ////////////////////////////////////////////////////////////
@@ -1564,7 +1559,7 @@ _REF_EXTRA=extra
     self.ylog             = Ptr_New(/ALLOCATE_HEAP)
     
     ;Initialize Objects
-    self.graphic          = Obj_New()
+    self.target           = Obj_New()
     self.map_object       = Obj_New()
     
 ;---------------------------------------------------------------------
@@ -1577,7 +1572,7 @@ _REF_EXTRA=extra
                          YCOORDS=ycoords, $
                          
                          ;MrContour Keywords
-                         GRAPHIC=graphic, $
+                         TARGET=target, $
                          
                          ;cgContour Keywords
                          AXISCOLOR=axiscolor, $
@@ -1685,7 +1680,7 @@ pro MrContour__define, class
               ycoords: Ptr_New(), $
               
               ;MrContour Properties
-              graphic: obj_new(), $
+              target: obj_new(), $
               init_xrange: fltarr(2), $
               init_yrange: fltarr(2), $
               p_sysvar: !P, $
