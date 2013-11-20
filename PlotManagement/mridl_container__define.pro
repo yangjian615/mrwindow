@@ -34,6 +34,13 @@
 ; PURPOSE:
 ;+
 ;   The purpose of this method is to add functionality to the IDL_Container class.
+;   Enhancements include::
+;       - Retrieve index of object within container
+;       - Print a list of object in the container
+;       - Container can be cleared before adding anything to it.
+;       - Objects can be replaced.
+;       - Bracket overloading allows access a la ISA and POSITION.
+;       - Objects can be removed without destroying them.
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -52,8 +59,60 @@
 ;       08/22/2013  -   Added the DESTROY keyword and Remove method. The Which method
 ;                           now finds the class names correctly. - MRA
 ;       08/23/2013  -   Added the GetIndex method. - MRA
+;       2013/11/19  -   Inherit IDL_Object, added the _OverloadBracketsRightSide method. - MRA
 ;-
 ;*****************************************************************************************
+;+
+;   The purpose of this method is to provide an array-like means of accessing graphics
+;   objects within the container. Like calling the Get method with either the POSITION or
+;   ISA keywords.
+;
+; :Params:
+;       ISRANGE:            in, required, type=intarr
+;                           A vector of 1's and 0's indicating if the corresponding
+;                               subscript parameters `SUBSCRIPT1` are index ranges or
+;                               index values.
+;       SUBSCRIPT1:         in, required, type=intarr/strarr
+;                           Index subscript of the graphics object to be returned, or the
+;                               class names of the objects to return.
+;-
+function MrIDL_Container::_OverloadBracketsRightSide, isRange, subscript1
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, obj_new()
+    endif
+
+;-----------------------------------------------------
+;Integer Subscripts \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
+    if MrIsA(subscript1, /INTEGER) then begin
+        ;If a scalar or array was given, get what was asked for.
+        if isRange[0] eq 0 then begin
+            result = self -> Get(POSITION=subscript1)
+        
+        ;If a range was given, create an index array.
+        endif else begin
+            position = linspace(subscript1[0], subscript1[1], subscript1[2], /INTERVAL, TYPE=3)
+            result = self -> Get(POSITION=position)
+        endelse
+
+;-----------------------------------------------------
+;String Subscripts \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
+    endif else if size(subscript1, /TNAME) eq 'STRING' then begin
+        result = self -> Get(IsA=subscript1)
+        
+    endif else message, 'Invalid subscript.'
+
+    return, result
+end
+
+
 ;+
 ;   The purpose of this method is to add functionality to the IDL_Container::Add method.
 ;   Additions include::

@@ -89,6 +89,7 @@
 ;                           _STRICT_EXTRA in some cases to make setting and getting
 ;                           properties easier and to reduce list of keywords. Renamed
 ;                           GRAPHIC to TARGET to match IDL v8.0+ - MRA
+;       2013/11/20  -   Disinherit MrIDL_Container. Add NAME property. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -143,10 +144,6 @@ PATH_XY=path_xy
     self.x_sysvar = !X
     self.y_sysvar = !Y
     self.p_sysvar = !P
-    
-    ;Draw the other items
-    oContained = self -> Get(/ALL, COUNT=count)
-    if count gt 0 then for i = 0, count - 1 do oContained[i] -> Draw
 end
 
 
@@ -564,6 +561,8 @@ end
 ;                       Data points with values below this value are ignored.
 ;       MISSINGVALUE:   out, optional, type=any
 ;                       Use this keyword to identify any missing data in the input data values.
+;       NAME:           out, optional, type=string
+;                       Name of the graphic.
 ;       NLEVELS:        out, optional, type=integer
 ;                       If the Contour plot LEVELS keyword is not used, this keyword will produce this
 ;                           number of equally spaced contour intervals. Unlike the Contour NLEVELS keyword,
@@ -646,6 +645,7 @@ XCOORDS=xcoords, $
 YCOORDS=ycoords, $
 
 ;MrContour Properties
+NAME=name, $
 TARGET=target, $
 P_SYSVAR=p_sysvar, $
 X_SYSVAR=x_sysvar, $
@@ -722,6 +722,7 @@ _REF_EXTRA=extra
     if arg_present(c_data)        ne 0 then c_data        = *self.c_data
     if arg_present(xcoords)       ne 0 then xcoords       = *self.xcoords
     if arg_present(ycoords)       ne 0 then ycoords       = *self.ycoords
+    if arg_present(name)          ne 0 then name          =  self.name
     if arg_present(p_sysvar)      ne 0 then p_sysvar      =  self.p_sysvar
     if arg_present(x_sysvar)      ne 0 then x_sysvar      =  self.x_sysvar
     if arg_present(y_sysvar)      ne 0 then y_sysvar      =  self.y_sysvar
@@ -888,6 +889,8 @@ end
 ;                       Data points with values below this value are ignored.
 ;       MISSINGVALUE:   in, optional, type=any
 ;                       Use this keyword to identify any missing data in the input data values.
+;       NAME:           in, optional, type=string
+;                       Specifies the name of the graphic.
 ;       NLEVELS:        in, optional, type=integer
 ;                       If the Contour plot LEVELS keyword is not used, this keyword will produce this
 ;                           number of equally spaced contour intervals. Unlike the Contour NLEVELS keyword,
@@ -960,6 +963,7 @@ YCOORDS=ycoords, $
 
 ;MrContour Keywords
 TARGET=target, $
+NAME=name, $
 P_SYSVAR=p_sysvar, $
 X_SYSVAR=x_sysvar, $
 Y_SYSVAR=y_sysvar, $
@@ -1069,6 +1073,7 @@ _REF_EXTRA=extra
     if n_elements(c_data)        ne 0 then *self.c_data        = c_data
     if n_elements(xcoords)       ne 0 then *self.xcoords       = xcoords
     if n_elements(ycoords)       ne 0 then *self.ycoords       = ycoords
+    if n_elements(name)          gt 0 then  self.name          = name
     if n_elements(p_sysvar)      ne 0 then p_sysvar            = self.p_sysvar
     if n_elements(x_sysvar)      ne 0 then x_sysvar            = self.x_sysvar
     if n_elements(y_sysvar)      ne 0 then y_sysvar            = self.y_sysvar
@@ -1200,7 +1205,6 @@ pro MrContour::cleanup
     ;Cleanup the remaining keywords by calling the superclass. This must be done because
     ;the superclasses method has been over-ridden here.
     self -> weGraphicsKeywords::Cleanup
-    self -> MrIDL_Container::Cleanup
     self -> MrGraphicAtom::Cleanup
 end
 
@@ -1319,6 +1323,8 @@ end
 ;                       Data points with values below this value are ignored.
 ;       MISSINGVALUE:   in, optional, type=any
 ;                       Use this keyword to identify any missing data in the input data values.
+;       NAME:           in, optional, type=string, default='MrContour'
+;                       Specifies the name of the graphic.
 ;       NLEVELS:        in, optional, type=integer, default=6
 ;                       If the Contour plot LEVELS keyword is not used, this keyword will produce this
 ;                           number of equally spaced contour intervals. Unlike the Contour NLEVELS keyword,
@@ -1398,6 +1404,7 @@ end
 FUNCTION MrContour::Init, data, x, y, $
 ;MrContour Keywords
 TARGET=target, $
+NAME=name, $
 
 ;CONTOUR KEYWORDS
 C_ANNOTATION=c_annotation, $
@@ -1466,9 +1473,6 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
     
     ;Superclass initialization methods
-    if self -> MrIDL_Container::Init() eq 0 then $
-        message, 'Unable to initialize MrIDL_Container.'
-        
     if self -> weGraphicsKeywords::Init(_EXTRA=extra) eq 0 then $
         message, 'Unable to initialize weGraphicsKeywords.'
     
@@ -1489,6 +1493,7 @@ _REF_EXTRA=extra
     ;Defaults
     SetDefaultValue, draw, 1, /BOOLEAN
     SetDefaultValue, label, 1, /BOOLEAN
+    SetDefaultValue, name, 'MrContour'
     SetDefaultValue, onImage, 0B, /BOOLEAN
     SetDefaultValue, outfilename, ''
     SetDefaultValue, outline, 0B, /BOOLEAN
@@ -1572,6 +1577,7 @@ _REF_EXTRA=extra
                          YCOORDS=ycoords, $
                          
                          ;MrContour Keywords
+                         NAME=name, $
                          TARGET=target, $
                          
                          ;cgContour Keywords
@@ -1670,7 +1676,6 @@ pro MrContour__define, class
     
     class = { MrContour, $
               inherits IDL_Object, $
-              inherits MrIDL_Container, $
               inherits MrGraphicAtom, $
               inherits weGraphicsKeywords, $
               
@@ -1683,6 +1688,7 @@ pro MrContour__define, class
               target: obj_new(), $
               init_xrange: fltarr(2), $
               init_yrange: fltarr(2), $
+              name: '', $
               p_sysvar: !P, $
               x_sysvar: !X, $
               y_sysvar: !Y, $

@@ -1651,7 +1651,6 @@ _REF_EXTRA = extra
     endif
 
     ;Superclasses
-    if self -> IDL_Object::Init()      eq 0 then return, 0
     if self -> MrPlotManager::Init()   eq 0 then return, 0
     if self -> MrSaveAs::Init()        eq 0 then return, 0
     if self -> MrZoom::Init()          eq 0 then return, 0
@@ -1802,7 +1801,6 @@ pro MrWindow__define, class
     
     class = { MrWindow, $
               ;In order of importance.
-              inherits IDL_Object, $            ;For dot-referencing in IDL 8.0
               inherits MrPlotManager, $         ;Manage plot layout
               inherits MrSaveAs, $              ;SaveAs menu
               inherits MrZoom, $                ;Zoom events and menu

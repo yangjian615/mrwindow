@@ -100,7 +100,7 @@ function MrGraphicAtom::CalcPosition
        ((*self.layout)[2] le 0 and (*self.layout)[nLay-1] le 0) then return, self.position
     
     ;Make sure the layout is valid.
-    if (self.layout[0] le 0) xor (self.layout[1] le 0) $
+    if ((*self.layout)[0] le 0) xor ((*self.layout)[1] le 0) $
         then message, 'Cannot calculate position. Layout must have at least ' + $
                       'one column and one row.'
 
@@ -466,8 +466,8 @@ YGAP=ygap
     endif
     
     ;Define pointers
-    self.aspect   = ptr_new(/ALLOCATE_HEAP)
-    self.layout   = ptr_new(/ALLOCATE_HEAP)
+    self.aspect = ptr_new(/ALLOCATE_HEAP)
+    self.layout = ptr_new(/ALLOCATE_HEAP)
 
     ;Set the object properties. Because this class is meant to be inherited, call
     ;MrGraphicAtom::SetProperty explicitly to skip the subclass.

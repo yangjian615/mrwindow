@@ -83,6 +83,7 @@
 ;       2013/11/17  -   CHARSIZE is now a MrGraphicAtom property. Use _EXTRA instead of
 ;                           _STRICT_EXTRA in some cases to make setting and getting
 ;                           properties easier and to reduce list of keywords. - MRA
+;       2013/11/20  -   MrIDL_Container no longer inherited. Added the NAME property.
 ;-
 ;*****************************************************************************************
 ;+
@@ -109,10 +110,6 @@ NOERASE = noerase
         self.y_sysvar = !Y
         self.p_sysvar = !P
     endif
-
-    ;Draw the other items
-    oContained = self -> Get(/ALL, COUNT=count)
-    if count gt 0 then for i = 0, count - 1 do oContained[i] -> Draw, /NOERASE
 end
 
 
@@ -255,6 +252,8 @@ end
 ;       MIN_VALUE:          out, optional, type=float
 ;                           The minimum value plotted. Any values smaller than this are
 ;                               treated as missing.
+;       NAME:               out, optional, type=string
+;                           Name of the graphic.
 ;       NSUM:               out, optional, type=integer
 ;                           The presence of this keyword indicates the number of data
 ;                               points to average when plotting.
@@ -288,6 +287,7 @@ INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
 HIDE = hide, $
 LABEL = label, $
+NAME = name, $
 P_SYSVAR = p_sysvar, $
 X_SYSVAR = x_sysvar, $
 Y_SYSVAR = y_sysvar, $
@@ -326,6 +326,7 @@ _REF_EXTRA = extra
     if arg_present(init_yrange) then init_yrange =  self.init_yrange
     if arg_present(hide)        then hide        =  self.hide
     if arg_present(label)       then label       =  self.label
+    if arg_present(name)        then name        =  self.name
     if arg_present(p_sysvar)    then p_sysvar    =  self.p_sysvar
     if arg_present(x_sysvar)    then x_sysvar    =  self.x_sysvar
     if arg_present(y_sysvar)    then y_sysvar    =  self.y_sysvar
@@ -414,6 +415,8 @@ end
 ;       MIN_VALUE:          in, optional, type=float
 ;                           The minimum value plotted. Any values smaller than this are
 ;                               treated as missing.
+;       NAME:               in, optional, type=string
+;                           Specifies the name of the graphic.
 ;       NSUM:               in, optional, type=integer
 ;                           The presence of this keyword indicates the number of data
 ;                               points to average when plotting.
@@ -460,6 +463,7 @@ SYMCOLOR = symcolor, $
 ;Graphics Properties
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
+NAME = name, $
 NSUM = nsum, $
 POLAR = polar, $
 XLOG = xlog, $
@@ -500,6 +504,7 @@ _REF_EXTRA = extra
     ;Graphics Properties
     if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
     if n_elements(MIN_VALUE) ne 0 then *self.min_value = min_value
+    if n_elements(name)      gt 0 then  self.name = name
     if n_elements(NSUM)      ne 0 then *self.nsum = nsum
     if n_elements(POLAR)     ne 0 then *self.polar = keyword_set(polar)
     if n_elements(XLOG)      ne 0 then *self.xlog = keyword_set(xlog)
@@ -554,7 +559,6 @@ pro MrPlot::cleanup
     
     ;Cleanup the superclass.
     self -> weGraphicsKeywords::CLEANUP
-    self -> MrIDL_Container::Cleanup
     self -> MrGraphicAtom::Cleanup
 end
 
@@ -599,6 +603,8 @@ end
 ;       MIN_VALUE:          in, optional, type=float
 ;                           The minimum value plotted. Any values smaller than this are
 ;                               treated as missing.
+;       NAME:               in, optional, type=string, default='MrPlot'
+;                           Specifies the name of the graphic.
 ;       POLAR:              in, optional, type=boolean
 ;                           Indicates that X and Y are actually R and Theta and that the
 ;                               plot is in polar coordinates.
@@ -635,8 +641,7 @@ function MrPlot::init, x, y, $
 DIMENSION = dimension, $
 DRAW = draw, $
 HIDE = hide, $
-LEGENDS = legends, $
-OPLOTS = oplots, $
+OVERPLOT = overplot, $
 
 ;cgPlot Keywords
 SYMCOLOR = symcolor, $
@@ -645,6 +650,7 @@ SYMCOLOR = symcolor, $
 COLOR = color, $
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
+NAME = name, $
 NSUM = nsum, $
 POLAR = polar, $
 XRANGE = xrange, $
@@ -668,6 +674,7 @@ _REF_EXTRA = extra
     setDefaultValue, draw, 1, /BOOLEAN
     setDefaultValue, gui, 1, /BOOLEAN
     setDefaultValue, hide, 0, /BOOLEAN
+    setDefaultValue, name, 'MrPlot'
     setDefaultValue, xsize, 600
     setDefaultValue, ysize, 340
     nx = n_elements(x)
@@ -676,9 +683,6 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ;Superclass Properties ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
-
-    if self -> MrIDL_Container::Init() eq 0 then $
-        message, 'Unable to initialize MrIDL_Container.'
 
     ;Call the superclass init method. Prevent some Coyote Graphics
     ;defaults from taking effect. The EXTRA structure has precedence over
@@ -770,6 +774,7 @@ _REF_EXTRA = extra
                          LABEL = label, $
                          MAX_VALUE = max_value, $
                          MIN_VALUE = min_value, $
+                         NAME = name, $
                          NSUM = nsum, $
                          POLAR = polar, $
                          SYMCOLOR = symcolor, $
@@ -807,7 +812,6 @@ pro MrPlot__define, class
     compile_opt idl2
     
     class = {MrPlot, $
-             inherits MrIDL_Container, $
              inherits MrGraphicAtom, $
              inherits weGraphicsKeywords, $
              
@@ -818,6 +822,7 @@ pro MrPlot__define, class
              ;Graphics Properties
              max_value: ptr_new(), $           ;maximum value displayed in plot
              min_value: ptr_new(), $           ;minimum value displayed in plot
+             name: '', $                       ;name of the graphic
              xlog: ptr_new(), $                ;log-scale the x-axis?
              ylog: ptr_new(), $                ;log-scale the y-axis?
              polar: ptr_new(), $               ;create a polar plot?

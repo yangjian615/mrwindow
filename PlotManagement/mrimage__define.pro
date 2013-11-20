@@ -74,11 +74,12 @@
 ;                           moved to MrGraphicAtom. - MRA
 ;       09/29/2013  -   Ensure that the layout is updated only when a layout keyword is
 ;                           passed in. - MRA
-;       2013-10-25  -   The position of the image is now always defined via the DPOSITION
+;       2013/10/25  -   The position of the image is now always defined via the DPOSITION
 ;                           keyword to IMAGE_PLOTS. This makes zooming simpler. - MRA
-;       2013-11-17  -   Added the _TF_Paint and SetPixelLocations methods. Use MrImage.pro
+;       2013/11/17  -   Added the _TF_Paint and SetPixelLocations methods. Use MrImage.pro
 ;                           instead of Image_Plots.pro to allow for [XY]LOG-scaling of
 ;                           images and ability to draw image pixels in different sizes. - MRA
+;       2013/11/20  -   MrIDL_Container is no longer inherited. Added NAME property. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -107,10 +108,6 @@ NOERASE=noerase
         self.y_sysvar = !Y
         self.p_sysvar = !P
     endif
-
-    ;Draw all objects in the container    
-    allObj = self -> Get(/ALL, COUNT=nObj)
-    if nObj gt 0 then for i = 0, nObj - 1 do allObj[i] -> Draw
 end
 
 
@@ -150,14 +147,21 @@ NOERASE=noerase
         ;Find all finite values
         ixFinite = where(finite(*self.Xmin) eq 1 and finite(*self.Xmax) eq 1, nxFinite)
         iyFinite = where(finite(*self.Ymin) eq 1 and finite(*self.Ymax) eq 1, nyFinite)
-        
+
         ;Find all finite values that lie within [XY]RANGE
         ix = where((*self.Xmin)[ixFinite] ge (*self.xrange)[0] and (*self.Xmax)[ixFinite] lt (*self.xrange)[1], nx)
         iy = where((*self.Ymin)[iyFinite] ge (*self.yrange)[0] and (*self.Ymax)[iyFinite] lt (*self.yrange)[1], ny)
 
         ;Find all values that do not match the above requirements
-        ixRemove = where(histogram(ixFinite[ix], MIN=0, MAX=product(size(*self.Xmin, /DIMENSIONS))) eq 0, nxRemove)
-        iyRemove = where(histogram(iyFinite[iy], MIN=0, MAX=product(size(*self.Ymin, /DIMENSIONS))) eq 0, nyRemove)
+        if nx eq 0 then begin
+            nxRemove = n_elements(*self.Xmin)
+            ixRemove = lindgen(nxRemove)
+        endif else ixRemove = where(histogram(ixFinite[ix], MIN=0, MAX=product(size(*self.Xmin, /DIMENSIONS))) eq 0, nxRemove)
+            
+        if ny eq 0 then begin
+            nyRemove = n_elements(*self.Ymin)
+            iyRemove = lindgen(nyRemove)
+        endif else iyRemove = where(histogram(iyFinite[iy], MIN=0, MAX=product(size(*self.Ymin, /DIMENSIONS))) eq 0, nyRemove)
         
         ;Copy the pixel locations
         Xmin = *self.Xmin
@@ -177,7 +181,6 @@ NOERASE=noerase
             Ymax[iyRemove] = !values.f_nan
         endif
         
-stop
 ;---------------------------------------------------------------------
 ;DATA POSITION? //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -474,6 +477,8 @@ end
 ;       MISSING_COLOR:      out, optional, type=string, default=`FGCOLOR`
 ;                           The color name of the color in which missing data will be
 ;                               displayed.
+;       NAME:               out, optional, type=string
+;                           Specifies the name of the graphic.
 ;       NAN:                out, optional, type=boolean
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
@@ -525,12 +530,17 @@ HIDE = hide, $
 IDISPLAY = iDisplay, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
+NAME = name, $
 TV = tv, $
 P_SYSVAR = p_sysvar, $
 X_SYSVAR = x_sysvar, $
 Y_SYSVAR = y_sysvar, $
+XMIN = xmin, $
+XMAX = xmax, $
+YMIN = ymin, $
+YMAX = ymax, $
 
-;IMAGE_PLOTS Keywords
+;MrImage.pro Keywords
 AXES = axes, $
 BOTTOM = bottom, $
 CENTER = center, $
@@ -573,9 +583,14 @@ _REF_EXTRA = extra
     if arg_present(iDisplay)    then iDisplay    =  self.iDisplay
     if arg_present(INIT_XRANGE) then init_xrange =  self.init_xrange
     if arg_present(INIT_YRANGE) then init_yrange =  self.init_yrange
+    if arg_present(name)        then name        =  self.name
     if arg_present(p_sysvar)    then p_sysvar    =  self.p_sysvar
     if arg_present(x_sysvar)    then x_sysvar    =  self.x_sysvar
     if arg_present(y_sysvar)    then y_sysvar    =  self.y_sysvar
+    if arg_present(xmin) then if n_elements(*self.Xmin) gt 0 then xmin = *self.Xmin
+    if arg_present(xmax) then if n_elements(*self.Xmax) gt 0 then xmax = *self.Xmax
+    if arg_present(ymin) then if n_elements(*self.Ymin) gt 0 then ymin = *self.Ymin
+    if arg_present(ymax) then if n_elements(*self.Ymax) gt 0 then ymax = *self.Ymax
         
     ;Graphics Properties
     if arg_present(MAX_VALUE) and n_elements(*self.MAX_VALUE) ne 0 then max_value = *self.max_value
@@ -710,6 +725,8 @@ end
 ;       NAN:                in, optional, type=boolean
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
+;       NAME:               in, optional, type=string
+;                           Specifies the name of the graphic.
 ;       PALETTE:            in, optional, type=bytarr(3,256)
 ;                           Color table to be loaded before the image is displayed.
 ;       P_SYSVAR:           in, optional, type=structure
@@ -759,6 +776,7 @@ HIDE = hide, $
 IDISPLAY = iDisplay, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
+NAME = name, $
 TV = tv, $
 P_SYSVAR = p_sysvar, $
 X_SYSVAR = x_sysvar, $
@@ -806,6 +824,7 @@ _REF_EXTRA = extra
     if n_elements(iDisplay)    ne 0 then self.iDisplay = iDisplay
     if n_elements(INIT_XRANGE) ne 0 then self.init_xrange = init_xrange
     if n_elements(INIT_YRANGE) ne 0 then self.init_yrange = init_yrange
+    if n_elements(name)        gt 0 then self.name = name
     if n_elements(P_SYSVAR)    ne 0 then self.p_sysvar = p_sysvar
     if n_elements(X_SYSVAR)    ne 0 then self.x_sysvar = x_sysvar
     if n_elements(Y_SYSVAR)    ne 0 then self.y_sysvar = y_sysvar
@@ -910,7 +929,6 @@ pro MrImage::cleanup
     ptr_free, self.Ymax
     
     ;Superclasses
-    self -> MrIDL_Container::Cleanup
     self -> weGraphicsKeywords::Cleanup
     self -> MrGraphicAtom::Cleanup
 end
@@ -975,6 +993,8 @@ end
 ;       NAN:                in, optional, type=boolean, default=0
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
+;       NAME:               in, optional, type=string, default='MrImage'
+;                           Specifies the name of the graphic.
 ;       PALETTE:            in, optional, type=bytarr(3,256)
 ;                           Color table to be loaded before the image is displayed.
 ;       POSITION:           in, optional, type=fltarr(4)
@@ -1037,9 +1057,10 @@ end
 function MrImage::init, image, x, y, x0, y0, x1, y1, $
 ;MrImage Keywords
 DRAW = draw, $
-HITE = hide, $
+HIDE = hide, $
 IDISPLAY = idisplay, $
 KEEP_ASPECT = keep_aspect, $
+NAME = name, $
 TV = tv, $
       
 ;IMAGE_PLOTS Keywords
@@ -1085,16 +1106,13 @@ _REF_EXTRA = extra
     setDefaultValue, tv, 0, /BOOLEAN
     setDefaultValue, draw, 1, /BOOLEAN
     setDefaultValue, iDisplay, 0
+    setDefaultValue, name, 'MrImage'
     setDefaultValue, xsize, 600
     setDefaultValue, xlog, 0, /BOOLEAN
     setDefaultValue, ylog, 0, /BOOLEAN
     setDefaultValue, ysize, 340
     setDefaultValue, paint, 0, /BOOLEAN
     if xlog + ylog gt 0 || n_params() gt 3 then paint = 1
-    
-    ;Object Container
-    if self -> MrIDL_Container::INIT() eq 0 then $
-        message, 'Unable to initialize MrIDL_Container.'
     
     ;Call the superclass init method. Prevent some Coyote Graphics
     ;defaults from taking effect. The EXTRA structure has precedence over
@@ -1234,6 +1252,7 @@ _REF_EXTRA = extra
                          MISSING_VALUE = missing_value, $
                          MISSING_COLOR = missing_color, $
                          NAN = nan, $
+                         NAME = name, $
                          PAINT = paint, $
                          PALETTE = palette, $
                          RANGE = imRange, $
@@ -1285,7 +1304,7 @@ pro MrImage__define
     compile_opt idl2
     
     define = {MrImage, $
-              inherits MrIDL_Container, $
+              inherits MrGrAtom, $
               inherits MrGraphicAtom, $
               inherits weGraphicsKeywords, $
               
@@ -1298,7 +1317,6 @@ pro MrImage__define
               tv: 0B, $                         ;indicate that a TV position was given
               
               ;MrImage Properties
-              hide: 0B, $                       ;Display the image?
               idisplay: 0L, $                   ;Index to display (>3D images)
               init_range: dblarr(2), $          ;Initial image range
               init_xrange: dblarr(2), $         ;Initial x-range

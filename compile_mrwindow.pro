@@ -32,7 +32,6 @@
 .comp ./cdf-reader/utilities/has_tag.pro
 .comp ./cdf-reader/utilities/isnumeric.pro
 .comp ./cdf-reader/utilities/mrisa.pro
-.comp ./cdf-reader/utilities/replace_fillval.pro
 .comp ./cdf-reader/utilities/type_to_format_code.pro
 
 ;Plot Management
@@ -40,10 +39,10 @@
 .comp ./PlotManagement/mrcreategraphic__define.pro
 .comp ./PlotManagement/mrgraphicatom__define.pro
 .comp ./PlotManagement/mridl_container__define.pro
-.comp ./PlotManagement/mrimageobject__define.pro
+.comp ./PlotManagement/mrimage__define.pro
 .comp ./PlotManagement/mrplotlayout__define.pro
 .comp ./PlotManagement/mrplotmanager__define.pro
-.comp ./PlotManagement/mrplotobject__define.pro
+.comp ./PlotManagement/mrplot__define.pro
 
 ;Wile E. Graphics utils
 .comp ./WileE/wearrow__define.pro
@@ -76,6 +75,7 @@
 .comp ./utilities/mva.pro
 .comp ./utilities/plotpositions_gui.pro
 .comp ./utilities/pwd.pro
+.comp ./utilities/replace_fillval.pro
 .comp ./utilities/rotate_vector.pro
 .comp ./utilities/ssm_to_hms.pro
 .comp ./utilities/text_gui.pro
