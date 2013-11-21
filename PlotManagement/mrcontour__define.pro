@@ -90,6 +90,8 @@
 ;                           properties easier and to reduce list of keywords. Renamed
 ;                           GRAPHIC to TARGET to match IDL v8.0+ - MRA
 ;       2013/11/20  -   Disinherit MrIDL_Container. Add NAME property. - MRA
+;       2013/11/20  -   MrIDL_Container and MrGraphicAtom is disinherited. Inherit instead
+;                           MrGrAtom and MrLayout. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -138,12 +140,8 @@ PATH_XY=path_xy
     endif else begin
         self -> doContour, NOERASE=noerase, $
                            OLEVELS=oLevels
+        self -> SaveCoords
     endelse
-    
-    ;Save the system variables
-    self.x_sysvar = !X
-    self.y_sysvar = !Y
-    self.p_sysvar = !P
 end
 
 
@@ -645,20 +643,7 @@ XCOORDS=xcoords, $
 YCOORDS=ycoords, $
 
 ;MrContour Properties
-NAME=name, $
 TARGET=target, $
-P_SYSVAR=p_sysvar, $
-X_SYSVAR=x_sysvar, $
-Y_SYSVAR=y_sysvar, $
-
-;MrGraphicAtom Keywords
-ASPECT=aspect, $
-LAYOUT=layout, $
-POSITION=position, $
-XMARGIN=xmargin, $
-XGAP=xgap, $
-YMARGIN=ymargin, $
-YGAP=ygap, $
 
 ;cgContour Properties
 AXISCOLOR=axiscolor, $
@@ -722,10 +707,6 @@ _REF_EXTRA=extra
     if arg_present(c_data)        ne 0 then c_data        = *self.c_data
     if arg_present(xcoords)       ne 0 then xcoords       = *self.xcoords
     if arg_present(ycoords)       ne 0 then ycoords       = *self.ycoords
-    if arg_present(name)          ne 0 then name          =  self.name
-    if arg_present(p_sysvar)      ne 0 then p_sysvar      =  self.p_sysvar
-    if arg_present(x_sysvar)      ne 0 then x_sysvar      =  self.x_sysvar
-    if arg_present(y_sysvar)      ne 0 then y_sysvar      =  self.y_sysvar
     
     ;cgContour Properties
     if arg_present(axiscolor)     ne 0 then axiscolor     = *self.axiscolor
@@ -780,8 +761,9 @@ _REF_EXTRA=extra
         else map_object = obj_new()
     
     ;Superclass properties
-    if n_elements(extra) ne 0 then begin    
-        self -> MrGraphicAtom::GetProperty, _EXTRA=extra
+    if n_elements(extra) ne 0 then begin
+        self -> MrLayout::GetProperty, _EXTRA=extra
+        self -> MrGrAtom::GetProperty, _EXTRA=extra
         self -> weGraphicsKeywords::GetProperty, _EXTRA=extra
     endif
 end
@@ -865,13 +847,6 @@ end
 ;                           no contour levels are labelled. A 1 (the default) means all contour levels are
 ;                           labelled. A 2 means label every 2nd contour level is labelled. A 3 means every 
 ;                           3rd contour level is labelled, and so on.
-;       LAYOUT:         in, optional, type=intarr(3)
-;                       This keyword specifies a grid with a graphics window and determines where the
-;                           graphic should appear. The syntax of LAYOUT is three numbers: [ncolumns, nrows, location].
-;                           The grid is determined by the number of columns (ncolumns) by the number of 
-;                           rows (nrows). The location of the graphic is determined by the third number. The
-;                           grid numbering starts in the upper left (1) and goes sequentually by column and then
-;                           by row.
 ;       LEVELS:         in, optional, type=any
 ;                       A vector of data levels to contour. If used, NLEVELS is ignored. If missing, 
 ;                           NLEVELS is used to construct N equally-spaced contour levels.
@@ -889,8 +864,6 @@ end
 ;                       Data points with values below this value are ignored.
 ;       MISSINGVALUE:   in, optional, type=any
 ;                       Use this keyword to identify any missing data in the input data values.
-;       NAME:           in, optional, type=string
-;                       Specifies the name of the graphic.
 ;       NLEVELS:        in, optional, type=integer
 ;                       If the Contour plot LEVELS keyword is not used, this keyword will produce this
 ;                           number of equally spaced contour intervals. Unlike the Contour NLEVELS keyword,
@@ -963,10 +936,6 @@ YCOORDS=ycoords, $
 
 ;MrContour Keywords
 TARGET=target, $
-NAME=name, $
-P_SYSVAR=p_sysvar, $
-X_SYSVAR=x_sysvar, $
-Y_SYSVAR=y_sysvar, $
 
 ;cgContour Properties
 AXISCOLOR=axiscolor, $
@@ -1037,11 +1006,11 @@ _REF_EXTRA=extra
             
         ;Copy its location and coordinates. They will be set below.
         target -> GetProperty, INDEP=xcoords, $
-                                DEP=ycoords, $
-                                LAYOUT=layout, $
-                                POSITION=position, $
-                                XRANGE=xrange, $
-                                YRANGE=yrange
+                               DEP=ycoords, $
+                               LAYOUT=layout, $
+                               POSITION=position, $
+                               XRANGE=xrange, $
+                               YRANGE=yrange
         
         ;Make sure the position is defined.
         if n_elements(position) eq 0 then $
@@ -1073,10 +1042,6 @@ _REF_EXTRA=extra
     if n_elements(c_data)        ne 0 then *self.c_data        = c_data
     if n_elements(xcoords)       ne 0 then *self.xcoords       = xcoords
     if n_elements(ycoords)       ne 0 then *self.ycoords       = ycoords
-    if n_elements(name)          gt 0 then  self.name          = name
-    if n_elements(p_sysvar)      ne 0 then p_sysvar            = self.p_sysvar
-    if n_elements(x_sysvar)      ne 0 then x_sysvar            = self.x_sysvar
-    if n_elements(y_sysvar)      ne 0 then y_sysvar            = self.y_sysvar
     
     ;cgContour Properties
     if n_elements(axiscolor)     ne 0 then *self.axiscolor     = axiscolor
@@ -1129,15 +1094,24 @@ _REF_EXTRA=extra
     endif
     
     ;Superclass properties
-    if n_elements(extra) gt 0 || n_elements(position) gt 0 || n_elements(layout) gt 0 then begin
-        ;MrGraphicAtom -- We must pick out each keyword here to prevent MrGraphicAtom
-        ;                 from updating the position every time (i.e. when the layout
-        ;                 remains unchanged).
-        atom_kwds = ['ASPECT', 'CHARSIZE', 'LAYOUT', 'POSITION', 'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
-        void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
-        if nAtom gt 0 then self -> MrGraphicAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
+    if n_elements(extra) gt 0 then begin
+        ;MrLayout -- We must pick out each keyword here to prevent MrGraphicAtom
+        ;            from updating the position every time (i.e. when the layout
+        ;            remains unchanged).
+        layout_kwds = ['ASPECT', 'CHARSIZE', 'LAYOUT', 'MARGIN', 'POSITION', $
+                       'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
+        void = IsMember(layout_kwds, extra, iLay, N_MATCHES=nLay, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
+        if nLay gt 0 then self -> MrLayout::SetProperty, _STRICT_EXTRA=extra[iLay]
 
-        ;weGraphicsKeywords properties
+        ;MrGrAtom -- Pick out the keywords here to use _STRICT_EXTRA instead of _EXTRA
+        if nExtra gt 0 then begin
+            atom_kwds = ['HIDE', 'NAME']
+            void = IsMember(atom_kwds, extra[iExtra], iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=jExtra, N_NONMEMBER=nExtra)
+            if nExtra gt 0 then iExtra = iExtra[jExtra]
+            if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
+        endif
+    
+        ;weGraphicsKeywords Properties
         if nExtra gt 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
     endif
     
@@ -1204,8 +1178,9 @@ pro MrContour::cleanup
 
     ;Cleanup the remaining keywords by calling the superclass. This must be done because
     ;the superclasses method has been over-ridden here.
-    self -> weGraphicsKeywords::Cleanup
-    self -> MrGraphicAtom::Cleanup
+    self -> weGraphicsKeywords::CleanUp
+    self -> MrGrAtom::CleanUp
+    self -> MrLayout::CleanUp
 end
 
 
@@ -1299,13 +1274,6 @@ end
 ;                           no contour levels are labelled. A 1 (the default) means all contour levels are
 ;                           labelled. A 2 means label every 2nd contour level is labelled. A 3 means every 
 ;                           3rd contour level is labelled, and so on.
-;       LAYOUT:         in, optional, type=intarr(3)
-;                       This keyword specifies a grid with a graphics window and determines where the
-;                           graphic should appear. The syntax of LAYOUT is three numbers: [ncolumns, nrows, location].
-;                           The grid is determined by the number of columns (ncolumns) by the number of 
-;                           rows (nrows). The location of the graphic is determined by the third number. The
-;                           grid numbering starts in the upper left (1) and goes sequentually by column and then
-;                           by row.
 ;       LEVELS:         in, optional, type=any
 ;                       A vector of data levels to contour. If used, NLEVELS is ignored. If missing, 
 ;                           NLEVELS is used to construct N equally-spaced contour levels.
@@ -1404,7 +1372,6 @@ end
 FUNCTION MrContour::Init, data, x, y, $
 ;MrContour Keywords
 TARGET=target, $
-NAME=name, $
 
 ;CONTOUR KEYWORDS
 C_ANNOTATION=c_annotation, $
@@ -1467,17 +1434,27 @@ _REF_EXTRA=extra
         void = error_message()
         return, 0
     endif
-    
+
 ;---------------------------------------------------------------------
-;Superclasses ////////////////////////////////////////////////////////
+;Superclass Properties ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    
-    ;Superclass initialization methods
-    if self -> weGraphicsKeywords::Init(_EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize weGraphicsKeywords.'
-    
-    if self -> MrGraphicAtom::INIT(_EXTRA=extra) eq 0 then $
+    ;
+    ;If values appear in the call to the superclass's INIT method,
+    ;they will be over-ridden by like value if it appears in the
+    ;EXTRA structure
+    ;
+
+    ;weGraphicsKeywords
+    if self -> weGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrGraphicsKeywords.'
+
+    ;Graphic Atom
+    if self -> MrGrAtom::INIT(_EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrGraphicAtom.'
+        
+    ;MrLayout
+    if self -> MrLayout::INIT(_EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrLayout.'
 
 ;---------------------------------------------------------------------
 ;Defaults ////////////////////////////////////////////////////////////
@@ -1493,7 +1470,6 @@ _REF_EXTRA=extra
     ;Defaults
     SetDefaultValue, draw, 1, /BOOLEAN
     SetDefaultValue, label, 1, /BOOLEAN
-    SetDefaultValue, name, 'MrContour'
     SetDefaultValue, onImage, 0B, /BOOLEAN
     SetDefaultValue, outfilename, ''
     SetDefaultValue, outline, 0B, /BOOLEAN
@@ -1577,7 +1553,6 @@ _REF_EXTRA=extra
                          YCOORDS=ycoords, $
                          
                          ;MrContour Keywords
-                         NAME=name, $
                          TARGET=target, $
                          
                          ;cgContour Keywords
@@ -1675,8 +1650,8 @@ pro MrContour__define, class
     on_error, 2
     
     class = { MrContour, $
-              inherits IDL_Object, $
-              inherits MrGraphicAtom, $
+              inherits MrLayout, $
+              inherits MrGrAtom, $
               inherits weGraphicsKeywords, $
               
               ;Data properties
@@ -1688,14 +1663,7 @@ pro MrContour__define, class
               target: obj_new(), $
               init_xrange: fltarr(2), $
               init_yrange: fltarr(2), $
-              name: '', $
-              p_sysvar: !P, $
-              x_sysvar: !X, $
-              y_sysvar: !Y, $
-              
               ;cgContour Properties
-;              aspect: Ptr_New(), $
-;              layout: Ptr_New(), $
               label: 0, $
               map_object: Obj_New(), $
               missingvalue: Ptr_New(), $

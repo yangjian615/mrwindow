@@ -83,7 +83,8 @@
 ;       2013/11/17  -   CHARSIZE is now a MrGraphicAtom property. Use _EXTRA instead of
 ;                           _STRICT_EXTRA in some cases to make setting and getting
 ;                           properties easier and to reduce list of keywords. - MRA
-;       2013/11/20  -   MrIDL_Container no longer inherited. Added the NAME property.
+;       2013/11/20  -   MrIDL_Container and MrGraphicAtom is disinherited. Inherit instead
+;                           MrGrAtom and MrLayout. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -104,11 +105,7 @@ NOERASE = noerase
     ;Draw the plot
     if self.hide eq 0 then begin
         self -> doPlot, NOERASE=noerase
-    
-        ;Save the system variables
-        self.x_sysvar = !X
-        self.y_sysvar = !Y
-        self.p_sysvar = !P
+        self -> SaveCoords
     endif
 end
 
@@ -138,10 +135,10 @@ NOERASE=noerase
             LABEL     = self.label, $
             
             ;cgPlot Keywords
-            SYMCOLOR = *self.symcolor, $
+            SYMCOLOR  = *self.symcolor, $
                    
             ;MrGraphicsAtom Keywords
-            POSITION      = self.position, $
+            POSITION  = self.position, $
 
             ;Graphics Keywords
             MAX_VALUE = *self.max_value, $
@@ -240,8 +237,6 @@ end
 ;       INIT_YRANGE:        out, optional, type=fltarr(2)
 ;                           The initial state of the YRANGE keyword. This is used to reset
 ;                               the zoom to its original state.
-;       HIDE:               out, optional, type=boolean
-;                           If set, the graphic is hidden.
 ;       LABEL:              out, optional, type=string
 ;                           A label is similar to a plot title, but it is aligned to the
 ;                               left edge of the plot and is written in hardware fonts.
@@ -252,24 +247,16 @@ end
 ;       MIN_VALUE:          out, optional, type=float
 ;                           The minimum value plotted. Any values smaller than this are
 ;                               treated as missing.
-;       NAME:               out, optional, type=string
-;                           Name of the graphic.
 ;       NSUM:               out, optional, type=integer
 ;                           The presence of this keyword indicates the number of data
 ;                               points to average when plotting.
-;       P_SYSVAR:           out, optional, type=structure
-;                           The !P system variable state associated with this plot.
 ;       POLAR:              out, optional, type=boolean
 ;                           Indicates that X and Y are actually R and Theta and that the
 ;                               plot is in polar coordinates.
-;       X_SYSVAR:           out, optional, type=structure
-;                           The !X system variable state associated with the image
 ;       XLOG:               out, optional, type=boolean
 ;                           Indicates that a log scale is used on the x-axis
 ;       YLOG:               out, optional, type=boolean
 ;                           Indicates that a log scale is used on the y-axis
-;       Y_SYSVAR:           out, optional, type=structure
-;                           The !Y system variable state associated with the image
 ;       YNOZERO:            out, optional, type=boolean, default=0
 ;                           Inhibit setting the y  axis value to zero when all Y > 0 and
 ;                               no explicit minimum is set.
@@ -285,12 +272,7 @@ DEP = dep, $
 DIMENSION = dimension, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
-HIDE = hide, $
 LABEL = label, $
-NAME = name, $
-P_SYSVAR = p_sysvar, $
-X_SYSVAR = x_sysvar, $
-Y_SYSVAR = y_sysvar, $
 
 ;cgPlot Properties
 SYMCOLOR = symcolor, $
@@ -324,12 +306,7 @@ _REF_EXTRA = extra
     if arg_present(dimension)   then dimension   =  self.dimension
     if arg_present(init_xrange) then init_xrange =  self.init_xrange
     if arg_present(init_yrange) then init_yrange =  self.init_yrange
-    if arg_present(hide)        then hide        =  self.hide
     if arg_present(label)       then label       =  self.label
-    if arg_present(name)        then name        =  self.name
-    if arg_present(p_sysvar)    then p_sysvar    =  self.p_sysvar
-    if arg_present(x_sysvar)    then x_sysvar    =  self.x_sysvar
-    if arg_present(y_sysvar)    then y_sysvar    =  self.y_sysvar
     
     ;cgPlot Properties
     if arg_present(symcolor)  and n_elements(*self.symcolor)  ne 0 then symcolor = *self.symcolor
@@ -345,43 +322,10 @@ _REF_EXTRA = extra
     
     ;Get all of the remaining keywords from weGraphicsKeywords
     if n_elements(EXTRA) gt 0 then begin
-        self -> MrGraphicAtom::GetProperty, _EXTRA=extra
+        self -> MrGrAtom::GetProperty, _EXTRA=extra
+        self -> MrLayout::GetProperty, _EXTRA=extra
         self -> weGraphicsKeywords::GetProperty, _EXTRA=extra
     endif
-end
-
-
-;+
-;   Create a MrPlot object to be drawn in the device window.
-;
-; :Keywords:
-;       DRAW:               in, optional, type=boolean, default=0
-;                           Call the Draw method after adding the plot to the list.
-;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by MrPlot__define.
-;   
-;-
-pro MrPlot::Plot, $
-DRAW = draw, $
-_REF_EXTRA = extra
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = error_message()
-        return
-    endif
-
-    ;Create the plot
-    thePlot = obj_new('MrPlot', _STRICT_EXTRA=extra)
-    
-    ;Add the plot
-    self -> Add, thePlot
-    
-    ;Draw    
-    if keyword_set(draw) then self -> Draw
 end
 
 
@@ -403,8 +347,6 @@ end
 ;       INIT_YRANGE:        in, optional, type=fltarr(2)
 ;                           The initial state of the YRANGE keyword. This is used to reset
 ;                               the zoom to its original state.
-;       HIDE:               in, optional, type=boolean
-;                           Indicates whether the graphic is hidden or not.
 ;       LABEL:              in, optional, type=string
 ;                           A label is similar to a plot title, but it is aligned to the
 ;                               left edge of the plot and is written in hardware fonts.
@@ -415,24 +357,16 @@ end
 ;       MIN_VALUE:          in, optional, type=float
 ;                           The minimum value plotted. Any values smaller than this are
 ;                               treated as missing.
-;       NAME:               in, optional, type=string
-;                           Specifies the name of the graphic.
 ;       NSUM:               in, optional, type=integer
 ;                           The presence of this keyword indicates the number of data
 ;                               points to average when plotting.
-;       P_SYSVAR:           in, optional, type=structure
-;                           The !P system variable state associated with this plot.
 ;       POLAR:              in, optional, type=boolean
 ;                           Indicates that X and Y are actually R and Theta and that the
 ;                               plot is in polar coordinates.
-;       X_SYSVAR:           in, optional, type=structure
-;                           The !X system variable state associated with the image
 ;       XLOG:               in, optional, type=boolean
 ;                           Indicates that a log scale is used on the x-axis
 ;       YLOG:               in, optional, type=boolean
 ;                           Indicates that a log scale is used on the y-axis
-;       Y_SYSVAR:           in, optional, type=structure
-;                           The !Y system variable state associated with the image
 ;       YNOZERO:            in, optional, type=boolean, default=0
 ;                           Inhibit setting the y  axis value to zero when all Y > 0 and
 ;                               no explicit minimum is set.
@@ -451,11 +385,7 @@ DEP = dep, $
 DIMENSION = dimension, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
-HIDE = hide, $
 LABEL = label, $
-P_SYSVAR = p_sysvar, $
-X_SYSVAR = x_sysvar, $
-Y_SYSVAR = y_sysvar, $
 
 ;cgPlot Properties
 SYMCOLOR = symcolor, $
@@ -471,8 +401,8 @@ YLOG = ylog, $
 YNOZERO = ynozero, $
 
 ;weGraphics Properties
-XSTYLE = xstyle, $
-YSTYLE = ystyle, $
+XSTYLE = xstyle, $          ;Check explicitly so that the 2^0 bit is always set
+YSTYLE = ystyle, $          ;Check explicitly so that the 2^0 bit is always set
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -490,13 +420,9 @@ _REF_EXTRA = extra
 
     ;MrPlot Properties
     if n_elements(DIMENSION)   ne 0 then  self.dimension = dimension
-    if n_elements(HIDE)        ne 0 then  self.hide = hide
     if n_elements(LABEL)       ne 0 then  self.label = label
     if n_elements(INIT_XRANGE) ne 0 then  self.init_xrange = init_xrange
     if n_elements(INIT_YRANGE) ne 0 then  self.init_yrange = init_yrange
-    if n_elements(P_SYSVAR)    ne 0 then  self.p_sysvar = p_sysvar
-    if n_elements(X_SYSVAR)    ne 0 then  self.x_sysvar = x_sysvar
-    if n_elements(Y_SYSVAR)    ne 0 then  self.y_sysvar = y_sysvar
     
     ;cgPlot Properties
     if n_elements(SYMCOLOR) ne 0 then *self.symcolor = symcolor
@@ -504,7 +430,6 @@ _REF_EXTRA = extra
     ;Graphics Properties
     if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
     if n_elements(MIN_VALUE) ne 0 then *self.min_value = min_value
-    if n_elements(name)      gt 0 then  self.name = name
     if n_elements(NSUM)      ne 0 then *self.nsum = nsum
     if n_elements(POLAR)     ne 0 then *self.polar = keyword_set(polar)
     if n_elements(XLOG)      ne 0 then *self.xlog = keyword_set(xlog)
@@ -513,12 +438,21 @@ _REF_EXTRA = extra
     
     ;Superclass properties
     if n_elements(extra) gt 0 then begin
-        ;MrGraphicAtom -- We must pick out each keyword here to prevent MrGraphicAtom
-        ;                 from updating the position every time (i.e. when the layout
-        ;                 remains unchanged).
-        atom_kwds = ['ASPECT', 'CHARSIZE', 'LAYOUT', 'POSITION', 'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
-        void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
-        if nAtom gt 0 then self -> MrGraphicAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
+        ;MrLayout -- We must pick out each keyword here to prevent MrGraphicAtom
+        ;            from updating the position every time (i.e. when the layout
+        ;            remains unchanged).
+        layout_kwds = ['ASPECT', 'CHARSIZE', 'LAYOUT', 'MARGIN', 'POSITION', $
+                       'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
+        void = IsMember(layout_kwds, extra, iLay, N_MATCHES=nLay, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
+        if nLay gt 0 then self -> MrLayout::SetProperty, _STRICT_EXTRA=extra[iLay]
+
+        ;MrGrAtom -- Pick out the keywords here to use _STRICT_EXTRA instead of _EXTRA
+        if nExtra gt 0 then begin
+            atom_kwds = ['HIDE', 'NAME']
+            void = IsMember(atom_kwds, extra[iExtra], iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=jExtra, N_NONMEMBER=nExtra)
+            if nExtra gt 0 then iExtra = iExtra[jExtra]
+            if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
+        endif
     
         ;weGraphicsKeywords Properties
         if nExtra gt 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
@@ -559,7 +493,8 @@ pro MrPlot::cleanup
     
     ;Cleanup the superclass.
     self -> weGraphicsKeywords::CLEANUP
-    self -> MrGraphicAtom::Cleanup
+    self -> MrGrAtom::CleanUp
+    self -> MrLayout::CleanUp
 end
 
 
@@ -593,18 +528,12 @@ end
 ;       DRAW:               in, optional, type=boolean, default=1
 ;                           If set, the data will be drawn to the plot. DRAW=1 always if
 ;                               `GUI`=1.
-;       HIDE:               in, optional, type=boolean, default=0
-;                           If set, the graphic will be hidden.
-;       LEGENDS:            in, optional, type=object/obj_arr
-;                           weLegendItem or cgLegendItem objects to be added to the plot.
 ;       MAX_VALUE:          in, optional, type=float
 ;                           The maximum value plotted. Any values larger than this are
 ;                               treated as missing.
 ;       MIN_VALUE:          in, optional, type=float
 ;                           The minimum value plotted. Any values smaller than this are
 ;                               treated as missing.
-;       NAME:               in, optional, type=string, default='MrPlot'
-;                           Specifies the name of the graphic.
 ;       POLAR:              in, optional, type=boolean
 ;                           Indicates that X and Y are actually R and Theta and that the
 ;                               plot is in polar coordinates.
@@ -640,8 +569,6 @@ function MrPlot::init, x, y, $
 ;MrPlot Keywords
 DIMENSION = dimension, $
 DRAW = draw, $
-HIDE = hide, $
-OVERPLOT = overplot, $
 
 ;cgPlot Keywords
 SYMCOLOR = symcolor, $
@@ -650,7 +577,6 @@ SYMCOLOR = symcolor, $
 COLOR = color, $
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
-NAME = name, $
 NSUM = nsum, $
 POLAR = polar, $
 XRANGE = xrange, $
@@ -673,8 +599,6 @@ _REF_EXTRA = extra
     setDefaultValue, dimension, 0
     setDefaultValue, draw, 1, /BOOLEAN
     setDefaultValue, gui, 1, /BOOLEAN
-    setDefaultValue, hide, 0, /BOOLEAN
-    setDefaultValue, name, 'MrPlot'
     setDefaultValue, xsize, 600
     setDefaultValue, ysize, 340
     nx = n_elements(x)
@@ -683,17 +607,23 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ;Superclass Properties ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
+    ;
+    ;If values appear in the call to the superclass's INIT method,
+    ;they will be over-ridden by like value if it appears in the
+    ;EXTRA structure
+    ;
 
-    ;Call the superclass init method. Prevent some Coyote Graphics
-    ;defaults from taking effect. The EXTRA structure has precedence over
-    ;the keywords, so if AXISCOLOR is supplied by the user,
-    ;the one shown in the call will be ignored.
+    ;weGraphicsKeywords
     if self -> weGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrGraphicsKeywords.'
-    
+
     ;Graphic Atom
-    if self -> MrGraphicAtom::INIT(_EXTRA=extra) eq 0 then $
+    if self -> MrGrAtom::INIT(_EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrGraphicAtom.'
+        
+    ;MrLayout
+    if self -> MrLayout::INIT(_EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrLayout.'
 
 ;---------------------------------------------------------------------
 ;Dependent and Independent Variables /////////////////////////////////
@@ -746,10 +676,6 @@ _REF_EXTRA = extra
     self.symcolor = ptr_new(/ALLOCATE_HEAP)
     self.ynozero = ptr_new(/ALLOCATE_HEAP)
     
-    ;Add overplots and legends. Serves as an Init method.
-    if n_elements(oplots)  ne 0 then self -> Add, oplots
-    if n_elements(legends) ne 0 then self -> Add, legends
-    
     ;Set the initial x- and y-range
     if n_elements(xrange) eq 0 then xrange = [min(indep, max=maxIndep), maxIndep]
     if n_elements(yrange) eq 0 then begin
@@ -766,15 +692,13 @@ _REF_EXTRA = extra
     SetDefaultValue, color, d_color
 
     ;Set the object properties
-    self -> setProperty, INDEP = indep, $
+    self -> SetProperty, INDEP = indep, $
                          DEP = dep, $
                          COLOR = color, $
                          DIMENSION = dimension, $
-                         HIDE = hide, $
                          LABEL = label, $
                          MAX_VALUE = max_value, $
                          MIN_VALUE = min_value, $
-                         NAME = name, $
                          NSUM = nsum, $
                          POLAR = polar, $
                          SYMCOLOR = symcolor, $
@@ -812,9 +736,6 @@ pro MrPlot__define, class
     compile_opt idl2
     
     class = {MrPlot, $
-             inherits MrGraphicAtom, $
-             inherits weGraphicsKeywords, $
-             
              ;Data Properties
              indep: ptr_new(), $               ;independent variable
              dep: ptr_new(), $                 ;dependent variable
@@ -822,7 +743,6 @@ pro MrPlot__define, class
              ;Graphics Properties
              max_value: ptr_new(), $           ;maximum value displayed in plot
              min_value: ptr_new(), $           ;minimum value displayed in plot
-             name: '', $                       ;name of the graphic
              xlog: ptr_new(), $                ;log-scale the x-axis?
              ylog: ptr_new(), $                ;log-scale the y-axis?
              polar: ptr_new(), $               ;create a polar plot?
@@ -831,14 +751,17 @@ pro MrPlot__define, class
              
              ;cgPlot Properties
              symcolor: ptr_new(), $            ;color of each symbol
+             label: '', $                      ;*
              
              ;MrPlot Properties
              dimension: 0, $                   ;The over which plots will be made
-             hide: 0, $                        ;Show the plot?
-             label: '', $                      ;*
              init_xrange: dblarr(2), $         ;Initial y-range
              init_yrange: dblarr(2), $         ;Initial x-range
-             x_sysvar: !X, $                   ;Save the X system variable
-             y_sysvar: !Y, $                   ;Save the Y system variable
-             p_sysvar: !P}                     ;Save the P system variable
+             
+             ;Inheritances -- At the bottom so that IDL calls MrPlot's methods before
+             ;                it calls the superclass methods.
+             inherits MrGrAtom, $
+             inherits MrLayout, $
+             inherits weGraphicsKeywords $
+            }
 end

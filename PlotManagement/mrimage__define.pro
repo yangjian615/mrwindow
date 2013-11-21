@@ -79,7 +79,8 @@
 ;       2013/11/17  -   Added the _TF_Paint and SetPixelLocations methods. Use MrImage.pro
 ;                           instead of Image_Plots.pro to allow for [XY]LOG-scaling of
 ;                           images and ability to draw image pixels in different sizes. - MRA
-;       2013/11/20  -   MrIDL_Container is no longer inherited. Added NAME property. - MRA
+;       2013/11/20  -   MrIDL_Container and MrGraphicAtom is disinherited. Inherit instead
+;                           MrGrAtom and MrLayout. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -102,11 +103,7 @@ NOERASE=noerase
     ;Now draw the plot
     if self.hide eq 0 then begin
         self -> doImage, NOERASE=noerase
-
-        ;Save the system variables
-        self.x_sysvar = !X
-        self.y_sysvar = !Y
-        self.p_sysvar = !P
+        self -> SaveCoords
     endif
 end
 
@@ -460,12 +457,6 @@ end
 ;       INIT_YRANGE:        out, optional, type=fltarr(2)
 ;                           The initial state of the YRANGE keyword. This is used to reset
 ;                               the zoom to its original state.
-;       LAYOUT:             out, optional, type=intarr(3)/intarr(4)
-;                           A vector specifying [# columns, # rows, index], or
-;                               [# columns, # rows, column, row] of the plot layout and
-;                               plot position. "index" increases first across then down.
-;                               All numbers start with 1. If `POSITION` is also specified,
-;                               this keyword is ignored.
 ;       MAX_VALUE:          out, optional, type=float
 ;                           The maximum value plotted. Any values larger than this are
 ;                               treated as missing.
@@ -477,8 +468,6 @@ end
 ;       MISSING_COLOR:      out, optional, type=string, default=`FGCOLOR`
 ;                           The color name of the color in which missing data will be
 ;                               displayed.
-;       NAME:               out, optional, type=string
-;                           Specifies the name of the graphic.
 ;       NAN:                out, optional, type=boolean
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
@@ -502,15 +491,11 @@ end
 ;       X_POS:              out, optional, type=int
 ;                           If the `TV` keyword is in use, then this specifies the x-
 ;                               position of the image as specified by the IDL's TV command.
-;       X_SYSVAR:           out, optional, type=structure
-;                           The !X system variable state associated with the image
 ;       XLOG:               out, optional, type=boolean
 ;                           Indicates that a log scale is used on the x-axis
 ;       Y_POS:              out, optional, type=int
 ;                           If the `TV` keyword is in use, then this specifies the y-
 ;                               position of the image as specified by the IDL's TV command.
-;       Y_SYSVAR:           out, optional, type=structure
-;                           The !Y system variable state associated with the image
 ;       YLOG:               out, optional, type=boolean
 ;                           Indicates that a log scale is used on the y-axis
 ;       _REF_EXTRA:         out, optional, type=any
@@ -526,15 +511,10 @@ X_POS = x_pos, $
 Y_POS = y_pos, $
 
 ;MrImage Keywords
-HIDE = hide, $
 IDISPLAY = iDisplay, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
-NAME = name, $
 TV = tv, $
-P_SYSVAR = p_sysvar, $
-X_SYSVAR = x_sysvar, $
-Y_SYSVAR = y_sysvar, $
 XMIN = xmin, $
 XMAX = xmax, $
 YMIN = ymin, $
@@ -579,14 +559,9 @@ _REF_EXTRA = extra
     if arg_present(INDEP) and n_elements(*self.INDEP) ne 0 then indep = *self.indep
 
     ;MrImage Properties
-    if arg_present(hide)        then hide        =  self.hide
     if arg_present(iDisplay)    then iDisplay    =  self.iDisplay
     if arg_present(INIT_XRANGE) then init_xrange =  self.init_xrange
     if arg_present(INIT_YRANGE) then init_yrange =  self.init_yrange
-    if arg_present(name)        then name        =  self.name
-    if arg_present(p_sysvar)    then p_sysvar    =  self.p_sysvar
-    if arg_present(x_sysvar)    then x_sysvar    =  self.x_sysvar
-    if arg_present(y_sysvar)    then y_sysvar    =  self.y_sysvar
     if arg_present(xmin) then if n_elements(*self.Xmin) gt 0 then xmin = *self.Xmin
     if arg_present(xmax) then if n_elements(*self.Xmax) gt 0 then xmax = *self.Xmax
     if arg_present(ymin) then if n_elements(*self.Ymin) gt 0 then ymin = *self.Ymin
@@ -616,7 +591,8 @@ _REF_EXTRA = extra
     
     ;weGraphicsKeywords Properties
     if n_elements(EXTRA) ne 0 then begin
-        self -> MrGraphicAtom::GetProperty, _EXTRA=extra
+        self -> MrLayout::GetProperty, _EXTRA=extra
+        self -> MrGrAtom::GetProperty, _EXTRA=extra
         self -> weGraphicsKeywords::GetProperty, _EXTRA=extra
     endif
 end
@@ -699,18 +675,6 @@ end
 ;                               for > 2D image data.
 ;       AXES:               in, optional, type=boolean
 ;                           Draw a set of axes around the image.
-;       INIT_XRANGE:        in, optional, type=fltarr(2)
-;                           The initial state of the XRANGE keyword. This is used to reset
-;                               the zoom to its original state.
-;       INIT_YRANGE:        in, optional, type=fltarr(2)
-;                           The initial state of the YRANGE keyword. This is used to reset
-;                               the zoom to its original state.
-;       LAYOUT:             in, optional, type=intarr(3)/intarr(4)
-;                           A vector specifying [# columns, # rows, index], or
-;                               [# columns, # rows, column, row] of the plot layout and
-;                               plot position. "index" increases first across then down.
-;                               All numbers start with 1. If `POSITION` is also specified,
-;                               this keyword is ignored.
 ;       MAX_VALUE:          in, optional, type=float
 ;                           The maximum value plotted. Any values larger than this are
 ;                               treated as missing.
@@ -725,8 +689,6 @@ end
 ;       NAN:                in, optional, type=boolean
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
-;       NAME:               in, optional, type=string
-;                           Specifies the name of the graphic.
 ;       PALETTE:            in, optional, type=bytarr(3,256)
 ;                           Color table to be loaded before the image is displayed.
 ;       P_SYSVAR:           in, optional, type=structure
@@ -746,15 +708,11 @@ end
 ;       X_POS:              in, optional, type=int
 ;                           If the `TV` keyword is in use, then this specifies the x-
 ;                               position of the image as specified by the IDL's TV command.
-;       X_SYSVAR:           in, optional, type=structure
-;                           The !X system variable state associated with the image
 ;       XLOG:               in, optional, type=boolean
 ;                           Indicates that a log scale is used on the x-axis
 ;       Y_POS:              in, optional, type=int
 ;                           If the `TV` keyword is in use, then this specifies the y-
 ;                               position of the image as specified by the IDL's TV command.
-;       Y_SYSVAR:           in, optional, type=structure
-;                           The !Y system variable state associated with the image
 ;       YLOG:               in, optional, type=boolean
 ;                           Indicates that a log scale is used on the y-axis
 ;       _REF_EXTRA:         in, optional, type=any
@@ -774,13 +732,8 @@ Y_POS = y_pos, $
 ;MrImage Keywords
 HIDE = hide, $
 IDISPLAY = iDisplay, $
-INIT_XRANGE = init_xrange, $
-INIT_YRANGE = init_yrange, $
 NAME = name, $
 TV = tv, $
-P_SYSVAR = p_sysvar, $
-X_SYSVAR = x_sysvar, $
-Y_SYSVAR = y_sysvar, $
       
 ;IMAGE_PLOTS Keywords
 AXES = axes, $
@@ -822,12 +775,7 @@ _REF_EXTRA = extra
     ;MrImage Keywords
     if n_elements(hide)        gt 0 then self.hide = keyword_set(hide)
     if n_elements(iDisplay)    ne 0 then self.iDisplay = iDisplay
-    if n_elements(INIT_XRANGE) ne 0 then self.init_xrange = init_xrange
-    if n_elements(INIT_YRANGE) ne 0 then self.init_yrange = init_yrange
     if n_elements(name)        gt 0 then self.name = name
-    if n_elements(P_SYSVAR)    ne 0 then self.p_sysvar = p_sysvar
-    if n_elements(X_SYSVAR)    ne 0 then self.x_sysvar = x_sysvar
-    if n_elements(Y_SYSVAR)    ne 0 then self.y_sysvar = y_sysvar
     if n_elements(TV)          ne 0 then self.tv = keyword_set(tv)
 
     ;IMAGE_PLOTS.PRO Properties
@@ -851,16 +799,25 @@ _REF_EXTRA = extra
     
     ;Check PAINT after XLOG and YLOG have been set
     if n_elements(paint) gt 0 then self.paint = keyword_set(paint)
-
-    ;Superclass Properties
-    if n_elements(extra) gt 0 then begin    
-        ;MrGraphicAtom -- We must pick out each keyword here to prevent MrGraphicAtom
-        ;                 from updating the position every time (i.e. when the layout
-        ;                 remains unchanged).
-        atom_kwds = ['ASPECT', 'CHARSIZE', 'LAYOUT', 'POSITION', 'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
-        void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
-        if nAtom gt 0 then self -> MrGraphicAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
     
+    ;Superclass properties
+    if n_elements(extra) gt 0 then begin
+        ;MrLayout -- We must pick out each keyword here to prevent MrGraphicAtom
+        ;            from updating the position every time (i.e. when the layout
+        ;            remains unchanged).
+        layout_kwds = ['ASPECT', 'CHARSIZE', 'LAYOUT', 'MARGIN', 'POSITION', $
+                       'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
+        void = IsMember(layout_kwds, extra, iLay, N_MATCHES=nLay, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
+        if nLay gt 0 then self -> MrLayout::SetProperty, _STRICT_EXTRA=extra[iLay]
+
+        ;MrGrAtom -- Pick out the keywords here to use _STRICT_EXTRA instead of _EXTRA
+        if nExtra gt 0 then begin
+            atom_kwds = ['HIDE', 'NAME']
+            void = IsMember(atom_kwds, extra[iExtra], iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=jExtra, N_NONMEMBER=nExtra)
+            if nExtra gt 0 then iExtra = iExtra[jExtra]
+            if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
+        endif
+
         ;weGraphicsKeywords Properties
         if nExtra gt 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
     endif
@@ -929,8 +886,9 @@ pro MrImage::cleanup
     ptr_free, self.Ymax
     
     ;Superclasses
-    self -> weGraphicsKeywords::Cleanup
-    self -> MrGraphicAtom::Cleanup
+    self -> weGraphicsKeywords::CleanUp
+    self -> MrGrAtom::CleanUp
+    self -> MrLayout::CleanUp
 end
 
 
@@ -970,15 +928,6 @@ end
 ;                               assumed to be ordered [x,y,A,B,C,...] and `IDISPLAY` is
 ;                               the index within the dimensions [A,B,C,...] at which the
 ;                               2D image will be displayed.
-;       LAYOUT:             in, optional, type=intarr(3)/intarr(4)
-;                           The location of the plot in a 2D plotting grid. The first two
-;                               elements specify the total number of columns and rows in
-;                               the 2D layout. If 3-elements exist, the third specifies
-;                               the overall position of the plot: [ncols, nrows, index].
-;                               If 4-elements, the column and row in which the plot is to
-;                               be placed: [ncols, nrows, col, row]. "index" begins at 1
-;                               the with plot in the upper-left corner, then increases
-;                               first down, then right.
 ;       MIN_VALUE:          in, optional, type=float
 ;                           The minimum value plotted. Any values smaller than this are
 ;                               treated as missing.
@@ -993,8 +942,6 @@ end
 ;       NAN:                in, optional, type=boolean, default=0
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
-;       NAME:               in, optional, type=string, default='MrImage'
-;                           Specifies the name of the graphic.
 ;       PALETTE:            in, optional, type=bytarr(3,256)
 ;                           Color table to be loaded before the image is displayed.
 ;       POSITION:           in, optional, type=fltarr(4)
@@ -1057,10 +1004,8 @@ end
 function MrImage::init, image, x, y, x0, y0, x1, y1, $
 ;MrImage Keywords
 DRAW = draw, $
-HIDE = hide, $
 IDISPLAY = idisplay, $
 KEEP_ASPECT = keep_aspect, $
-NAME = name, $
 TV = tv, $
       
 ;IMAGE_PLOTS Keywords
@@ -1106,24 +1051,33 @@ _REF_EXTRA = extra
     setDefaultValue, tv, 0, /BOOLEAN
     setDefaultValue, draw, 1, /BOOLEAN
     setDefaultValue, iDisplay, 0
-    setDefaultValue, name, 'MrImage'
     setDefaultValue, xsize, 600
     setDefaultValue, xlog, 0, /BOOLEAN
     setDefaultValue, ylog, 0, /BOOLEAN
     setDefaultValue, ysize, 340
     setDefaultValue, paint, 0, /BOOLEAN
     if xlog + ylog gt 0 || n_params() gt 3 then paint = 1
-    
-    ;Call the superclass init method. Prevent some Coyote Graphics
-    ;defaults from taking effect. The EXTRA structure has precedence over
-    ;the keywords, so if AXISCOLOR, COLOR, or CHARSIZE are supplied by the user,
-    ;those values will be used.
-    if self -> weGraphicsKeywords::INIT(AXISCOLOR='black', COLOR='black', _EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize weGraphicsKeywords.'
-    
+
+;---------------------------------------------------------------------
+;Superclass Properties ///////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;
+    ;If values appear in the call to the superclass's INIT method,
+    ;they will be over-ridden by like value if it appears in the
+    ;EXTRA structure
+    ;
+
+    ;weGraphicsKeywords
+    if self -> weGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrGraphicsKeywords.'
+
     ;Graphic Atom
-    if self -> MrGraphicAtom::INIT(_EXTRA=extra) eq 0 then $
+    if self -> MrGrAtom::INIT(_EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrGraphicAtom.'
+        
+    ;MrLayout
+    if self -> MrLayout::INIT(_EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrLayout.'
 
 ;---------------------------------------------------------------------
 ;Input Parameters ////////////////////////////////////////////////////
@@ -1245,14 +1199,12 @@ _REF_EXTRA = extra
                          BOTTOM = bottom, $
                          CTINDEX = ctindex, $
                          DATA_POS = data_pos, $
-                         HIDE = hide, $
                          IDISPLAY = iDisplay, $
                          MAX_VALUE = max_value, $
                          MIN_VALUE = min_value, $
                          MISSING_VALUE = missing_value, $
                          MISSING_COLOR = missing_color, $
                          NAN = nan, $
-                         NAME = name, $
                          PAINT = paint, $
                          PALETTE = palette, $
                          RANGE = imRange, $
@@ -1305,7 +1257,7 @@ pro MrImage__define
     
     define = {MrImage, $
               inherits MrGrAtom, $
-              inherits MrGraphicAtom, $
+              inherits MrLayout, $
               inherits weGraphicsKeywords, $
               
               ;Data
@@ -1321,9 +1273,6 @@ pro MrImage__define
               init_range: dblarr(2), $          ;Initial image range
               init_xrange: dblarr(2), $         ;Initial x-range
               init_yrange: dblarr(2), $         ;Initial y-range
-              p_sysvar: !P, $                   ;Save the P system variable
-              x_sysvar: !X, $                   ;Save the X system variable
-              y_sysvar: !Y, $                   ;Save the Y system variable
               
               ;MrImage.pro Keywords
               axes: ptr_new(), $                ;Draw axes around the image?

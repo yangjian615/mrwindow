@@ -600,12 +600,7 @@ pro MrWindow::Focus, event
 ;---------------------------------------------------------------------
 
     ;Set the system variables and synchronize.
-    if isMember((*self.gTypes).data, typename(self.focus)) then begin
-        self.focus -> getProperty, X_SYSVAR=x_sysvar, Y_SYSVAR=y_sysvar, P_SYSVAR=p_sysvar
-        !X = x_sysvar
-        !Y = y_sysvar
-        !P = p_sysvar
-    endif
+    if isMember((*self.gTypes).data, typename(self.focus)) then self.focus -> RestoreCoords
 end
 
 
