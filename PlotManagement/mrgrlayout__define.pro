@@ -1021,7 +1021,7 @@ POSITION = position
 ;---------------------------------------------------------------------
     endif else if n_loc eq 0 then begin
         ;Get availability 
-        void = self -> IsAvailable(ITAKEN=pIndex, NTAKEN=nTaken, /PLOT_INDEX)
+        void = self -> IsAvailable(IFREE=pFree, NFREE=nFree, ITAKEN=pIndex, NTAKEN=nTaken, /PLOT_INDEX)
         
         ;
         ;We want to return a position that is after the last unavailable position.
@@ -1039,31 +1039,30 @@ POSITION = position
     ;---------------------------------------------------------------------
     ;Something Already Taken? ////////////////////////////////////////////
     ;---------------------------------------------------------------------
-        endif else begin
+        endif else if nFree gt 0 then begin
             ;Take the highest available plot location
-            thisPI = pIndex[-1] + 1
-
+            thisPI = pFree[0]
+            
+            location = self -> ConvertLocation(thisPI, /PLOT_INDEX, /TO_COLROW)
+            layout = self.GrLayout
+            
         ;---------------------------------------------------------------------
         ;Outside Current Layout? /////////////////////////////////////////////
         ;---------------------------------------------------------------------
-            if thisPI gt self.GrLayout[0]*self.GrLayout[1]-1 then begin
+        endif else if nFree eq 0 then begin
             
-                ;Update the layout?
-                if keyword_set(update_layout) $
-                    then self -> ExpandLayout, 0, 1 $
-                    else layout = self.GrLayout + [0,1]
-                
-                ;Find the location in the new layout.
-                location = [1, self.GrLayout[1]]
+            ;Update the layout?
+            if keyword_set(update_layout) $
+                then self -> ExpandLayout, 0, 1 $
+                else layout = self.GrLayout + [0,1]
+            
+            ;Find the location in the new layout.
+            location = [1, self.GrLayout[1]]
             
         ;---------------------------------------------------------------------
         ;Inside Current Layout? //////////////////////////////////////////////
         ;---------------------------------------------------------------------
-            endif else begin
-                location = self -> ConvertLocation(thisPI, /PLOT_INDEX, /TO_COLROW)
-                layout = self.GrLayout
-            endelse
-        endelse
+        endif
         
     ;otherwise, throw an error message
     endif else message, 'LOCATION: incorrect number of elements.'
@@ -1518,13 +1517,15 @@ pro MrGrLayout::ShiftPlots, location
         self -> ExpandLayout, 0, 1
         iList = self -> ConvertLocation(location, /TO_LIST_INDEX)
         iNotTaken = min(where((*self.posIsTaken)[iList:*] eq 0))+iList
+        
+    ;Otherwise pick the first available location that is after the given location.
     endif else begin
-        iNotTaken = iNotTaken[0]
+        iNotTaken = iNotTaken[0]+iList
     endelse
     
     ;Make the first available position unavailable, then make the chosen position
     ;available. All positions in between remain unavailable.
-    (*self.posIsTaken)[iNotTaken+iList] = 1
+    (*self.posIsTaken)[iNotTaken] = 1
     (*self.posIsTaken)[iList] = 0
 end
 

@@ -37,12 +37,14 @@
 ;Plot Management
 .comp ./PlotManagement/mrcontour__define.pro
 .comp ./PlotManagement/mrcreategraphic__define.pro
-.comp ./PlotManagement/mrgraphicatom__define.pro
+.comp ./PlotManagement/mrdatacoords__define.pro
+.comp ./PlotManagement/mrgratom__define.pro
+.comp ./PlotManagement/mrgrlayout__define.pro
 .comp ./PlotManagement/mridl_container__define.pro
 .comp ./PlotManagement/mrimage__define.pro
-.comp ./PlotManagement/mrplotlayout__define.pro
-.comp ./PlotManagement/mrplotmanager__define.pro
+.comp ./PlotManagement/mrlayout__define.pro
 .comp ./PlotManagement/mrplot__define.pro
+.comp ./PlotManagement/mrplotmanager__define.pro
 
 ;Wile E. Graphics utils
 .comp ./WileE/wearrow__define.pro
@@ -62,15 +64,16 @@
 .comp ./utilities/dot_product.pro
 .comp ./utilities/epoch_to_ssm.pro
 .comp ./utilities/file_extension.pro
+.comp ./utilities/getmrwindows.pro
 .comp ./utilities/ht_velocity.pro
 .comp ./utilities/ismember.pro
 .comp ./utilities/load_color.pro
-.comp ./utilities/mrgetwindow.pro
+.comp ./utilities/moveplot_gui.pro
 .comp ./utilities/mrimage.pro
 .comp ./utilities/mrpixelcorners.pro
 .comp ./utilities/mrpixeldeltas.pro
 .comp ./utilities/mrpixelpoints.pro
-.comp ./utilities/mrplotlayout.pro
+.comp ./utilities/mrlayout.pro
 .comp ./utilities/time_select.pro   ;Must be before mva.pro to compile correctly
 .comp ./utilities/mva.pro
 .comp ./utilities/plotpositions_gui.pro

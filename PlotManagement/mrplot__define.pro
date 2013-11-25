@@ -111,7 +111,7 @@ NOERASE = noerase
 
     ;Draw the plot
     if self.overplot then begin
-        *self.overplot -> RestoreCoords
+        self.target -> RestoreCoords
         self -> doOverplot
         self -> SaveCoords
     endif else begin
@@ -483,7 +483,7 @@ DISABLE=disable
         ;If not TARGET was specified, get the currently selected graphic
         if n_elements(target) eq 0 then target = self.window -> GetSelect()
 
-        ;Make we can overplot on top of the target graphic
+        ;Ensure we can overplot on top of the target graphic
         oplottable = ['MrPlot', 'MrImage', 'MrContour']
         if IsMember(oplottable, obj_class(target), /FOLD_CASE) eq 0 || obj_valid(target) eq 0 $
             then message, 'TARGET must be valid and of class ' + strjoin(oplottable, ' ')
@@ -888,12 +888,13 @@ _REF_EXTRA = extra
     self.min_value = ptr_new(/ALLOCATE_HEAP)
     self.max_value = ptr_new(/ALLOCATE_HEAP)
     self.nsum = ptr_new(/ALLOCATE_HEAP)
-    self.overplot = ptr_new(/ALLOCATE_HEAP)
     self.xlog = ptr_new(/ALLOCATE_HEAP)
     self.ylog = ptr_new(/ALLOCATE_HEAP)
     self.polar = ptr_new(/ALLOCATE_HEAP)
     self.symcolor = ptr_new(/ALLOCATE_HEAP)
     self.ynozero = ptr_new(/ALLOCATE_HEAP)
+    
+    self.target = obj_new()
 
     ;If REFRESH=1 three things happen: If the call to MrGrAtom is
     ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
@@ -985,11 +986,13 @@ _REF_EXTRA = extra
                          YLOG = keyword_set(ylog), $
                          YNOZERO = ynozero, $
                          YRANGE = yrange
-
-    ;If overplot is 1 or a valid object refrence, then call the overplot method.
-    if keyword_set(target) $
-        then self -> Overplot, target $
-        else *self.overplot = 0
+    
+    ;Overplot?
+    if n_elements(target) gt 0 then begin
+        if size(target, /TNAME) eq 'OBJREF' $
+            then self -> Overplot, target $
+            else if keyword_set(target) then self -> Overplot
+    endif
 
     ;Make sure the x- and y-style keywords have the 2^0 bit set to force
     ;exact axis ranges.    

@@ -1123,7 +1123,7 @@ pro MrPlotManager::ShiftPlots, location
     
     ;Shift the layout so that the layout_positions are up-to-date.
     self -> MrGrLayout::ShiftPlots, location
-    
+
 ;---------------------------------------------------------------------
 ;Shift Plots /////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1143,9 +1143,10 @@ pro MrPlotManager::ShiftPlots, location
             else: message, 'Layout has incorrect format. Cannot be shifted.'
         endcase
         
+        ;THESEOBJ are in no particular order. Must check them all.
         if thisPIndex lt pStartShift then continue
-        if thisPIndex ge pStopShift then break
-        
+        if thisPIndex ge pStopShift then continue
+
         ;If we make it to here, shift the plot
         thisPIndex += 1
         newLocation = self -> ConvertLocation(thisPIndex, layout, /PLOT_INDEX, /TO_COLROW)

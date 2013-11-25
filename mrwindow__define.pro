@@ -678,7 +678,7 @@ pro MrWindow::File_Menu_Events, event
             cdf_obj = obj_new('CDF_PLOT')
             thePlot = cdf_obj -> Plot(GROUP_LEADER=self.tlb, $
                                       DISPLAY_TYPE=display_type, $
-                                      /CURRENT, DRAW=0)
+                                      /CURRENT)
             
             ;Add Spectrograms
             if display_type eq '3D_SPECTROGRAM' || display_type eq 'SPECTROGRAM' then begin
@@ -833,7 +833,7 @@ _REF_EXTRA = extra
 ;LAYOUT PROPERTIES ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
-        self -> MrPlotLayout::GetProperty, _STRICT_EXTRA=extra
+        self -> MrGrLayout::GetProperty, _STRICT_EXTRA=extra
     endif
 end
 
@@ -1182,7 +1182,7 @@ pro MrWindow::SetCurrent
     endif
 
     ;Find SELF in the array.
-    iCurrent = where(!MrWindow_Array eq self)
+    iCurrent = where(*!MrWindow_Array eq self)
     
     ;Shift it to the front.
     !MrWindow_Array = shift(!MrWindow_Array, -iCurrent)
@@ -1306,7 +1306,7 @@ _REF_EXTRA = extra
     if n_elements(savedir) ne 0 then self.savedir = savedir
         
     nExtra = n_elements(extra)
-    
+
 ;---------------------------------------------------------------------
 ;CURSOR PROPERTIES ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1422,7 +1422,6 @@ pro MrWindow::SysVRemove, object
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-stop
         void = error_message()
         return
     endif
@@ -1602,24 +1601,19 @@ pro MrWindow::whichObjects
     ;Step through each object
     for i = 0, nData - 1 do begin
         ;Print a header.
-        if i eq 0 then print, '--Index--', '--Type--', '-Location-', '--Position--', $
-                              FORMAT='(a9, 4x, a' + typeLen + ', 4x, a10, 4x, a12)'
+        if i eq 0 then print, '--Index--', '--Type--', '-Location-', '--Name--', $
+                              FORMAT='(a9, 4x, a' + typeLen + ', 4x, a10, 4x, a8)'
                               
         ;Get the object's position and layout
-        dataObj[i] -> GetProperty, POSITION=position, LAYOUT=layout
-        
-        ;If no layout exists, find its fixed position
-        if n_elements(layout) eq 0 $
-            then location = self -> FindLocation(position) $
-            else location = layout[2:3]
+        dataObj[i] -> GetProperty, LAYOUT=layout
 
         ;Print the type-name, location, and position
         sIndex    = string(index[i], FORMAT='(i2)')
-        sLocation = string(location, FORMAT='(%"[%3i,%3i]")')
-        sPosition = string(position, FORMAT='(%"[%6.4f, %6.4f, %6.4f, %6.4f]")')
+        sLocation = string(layout[2:3], FORMAT='(%"[%3i,%3i]")')
+        sName = dataObj[i] -> GetName()
 
-        print, FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0, 5x, a32)', $
-               sIndex, typename(dataObj[i]), sLocation, sPosition
+        print, FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0, 5x, a0)', $
+               sIndex, obj_class(dataObj[i]), sLocation, sName
     
     endfor
     print, ''
@@ -1638,18 +1632,15 @@ pro MrWindow::whichObjects
     
     for i = 0, nAnn - 1 do begin
         ;Print a header.
-        if i eq 0 then print, '--Index--', '--Type--', '--Position--', $
+        if i eq 0 then print, '--Index--', '--Type--', '--Name--', $
                               FORMAT='(a9, 4x, a' + typeLen + ', 4x, a12)'
-                              
-        ;Get the object's position and layout
-;        annObj[i] -> GetProperty, POSITION=position
         
         ;Print the type-name, location, and position
-        sIndex    = string(index[i], FORMAT='(i2)')
-;        sPosition = string(position, FORMAT='(%"[%6.4f, %6.4f, %6.4f, %6.4f]")')
+        sIndex = string(index[i], FORMAT='(i2)')
+        sName  = annObj[i] -> GetName()
 
-        print, FORMAT='(4x, a2, 7x, a' + typeLen + ')', $;, 5x, a32)', $
-               sIndex, typename(annObj[i]);, sPosition
+        print, FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0)', $
+               sIndex, obj_class(annObj[i]), sName
     
     endfor
     print, ''
@@ -1837,7 +1828,7 @@ _REF_EXTRA = extra
     self.savedir = savedir
     self.xsize = xsize
     self.ysize = ysize
-    
+
     self -> SetProperty, _EXTRA=extra
     
     ;Wait until here set REFRESH so that nothing is drawn or realized
