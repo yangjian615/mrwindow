@@ -95,17 +95,14 @@
 ;-
 function MrWindow, parent, $
 ARROWS = arrows, $
-CMODE = cmode, $
-BUILD = build, $
-LMODE = lmode, $
+DRAW = draw, $
+NOGUI = noGUI, $
+BUFFER = buffer, $
 PLOTOBJECTS = plotObjects, $
-REALIZE = realize, $
-RMODE = rmode, $
 SAVEDIR = savedir, $
 TEXT = text, $
 XSIZE = xsize, $
 YSIZE = ysize, $
-ZOOMFACTOR = zoomfactor, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -120,17 +117,14 @@ _REF_EXTRA = extra
     ;Create a MrWindow object reference.
     oMrWindow = obj_new('MrWindow', parent, $
                                     ARROWS = arrows, $
-                                    CMODE = cmode, $
-                                    BUILD = build, $
-                                    LMODE = lmode, $
+                                    DRAW = draw, $
+                                    NOGUI = noGUI, $
+                                    BUFFER = buffer, $
                                     PLOTOBJECTS = plotObjects, $
-                                    REALIZE = realize, $
-                                    RMODE = rmode, $
                                     SAVEDIR = savedir, $
                                     TEXT = text, $
                                     XSIZE = xsize, $
                                     YSIZE = ysize, $
-                                    ZOOMFACTOR = zoomfactor, $
                                     _EXTRA = extra)
                                     
     return, oMrWindow

@@ -203,6 +203,9 @@
 ;                           the current object is zoomable. IFOCUS changed from an object's
 ;                           container index to the object's reference. Added the FOCUS
 ;                           property. Zoom events are forwarded to MrZoom::Draw_Events - MRA
+;       2013/11/22  -   Renamed DISPLAY to BUFFER, removed the BUILD option, changed
+;                           REALIZE to DRAW, renamed CREATEGUI to NOGUI. Input options
+;                           have been simplified sigificantly. Added NAME keyword. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -212,9 +215,9 @@
 ;
 ; :Keywords:
 ;       XSIZE:          in, optional, type=boolean, default=600
-;                       If `BUILD` is set, then this is the width of the draw widget.
+;                       Width of the draw widget.
 ;       YSIZE:          in, optional, type=boolean, default=340
-;                       If `BUILD` is set, then this is the height of the draw widget.
+;                       Height of the draw widget.
 ;-
 pro MrWindow::BuildGUI, $
 XSIZE = xsize, $
@@ -316,12 +319,19 @@ pro MrWindow::Draw
         return
     endif
     
+    ;Return if we are not refreshing.
+    if self._refresh eq 0B then return
+    
+    ;Realize the widget if need be.
+    if self.buffer eq 0 and self._realized eq 0 then self -> Realize
+    
     ;Set the current window to the pixmap window and erase it
     if (!d.flags and 256) ne 0 then begin
         wset, self.pixID
         erase
     endif
     
+    ;Get all objects
     allObj = self -> Get(/ALL, COUNT=nObj)
     
     ;Create an empty plot if none exists.
@@ -575,6 +585,7 @@ pro MrWindow::Focus, event
         tf_clicked = bytarr(nObj)
         delta = fltarr(nObj)
         for i = 0, nObj - 1 do begin
+            if obj_class(dataObj[i]) eq 'MRPLOT' && dataObj[i] -> GetOverplot() then continue
             tf_clicked[i] = dataObj[i] -> IsInside(event.x, event.y, DELTA=del)
             delta[i] = del
         endfor
@@ -586,7 +597,7 @@ pro MrWindow::Focus, event
         iClicked = where(tf_clicked eq 1, nClicked)
         if nClicked eq 0 $
             then self.focus = obj_new() $
-            else self.focus = dataObj[iClicked]
+            else self.focus = dataObj[iClicked[0]]
 
 ;---------------------------------------------------------------------
 ;Container Index Given? //////////////////////////////////////////////
@@ -660,37 +671,50 @@ pro MrWindow::File_Menu_Events, event
     ;OPEN CDF ////////////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
         'OPEN CDF': begin
+            ;Set this window as the current window
+            self -> SetCurrent
+            
             ;Create the plot from the data
             cdf_obj = obj_new('CDF_PLOT')
             thePlot = cdf_obj -> Plot(GROUP_LEADER=self.tlb, $
                                       DISPLAY_TYPE=display_type, $
-                                      COLORBAR=theColorbar)
-            if obj_valid(thePlot) eq 0 then return
-            
-            ;Add Plots.
-            if strupcase(display_type) eq 'TIME_SERIES' then begin
-                self -> Add, thePlot, /DRAW
+                                      /CURRENT, DRAW=0)
             
             ;Add Spectrograms
-            endif else if isMember(['3D_SPECTROGRAM', 'SPECTROGRAM'], display_type, /FOLD_CASE) then begin
-                    ;Add the image and get its position
-                    self -> Add, [thePlot, theColorbar]
-                    
-                    ;Make sure there is enough room for a colorbar.
-                    if self.xmargin[1] lt 15 then self -> SetProperty, XMARGIN=[self.xmargin[0],15]
-
-                    ;Add the colorbar and bind it to the image.
-                    self -> Bind, thePlot, theColorbar, /CAXIS
-                    self -> Draw
+            if display_type eq '3D_SPECTROGRAM' || display_type eq 'SPECTROGRAM' then begin
+                ;Make sure there is enough room for a colorbar.
+                if self.xmargin[1] lt 15 then self -> SetProperty, XMARGIN=[self.xmargin[0],15]
             
             endif else message, 'Display type "' + display_type + '" not recognized.'
             
-            ;Destroy the object
+            ;Draw and destroy the object
+            self -> Draw
             obj_destroy, cdf_obj
         endcase
         
         else: message, 'Button "' + button_name + '" not recognized.'
     endcase
+end
+
+
+;+
+;   A simple way of obtaining the window's name.
+;
+;   :Returns:
+;       NAME:           The name of the window
+;-
+function MrWindow::GetName
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, ''
+    endif
+    
+    return, self.name
 end
 
 
@@ -724,6 +748,8 @@ end
 ;                           
 ;-
 pro MrWindow::GetProperty, index, $
+NAME = name, $
+REFRESH = refresh, $
 SAVEDIR = save_dir, $
 THEOBJ = theObj, $
 XSIZE = xsize, $
@@ -756,6 +782,8 @@ _REF_EXTRA = extra
     
     ;Get Properties
     if arg_present(cmode)   then cmode = self.cmode
+    if arg_present(name)    then name = self.name
+    if arg_present(refresh) then refresh = self._refresh
     if arg_present(savedir) then savedir = self.savedir
     if arg_present(xsize)   then xsize = self.xsize
     if arg_present(ysize)   then ysize = self.ysize
@@ -814,6 +842,30 @@ end
 ;   Determines if the object indicated by self.focus is zoomable or not.
 ;
 ;   :Returns:
+;       theSelected:            The currently selected graphic.
+;-
+function MrWindow::GetSelect
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, obj_new()
+    endif
+    
+    ;Return the selected graphic, if valid.
+    if obj_valid(self.focus) $
+        then return, self.focus $
+        else return, obj_new()
+end
+
+
+;+
+;   Determines if the object indicated by self.focus is zoomable or not.
+;
+;   :Returns:
 ;       TF_ZOOMABLE:            Returns true (1) if the object indicated by self.Focus
 ;                                   is able to be zoomed, false (0) if not.
 ;-
@@ -861,7 +913,6 @@ pro MrWindow::Notify_Realize
     
     ;Draw the plot now that the window is realized.
     self -> Draw
-    
 end
 
 
@@ -974,6 +1025,7 @@ pro MrWindow::quit, event
     
     ;Destroy the widget
     widget_control, event.top, /DESTROY
+    self._realized = 0B
 end
 
 
@@ -988,8 +1040,7 @@ end
 ;                       Any keyword accepted by the BUILD method is also excepted for
 ;                           keyword inheritance.
 ;-
-pro MrWindow::RealizeGUI, $
-BUILD = build, $
+pro MrWindow::Realize, $
 _REF_EXTRA = extra
     compile_opt idl2
 
@@ -1001,25 +1052,41 @@ _REF_EXTRA = extra
         return
     endif
     
-    ;Default to building the GUI
-    setDefaultValue, build, 1, /BOOLEAN
-    
-    ;Switch display modes, if necessary.
-    if self.display eq 0 then begin
-        self.display = 1
-        wDelete, self.winID
-    endif
-    
     ;Build the GUI
-    if keyword_set(build) then self -> buildGUI, _STRICT_EXTRA=extra
-    
-    ;Make sure a GUI has been built.
-    if self.tlb eq 0 then message, 'GUI must be built first.'
+    if widget_info(self.tlb, /VALID_ID) eq 0 then self -> buildGUI, _STRICT_EXTRA=extra
         
     ;Realize the widget and start event handling
     widget_control, self.tlb, /REALIZE
     xmanager, 'MrWindow', self.tlb, /NO_BLOCK, EVENT_HANDLER='MrWindow_Events', $
               CLEANUP='MrWindow_CleanUp'
+    
+    ;Indicate that the widget has been realized
+    self._realized = 1B
+end
+
+
+;+
+;   The purpose of this method it enable or diable refreshing of the display.
+;-
+pro MrWindow::Refresh, $
+DISABLE=disable
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Enable or disable.
+    if n_elements(disable) eq 0 $
+        then self._refresh = 1B $
+        else self._refresh = ~keyword_set(disable)
+    
+    ;Re-draw the window contents.
+    if self._refresh then self -> Draw
 end
 
   
@@ -1031,12 +1098,8 @@ end
 ;                           The width of the draw window in pixels
 ;       YSIZE:              in, required, type=long
 ;                           The height of the draw window in pixels
-;
-; :Keywords:
-;       DRAW:               in, optional, type=boolean, default=0
 ;-
-pro MrWindow::ResizeDrawWidget, xsize, ysize, $
-DRAW = draw
+pro MrWindow::ResizeDrawWidget, xsize, ysize
     compile_opt idl2
     
     ;Error handling
@@ -1049,7 +1112,7 @@ DRAW = draw
 
     ;Make sure the dimensions of the new window are >= 0. Ambiguous error results otherwise:
     ;"integer parameter out of range for operation"
-    if xsize le 0 or ysize le 0 then message, 'XSIZE and YSIZE must be = 0.'
+    if xsize le 0 or ysize le 0 then message, 'XSIZE and YSIZE must be > 0.'
 
 ;---------------------------------------------------------------------
 ;Check Windows ///////////////////////////////////////////////////////
@@ -1088,7 +1151,7 @@ DRAW = draw
     endif else if winIsAvailable then begin
         wDelete, self.winID
         
-        if self.display then pixmap = 0 else pixmap = 1
+        if self.buffer then pixmap = 0 else pixmap = 1
         self.winID = MrGetWindow(TITLE='MrWindow', XSIZE=xsize, YSIZE=ysize, /FREE, PIXMAP=pixmap)
     endif
     
@@ -1097,11 +1160,32 @@ DRAW = draw
     self.ysize = ysize
 
     ;Recalculate and apply positions in resized window.
-    self -> CalcLayoutPositions
+    self -> Refresh, /DISABLE
+    self -> CalcPositions
     self -> ApplyPositions
+    self -> Refresh
+end
+
+
+;+
+;   The purpose of this method is to make this window the current window.
+;-
+pro MrWindow::SetCurrent
+    compile_opt strictarr
     
-    ;Draw the plot to the new size
-    if keyword_set(draw) then self -> Draw
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    ;Find SELF in the array.
+    iCurrent = where(!MrWindow_Array eq self)
+    
+    ;Shift it to the front.
+    !MrWindow_Array = shift(!MrWindow_Array, -iCurrent)
 end
 
 
@@ -1145,8 +1229,8 @@ end
 ;-
 pro MrWindow::SetProperty, index, $
 AMODE = amode, $
-DRAW = draw, $
 RANGE = range, $
+NAME = name, $
 POSITION = position, $
 SAVEDIR = savedir, $
 XSIZE = xsize, $
@@ -1216,6 +1300,7 @@ _REF_EXTRA = extra
     
     ;Set Properties
     if n_elements(amode)   ne 0 then self.amode = amode
+    if n_elements(name)    ne 0 then self.name = name
     if n_elements(xsize)   ne 0 then self -> ResizeDrawWidget, xsize, self.ysize
     if n_elements(ysize)   ne 0 then self -> ResizeDrawWidget, self.xsize, ysize
     if n_elements(savedir) ne 0 then self.savedir = savedir
@@ -1266,15 +1351,102 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
         ;Recalculate the plot positions when layout changes.
-        self -> MrPlotLayout::SetProperty, _STRICT_EXTRA=extra
+        self -> MrGrLayout::SetProperty, _STRICT_EXTRA=extra
         self -> ApplyPositions
     endif
 
     ;Draw?
-    if keyword_set(draw) then self -> draw
+    self -> draw
 end
 
-  
+
+;+
+;   The purpose of this method is to add a MrWindow object to the !MrWindow_Array system
+;   variable. If the system variable does not exist, it will be created.
+;-
+pro MrWindow::SysVAdd, object
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    if obj_class(object) ne 'MRWINDOW' then $
+        message, 'Only MrWindow objects can be added to !MrWindow_Array.'
+
+    ;If the system variable exists does, add the window to the beginning of the list of
+    ;windows. If not, create the system variable.
+    if self -> SysVExists() $
+        then if n_elements(*!MrWindow_Array) gt 0 $
+            then *!MrWindow_Array = [object, *!MrWindow_Array] $
+            else *!MrWindow_Array = [object] $
+        else defsysv, '!MrWindow_Array', ptr_new([object])
+end
+
+
+;+
+;   The purpose of this method is to check if the !MrWindow_Array system variable exists.
+;
+; :Returns:
+;       EXISTS:             True (1) if !MrWindow_Array exists. False (0) if not.
+;-
+function MrWindow::SysVExists
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, 0
+    endif
+    
+    ;Check if it exists.
+    defsysv, '!MrWindow_Array', EXISTS=exists
+    return, exists
+end
+
+
+;+
+;   The purpose of this method is to remove a MrWindow object from the !MrWindow_Array
+;   system variable.
+;-
+pro MrWindow::SysVRemove, object
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+stop
+        void = error_message()
+        return
+    endif
+    
+    ;Make sure MrWindow object was given
+    if obj_class(object) ne 'MRWINDOW' then $
+        message, 'Only MrWindow objects can be removed from !MrWindow_Array.'
+        
+    ;Check if the system variable exists
+    if self -> SysVExists() eq 0 then return
+    
+    ;Pick out the objects that will be kept
+    void = IsMember(*!MrWindow_Array, object, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
+    
+    ;Throw away the rest.
+    if nKeep gt 0 then begin
+        *!MrWindow_Array = (*!MrWindow_Array)[iKeep]
+    endif else begin
+        ptr_free, !MrWindow_Array
+        !MrWindow_Array = ptr_new(/ALLOCATE_HEAP)
+    endelse
+end
+
+
 ;+
 ;   This method resizes the top level base, then updates the contents of the draw widget
 ;   to be proportioned appropriately.
@@ -1284,7 +1456,7 @@ end
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrWindow::TLB_Resize_Events, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1313,10 +1485,10 @@ pro MrWindow::TLB_Resize_Events, event
     
     ;Recalculate the normalized positions based on the new window size.
     ;Draw the plot to the new size
-    self -> CalcLayoutPositions
+    self -> Refresh, /DISABLE
+    self -> CalcPositions
     self -> ApplyPositions
-
-    self -> Draw
+    self -> Refresh
 end
 
 
@@ -1548,9 +1720,9 @@ pro MrWindow::cleanup
     
     ;Cleanup inherited properties.
     self -> MrAbstractAnalysis::Cleanup
-    self -> MrAbstractArrow::Cleanup
+;    self -> MrAbstractArrow::Cleanup
     self -> MrCursor::Cleanup
-    self -> MrAbstractText::Cleanup
+;    self -> MrAbstractText::Cleanup
     self -> MrSaveAs::Cleanup
     self -> MrZoom::Cleanup
     self -> MrPlotManager::Cleanup
@@ -1561,6 +1733,9 @@ pro MrWindow::cleanup
     
     ;If a widget is still active, destroy it
     if widget_info(self.tlb, /VALID_ID) then widget_control, self.tlb, /DESTROY
+    
+    ;Remove self from the !MrWindow_Array system variable
+    self -> SysVRemove, self
 end
 
 
@@ -1573,30 +1748,18 @@ end
 ;       PARENT:             in, optional, type=int
 ;                           The widget ID of a parent widget in which to place the draw
 ;                               window. If not provided, the draw window will be placed
-;                               in a MrWindow widget unless `CREATEGUI`=0.
+;                               in a MrWindow widget unless `NOGUI`=1.
 ;
 ; :Keywords:
-;       BUILD:              in, optional, type=Boolean, default=1
-;                           Build the GUI. This gives the option to construct the GUI
-;                               without having to realize it yet.
-;       CREATEGUI:          in, optional, type=boolean, default=1
-;                           If set, graphics will be drawn in either a MrWindow widget
-;                               or in the widget specified by `PARENT`. If not set, graphics
-;                               will be diplayed in a normal IDL graphics window. Setting
-;                               this keyword to 0 also sets `REALIZE`=0 and `BUILD`=0
-;       DISPLAY:            in, optional, type=boolean, default=1
-;                           If set, graphics produced by the Draw method will be created
-;                               in a visible display window. If not set (i.e. =0),
-;                               graphics will be output to an invisible pixmap window. The
-;                               latter will aslo automatically set CreateGUI=0. This is
-;                               useful, say, if you want to save an image without having
-;                               it be displayed first.
-;       REALIZE:            in, optional, type=boolean, default=1
-;                           If set and `PARENT` is not given, then the MrWindow widget will
-;                               be realized imediately after it is built. If not set, the
-;                               GUI will be built but not realized. Realization causes a
-;                               call to the Draw method via "Notify_Realize". Setting this
-;                               also sets `BUILD`=1.
+;       NOGUI:              in, optional, type=boolean, default=0
+;                           If set, graphics will be created in a normal IDL window, unless
+;                               `PARENT` is provided.
+;       BUFFER:             in, optional, type=boolean, default=0
+;                           If set, graphics will be directed to an invisible pixmap window
+;                               instead of generating a widget window.
+;       DRAW:               in, optional, type=boolean, default=1
+;                           If set, the Draw method will be called. Widgets will be
+;                               realized at this time.
 ;       SAVEDIR:            in, optional, type=string, default=current
 ;                           The directory in which to save files. When the display is
 ;                               saved via the ::saveImage method, if no filename is given,
@@ -1625,11 +1788,12 @@ end
 function MrWindow::init, parent, $
 ;MrWindow Keywords
 ARROWS = arrows, $
-CREATEGUI = createGUI, $
-DISPLAY = display, $
-BUILD = build, $
+DRAW = draw, $
+NAME = name, $
+NOGUI = noGUI, $
+BUFFER = buffer, $
 PLOTOBJECTS = plotObjects, $
-REALIZE = realize, $
+REFRESH = refresh, $
 SAVEDIR = savedir, $
 TEXT = text, $
 XSIZE = xsize, $
@@ -1644,7 +1808,7 @@ _REF_EXTRA = extra
         void = error_message()
         return, 0
     endif
-
+    
     ;Superclasses
     if self -> MrPlotManager::Init()   eq 0 then return, 0
     if self -> MrSaveAs::Init()        eq 0 then return, 0
@@ -1658,34 +1822,26 @@ _REF_EXTRA = extra
     
     ;Default window size
     setDefaultValue, amode, 0, /BOOLEAN
-    setDefaultValue, build, 1, /BOOLEAN
-    setDefaultValue, realize, 1, /BOOLEAN
+    setDefaultValue, buffer, 0, /BOOLEAN
+    setDefaultValue, refresh, 1, /BOOLEAN
+    setDefaultValue, name, 'MrWindow'
+    setDefaultValue, noGUI, 0, /BOOLEAN
     setDefaultValue, savedir, current
     setDefaultvalue, xsize, 600
     setDefaultValue, ysize, 340
-    setDefaultValue, createGUI, 1, /BOOLEAN
-    setDefaultValue, display, 1, /BOOLEAN
-    
-    ;If nothing is to be displayed, do not create the GUI.
-    if display eq 0 then createGUI = 0
-    
-    ;Do not realize the GUI if we are not building it.
-    if build eq 0 then realize = 0
-    
-    ;If not creating a GUI, then do not build or realize.
-    if createGUI eq 0 then begin
-        realize = 0
-        build = 0
-    endif
     
     ;Set properties
     self.amode = amode
-    self.display = display
+    self.buffer = buffer
+    self.name = name
     self.savedir = savedir
     self.xsize = xsize
     self.ysize = ysize
     
     self -> SetProperty, _EXTRA=extra
+    
+    ;Wait until here set REFRESH so that nothing is drawn or realized
+    self._refresh = refresh
         
     ;Add objects
     if n_elements(arrows)       gt 0 then self -> Add, arrows
@@ -1697,16 +1853,20 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ;Display Window //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+    ;Buffer the output?
+    if buffer then begin
+        self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
+        self.winID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
 
-	;Was a parent widget provided? If not...
-	if n_elements(parent) eq 0 then begin
+	;MrWindow or IDL Window?
+	endif else if n_elements(parent) eq 0 then begin
 
     ;---------------------------------------------------------------------
     ;IDL Window //////////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
 
 	    ;Is a GUI being built or realized? If not...
-	    if keyword_set(createGUI) eq 0 then begin
+	    if keyword_set(noGUI) then begin
 	    
 	        ;Create a normal window. Make it a pixmap if DISPLAY=0
 	        if display eq 1 then pixmap = 0 else pixmap = 1
@@ -1726,33 +1886,19 @@ _REF_EXTRA = extra
             ;pixmap window.
             self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
         
-            ;Realize the widget?
-            if keyword_set(realize) then begin
-                self -> realizeGUI, /BUILD, XSIZE=xsize, YSIZE=ysize
-                
-            ;Build the widget?
-            ;Without realizing the widget, no window will be created. Thus, the Draw method
-            ;will have nothing to draw to and the SaveAs options will have nothing to read
-            ;from. As a fix, create a temporary pixmap window (it will be deleted when the
-            ;widget is realized and the Notify_Realize method is called).
-            endif else if keyword_set(build) then begin
-                self.winID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
-                self -> buildGUI, XSIZE=xsize, YSIZE=ysize
-                
-            ;Neither Build nor Realize. See previous comment.
-            endif else begin
-                self.winID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
-            endelse
-	    
+            ;Refresh? -- If we are not refreshing, we must create a temporary window.
+            if refresh eq 0 $
+                then self.winID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
 	    endelse
 
     ;---------------------------------------------------------------------
     ;External GUI ////////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
-
-    ;If a parent was provided, just add the draw widget. We have to know when the 
-    ;widget is realized so that we can get the Window ID in which to draw the plots.
-    ;Realization needs its own event handler because the UVALUE is for other events
+        ;
+        ;If a parent was provided, just add the draw widget. We have to know when the 
+        ;widget is realized so that we can get the Window ID in which to draw the plots.
+        ;Realization needs its own event handler because the UVALUE is for other events
+        ;
 	endif else begin
 	    self.tlb = parent
         
@@ -1766,6 +1912,9 @@ _REF_EXTRA = extra
                                   UVALUE={object: self, method: 'Draw_Events'})
 	endelse
 
+    self -> SysVAdd, self
+    self -> Draw
+
     return, 1
 end
 
@@ -1778,18 +1927,20 @@ end
 ;                       The class definition structure.
 ;
 ; :Fields:
-;       TLB:            ;Widget ID of the top level base
-;       DISPLAY:        ;Display the graphics?
-;       DRAWID:         ;Widget ID of the draw widget
-;       FOCUS:          ;Object of focus
-;       PIXID:          ;Window ID of the pixmap
-;       MENUID:         ;Widget ID of the menu bar
-;       STATUSID:       ;Widget ID of the status bar
-;       WINID:          ;Window ID of the draw window
-;       X0:             ;First clicked x-coordinate
-;       Y0:             ;First clicked y-coordinate
-;       XSIZE:          ;x-size of the draw window
-;       YSIZE:          ;y-size of the draw window
+;       TLB:            Widget ID of the top level base
+;       DISPLAY:        Display the graphics?
+;       DRAWID:         Widget ID of the draw widget
+;       FOCUS:          Object of focus
+;       PIXID:          Window ID of the pixmap
+;       MENUID:         Widget ID of the menu bar
+;       _REALIZED:      Indicates that the widget has been realized
+;       _REFRESH:       Indicates that the graphics window should be refreshed
+;       STATUSID:       Widget ID of the status bar
+;       WINID:          Window ID of the draw window
+;       X0:             First clicked x-coordinate
+;       Y0:             First clicked y-coordinate
+;       XSIZE:          x-size of the draw window
+;       YSIZE:          y-size of the draw window
 ;-
 pro MrWindow__define, class
     compile_opt idl2
@@ -1806,11 +1957,14 @@ pro MrWindow__define, class
               inherits MrAbstractAnalysis, $    ;Analysis events and menu
               
               tlb: 0, $                         ;Widget ID of the top level base
-              display: 0, $                     ;Display the graphics?
+              buffer: 0, $                      ;Buffer the graphics?
               drawID: 0, $                      ;Widget ID of the draw widget
               focus: obj_new(), $               ;Object of focus
               pixID: 0, $                       ;Window ID of the pixmap
               menuID: 0, $                      ;Widget ID of the menu bar
+              name: '', $                       ;Name of the window
+              _realized: 0B, $                  ;Has the widget been realized?
+              _refresh: 0B, $                   ;Refresh the window?
               statusID: 0, $                    ;Widget ID of the status bar
               winID: 0, $                       ;Window ID of the draw window
               x0: 0, $                          ;First clicked x-coordinate, for zooming

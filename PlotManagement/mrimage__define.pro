@@ -81,6 +81,9 @@
 ;                           images and ability to draw image pixels in different sizes. - MRA
 ;       2013/11/20  -   MrIDL_Container and MrGraphicAtom is disinherited. Inherit instead
 ;                           MrGrAtom and MrLayout. - MRA
+;       2013/11/22  -   Renamed DRAW to REFRESH. Refreshing is now done automatically.
+;                           Call the Refresh method with the DISABLE keyword set to
+;                           temporarily turn of Refresh. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -438,17 +441,9 @@ end
 ;                               scaled image.
 ;       CTINDEX:            out, optional, type=int
 ;                           The color table index of a color table to be loaded.
-;       DEP:                out, optional, type=any
-;                           The position (as specified by the TV procedure) of the image
-;                               or the data associated with the dependent variable.
-;       INDEP:              out, optional, type=any
-;                           The position (as specified by the TV procedure) of the image
-;                               or the data associated with the independent variable.
 ;       IDISPLAY:           in, optional, type=boolean, default=0
 ;                           The index at which a 2D cut is to be taken. Applicable only
 ;                               for > 2D image data.
-;       IMAGE:              out, optional, type=any
-;                           The image to be displayed.
 ;       AXES:               out, optional, type=boolean
 ;                           Draw a set of axes around the image.
 ;       INIT_XRANGE:        out, optional, type=fltarr(2)
@@ -504,9 +499,6 @@ end
 ;-
 pro MrImage::GetProperty, $
 ;Data keywords
-IMAGE = image, $
-INDEP = indep, $
-DEP = dep, $
 X_POS = x_pos, $
 Y_POS = y_pos, $
 
@@ -552,11 +544,8 @@ _REF_EXTRA = extra
     endif
 
     ;Data Properties
-    if arg_present(IMAGE) and n_elements(*self.IMAGE) ne 0 then image = *self.image
     if arg_present(X_POS) and n_elements(*self.X_POS) ne 0 then x_pos = *self.x_pos
     if arg_present(Y_POS) and n_elements(*self.Y_POS) ne 0 then y_pos = *self.y_pos
-    if arg_present(DEP)   and n_elements(*self.DEP)   ne 0 then dep = *self.dep
-    if arg_present(INDEP) and n_elements(*self.INDEP) ne 0 then indep = *self.indep
 
     ;MrImage Properties
     if arg_present(iDisplay)    then iDisplay    =  self.iDisplay
@@ -595,6 +584,63 @@ _REF_EXTRA = extra
         self -> MrGrAtom::GetProperty, _EXTRA=extra
         self -> weGraphicsKeywords::GetProperty, _EXTRA=extra
     endif
+end
+
+
+;+
+;   The purpose of this method is to retrieve data
+;
+; :Calling Sequence:
+;       myPlot -> GetData, image
+;       myPlot -> GetData, image, x, y
+;       myPlot -> GetData, image, x, y, x1, y1
+;
+; :Params:
+;       IMAGE:          out, required, type=numeric array
+;                       A named variable into which the image data will be returned.
+;       X:              out, optional, type=numeric array
+;                       A named variable into which the independent variable data will
+;                           be returned. `Y` must also be provided.
+;       Y:              out, optional, type=numeric array
+;                       A named variable into which the dependent variable data will
+;                           be returned. `Y` must also be provided.
+;       X1:             out, optional, type=numeric array
+;                       A named variable into which the x-corrdinate of the upper-right
+;                           corner of each pixel in `IMAGE` will be returned. If present,
+;                           then `X` represents the x-coordinate of the lower-right corner
+;                           of each pixel. Must be used in conjunction with `Y1`.
+;       Y1:             out, optional, type=numeric array
+;                       A named variable into which the y-corrdinate of the upper-right
+;                           corner of each pixel in `IMAGE` will be returned. If present,
+;                           then `Y` represents the y-coordinate of the lower-right corner
+;                           of each pixel.
+;-
+pro MrImage::GetData, image, x, y, x1, y1
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Retrieve the data
+    case n_params() of
+        1: image = *self.image
+        3: begin
+            x = *self.indep
+            y = *self.dep
+        endcase
+        5: begin
+            x = *self.Xmin
+            y = *self.Ymin
+            x1 = *self.Xmax
+            y1 = *self.Ymax
+        endcase
+        else: message, 'Incorrect number of parameters.'
+    endcase
 end
 
 
@@ -654,6 +700,137 @@ end
 
 
 ;+
+;   The purpose of this method is to retrieve data
+;
+; :Calling Sequence:
+;       myGraphic -> GetData, image
+;       myGraphic -> GetData, image, x, y
+;       myGraphic -> GetData, image, x, y, x1, y1
+;
+; :Params:
+;       IMAGE:          in, required, type=numeric array
+;                       Image data will be returned.
+;       X:              in, optional, type=numeric array
+;                       Independent variable data. `Y` must also be provided.
+;       Y:              in, optional, type=numeric array
+;                       Dependent variable data will.
+;       X1:             in, optional, type=numeric array
+;                       X-corrdinate of the upper-right corner of each pixel in `IMAGE`.
+;                           If present, then `X` represents the x-coordinate of the lower-
+;                           right corner of each pixel. Must beused in conjunction with `Y1`.
+;       Y1:             in, optional, type=numeric array
+;                       Y-corrdinate of the upper-right corner of each pixel in `IMAGE`.
+;                           If present, then `Y` represents the y-coordinate of the lower-
+;                           right corner of each pixel.
+;-
+pro MrImage::SetData, image, x, y, x1, y1
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Retrieve the data
+    case n_params() of
+        1: *self.image = image
+        3: begin
+            *self.image = image
+            *self.indep = x
+            *self.dep = y
+        endcase
+        4: begin
+            *self.Xmin = x
+            *self.Ymin = y
+            *self.Xmax = y2
+            *self.Ymax = y1
+        endcase
+        else: message, 'Incorrect number of parameters.'
+    endcase
+    
+    self.window.draw
+end
+
+
+;+
+;   The purpose of this method is to set the layout of a plot while maintaining the
+;   automatically updating grid.
+;
+; :Params:
+;       LAYOUT:             in, required, type=intarr(3)/intarr(4)
+;                           A vector of the form [nCols, nRos, index] or
+;                               [nCols, nRows, col, row], indicating the number of columns
+;                               and rows in the overall layout (nCols, nRows), the index
+;                               where the plot is to be placed ("index", starting with 1
+;                               and increasing left->right then top->bottom). Alternatively,
+;                               "col" and "row" are the column and row in which the plot
+;                               is to be placed. Ignored if `POSITION` is present.
+;
+; :Keywords:
+;       POSITION:           in, optional, type=fltarr(4)
+;                           A vector of the form [x0, y0, x1, y1] specifying the lower-left
+;                               and upper-right corners of the plot, in normal coordinates.
+;                               If this keyword is given, `LAYOUT` is ignored. This keyword
+;                               should not be used. Instead use the SetProperty method
+;                               (or dot-referencing in IDL 8.0+). This is only meant
+;                               for use by MrPlotManager__Define for synchronizing layout
+;                               properties with the window.
+;       UPDATE_LAYOUT:      in, optional, type=boolean, default=1
+;                           Indicate that the layout is to be updated. All graphics within
+;                               the graphics window will be adjusted. This keyword is
+;                               used by MrPlotManager__Define when applying the layout
+;                               grid to each plot. It is not meant to be used elsewhere.
+;       _REF_EXTRA:         in, optional, type=any
+;                           Any keyword accepted by MrLayout::SetProperty is also accepted
+;                               for keyword inheritance.
+;-
+pro MrImage::SetLayout, layout, $
+POSITION=position, $
+UPDATE_LAYOUT=update_layout, $
+_REF_EXTRA=extra
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        if n_elements(init_refresh) gt 0 $
+            then self.window -> Refresh, DISABLE=~init_refresh
+        return
+    endif
+    
+    ;Default to updating the layout
+    SetDefaultValue, update_layout, 1, /BOOLEAN
+    
+    ;Turn refresh off.
+    self.window -> GetProperty, REFRESH=init_refresh
+    self.window -> Refresh, /DISABLE
+    
+    ;If we are updating the layout, let the window take care of things.
+    if update_layout then begin
+        if n_elements(position) gt 0 $
+            then self.window -> SetPosition, (*self.layout)[2:*], position $
+            else self.window -> SetPosition, (*self.layout)[2:*], layout
+        
+        ;Adjust other aspects of the layout.
+        if n_elements(extra) gt 0 then self.window -> SetProperty, _EXTRA=extra
+    
+    ;If we are not updating the layout...
+    endif else begin
+        self -> MrLayout::SetProperty, LAYOUT=layout, POSITION=position, UPDATE_LAYOUT=0, $
+                                       _STRICT_EXTRA=extra
+    endelse
+    
+    ;Reset the refresh state.
+    self.window -> Refresh, DISABLE=~init_refresh
+end
+
+
+;+
 ;   The purpose of this method is to set object properties. 
 ;
 ; :Keywords:
@@ -662,12 +839,6 @@ end
 ;                               scaled image.
 ;       CTINDEX:            in, optional, type=int
 ;                           The color table index of a color table to be loaded.
-;       DEP:                in, optional, type=any
-;                           The position (as specified by the TV procedure) of the image
-;                               or the data associated with the dependent variable.
-;       INDEP:              in, optional, type=any
-;                           The position (as specified by the TV procedure) of the image
-;                               or the data associated with the independent variable.
 ;       IMAGE:              in, optional, type=any
 ;                           The image to be displayed.
 ;       IDISPLAY:           in, optional, type=boolean, default=0
@@ -720,12 +891,7 @@ end
 ;                               keyword inheritance.
 ;-
 pro MrImage::SetProperty, $
-DRAW = draw, $
-
 ;Data keywords
-DEP = dep, $
-IMAGE = image, $
-INDEP = indep, $
 X_POS = x_pos, $
 Y_POS = y_pos, $
 
@@ -752,6 +918,7 @@ TOP = top, $
 ;Graphics Keywords
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
+POSITION = position, $
 XLOG = xlog, $
 YLOG = ylog, $
 _REF_EXTRA = extra
@@ -768,9 +935,6 @@ _REF_EXTRA = extra
     ;Data
     if n_elements(x_pos) ne 0 then *self.x_pos = x_pos
     if n_elements(y_pos) ne 0 then *self.y_pos = y_pos
-    if n_elements(indep) ne 0 then *self.indep = indep
-    if n_elements(dep)   ne 0 then *self.dep = dep
-    if n_elements(image) ne 0 then *self.image = image
 
     ;MrImage Keywords
     if n_elements(hide)        gt 0 then self.hide = keyword_set(hide)
@@ -794,6 +958,7 @@ _REF_EXTRA = extra
     ;Graphics Properties
     if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
     if n_elements(MIN_VALUE) ne 0 then *self.min_value = min_value
+    if n_elements(position)  gt 0 then  self -> SetLayout, POSITION=position
     if n_elements(XLOG)      ne 0 then  self.xlog = keyword_set(xlog)
     if n_elements(YLOG)      ne 0 then  self.ylog = keyword_set(ylog)
     
@@ -801,28 +966,19 @@ _REF_EXTRA = extra
     if n_elements(paint) gt 0 then self.paint = keyword_set(paint)
     
     ;Superclass properties
-    if n_elements(extra) gt 0 then begin
-        ;MrLayout -- We must pick out each keyword here to prevent MrGraphicAtom
-        ;            from updating the position every time (i.e. when the layout
-        ;            remains unchanged).
-        layout_kwds = ['ASPECT', 'CHARSIZE', 'LAYOUT', 'MARGIN', 'POSITION', $
-                       'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
-        void = IsMember(layout_kwds, extra, iLay, N_MATCHES=nLay, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
-        if nLay gt 0 then self -> MrLayout::SetProperty, _STRICT_EXTRA=extra[iLay]
-
+    nExtra = n_elements(extra)
+    if nExtra gt 0 then begin
         ;MrGrAtom -- Pick out the keywords here to use _STRICT_EXTRA instead of _EXTRA
-        if nExtra gt 0 then begin
-            atom_kwds = ['HIDE', 'NAME']
-            void = IsMember(atom_kwds, extra[iExtra], iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=jExtra, N_NONMEMBER=nExtra)
-            if nExtra gt 0 then iExtra = iExtra[jExtra]
-            if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
-        endif
-
+        atom_kwds = ['HIDE', 'NAME']
+        void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
+        if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
+    
         ;weGraphicsKeywords Properties
         if nExtra gt 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
     endif
         
-    if keyword_set(draw) then self -> Draw
+    ;Refresh the window
+    self.window -> Draw
 end
 
 
@@ -871,6 +1027,7 @@ pro MrImage::cleanup
     ptr_free, self.axes
     ptr_free, self.bottom
     ptr_free, self.ctindex
+    ptr_free, self.data_pos
     ptr_free, self.max_value
     ptr_free, self.min_value
     ptr_free, self.missing_color
@@ -1003,7 +1160,7 @@ end
 ;-
 function MrImage::init, image, x, y, x0, y0, x1, y1, $
 ;MrImage Keywords
-DRAW = draw, $
+CURRENT = current, $
 IDISPLAY = idisplay, $
 KEEP_ASPECT = keep_aspect, $
 TV = tv, $
@@ -1049,7 +1206,6 @@ _REF_EXTRA = extra
     ;Defaults
     setDefaultValue, gui, 1, /BOOLEAN
     setDefaultValue, tv, 0, /BOOLEAN
-    setDefaultValue, draw, 1, /BOOLEAN
     setDefaultValue, iDisplay, 0
     setDefaultValue, xsize, 600
     setDefaultValue, xlog, 0, /BOOLEAN
@@ -1070,14 +1226,56 @@ _REF_EXTRA = extra
     ;weGraphicsKeywords
     if self -> weGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrGraphicsKeywords.'
-
-    ;Graphic Atom
-    if self -> MrGrAtom::INIT(_EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGraphicAtom.'
         
     ;MrLayout
     if self -> MrLayout::INIT(_EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrLayout.'
+        
+;---------------------------------------------------------------------
+;Allocate Heap to Pointers ///////////////////////////////////////////
+;---------------------------------------------------------------------
+    self.image         = ptr_new(/ALLOCATE_HEAP)
+    self.indep         = ptr_new(/ALLOCATE_HEAP)
+    self.dep           = ptr_new(/ALLOCATE_HEAP)
+    self.x_pos         = ptr_new(/ALLOCATE_HEAP)
+    self.y_pos         = ptr_new(/ALLOCATE_HEAP)
+    self.axes          = ptr_new(/ALLOCATE_HEAP)
+    self.bottom        = ptr_new(/ALLOCATE_HEAP)
+    self.ctindex       = ptr_new(/ALLOCATE_HEAP)
+    self.data_pos      = ptr_new(/ALLOCATE_HEAP)
+    self.max_value     = ptr_new(/ALLOCATE_HEAP)
+    self.min_value     = ptr_new(/ALLOCATE_HEAP)
+    self.missing_value = ptr_new(/ALLOCATE_HEAP)
+    self.missing_color = ptr_new(/ALLOCATE_HEAP)
+    self.nan           = ptr_new(/ALLOCATE_HEAP)
+    self.palette       = ptr_new(/ALLOCATE_HEAP)
+    self.range         = ptr_new(/ALLOCATE_HEAP)
+    self.scale         = ptr_new(/ALLOCATE_HEAP)
+    self.top           = ptr_new(/ALLOCATE_HEAP)
+    self.Xmax          = ptr_new(/ALLOCATE_HEAP)
+    self.Xmin          = ptr_new(/ALLOCATE_HEAP)
+    self.Ymax          = ptr_new(/ALLOCATE_HEAP)
+    self.Ymin          = ptr_new(/ALLOCATE_HEAP)
+
+    ;If REFRESH=1 three things happen: If the call to MrGrAtom is
+    ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
+    ;      cause errors.
+    ;   2. here, then when MrGrAtom calls the SetProperty
+    ;      method, none of the data will be loaded into the object.
+    ;   3. after the call to SetProperty so that all of the data is loaded, the initial
+    ;      call to SetProperty will not have a valid self.window property
+    ;
+    ;To fix problem 1 and 3, put the call to MrGrAtom here. To fix problem 2,
+    ;turn Refresh off.
+    if keyword_set(current) then begin
+        theWin = GetMrWindows(/CURRENT)
+        theWin -> GetProperty, REFRESH=init_refresh
+        theWin -> Refresh, /DISABLE
+    endif
+
+    ;Graphic Atom
+    if self -> MrGrAtom::INIT(CURRENT=current, _EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrGrAtom.'
 
 ;---------------------------------------------------------------------
 ;Input Parameters ////////////////////////////////////////////////////
@@ -1162,40 +1360,16 @@ _REF_EXTRA = extra
 ;Check/Set Keywords //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    ;IMAGE_PLOTS Properties
-    self.image         = ptr_new(/ALLOCATE_HEAP)
-    self.indep         = ptr_new(/ALLOCATE_HEAP)
-    self.dep           = ptr_new(/ALLOCATE_HEAP)
-    self.axes          = ptr_new(/ALLOCATE_HEAP)
-    self.bottom        = ptr_new(/ALLOCATE_HEAP)
-    self.ctindex       = ptr_new(/ALLOCATE_HEAP)
-    self.data_pos      = ptr_new(/ALLOCATE_HEAP)
-    self.min_value     = ptr_new(/ALLOCATE_HEAP)
-    self.missing_value = ptr_new(/ALLOCATE_HEAP)
-    self.missing_color = ptr_new(/ALLOCATE_HEAP)
-    self.max_value     = ptr_new(/ALLOCATE_HEAP)
-    self.nan           = ptr_new(/ALLOCATE_HEAP)
-    self.palette       = ptr_new(/ALLOCATE_HEAP)
-    self.range         = ptr_new(/ALLOCATE_HEAP)
-    self.scale         = ptr_new(/ALLOCATE_HEAP)
-    self.top           = ptr_new(/ALLOCATE_HEAP)
-    self.Xmax          = ptr_new(/ALLOCATE_HEAP)
-    self.Xmin          = ptr_new(/ALLOCATE_HEAP)
-    self.xrange        = ptr_new(/ALLOCATE_HEAP)
-    self.Ymax          = ptr_new(/ALLOCATE_HEAP)
-    self.Ymin          = ptr_new(/ALLOCATE_HEAP)
-    self.yrange        = ptr_new(/ALLOCATE_HEAP)
-    
     ;Image range
     if n_elements(range) eq 0 $
         then imRange = [min(image, NAN=nan, max=imMax), imMax] $
         else imRange = range
 
+    ;Set the data
+    self -> SetData, image, indep, dep
+
     ;Set the object properties
-    self -> SetProperty, IMAGE = image, $
-                         DEP = dep, $
-                         INDEP = indep, $
-                         AXES = axes, $
+    self -> SetProperty, AXES = axes, $
                          BOTTOM = bottom, $
                          CTINDEX = ctindex, $
                          DATA_POS = data_pos, $
@@ -1244,6 +1418,11 @@ _REF_EXTRA = extra
     self.init_xrange = xrange
     self.init_yrange = yrange
     self.init_range = imRange
+    
+    ;Refresh the graphics?
+    if keyword_set(current) $
+        then theWin -> Refresh, DISABLE=~init_refresh $
+        else self.window -> Draw
 
     return, 1
 end

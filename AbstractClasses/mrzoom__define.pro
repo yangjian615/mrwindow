@@ -523,9 +523,10 @@ pro MrZoom::Box_Zoom, event
             if self.y0 eq event.y then void = temporary(yrange)
             
             ;Set the new range and apply any bindings
+            self -> Refresh, /DISABLE
             self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
             self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS
-            self -> Draw
+            self -> Refresh
             
             ;reset initial click
             self.x0 = -1
@@ -1155,9 +1156,13 @@ pro MrZoom::Pan, event
             self.x0 = event.x
             self.y0 = event.y
             
-            ;Hide the plot being panned, then draw everything else
+            ;Hide the plot being panned. Setting the property will casue the
+            ;graphic window to be refreshed with the FOCUS graphic hidden.
             self.focus -> SetProperty, HIDE=1   ;;;;;;;;;;;;;
-            self -> Draw                        ;;;;;;;;;;;;;
+            
+            ;Disable refreshing then turn hide off
+            self -> Refresh, /DISABLE
+            self.focus -> SetProperty, HIDE=0
         
             ;Turn on motion events
             self -> On_Off_Motion_Events, /ON
@@ -1202,8 +1207,7 @@ pro MrZoom::Pan, event
             
             ;Apply bindings. Need a Draw to update the bindings.
             self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS, /CAXIS
-
-            self -> Draw
+            self -> Refresh
         endcase
     endcase
 end
@@ -1388,11 +1392,10 @@ pro MrZoom::Wheel_Zoom_XY, event
     if yrange[0] gt yrange[1] then yrange[0] = yrange[1] - delta_y
     
     ;Set the zoomed x- and y-range
+    self -> Refresh, /DISABLE
     self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
     self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS
-
-    ;Redraw the plot
-    self -> draw
+    self -> Refresh
 end
 
 
@@ -1533,6 +1536,7 @@ pro MrZoom::XY_Zoom, event
     yrange = reform(xy[1,*])
     
     ;only zoom if the coordinate changed
+    self -> Refresh, /DISABLE
     case self.zmode of
         1: begin
             if self.x0 ne event.x then begin
@@ -1557,7 +1561,7 @@ pro MrZoom::XY_Zoom, event
     self.y0 = -1
     
     ;Re-draw the plot
-    self -> draw
+    self -> Refresh
 end
 
 

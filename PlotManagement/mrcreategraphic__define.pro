@@ -74,17 +74,12 @@
 ;                           Assumes device coordinates.
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
-;                           Add the arrow object to the container. This assumes that
-;                               the IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
-;                           Call the Draw method after adding the overplot to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by weArrow__define or cgArrow is also
 ;                               accepted for keyword inheritance.
 ;-
 function MrCreateGraphic::Arrow, x0, y0, x1, y1, $
+CURRENT=current, $
 DRAW = draw, $
 _REF_EXTRA = extra
     compile_opt idl2
@@ -98,13 +93,7 @@ _REF_EXTRA = extra
     endif
 
     ;Create a cgOverPlot object
-    theArrow = obj_new('weArrow', x0, y0, x1, y1, _STRICT_EXTRA=extra)
-
-    ;Add the overplot to the array of overplots
-    if keyword_set(add) then self -> Add, theArrow
-    
-    ;Re-Draw
-    if keyword_set(draw) then self -> Draw
+    theArrow = obj_new('weArrow', x0, y0, x1, y1, /CURRENT, DRAW=draw, _STRICT_EXTRA=extra)
     
     return, theArrow
 end
@@ -123,20 +112,13 @@ end
 ;                           The Z location of the axis. 
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
-;                           Add the axis object to the container. This assumes that
-;                               the IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
-;                           Call the Draw method after adding the overplot to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by weOverPlot__define or cgOverPlot__define
 ;
 ;   
 ;-
 function MrCreateGraphic::Axis, xloc, yloc, zloc, $
-ADD = add, $
-DRAW = draw, $
+CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -149,14 +131,8 @@ _REF_EXTRA = extra
     endif
 
     ;Create a cgOverPlot object
-    theAxis = obj_new('weAxis', xloc, yloc, zloc, _STRICT_EXTRA=extra)
+    theAxis = obj_new('weAxis', xloc, yloc, zloc, /CURRENT, _STRICT_EXTRA=extra)
 
-    ;Add the overplot to the array of overplots
-    if keyword_set(add) then self -> Add, theAxis
-    
-    ;Re-Draw
-    if keyword_set(draw) then self -> Draw
-    
     return, theAxis
 end
 
@@ -166,12 +142,6 @@ end
 ;   added to the container
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
-;                           Add the colorbar object to the container. This assumes that
-;                               the IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
-;                           Call the Draw method after creating the colorbar.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrImagePlot__define.
 ;
@@ -181,7 +151,7 @@ end
 ;   
 ;-
 function MrCreateGraphic::Colorbar, $
-ADD = add, $
+CURRENT=current, $
 DRAW = draw, $
 _REF_EXTRA = extra
     compile_opt idl2
@@ -194,17 +164,8 @@ _REF_EXTRA = extra
         return, obj_new()
     endif
 
-    ;Set Defaults
-    SetDefaultValue, add, 1, /BOOLEAN
-    SetDefaultValue, draw, 1, /BOOLEAN
-
     ;Create the color bar
-    theColorBar = obj_new('weColorBar', _STRICT_EXTRA=extra, DRAW=0)
-    
-    ;Add the image
-    if keyword_set(add) $
-        then self -> Add, theColorBar, DRAW=draw $
-        else if keyword_set(draw) then theColorbar -> Draw
+    theColorBar = obj_new('weColorBar', /CURRENT, _STRICT_EXTRA=extra)
     
     return, theColorBar
 end
@@ -215,12 +176,6 @@ end
 ;   added to the container
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=1
-;                           Add the coutour object to the container. This assumes that the
-;                               IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=1
-;                           Call the Draw method after adding the image to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrImagePlot__define.
 ;
@@ -230,7 +185,7 @@ end
 ;   
 ;-
 function MrCreateGraphic::Contour, data, x, y, $
-ADD = add, $
+CURRENT=current, $
 DRAW = draw, $
 _REF_EXTRA = extra
     compile_opt idl2
@@ -243,17 +198,8 @@ _REF_EXTRA = extra
         return, obj_new()
     endif
 
-    ;Set Defaults
-    SetDefaultValue, add, 1, /BOOLEAN
-    SetDefaultValue, draw, 1, /BOOLEAN
-
     ;Create the color bar
-    theContour = obj_new('MrContour', data, x, y, _STRICT_EXTRA=extra, DRAW=0)
-    
-    ;Add the image
-    if keyword_set(add) $
-        then self -> Add, theContour, DRAW=draw $
-        else if keyword_set(draw) then theContour -> Draw
+    theContour = obj_new('MrContour', data, x, y, /CURRENT, _STRICT_EXTRA=extra)
     
     return, theContour
 end
@@ -264,12 +210,6 @@ end
 ;   added to the container
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=1
-;                           Add the image object to the container. This assumes that the
-;                               IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=1
-;                           Call the Draw method after adding the image to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrImagePlot__define.
 ;
@@ -279,8 +219,7 @@ end
 ;   
 ;-
 function MrCreateGraphic::Image, image, x, y, $
-ADD = add, $
-DRAW = draw, $
+CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -292,19 +231,8 @@ _REF_EXTRA = extra
         return, obj_new()
     endif
 
-    ;Set Defaults
-    SetDefaultValue, add, 1, /BOOLEAN
-    SetDefaultValue, draw, 1, /BOOLEAN
-
     ;Create the color bar
-    theImage = obj_new('MrImage', image, x, y, _STRICT_EXTRA=extra, DRAW=0)
-    
-    ;Add the image
-    if keyword_set(add) then self -> Add, theImage
-    
-    ;Draw    
-    if keyword_set(draw) then $
-        if (add eq 1) then self -> Draw else theImage -> Draw
+    theImage = obj_new('MrImage', image, x, y, /CURRENT, _STRICT_EXTRA=extra)
     
     return, theImage
 end
@@ -315,18 +243,11 @@ end
 ;   added to the container
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=1
-;                           Add the legend object to the container. This assumes that the
-;                               IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=1
-;                           Call the Draw method after adding the legend to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by weLegendItem.
 ;-
 function MrCreateGraphic::Legend, $
-ADD = add, $
-DRAW = draw, $
+CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -338,19 +259,8 @@ _REF_EXTRA = extra
         return, obj_new()
     endif
 
-    ;Set Defaults
-    SetDefaultValue, add, 1, /BOOLEAN
-    SetDefaultValue, draw, 1, /BOOLEAN
-    
     ;Create the legend
-    theLegend = obj_new('weLegendItem', _STRICT_EXTRA=extra)
-    
-    ;Add the legend
-    if keyword_set(add) then self -> Add, theLegend
-    
-    ;Draw    
-    if keyword_set(draw) then $
-        if (add eq 1) then self -> Draw else theLegend -> Draw
+    theLegend = obj_new('weLegendItem', /CURRENT, _STRICT_EXTRA=extra)
     
     return, theLegend
 end
@@ -373,20 +283,13 @@ end
 ;                               as individual vectors in the same set of axes.
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
-;                           Add the overplot object to the container. This assumes that
-;                               the IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
-;                           Call the Draw method after adding the overplot to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by weOverPlot__define or cgOverPlot__define
 ;
 ;   
 ;-
 function MrCreateGraphic::OverPlot, x, y, $
-ADD = add, $
-DRAW = draw, $
+CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -398,19 +301,8 @@ _REF_EXTRA = extra
         return, obj_new()
     endif
 
-    ;Set Defaults
-    SetDefaultValue, add, 1, /BOOLEAN
-    SetDefaultValue, draw, 1, /BOOLEAN
-
     ;Create a cgOverPlot object
-    theOverplot = obj_new('weOverPlot', x, y, _STRICT_EXTRA=extra)
-    
-    ;Add the OverPlot
-    if keyword_set(add) then self -> Add, theOverplot
-    
-    ;Draw    
-    if keyword_set(draw) then $
-        if (add eq 1) then self -> Draw else theOverplot -> Draw
+    theOverplot = obj_new('weOverPlot', x, y, /CURRENT, _STRICT_EXTRA=extra)
     
     return, theOverplot
 end
@@ -421,12 +313,6 @@ end
 ;   added to the container
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=1
-;                           Add the plot object to the container. This assumes that the
-;                               IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=1
-;                           Call the Draw method after adding the plot to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrPlotObject__define.
 ;
@@ -436,8 +322,7 @@ end
 ;   
 ;-
 function MrCreateGraphic::Plot, x, y, $
-ADD = add, $
-DRAW = draw, $
+CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -449,19 +334,8 @@ _REF_EXTRA = extra
         return, obj_new()
     endif
 
-    ;Set Defaults
-    SetDefaultValue, add, 1, /BOOLEAN
-    SetDefaultValue, draw, 1, /BOOLEAN
-
     ;Create the plot
-    thePlot = obj_new('MrPlot', x, y, _STRICT_EXTRA=extra, DRAW=0)
-    
-    ;Add the plot
-    if (add eq 1) then self -> Add, thePlot
-    
-    ;Draw    
-    if keyword_set(draw) then $
-        if (add eq 1) then self -> Draw else thePlot -> Draw
+    thePlot = obj_new('MrPlot', x, y, /CURRENT, _STRICT_EXTRA=extra)
     
     return, thePlot
 end
@@ -472,12 +346,6 @@ end
 ;   added to the container
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=1
-;                           Add the plot object to the container. This assumes that the
-;                               IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=1
-;                           Call the Draw method after adding the plot to the list.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrPlotObject__define.
 ;
@@ -487,8 +355,7 @@ end
 ;   
 ;-
 function MrCreateGraphic::PlotS, x, y, z, $
-ADD = add, $
-DRAW = draw, $
+CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -500,19 +367,8 @@ _REF_EXTRA = extra
         return, obj_new()
     endif
 
-    ;Set Defaults
-    SetDefaultValue, add, 1, /BOOLEAN
-    SetDefaultValue, draw, 1, /BOOLEAN
-
     ;Create the plot
-    thePlotS = obj_new('MrPlotS', x, y, z, _STRICT_EXTRA=extra, DRAW=0)
-    
-    ;Add the plot
-    if (add eq 1) then self -> Add, thePlotS
-    
-    ;Draw    
-    if keyword_set(draw) then $
-        if (add eq 1) then self -> Draw else thePlotS -> Draw
+    thePlotS = obj_new('MrPlotS', x, y, z, /CURRENT, _STRICT_EXTRA=extra)
     
     return, thePlotS
 end
@@ -533,12 +389,6 @@ end
 ;                           The text to be put on the axis.
 ;
 ; :Keywords:
-;       ADD:                in, optional, type=boolean, default=0
-;                           Add the plot object to the container. This assumes that the
-;                               IDL_Container class or MrIDL_Container class is also a
-;                               subclass.
-;       DRAW:               in, optional, type=boolean, default=0
-;                           Call the Draw method after adding the overplot to the list.
 ;       OUTLOC:             out, optional, type=fltarr(2)
 ;                           If `PLACE` is set, then this will return the location at which
 ;                               the text was placed in the window.
@@ -554,7 +404,7 @@ end
 ;                               accepted for keyword inheritance.
 ;-
 function MrCreateGraphic::Text, xloc, yloc, text, $
-ADD = add, $
+CURRENT=current, $
 DRAW = draw, $
 OUTLOC = outloc, $
 PLACE = place, $
@@ -570,23 +420,14 @@ _REF_EXTRA = extra
         return, obj_new()
     endif
 
-    ;Set Defaults
-    SetDefaultValue, add, 1, /BOOLEAN
-    SetDefaultValue, draw, 1, /BOOLEAN
-    
     ;If PLACE is set, then no location was given. Shuffle
     if keyword_set(place) then text = temporary(xloc)
 
     ;Create a cgOverPlot object
-    theText = obj_new('weText', xloc, yloc, text, PLACE=place, WIDTH=width, OUTLOC=outloc, $
+    theText = obj_new('weText', xloc, yloc, text, /CURRENT, $
+                      PLACE=place, WIDTH=width, OUTLOC=outloc, $
                       _STRICT_EXTRA=extra)
 
-    ;Add the text to the array of text objects
-    if keyword_set(add) then self -> Add, theText
-    
-    ;Re-Draw
-    if keyword_set(draw) then self -> Draw
-    
     return, theText
 end
 

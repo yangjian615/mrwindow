@@ -85,6 +85,11 @@
 ;                           properties easier and to reduce list of keywords. - MRA
 ;       2013/11/20  -   MrIDL_Container and MrGraphicAtom is disinherited. Inherit instead
 ;                           MrGrAtom and MrLayout. - MRA
+;       2013/11/21  -   Added the doOverplot and TF_Overplot methods as well as the
+;                           OVERPLOT property. Renamed DRAW to REFRESH. Refreshing is now
+;                           done automatically. Call the Refresh method with the DISABLE
+;                           keyword set to temporarily turn of Refresh. - MRA
+;       2013/11/23  -   Added the SetLayout and Overplot methods. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -102,11 +107,17 @@ NOERASE = noerase
         return
     endif
 
+    if self.hide then return
+
     ;Draw the plot
-    if self.hide eq 0 then begin
+    if self.overplot then begin
+        *self.overplot -> RestoreCoords
+        self -> doOverplot
+        self -> SaveCoords
+    endif else begin
         self -> doPlot, NOERASE=noerase
         self -> SaveCoords
-    endif
+    endelse
 end
 
 
@@ -222,15 +233,116 @@ end
 
 
 ;+
+;   The purpose of this method is to do the actual overplotting. Basically, having this
+;   here merely to saves space in the Draw method.
+;-
+pro MrPlot::doOverplot
+
+    catch, theerror
+    if theerror ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Get the dimensions of the independent variable.
+    weoplot, *self.indep, *self.dep, $
+
+             ;weOPlot Keywords
+             COLOR     = *self.color, $
+             DIMENSION =  self.dimension, $
+             LINESTYLE = *self.linestyle, $
+             PSYM      = *self.psym, $
+             SYMCOLOR  = *self.symcolor, $
+             SYMSIZE   = *self.symsize, $
+             THICK     = *self.thick, $
+
+             ;cgOPlot Keywords
+             CHARSIZE  =  self.charsize, $
+
+             ;OPlot Keywords
+             NSUM      = *self. nsum, $
+             POLAR     = *self. polar, $
+             CLIP      = *self. clip, $
+             NOCLIP    = *self. noclip, $
+             T3D       = *self. t3d, $
+             ZVALUE    = *self. zvalue
+END
+  
+
+;+
+;   The purpose of this method is to retrieve data
+;
+; :Calling Sequence:
+;       myGraphic -> SetData, y
+;       myGraphic -> SetData, x, y
+;
+; :Params:
+;       X:              out, required, type=numeric array
+;                       If this is the only argument, the dependent variable data is
+;                           returned. If `Y` is also present, X will be the independent
+;                           variable's data.
+;       Y:              out, optional, type=numeric array
+;                       If present, the dependent variable's data will be returned
+;-
+pro MrPlot::GetData, x, y
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Retrieve the data
+    case n_params() of
+        1: x = *self.dep
+        2: begin
+            x = *self.indep
+            y = *self.dep
+        endcase
+        else: message, 'Incorrect number of parameters.'
+    endcase
+end
+
+
+;+
+;   The purpose of this method is to determine if overplotting is being done.
+;
+; :Params:
+;       TARGET:             out, optional, type=object
+;                           If `TF_OVERPLOT`=1, then the overplot target will be returned.
+;
+; :Returns:
+;       TF_OVERPLOT:        True (1) if overplotting, false (0) if not.
+;-
+function MrPlot::GetOverplot, target
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return, 0B
+    endif
+    
+    ;Get the overplot state and the target.
+    tf_overplot = self.overplot
+    if tf_overplot then if arg_present(target) then target = self.target
+    
+    return, tf_overplot
+end
+
+
+;+
 ;   The purpose of this method is to retrieve object properties
 ;
 ; :Keywords:
-;       DEP:                out, optional, type=any
-;                           Data associated with the dependent variable.
 ;       DIMENSION:          in, optional, type=int
 ;                           The dimension over which to plot.
-;       INDEP:              out, optional, type=any
-;                           Data associated with the independent variable.
 ;       INIT_XRANGE:        out, optional, type=fltarr(2)
 ;                           The initial state of the XRANGE keyword. This is used to reset
 ;                               the zoom to its original state.
@@ -265,9 +377,6 @@ end
 ;                               keyword inheritance.
 ;-
 pro MrPlot::GetProperty, $
-INDEP = indep, $
-DEP = dep, $
-
 ;MrPlot Properties
 DIMENSION = dimension, $
 INIT_XRANGE = init_xrange, $
@@ -275,6 +384,7 @@ INIT_YRANGE = init_yrange, $
 LABEL = label, $
 
 ;cgPlot Properties
+OVERPLOT = overplot, $
 SYMCOLOR = symcolor, $
 
 ;Graphics Properties
@@ -298,18 +408,15 @@ _REF_EXTRA = extra
         return
     endif
     
-    ;Data Properties
-    if arg_present(INDEP) then if n_elements(*self.indep) ne 0 then indep = *self.indep
-    if arg_present(DEP)   then if n_elements(*self.dep)   ne 0 then dep = *self.dep
-
     ;MrPlot Properties
     if arg_present(dimension)   then dimension   =  self.dimension
     if arg_present(init_xrange) then init_xrange =  self.init_xrange
     if arg_present(init_yrange) then init_yrange =  self.init_yrange
     if arg_present(label)       then label       =  self.label
+    if arg_present(overplot)    then if n_elements(*self.overplot) gt 0 then overplot = *self.overplot
     
     ;cgPlot Properties
-    if arg_present(symcolor)  and n_elements(*self.symcolor)  ne 0 then symcolor = *self.symcolor
+    if arg_present(symcolor) and n_elements(*self.symcolor)  ne 0 then symcolor = *self.symcolor
     
     ;Graphics Properties
     if arg_present(MAX_VALUE) and n_elements(*self.MAX_VALUE) ne 0 then max_value = *self.max_value
@@ -330,23 +437,193 @@ end
 
 
 ;+
+;   The purpose of this method is to change the plot from a normal plot to an overplot
+;   and vice versa.
+;
+; :Params:
+;       TARGET:             in, optional, type=objref
+;                           An MrGraphicObject onto which this Plot will be overplotted.
+;                               If not present, the currently selected graphic will be
+;                               used.
+;
+; :Keywords:
+;       DISABLE:            in, optional, type=boolean, default=0
+;                           Convert an overplot to a plot. If set, then `TARGET` may be
+;                               a 4-element vector of the form [x0, y0, x1, y1] that
+;                               specifies the lower-right and upper-left corners of the
+;                               plot. If `TARGET` is not provided, the plot will be placed
+;                               at the next available layout location.
+;-
+pro MrPlot::Overplot, target, $
+DISABLE=disable
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        if n_elements(init_refresh) gt 0 then self.window -> Refresh, DISABLE=~init_refresh
+        return
+    endif
+    
+    ;Disable refreshing
+    self.window -> GetProperty, REFRESH=init_refresh
+    self.window -> Refresh, /DISABLE
+    
+    ;Disable overplotting
+    if keyword_set(disable) then begin
+        self.window -> Make_Location, location
+        self.window -> SetPosition, (*self.layout)[2:*], location
+        self.target = obj_new()
+        self.overplot = 0B
+
+    ;Enable overplotting        
+    endif else begin
+        ;If not TARGET was specified, get the currently selected graphic
+        if n_elements(target) eq 0 then target = self.window -> GetSelect()
+
+        ;Make we can overplot on top of the target graphic
+        oplottable = ['MrPlot', 'MrImage', 'MrContour']
+        if IsMember(oplottable, obj_class(target), /FOLD_CASE) eq 0 || obj_valid(target) eq 0 $
+            then message, 'TARGET must be valid and of class ' + strjoin(oplottable, ' ')
+
+        ;Get the position
+        target -> GetProperty, POSITION=position
+        
+        ;Remove SELF from layout.
+        self.window -> SetPosition, (*self.layout)[2:*], position
+        self.overplot = 1B
+        self.target = target
+    endelse
+    
+    ;Re-enable refreshing
+    self.window -> Refresh, DISABLE=~init_refresh
+end
+
+
+;+
+;   The purpose of this method is to set data
+;
+; :Calling Sequence:
+;       myGraphic -> SetData, y
+;       myGraphic -> SetData, x, y
+;
+; :Params:
+;       X:              in, required, type=numeric array
+;                       If this is the only argument, then X represents the dependent
+;                           variable data. If `Y` is also given, then X represents the
+;                           independent variable data.
+;       Y:              in, optional, type=numeric array
+;                       The dependent variable data.
+;-
+pro MrPlot::SetData, x, y
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Retrieve the data
+    case n_params() of
+        1: *self.dep = x
+        2: begin
+            *self.indep = x
+            *self.dep = y
+        endcase
+        else: message, 'Incorrect number of parameters.'
+    endcase
+    
+    ;Refresh the graphics window
+    self.window -> Draw
+end
+
+
+;+
+;   The purpose of this method is to set the layout of a plot while maintaining the
+;   automatically updating grid.
+;
+; :Params:
+;       LAYOUT:             in, required, type=intarr(3)/intarr(4)
+;                           A vector of the form [nCols, nRos, index] or
+;                               [nCols, nRows, col, row], indicating the number of columns
+;                               and rows in the overall layout (nCols, nRows), the index
+;                               where the plot is to be placed ("index", starting with 1
+;                               and increasing left->right then top->bottom). Alternatively,
+;                               "col" and "row" are the column and row in which the plot
+;                               is to be placed. Ignored if `POSITION` is present.
+;
+; :Keywords:
+;       POSITION:           in, optional, type=fltarr(4)
+;                           A vector of the form [x0, y0, x1, y1] specifying the lower-left
+;                               and upper-right corners of the plot, in normal coordinates.
+;                               If this keyword is given, `LAYOUT` is ignored. This keyword
+;                               should not be used. Instead use the SetProperty method
+;                               (or dot-referencing in IDL 8.0+). This is only meant
+;                               for use by MrPlotManager__Define for synchronizing layout
+;                               properties with the window.
+;       UPDATE_LAYOUT:      in, optional, type=boolean, default=1
+;                           Indicate that the layout is to be updated. All graphics within
+;                               the graphics window will be adjusted. This keyword is
+;                               used by MrPlotManager__Define when applying the layout
+;                               grid to each plot. It is not meant to be used elsewhere.
+;       _REF_EXTRA:         in, optional, type=any
+;                           Any keyword accepted by MrLayout::SetProperty is also accepted
+;                               for keyword inheritance.
+;-
+pro MrPlot::SetLayout, layout, $
+POSITION=position, $
+UPDATE_LAYOUT=update_layout, $
+_REF_EXTRA=extra
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        if n_elements(init_refresh) gt 0 $
+            then self.window -> Refresh, DISABLE=~init_refresh
+        return
+    endif
+    
+    ;Default to updating the layout
+    SetDefaultValue, update_layout, 1, /BOOLEAN
+    
+    ;Turn refresh off.
+    self.window -> GetProperty, REFRESH=init_refresh
+    self.window -> Refresh, /DISABLE
+    
+    ;If we are updating the layout, let the window take care of things.
+    if update_layout then begin
+        if n_elements(position) gt 0 $
+            then self.window -> SetPosition, (*self.layout)[2:*], position $
+            else self.window -> SetPosition, (*self.layout)[2:*], layout
+        
+        ;Adjust other aspects of the layout.
+        if n_elements(extra) gt 0 then self.window -> SetProperty, _EXTRA=extra
+    
+    ;If we are not updating the layout...
+    endif else begin
+        self -> MrLayout::SetProperty, LAYOUT=layout, POSITION=position, UPDATE_LAYOUT=0, $
+                                      _STRICT_EXTRA=extra
+    endelse
+    
+    ;Reset the refresh state.
+    self.window -> Refresh, DISABLE=~init_refresh
+end
+
+
+;+
 ;   The purpose of this method is to set object properties. 
 ;
 ; :Keywords:
-;       DEP:                in, optional, type=any
-;                           Data associated with the dependent variable.
 ;       DIMENSION:          in, optional, type=int
 ;                           The dimension over which to plot.
-;       DRAW:               in, optional, type=boolean, default=0
-;                           Redraw the plot after setting the object properties.
-;       INDEP:              in, optional, type=any
-;                           Data associated with the independent variable.
-;       INIT_XRANGE:        in, optional, type=fltarr(2)
-;                           The initial state of the XRANGE keyword. This is used to reset
-;                               the zoom to its original state.
-;       INIT_YRANGE:        in, optional, type=fltarr(2)
-;                           The initial state of the YRANGE keyword. This is used to reset
-;                               the zoom to its original state.
 ;       LABEL:              in, optional, type=string
 ;                           A label is similar to a plot title, but it is aligned to the
 ;                               left edge of the plot and is written in hardware fonts.
@@ -363,6 +640,10 @@ end
 ;       POLAR:              in, optional, type=boolean
 ;                           Indicates that X and Y are actually R and Theta and that the
 ;                               plot is in polar coordinates.
+;       POSITION:           in, optional, type=fltarr(4)
+;                           A vector of the form [x0, y0, x1, y1] specifying the location
+;                               of the lower-left and upper-right corners of the graphic,
+;                               in normalized coordinates.
 ;       XLOG:               in, optional, type=boolean
 ;                           Indicates that a log scale is used on the x-axis
 ;       YLOG:               in, optional, type=boolean
@@ -371,20 +652,12 @@ end
 ;                           Inhibit setting the y  axis value to zero when all Y > 0 and
 ;                               no explicit minimum is set.
 ;       _REF_EXTRA:         in, optional, type=any
-;                           Keyword accepted by the superclasses are also accepted for
-;                               keyword inheritance.
+;                           Keyword accepted by the MrGrAtom and weGraphicsKeywords are
+;                               also accepted for keyword inheritance.
 ;-
 pro MrPlot::SetProperty, $
-DRAW = draw, $
-
-;Data Properties
-INDEP = indep, $
-DEP = dep, $
-
 ;MrPlot Properties
 DIMENSION = dimension, $
-INIT_XRANGE = init_xrange, $
-INIT_YRANGE = init_yrange, $
 LABEL = label, $
 
 ;cgPlot Properties
@@ -393,7 +666,6 @@ SYMCOLOR = symcolor, $
 ;Graphics Properties
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
-NAME = name, $
 NSUM = nsum, $
 POLAR = polar, $
 XLOG = xlog, $
@@ -401,6 +673,7 @@ YLOG = ylog, $
 YNOZERO = ynozero, $
 
 ;weGraphics Properties
+POSITION = position, $
 XSTYLE = xstyle, $          ;Check explicitly so that the 2^0 bit is always set
 YSTYLE = ystyle, $          ;Check explicitly so that the 2^0 bit is always set
 _REF_EXTRA = extra
@@ -414,15 +687,9 @@ _REF_EXTRA = extra
         return
     endif
     
-    ;Data Properties
-    if n_elements(INDEP) ne 0 then *self.indep = indep
-    if n_elements(DEP) ne 0 then *self.dep = dep
-
     ;MrPlot Properties
     if n_elements(DIMENSION)   ne 0 then  self.dimension = dimension
     if n_elements(LABEL)       ne 0 then  self.label = label
-    if n_elements(INIT_XRANGE) ne 0 then  self.init_xrange = init_xrange
-    if n_elements(INIT_YRANGE) ne 0 then  self.init_yrange = init_yrange
     
     ;cgPlot Properties
     if n_elements(SYMCOLOR) ne 0 then *self.symcolor = symcolor
@@ -435,34 +702,27 @@ _REF_EXTRA = extra
     if n_elements(XLOG)      ne 0 then *self.xlog = keyword_set(xlog)
     if n_elements(YLOG)      ne 0 then *self.ylog = keyword_set(ylog)
     if n_elements(YNOZERO)   ne 0 then *self.ynozero = keyword_set(ynozero)
+    if n_elements(xstyle)    ne 0 then *self.xstyle = ~(xstyle and 1) + xstyle
+    if n_elements(ystyle)    ne 0 then *self.ystyle = ~(ystyle and 1) + ystyle
     
-    ;Superclass properties
-    if n_elements(extra) gt 0 then begin
-        ;MrLayout -- We must pick out each keyword here to prevent MrGraphicAtom
-        ;            from updating the position every time (i.e. when the layout
-        ;            remains unchanged).
-        layout_kwds = ['ASPECT', 'CHARSIZE', 'LAYOUT', 'MARGIN', 'POSITION', $
-                       'XMARGIN', 'XGAP', 'YMARGIN', 'YGAP', 'UPDATE_LAYOUT']
-        void = IsMember(layout_kwds, extra, iLay, N_MATCHES=nLay, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
-        if nLay gt 0 then self -> MrLayout::SetProperty, _STRICT_EXTRA=extra[iLay]
+    if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
 
+;---------------------------------------------------------------------
+;Superclass Properties ///////////////////////////////////////////////
+;---------------------------------------------------------------------
+    nExtra = n_elements(extra)
+    if nExtra gt 0 then begin
         ;MrGrAtom -- Pick out the keywords here to use _STRICT_EXTRA instead of _EXTRA
-        if nExtra gt 0 then begin
-            atom_kwds = ['HIDE', 'NAME']
-            void = IsMember(atom_kwds, extra[iExtra], iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=jExtra, N_NONMEMBER=nExtra)
-            if nExtra gt 0 then iExtra = iExtra[jExtra]
-            if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
-        endif
+        atom_kwds = ['HIDE', 'NAME']
+        void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
+        if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
     
         ;weGraphicsKeywords Properties
         if nExtra gt 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
     endif
     
-    if n_elements(xstyle) ne 0 then *self.xstyle = ~(xstyle and 1) + xstyle
-    if n_elements(ystyle) ne 0 then *self.ystyle = ~(ystyle and 1) + ystyle
-    
-    ;Draw?
-    if keyword_set(draw) then self -> draw
+    ;Refresh the graphics window
+    self.window -> Draw
 end
 
 
@@ -567,10 +827,11 @@ end
 ;-
 function MrPlot::init, x, y, $
 ;MrPlot Keywords
+CURRENT = current, $
 DIMENSION = dimension, $
-DRAW = draw, $
 
 ;cgPlot Keywords
+OVERPLOT = target, $
 SYMCOLOR = symcolor, $
 
 ;Graphics Keywords
@@ -597,10 +858,7 @@ _REF_EXTRA = extra
 
     dims = size(x, /DIMENSIONS)
     setDefaultValue, dimension, 0
-    setDefaultValue, draw, 1, /BOOLEAN
-    setDefaultValue, gui, 1, /BOOLEAN
-    setDefaultValue, xsize, 600
-    setDefaultValue, ysize, 340
+    setDefaultValue, refresh, 1, /BOOLEAN
     nx = n_elements(x)
     ny = n_elements(y)
 
@@ -616,14 +874,46 @@ _REF_EXTRA = extra
     ;weGraphicsKeywords
     if self -> weGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrGraphicsKeywords.'
-
-    ;Graphic Atom
-    if self -> MrGrAtom::INIT(_EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGraphicAtom.'
         
     ;MrLayout
     if self -> MrLayout::INIT(_EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrLayout.'
+
+;---------------------------------------------------------------------
+;Allocate Memory to Pointers /////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    self.indep = ptr_new(/ALLOCATE_HEAP)
+    self.dep = ptr_new(/ALLOCATE_HEAP)
+    self.min_value = ptr_new(/ALLOCATE_HEAP)
+    self.max_value = ptr_new(/ALLOCATE_HEAP)
+    self.nsum = ptr_new(/ALLOCATE_HEAP)
+    self.overplot = ptr_new(/ALLOCATE_HEAP)
+    self.xlog = ptr_new(/ALLOCATE_HEAP)
+    self.ylog = ptr_new(/ALLOCATE_HEAP)
+    self.polar = ptr_new(/ALLOCATE_HEAP)
+    self.symcolor = ptr_new(/ALLOCATE_HEAP)
+    self.ynozero = ptr_new(/ALLOCATE_HEAP)
+
+    ;If REFRESH=1 three things happen: If the call to MrGrAtom is
+    ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
+    ;      cause errors.
+    ;   2. here, then when MrGrAtom calls the SetProperty
+    ;      method, none of the data will be loaded into the object.
+    ;   3. after the call to SetProperty so that all of the data is loaded, the initial
+    ;      call to SetProperty will not have a valid self.window property
+    ;
+    ;To fix problem 1 and 3, put the call to MrGrAtom here. To fix problem 2,
+    ;turn Refresh off.
+    if keyword_set(current) then begin
+        theWin = GetMrWindows(/CURRENT)
+        theWin -> GetProperty, REFRESH=init_refresh
+        theWin -> Refresh, /DISABLE
+    endif
+
+    ;Graphic Atom
+    if self -> MrGrAtom::INIT(CURRENT=current, _EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrGrAtom.'
 
 ;---------------------------------------------------------------------
 ;Dependent and Independent Variables /////////////////////////////////
@@ -659,23 +949,10 @@ _REF_EXTRA = extra
         
     ;Number of defaults to use.
     if xdim eq 0 then nDefaults = 1 else nDefaults = dims[xdim-1]
-
-;---------------------------------------------------------------------
-;Keywords ////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
     
-    ;Allocate heap for the variables
-    self.indep = ptr_new(/ALLOCATE_HEAP)
-    self.dep = ptr_new(/ALLOCATE_HEAP)
-    self.min_value = ptr_new(/ALLOCATE_HEAP)
-    self.max_value = ptr_new(/ALLOCATE_HEAP)
-    self.nsum = ptr_new(/ALLOCATE_HEAP)
-    self.xlog = ptr_new(/ALLOCATE_HEAP)
-    self.ylog = ptr_new(/ALLOCATE_HEAP)
-    self.polar = ptr_new(/ALLOCATE_HEAP)
-    self.symcolor = ptr_new(/ALLOCATE_HEAP)
-    self.ynozero = ptr_new(/ALLOCATE_HEAP)
-    
+;---------------------------------------------------------------------
+;Normal Plot? ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     ;Set the initial x- and y-range
     if n_elements(xrange) eq 0 then xrange = [min(indep, max=maxIndep), maxIndep]
     if n_elements(yrange) eq 0 then begin
@@ -691,10 +968,11 @@ _REF_EXTRA = extra
     if nDefaults eq 1 then d_color = default_colors[0] else d_color = default_colors[1:nDefaults]
     SetDefaultValue, color, d_color
 
+    ;Set the data
+    self -> SetData, indep, dep
+
     ;Set the object properties
-    self -> SetProperty, INDEP = indep, $
-                         DEP = dep, $
-                         COLOR = color, $
+    self -> SetProperty, COLOR = color, $
                          DIMENSION = dimension, $
                          LABEL = label, $
                          MAX_VALUE = max_value, $
@@ -708,6 +986,11 @@ _REF_EXTRA = extra
                          YNOZERO = ynozero, $
                          YRANGE = yrange
 
+    ;If overplot is 1 or a valid object refrence, then call the overplot method.
+    if keyword_set(target) $
+        then self -> Overplot, target $
+        else *self.overplot = 0
+
     ;Make sure the x- and y-style keywords have the 2^0 bit set to force
     ;exact axis ranges.    
     if n_elements(*self.xstyle) eq 0 $
@@ -718,8 +1001,10 @@ _REF_EXTRA = extra
         then *self.ystyle = 1 $
         else *self.ystyle += ~(*self.ystyle and 1)
 
-    ;Draw?
-    if keyword_set(draw) then self -> draw
+    ;Refresh the graphics?
+    if keyword_set(current) $
+        then theWin -> Refresh, DISABLE=~init_refresh $
+        else self.window -> Draw
 
     return, 1
 end
@@ -750,7 +1035,9 @@ pro MrPlot__define, class
              nsum: ptr_new(), $                ;*number of points to average when plotting
              
              ;cgPlot Properties
+             overplot: 0B, $                   ;Overplot?
              symcolor: ptr_new(), $            ;color of each symbol
+             target: obj_new(), $              ;Overplot target
              label: '', $                      ;*
              
              ;MrPlot Properties

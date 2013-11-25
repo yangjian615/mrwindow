@@ -1,7 +1,7 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;       MrPlotLayout__Define
+;       MrGrLayout__Define
 ;
 ;*****************************************************************************************
 ;   Copyright (c) 2013, Matthew Argall                                                   ;
@@ -45,7 +45,7 @@
 ; :Examples:
 ;   EXAMPLE 1: The Basics::
 ;       ;Make plots at [2,1] and [3,3]. Fill holes, remove extra cols and rows.
-;           MyObj = obj_new('MrPlotLayout')
+;           MyObj = obj_new('MrGrLayout')
 ;           MyObj -> AddToLayout, [2,1]
 ;           MyObj -> AddToLayout, [3,3]
 ;           MyObj -> WhichLayout
@@ -55,7 +55,7 @@
 ;
 ;   EXAMPLE 2: Complete::
 ;       ;Create the object and add the next available position to the layout
-;           MyObj = obj_new('MrPlotLayout')
+;           MyObj = obj_new('MrGrLayout')
 ;           MyObj -> AddToLayout
 ;
 ;       ;Add a specific location to the layout
@@ -129,7 +129,7 @@
 ;       06/19/2013  -   Since interaction with this class should be through the
 ;                           SetPositions method, not the SetProperty method, within the
 ;                           former an explicit interal call is made to 
-;                           MrPlotLayout::SetProperty so that subclasses do not get into
+;                           MrGrLayout::SetProperty so that subclasses do not get into
 ;                           in infinite loop in their SetProperty method when they call
 ;                           SetPositions. Also, the number of plots is updated as
 ;                           positions and locations are added/removed. Lastly, locations
@@ -166,6 +166,8 @@
 ;       09/24/2013  -   Calling SetProperty with the LAYOUT keyword now works. Check if
 ;                           the new layout is large enough to fit all of the plots. The
 ;       2013/11/17  -   Added the CHARSIZE property. - MRA
+;       2013/11/24  -   Inherit MrLayout__Define. Renamed from MrPlotLayout__Define to
+;                           MrGrLayout__Define. Changed LAYOUT property to GRLAYOUT. - MRA
 ;                           
 ;-
 ;*****************************************************************************************
@@ -187,7 +189,7 @@
 ; :Keywords:
 ;       LAYOUT:         out, optional, type=boolean
 ;                       The layout needed to accomodate `LOCATION` and `POSITION`. If
-;                           `UPDATE_LAYOUT`=1, this will be the same as "self.layout"
+;                           `UPDATE_LAYOUT`=1, this will be the same as "self.GrLayout"
 ;       UPDATE_LAYOUT:  in, optional, type=boolean, default=1
 ;                       Set to 0 to simulate adding a position to they layout. In this
 ;                           case, an available location and position will be found, but
@@ -195,7 +197,7 @@
 ;                           (find and) assimilate `LOCATION` and `POSITION` into the
 ;                           layout.
 ;-
-pro MrPlotLayout::AddToLayout, location, position, $
+pro MrGrLayout::AddToLayout, location, position, $
 LAYOUT=layout, $
 UPDATE_LAYOUT=update_layout
     compile_opt idl2
@@ -220,7 +222,7 @@ UPDATE_LAYOUT=update_layout
     if n_elements(location) eq 0 and n_elements(position) gt 0 then begin
         ;Create the location
         location = self -> MakeFixedLocation()
-        layout = self.layout
+        layout = self.GrLayout
         if update_layout eq 0 then return
         
         ;Add to the layout
@@ -254,8 +256,11 @@ end
 
 ;+
 ;   The purpose of this method is to calculate the plot positions.
+;
+;   Over-ride the super-class method to return all positions within the layout and
+;   store them as an object property.
 ;-
-pro MrPlotLayout::CalcLayoutPositions
+pro MrGrLayout::CalcPositions
     compile_opt idl2
     
     ;Error handling
@@ -267,21 +272,31 @@ pro MrPlotLayout::CalcLayoutPositions
     endif
     
     ;Return if nothing has been added to the layout.
-    if array_equal(self.layout, [0,0]) then return
+    if array_equal(self.GrLayout, [0,0]) then return
     
-    if self.layout[0] eq 0 xor self.layout[1] eq 0 $
+    ;Make sure a valid layout is present
+    if self.GrLayout[0] eq 0 xor self.GrLayout[1] eq 0 $
         then message, 'Cannot calculate position. Layout must have at least ' + $
                       'one column and one row.'
 
     ;Calculate positions
-    *self.layout_positions = MrPlotLayout(self.layout, $
-                                          ASPECT = *self.aspect, $
-                                          CHARSIZE = self.charsize, $
-                                          XGAP = self.xgap, $
-                                          XMARGIN = self.xmargin, $
-                                          YGAP = self.ygap, $
-                                          YMARGIN = self.ymargin)
-
+    *self.layout_positions = MrLayout(self.GrLayout, $
+                                      ASPECT   = *self.aspect, $
+                                      CHARSIZE =  self.charsize, $
+                                      OXMARGIN =  self.oxmargin, $
+                                      OYMARGIN =  self.oymargin, $
+                                      P_REGION =       p_region, $
+                                      P_WINDOW =       p_window, $
+                                      XGAP     =  self.xgap, $
+                                      XMARGIN  =  self.xmargin, $
+                                      YGAP     =  self.ygap, $
+                                      YMARGIN  =  self.ymargin)
+    
+    ;Save the window and region
+    self.x_region = p_region[[0,2]]
+    self.x_window = P_window[[0,2]]
+    self.y_region = p_region[[1,3]]
+    self.y_window = p_window[[1,3]]
 end
 
 
@@ -294,7 +309,7 @@ end
 ;       LAYOUT:         in, optional, type=boolean
 ;                       If set, only the layout positions will be cleared.
 ;-
-pro MrPlotLayout::ClearLayout, $
+pro MrGrLayout::ClearLayout, $
 FIXED=fixed, $
 LAYOUT=layout
     compile_opt idl2
@@ -333,7 +348,7 @@ LAYOUT=layout
         
         nLayout = self.nPlots - self.nFixed
         self.nPlots -= self.nFixed
-        self.layout = [0,0]
+        self.GrLayout = [0,0]
     endif
 end
 
@@ -347,7 +362,7 @@ end
 ;                       The [col, row] location of a plot to be converted.
 ;                           If LOCATION[0] < 0, then it is the location of a fixed
 ;                           position. In this case, the list index will be returned.
-;       LAYOUT:         in, optional, type=intarr(2), default=self.layout
+;       LAYOUT:         in, optional, type=intarr(2), default=self.GrLayout
 ;                       The number of columns and rows in the layout: [ncols, nrows].
 ;
 ; :Keywords:
@@ -371,7 +386,7 @@ end
 ; :Returns:
 ;       RESULT:         The result of the convertion.
 ;-
-function MrPlotLayout::ConvertLocation, location, layout, $
+function MrGrLayout::ConvertLocation, location, layout, $
 EXISTS=exists, $
 LIST_INDEX=list_index, $
 PLOT_INDEX=plot_index, $
@@ -402,7 +417,7 @@ TO_COLROW=to_colrow
 ;Defaults ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;Default to a [col, row] location.
-    SetDefaultValue, layout, self.layout
+    SetDefaultValue, layout, self.GrLayout
     plot_index = keyword_set(plot_index)
     list_index = keyword_set(list_index)
     to_plot_index = keyword_set(to_plot_index)
@@ -483,7 +498,7 @@ end
 ;       NROWS:          in, optional, type=integer, default=1
 ;                       Add this number of rows to the layout.
 ;-
-pro MrPlotLayout::ExpandLayout, nCols, nRows
+pro MrGrLayout::ExpandLayout, nCols, nRows
     compile_opt idl2
     
     ;Error handling
@@ -502,7 +517,7 @@ pro MrPlotLayout::ExpandLayout, nCols, nRows
     if nRows eq 0 && nCols[0] eq 0 then return
 
     ;Resposition all of the existing plots        
-    self -> SetProperty, LAYOUT=self.layout+[nCols[0], nRows]
+    self -> SetProperty, LAYOUT=self.GrLayout+[nCols[0], nRows]
 end
 
 
@@ -515,7 +530,7 @@ end
 ;                               If set, empty rows and columns will be removed from the
 ;                                   layout.
 ;-
-pro MrPlotLayout::FillHoles, $
+pro MrGrLayout::FillHoles, $
 TRIMLAYOUT=trimLayout
     compile_opt idl2
     
@@ -526,20 +541,20 @@ TRIMLAYOUT=trimLayout
         void = error_message()
         return
     endif
-    
+
     ;Get a vector of availability in plot-index order
-    tf_available = self -> IsAvailable(/PLOT_INDEX)
+    tf_available = self -> IsAvailable(IFREE=iFree, NFREE=nFRee, ITAKEN=iTaken, NTAKEN=nTaken)
     if tf_available eq !Null then return
-    
-    pFree = where(tf_available eq 1, nFree, COMPLEMENT=pTaken, NCOMPLEMENT=nTaken)
     if nFree eq 0 then return
     
-    pFilledTaken = indgen(nTaken) + 1
-    iFilledTaken = self -> ConvertLocation(pFilledTaken, /PLOT_INDEX, /TO_LIST_INDEX)
+    ;Make an array indicating which locations are taken (1) and free (0). Make the last
+    ;NFREE elements free.
+    nTotal = self.GrLayout[0]*self.GrLayout[1]
+    iFilledTaken = bytarr(nTotal) + 1B
+    iFilledTaken[nTotal-nFree:nTotal-1] = 0B
 
-    ;Rearrange the positions so that all of the taken positions are at the end.
-    (*self.posIsTaken)[*] = 0
-    (*self.posIsTaken)[iFilledTaken] = 1
+    ;Update the array that indicates which plots are taken
+    *self.posIsTaken = iFilledTaken
     
     ;Get rid of excess columns and rows?
     if keyword_set(trimLayout) then self -> TrimLayout
@@ -568,7 +583,7 @@ end
 ; :Returns:
 ;       LOCATION:       The location of `POSITION`. If no match is found, [0,0] is returned.
 ;-
-function MrPlotLayout::FindLocation, position, $
+function MrGrLayout::FindLocation, position, $
 EPSILON = epsilon, $
 FIXED = fixed, $
 NFOUND = nFound
@@ -607,11 +622,11 @@ NFOUND = nFound
 ;Search Layout Positions? ////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if fixed ne 1 then begin
-        nLayout = self.layout[0]*self.layout[1]
+        nLayout = self.GrLayout[0]*self.GrLayout[1]
         pLayout = reform(*self.layout_positions, 4, nLayout)
         
         ;Step through all of the layout positions
-        for i = 0, self.layout[0]*self.layout[1] - 1 do begin
+        for i = 0, self.GrLayout[0]*self.GrLayout[1] - 1 do begin
         
             ;If the layout position is not taken, skip it
             if (*self.posIsTaken)[i] eq 0 then continue
@@ -668,7 +683,7 @@ end
 ; :Keywords:
 ;       POSITION:           The position of the plot at `LOCATION`.
 ;-
-function MrPlotLayout::GetPosition, location
+function MrGrLayout::GetPosition, location
     compile_opt idl2
 
     ;Error handling
@@ -703,12 +718,6 @@ end
 ;   The purpose of this method is to retreive object properties.
 ;
 ; :Keywords:
-;       ASPECT:         out, optional, type=float
-;                       The aspect ratio (plot height/plot width) of each plot. For square
-;                           plots, ASPECT=1.0, for plots that are twice as wide as the are
-;                           long, ASPECT=0.5.
-;       CHARSIZE:       out, optional, type=float, default=1.5
-;                       Fraction of IDL's default character size.
 ;       LAYOUT:         out, required, type=intarr(2)
 ;                       A 2 element vector specifying the number of plots in the vertical
 ;                           and horizontal directions, [ncols, nrows].
@@ -718,30 +727,15 @@ end
 ;                       A vector specifying the [col, row] of the plot position to be
 ;                           returned. The position is returned in the variable `LOCATION`,
 ;                           with [1,1] indicating the top, left plot.
-;       XMARGIN:        out, optional, type=fltarr(2), default="[10, 3]"
-;                       The x-margins in character widths. [left margin, right margin]
-;                           The margins specify the distance between the edge of the plot 
-;                           axes and the edge of the plotting window.
-;       YMARGIN:        out, optional, type=fltarr(2), default="[4, 2]"
-;                       The y-margins in character heights. [bottom, top]
-;                           The margins specify the distance between the edge of the plot 
-;                           axes and the edge of the plotting window
-;       XGAP:           out, optional, type=float, default=14
-;                       The horizontal gap between plots in character widths (!D.y_ch_size)
-;       YGAP:           out, optional, type=float, default=7
-;                       The vertical gap between plots in character heights (!D.y_ch_size)
+;       _REF_EXTRA:     out, optional, type=any
+;                       Any keyword accepted by MrLayout::GetProperty is also accepted
+;                           for keyword inheritance.
 ;-
-pro MrPlotLayout::GetProperty, $
-ASPECT = aspect, $
-CHARSIZE = charsize, $
+pro MrGrLayout::GetProperty, $
 LAYOUT = layout, $
 LOCATION = location, $
-NPLOTS = nplots, $
 THISLOCATION = thisLocation, $
-XMARGIN = xmargin, $
-XGAP = xgap, $
-YMARGIN = ymargin, $
-YGAP = ygap
+_REF_EXTRA = extra
     compile_opt idl2
     
     ;Error handling
@@ -752,15 +746,12 @@ YGAP = ygap
         return
     endif
     
+    ;Superclass
+    if n_elements(extra) gt 0 then self -> MrLayout::GetProperty, _STRICT_EXTRA=extra
+    
     ;Get Properties
-    if arg_present(aspect)   and n_elements(*self.aspect) ne 0 then aspect = *self.aspect
-    if arg_present(charsize) then charsize = self.charsize
-    if arg_present(layout)   then layout   = self.layout
+    if arg_present(layout)   then layout   = self.GrLayout
     if arg_present(nplots)   then nplots   = self.nplots
-    if arg_present(xgap)     then xgap     = self.xgap
-    if arg_present(xmargin)  then xmargin  = self.xmargin
-    if arg_present(ygap)     then ygap     = self.ygap
-    if arg_present(ymargin)  then ymargin  = self.ymargin 
     if arg_present(location) then $
         if n_elements(thisLocation) ne 0 and n_elements(*self.layout_positions) ne 0 $
             then location = (*self.layout_positions)[*, location[0]-1, location[1]-1]
@@ -807,7 +798,7 @@ end
 ;                           0     if not.
 ;                           !Null if no layout has been established.
 ;-
-function MrPlotLayout::IsAvailable, location, $
+function MrGrLayout::IsAvailable, location, $
 IFREE = iFree, $
 INSIDE = inside, $
 ITAKEN = iTaken, $
@@ -874,7 +865,7 @@ PLOT_INDEX = plot_index
 
         ;If the layout is empty, then the location is avaialble
         ;(unless INSIDE is set).
-        if array_equal(self.layout, [0,0]) then $
+        if array_equal(self.GrLayout, [0,0]) then $
             if inside eq 1 then return, 0 else return, 1
     
         ;If LOCATION is outside of the layout, then the location is available
@@ -897,7 +888,7 @@ end
 ; :Returns:
 ;       LOCATION:           The next available location for a fixed position.
 ;-
-function MrPlotLayout::MakeFixedLocation
+function MrGrLayout::MakeFixedLocation
     compile_opt idl2
     
     ;Error handling
@@ -947,7 +938,7 @@ end
 ;   Uses the following external programs::
 ;       SetDefaultValue.pro (Coyote Graphics)
 ;-
-pro MrPlotLayout::Make_Location, location, $
+pro MrGrLayout::Make_Location, location, $
 UPDATE_LAYOUT = update_layout, $
 LAYOUT = layout, $
 POSITION = position
@@ -968,9 +959,9 @@ POSITION = position
 
     setDefaultValue, update_layout, 0, /BOOLEAN
 
-    ;SELF.LAYOUT is initialized to [0,0], which is an invalid plot location. If this
+    ;SELF.GRLAYOUT is initialized to [0,0], which is an invalid plot location. If this
     ;is still the case, and LOCATION was not given, then make sure location is defined.
-    if array_equal(self.layout, [0,0]) && n_loc eq 0 then begin
+    if array_equal(self.GrLayout, [0,0]) && n_loc eq 0 then begin
         location = [1,1]
         n_loc = 2
     endif
@@ -1001,8 +992,8 @@ POSITION = position
                 ;so that current positions can be shifted out of the way to make room
                 ;for the new one.
                 if nFree eq 0 || (max(pFree gt pIndex) eq 0) $
-                    then layout = self.layout + [0,1] $
-                    else layout = self.layout
+                    then layout = self.GrLayout + [0,1] $
+                    else layout = self.GrLayout
             endelse
 
     ;---------------------------------------------------------------------
@@ -1010,19 +1001,19 @@ POSITION = position
     ;---------------------------------------------------------------------
         endif else begin
             ;Are more columns needed?
-            if location[0] gt self.layout[0] $
-                then nCols = location[0] - self.layout[0] $
+            if location[0] gt self.GrLayout[0] $
+                then nCols = location[0] - self.GrLayout[0] $
                 else nCols = 0
             
             ;Are more rows needed?
-            if location[1] gt self.layout[1] $
-                then nRows = location[1] - self.layout[1] $
+            if location[1] gt self.GrLayout[1] $
+                then nRows = location[1] - self.GrLayout[1] $
                 else nRows = 0
 
             ;Update the layout?
             if keyword_set(update_layout) $
                 then self -> ExpandLayout, nCols, nRows $
-                else layout = self.layout + [nCols, nRows]
+                else layout = self.GrLayout + [nCols, nRows]
         endelse
     
 ;---------------------------------------------------------------------
@@ -1043,7 +1034,7 @@ POSITION = position
         if nTaken eq 0 then begin
             ;Take the first one.
             location = [1,1]
-            layout = self.layout
+            layout = self.GrLayout
             
     ;---------------------------------------------------------------------
     ;Something Already Taken? ////////////////////////////////////////////
@@ -1055,22 +1046,22 @@ POSITION = position
         ;---------------------------------------------------------------------
         ;Outside Current Layout? /////////////////////////////////////////////
         ;---------------------------------------------------------------------
-            if thisPI gt self.layout[0]*self.layout[1]-1 then begin
+            if thisPI gt self.GrLayout[0]*self.GrLayout[1]-1 then begin
             
                 ;Update the layout?
                 if keyword_set(update_layout) $
                     then self -> ExpandLayout, 0, 1 $
-                    else layout = self.layout + [0,1]
+                    else layout = self.GrLayout + [0,1]
                 
                 ;Find the location in the new layout.
-                location = [1, self.layout[1]]
+                location = [1, self.GrLayout[1]]
             
         ;---------------------------------------------------------------------
         ;Inside Current Layout? //////////////////////////////////////////////
         ;---------------------------------------------------------------------
             endif else begin
                 location = self -> ConvertLocation(thisPI, /PLOT_INDEX, /TO_COLROW)
-                layout = self.layout
+                layout = self.GrLayout
             endelse
         endelse
         
@@ -1085,10 +1076,10 @@ POSITION = position
         if keyword_set(update_layout) then begin
             position = (*self.layout_positions)[*, location[0]-1, location[1]-1]
         endif else begin
-            position = MrPlotLayout(layout, location, $
-                                    ASPECT=*self.aspect, CHARSIZE=self.charsize, $
-                                    XMARGIN=self.xmargin, XGAP=self.xgap, $
-                                    YMARGIN=self.ymargin, YGAP=self.ygap)
+            position = MrLayout(layout, location, $
+                                ASPECT=*self.aspect, CHARSIZE=self.charsize, $
+                                OXMARGIN=self.oxmargin, XMARGIN=self.xmargin, XGAP=self.xgap, $
+                                OYMARGIN=self.oymargin, YMARGIN=self.ymargin, YGAP=self.ygap)
         endelse
     endif
 end
@@ -1115,7 +1106,7 @@ end
 ; :Returns:
 ;       EXISTS:         Tells whether the plot exists (1) or not (0).
 ;-
-function MrPlotLayout::PlotExists, location, layout, $
+function MrGrLayout::PlotExists, location, layout, $
 LIST_INDEX = list_index, $
 PLOT_INDEX = plot_index
     compile_opt idl2
@@ -1129,7 +1120,7 @@ PLOT_INDEX = plot_index
     endif
     
     ;Default to current layout
-    SetDefaultValue, layout, self.layout
+    SetDefaultValue, layout, self.GrLayout
 
     ;Layout Positions
     if location[0] ge 0 then begin
@@ -1167,7 +1158,7 @@ end
 ;                           holes in the layout. Set this keyword to 1 (one) to adjust
 ;                           plot locations so that those holes are filled.
 ;-
-pro MrPlotLayout::RemoveFromLayout, location, $
+pro MrGrLayout::RemoveFromLayout, location, $
 FILLHOLES = fillHoles
     compile_opt idl2
     
@@ -1259,7 +1250,7 @@ end
 ;                               from the auto-updating layout and placed into a fixed
 ;                               location. Its actual position will not change.
 ;-
-pro MrPlotLayout::SetPosition, old_position, new_position, $
+pro MrGrLayout::SetPosition, old_position, new_position, $
 OUTPOSITION = outPosition, $
 OUTLOCATION = outLocation, $
 TOFIXED = toFixed
@@ -1368,7 +1359,7 @@ end
 ;       NEWISTAKEN:         An array indicating which positions are taken within the new
 ;                               layout scheme.
 ;-
-function MrPlotLayout::RePosition, old_layout, new_layout, plot_index
+function MrGrLayout::RePosition, old_layout, new_layout, plot_index
     compile_opt idl2
     
     ;Error handling
@@ -1429,37 +1420,19 @@ end
 ;   Use this method to set the value of object properties.
 ;
 ; :Keywords:
-;       ASPECT:         in, optional, type=float
-;                       The aspect ratio (plot height/plot width) of each plot. For square
-;                           plots, ASPECT=1.0, for plots that are twice as wide as the are
-;                           long, ASPECT=0.5.
-;       CHARSIZE:       in, optional, type=float, default=1.5
-;                       Fraction of IDL's default character size.
-;       LAYOUT:         in, required, type=intarr(2)
+;       LAYOUT:         in, optional, type=intarr(2)
 ;                       A 2 element vector specifying the number of plots in the vertical
 ;                           and horizontal directions, [ncols, nrows].
-;       XGAP:           in, optional, type=float, default=14
-;                       The horizontal gap between plots in character widths (!D.y_ch_size)
-;       XMARGIN:        in, optional, type=fltarr(2), default="[10, 3]"
-;                       The x-margins in character widths. [left margin, right margin]
-;                           The margins specify the distance between the edge of the plot 
-;                           axes and the edge of the plotting window.
-;       YGAP:           in, optional, type=float, default=7
-;                       The vertical gap between plots in character heights (!D.y_ch_size)
-;       YMARGIN:        in, optional, type=fltarr(2), default="[4, 2]"
-;                       The y-margins in character heights. [bottom, top]
-;                           The margins specify the distance between the edge of the plot 
-;                           axes and the edge of the plotting window
+;       UPDATE_LAYOUT:  in, optional, type=boolean, default=0
+;                       This keyword is ingored.
+;       _REF_EXTRA:     in, optional, type=any
+;                       Any keyword accepted by MrLayout::SetProperty is also accepted
+;                           for keyword inheritance.
 ;-
-pro MrPlotLayout::SetProperty, $
-ASPECT = aspect, $
-CHARSIZE = charsize, $
-DRAW = draw, $
+pro MrGrLayout::SetProperty, $
 LAYOUT = layout, $
-XMARGIN = xmargin, $
-XGAP = xgap, $
-YMARGIN = ymargin, $
-YGAP = ygap
+UPDATE_LAYOUT = update_layout, $
+_REF_EXTRA = extra
     compile_opt idl2
     
     ;Error handling
@@ -1471,15 +1444,10 @@ YGAP = ygap
     endif
 
     ;Set Properties
-    if n_elements(aspect)   gt 0 then *self.aspect = aspect
-    if n_elements(charsize) gt 0 then  self.charsize = charsize
-    if n_elements(xgap)     gt 0 then  self.xgap = xgap
-    if n_elements(xmargin)  gt 0 then  self.xmargin = xmargin
-    if n_elements(ygap)     gt 0 then  self.ygap = ygap
-    if n_elements(ymargin)  gt 0 then  self.ymargin = ymargin
+    if n_elements(extra) gt 0 then self -> MrLayout::SetProperty, _STRICT_EXTRA=extra
 
     ;Make sure plot locations are invariant to changes in the layout
-    if n_elements(layout) ne 0 then begin
+    if n_elements(layout) gt 0 then begin
     
         ;Is the new layout empty?
         if array_equal(layout, [0,0]) then begin
@@ -1499,20 +1467,20 @@ YGAP = ygap
                 void = max(pTaken, imax)
                 if layout[0]*layout[1] lt pTaken[imax] then $
                     message, 'LAYOUT is not big enough to contain the current set of plots. ' + $
-                             'Try theObj -> FillHoles, /TRIMLAYOUT, /DRAW first.'
+                             'Try theObj -> FillHoles, /TRIMLAYOUT first.'
             endif
 
             ;Resposition all of the existing plots        
-            *self.posIsTaken = self -> RePosition(self.layout, layout)
+            *self.posIsTaken = self -> RePosition(self.GrLayout, layout)
             if *self.posIsTaken eq !Null then *self.posIsTaken = bytarr(layout[0]*layout[1])
 
             ;Change the layout
-            self.layout = layout
+            self.GrLayout = layout
         endelse
     endif
     
     ;Calculate the positions of the plots within the new layout
-    self -> CalcLayoutPositions
+    self -> CalcPositions
 end
 
 
@@ -1527,7 +1495,7 @@ end
 ;                           The 1-based plot location [col, row] at which to begin 
 ;                               shifting plots.
 ;-
-pro MrPlotLayout::ShiftPlots, location
+pro MrGrLayout::ShiftPlots, location
     compile_opt idl2
     
     ;Error handling
@@ -1556,7 +1524,7 @@ pro MrPlotLayout::ShiftPlots, location
     
     ;Make the first available position unavailable, then make the chosen position
     ;available. All positions in between remain unavailable.
-    (*self.posIsTaken)[iNotTaken] = 1
+    (*self.posIsTaken)[iNotTaken+iList] = 1
     (*self.posIsTaken)[iList] = 0
 end
 
@@ -1564,7 +1532,7 @@ end
 ;+
 ;   Remove unused columns and rows.
 ;-
-pro MrPlotLayout::TrimLayout
+pro MrGrLayout::TrimLayout
     compile_opt idl2
     
     ;Error handling
@@ -1586,7 +1554,7 @@ pro MrPlotLayout::TrimLayout
     maxRow = max(ColRow[1,pTaken])
 
     ;Trim the layout and recalculate the layout positions.
-    if maxCol lt self.layout[0] || maxRow lt self.layout[1] $
+    if maxCol lt self.GrLayout[0] || maxRow lt self.GrLayout[1] $
         then self -> SetProperty, LAYOUT=[maxCol, maxRow]
 end
 
@@ -1595,7 +1563,7 @@ end
 ;   The purpose of this method is to describe the layout as well as the locations and
 ;   positions of the plots currently stored in it.
 ;-
-pro MrPlotLayout::whichLayout
+pro MrGrLayout::whichLayout
     compile_opt idl2
     
     ;Error handling
@@ -1613,7 +1581,7 @@ pro MrPlotLayout::whichLayout
     ;Print information about the overall layout.
     print, ''
     print, '-------LAYOUT-------'
-    print, FORMAT='(%"  Layout:    [%i, %i]")', self.layout
+    print, FORMAT='(%"  Layout:    [%i, %i]")', self.GrLayout
     print, FORMAT='(%"  nPlots:    %i")', self.nPlots
     print, FORMAT='(%"  nFixed:    %i")', self.nFixed
     if n_elements(*self.aspect) ne 0 then print, FORMAT='(%"  Aspect:     %f")', *self.aspect
@@ -1653,12 +1621,12 @@ pro MrPlotLayout::whichLayout
 ;GRID OF AVAILABILITY ////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if n_elements(*self.posIsTaken) gt 0 then begin
-        tf_free = ~reform(*self.posIsTaken, self.layout[0], self.layout[1])
+        tf_free = ~reform(*self.posIsTaken, self.GrLayout[0], self.GrLayout[1])
 
         print, ''
         print, '--LAYOUT AVAILABILITY--'
-        for i = 0, self.layout[1]-1 do begin
-            print, FORMAT='(a2, ' + strtrim(self.layout[0],2) + '(i1, 1x), a1)', $
+        for i = 0, self.GrLayout[1]-1 do begin
+            print, FORMAT='(a2, ' + strtrim(self.GrLayout[0],2) + '(i1, 1x), a1)', $
                    '| ', tf_free[*,i], '|'
         endfor
     endif
@@ -1670,7 +1638,7 @@ end
 ;+
 ;   Clean up after the object is destroyed.
 ;-
-pro MrPlotLayout::cleanup
+pro MrGrLayout::cleanup
     compile_opt idl2
     
     ;Error handling
@@ -1681,15 +1649,21 @@ pro MrPlotLayout::cleanup
         return
     endif
     
-    ptr_free, self.aspect
     ptr_free, self.fixed_positions
     ptr_free, self.layout_positions
     ptr_free, self.posIsTaken
+    
+    self -> MrLayout::CleanUp
 end
 
 
 ;+
-;   This method initializes the MrPlotLayout object.
+;   This method initializes the MrGrLayout object.
+;
+; :Params:
+;       LAYOUT:         in, required, type=intarr(2)
+;                       A 2 element vector specifying the number of plots in the vertical
+;                           and horizontal directions, [ncols, nrows].
 ;
 ; :Keywords:
 ;       ASPECT:         in, optional, type=float
@@ -1701,9 +1675,6 @@ end
 ;       CHARSIZE:       in, optional, type=float, default=1.5
 ;                       Fraction of IDL's default character size. Used to determine size
 ;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
-;       LAYOUT:         in, required, type=intarr(2)
-;                       A 2 element vector specifying the number of plots in the vertical
-;                           and horizontal directions, [ncols, nrows].
 ;       XMARGIN:        in, optional, type=fltarr(2), default="[10, 3]"
 ;                       The x-margins in character widths. [left margin, right margin]
 ;                           The margins specify the distance between the edge of the plot 
@@ -1716,15 +1687,18 @@ end
 ;                       The horizontal gap between plots in character widths (!D.y_ch_size)
 ;       YGAP:           in, optional, type=float, default=6
 ;                       The vertical gap between plots in character heights (!D.y_ch_size)
+;       _REF_EXTRA:     in, optional, type=any
+;                       Any keyword accepted by MrLayout::Init is also accepted
+;                           for keyword inheritance.
 ;-
-function MrPlotLayout::init, $
-ASPECT = aspect, $
-CALCULATE = calculate, $
-LAYOUT = layout, $
-XMARGIN = xmargin, $
-XGAP = xgap, $
-YMARGIN = ymargin, $
-YGAP = ygap
+function MrGrLayout::init, $
+;ASPECT = aspect, $
+UPDATE_LAYOUT = update_layout
+LAYOUT = layout
+;XMARGIN = xmargin, $
+;XGAP = xgap, $
+;YMARGIN = ymargin, $
+;YGAP = ygap
     compile_opt idl2
     
     ;Error handling
@@ -1735,22 +1709,27 @@ YGAP = ygap
         return, 0
     endif
 
+    if self -> MrLayout::Init(_STRICT_EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrLayout.'
+
     ;Set default values
-    setDefaultValue, calculate, 1, /BOOLEAN
-    setDefaultValue, charsize, 1.5
-    setDefaultValue, layout, [0, 0]
-    setDefaultValue, xmargin, [10, 3]
-    setDefaultValue, ymargin, [4, 2]
-    setDefaultValue, xgap, 14
-    setDefaultValue, ygap, 6
+    setDefaultValue, layout, [0,0]
+;    setDefaultValue, calculate, 1, /BOOLEAN
+;    setDefaultValue, charsize, 1.5
+;    setDefaultValue, layout, [0, 0]
+;    setDefaultValue, xmargin, [10, 3]
+;    setDefaultValue, ymargin, [4, 2]
+;    setDefaultValue, xgap, 14
+;    setDefaultValue, ygap, 6
     
     ;Set object Properties
-    self.charsize = charsize
-    self.layout = layout
-    self.xmargin = xmargin
-    self.ymargin = ymargin
-    self.xgap = xgap
-    self.ygap = ygap
+;    self.charsize = charsize
+;    self.layout = layout
+;    self.xmargin = xmargin
+;    self.ymargin = ymargin
+;    self.xgap = xgap
+;    self.ygap = ygap
+    self.GrLayout = layout
     self.fixed_positions = ptr_new(/ALLOCATE_HEAP)
     self.layout_positions = ptr_new(/ALLOCATE_HEAP)
     self.posIsTaken = ptr_new(/ALLOCATE_HEAP)
@@ -1760,8 +1739,8 @@ YGAP = ygap
         else self.aspect = ptr_new(aspect)
     
     ;Calculate the positions
-    if keyword_set(calculate) and array_equal(self.layout, [0,0]) eq 0 $
-        then self -> CalcLayoutPositions
+    if keyword_set(update_layout) and array_equal(self.GrLayout, [0,0]) eq 0 $
+        then self -> CalcPositions
     
     return, 1                     
 end
@@ -1770,20 +1749,22 @@ end
 ;+
 ;   The class definition
 ;-
-pro MrPlotLayout__define
+pro MrGrLayout__define
     compile_opt idl2
     
-    class = {mrplotlayout, $
-             aspect: ptr_new(), $           ;Aspect ratio of the plots.
-             charsize: 0.0, $               ;Character size
+    class = {MrGrLayout, $
+             inherits MrLayout, $
+;             aspect: ptr_new(), $           ;Aspect ratio of the plots.
+;             charsize: 0.0, $               ;Character size
              fixed_positions: ptr_new(), $  ;Fixed, non-layout-related positions.
-             layout: [0,0], $               ;Layout of the plot area [ncols, nrows].
+             GrLayout: [0,0], $               ;Layout of the plot area [ncols, nrows].
              layout_positions: ptr_new(), $ ;Positions outlined by the 2D plot-layout grid.
              nplots: 0, $                   ;Number of plots displayed.
              nfixed: 0, $                   ;Number of fixed positions.
-             posIsTaken: ptr_new(), $       ;Is the Layout_Position filled?
-             xgap: 0, $                     ;Size of the gap between plots in the x-direction.
-             xmargin: [0,0], $              ;Size of the [left, right] margins.
-             ygap: 0, $                     ;Size of the gap between plots in the y-direction.
-             ymargin: [0,0]}                ;Size of the [top, bottom] margins.
+             posIsTaken: ptr_new() $       ;Is the Layout_Position filled?
+;             xgap: 0, $                     ;Size of the gap between plots in the x-direction.
+;             xmargin: [0,0], $              ;Size of the [left, right] margins.
+;             ygap: 0, $                     ;Size of the gap between plots in the y-direction.
+;             ymargin: [0,0]}                ;Size of the [top, bottom] margins.
+            }
 end

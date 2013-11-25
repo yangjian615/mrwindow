@@ -49,6 +49,8 @@
 ; :History:
 ;   Modification History::
 ;       2013/11/20  -   Written by Matthew Argall
+;       2013/11/22  -   Added the WINDOW property, the _SetWindow, Refresh, and Close
+;                           methods, and the BUFFER, CURRENT, and NOGUI keywords. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -128,10 +130,153 @@ end
 
 
 ;+
+;   Turn refreshing of the graphics window on or off.
+;
+; :Keywords:
+;       DISABLE:            in, optional, type=boolean, default=0
+;                           If set, refreshing of the graphics window will be disabled.
+;-
+pro MrGrAtom::Refresh, $
+DISABLE=disable
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Turn refresh on or off.
+    if obj_valid(self.window) then self.window -> Refresh, DISABLE=disable
+end
+
+
+;+
+;   Set the MrWindow object in which the graphic will be displayed.
+;
+; :Keywords:
+;       BUFFER:             in, optional, type=boolean, default=0
+;                           If set, graphics will be directed to a buffer and a window
+;                               will not be created.
+;       CURRENT:            in, optional, type=boolean, default=0
+;                           If set, the graphic will be added to the current window. If
+;                               not, a new window will be created.
+;       NOGUI:              in, optional, type=boolean, default=0
+;                           If set, a MrWindow object will be created to manage all
+;                               graphics activities, but the display window will be a
+;                               normal IDL direct graphics window.
+;       NOWINDOW:           in, optional, type=boolean, default=0
+;                           If set, no MrWindow object will be created and `THEWINDOW`
+;                               will be an invalid object reference. In this case, graphics
+;                               are displayed and handled in the normal Direct Graphics
+;                               manner.
+;-
+pro MrGrAtom::_SetWindow, $
+BUFFER=buffer, $
+CURRENT=current, $
+NOGUI=noGUI
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+
+    ;No window?
+    if keyword_set(noWindow) then begin
+        self.window = obj_new()
+        return
+    endif
+    
+    ;If the graphic is already in a window, then remove it.
+    if obj_valid(self.window) then self.window -> Remove, self, DESTROY=0
+    
+    ;If we are to put the graphic in the current window, then get the current window.
+    if keyword_set(current) then begin
+        defsysv, '!MrWindow_Array', EXISTS=exists
+        
+        ;If the sytem variable exists and is a valid object, use it.
+        ;Otherwise, create a new window.
+        if exists and n_elements(*!MrWindow_Array) gt 0 $
+            then theWindow = (*!MrWindow_Array)[0] $
+            else theWindow = obj_new('MrWindow', BUFFER=buffer, NOGUI=noGUI, REFRESH=0)
+            
+    ;If the graphic is to go in a new window, create the window
+    endif else theWindow = obj_new('MrWindow', BUFFER=buffer, NOGUI=noGUI, REFRESH=0)
+
+    self.window = theWindow
+end
+
+
+;+
+;   The purpose of this method is to close the window in which the graphic is displayed.
+;   Doing so will::
+;       - Close the window.
+;       - Destroy the MrWindow object reference.
+;       - Destroy all objects that were contained in the window.
+;       - Destroy the widget, if there was one.
+;-
+pro MrGrAtom::Close
+    obj_destroy, self.window
+end
+
+
+;+
 ;   Destroy the object.
 ;-
 pro MrGrAtom::Destroy
     obj_destroy, self
+end
+
+
+;+
+;   Set properties of the object.
+;
+; :Params:
+;       NEWWINDOW:          in, required, type=object
+;                           A valid MrWindow object reference into which the graphic
+;                               will be moved.
+;
+; :Keywords:
+;       DESTROY:            in, optional, type=boolean, default=0
+;                           Destroy the old MrWindow object once the graphic is removed.
+;-
+pro MrGrAtom::SwitchWindows, newWindow, $
+DESTROY=destroy
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = error_message()
+        return
+    endif
+    
+    ;Make sure a valid window was given
+    if obj_valid(newWindow) eq 0 || obj_class(newWindow) ne 'MRWINDOW' then $
+        message, 'NEWWINDOW must be a valid MrWindow object.'
+    
+    ;Remove SELF from the current window
+    self.window -> Remove, self, DESTROY=0
+    
+    ;Switch to the new window
+    if keyword_set(destroy) then obj_destroy, self.window
+    self.window = newWindow
+    self.window -> Add, self
+end
+
+
+;+
+;   Return the name of the object.
+;-
+function MrGrAtom::GetName
+    return, self.name
 end
 
 
@@ -144,10 +289,13 @@ end
 ;       NAME:           out, optional, type=string
 ;                       A string specifying the name of the graphic. It can be used
 ;                           retrieve the graphic using bracket array notation.
+;       WINDOW:         out, optional, type=object
+;                       The MrWindow object in which the graphic is displayed.
 ;-
 pro MrGrAtom::GetProperty, $
 HIDE=hide, $
-NAME=name
+NAME=name, $
+WINDOW=window
     compile_opt strictarr
     
     ;Error handling
@@ -161,6 +309,7 @@ NAME=name
     ;Set GraphicAtom properties
     if arg_present(hide) then hide = self.hide
     if arg_present(name) then name = self.name
+    if arg_present(window) then window = self.window
 end
 
 
@@ -197,7 +346,7 @@ end
 ;   Clean up after the object is destroy
 ;-
 pro MrGrAtom::cleanup
-    ;Nothing to clean up
+    ;Nothing to clean up.
 end
 
 
@@ -205,6 +354,19 @@ end
 ;   The initialization method.
 ;
 ; :Keywords:
+;       BUFFER:         in, optional, type=boolean, default=0
+;                       If set, graphics will be directed to a buffer and a window
+;                           will not be created.
+;       CURRENT:        in, optional, type=boolean, default=0
+;                       If set, the graphic will be added to the current window. If
+;                           not, a new window will be created.
+;       NOGUI:          in, optional, type=boolean, default=0
+;                       If set, graphics will be displayed in a normal IDL window.
+;       NOWINDOW:       in, optional, type=boolean, default=0
+;                       If set, no MrWindow object will be created and `THEWINDOW`
+;                           will be an invalid object reference. In this case, graphics
+;                           are displayed and handled in the normal Direct Graphics
+;                           manner.
 ;       HIDE:           in, optional, type=boolean, default=0
 ;                       If set, the graphic will not be displayed.
 ;       NAME:           in, optional, type=string, default=Obj_Class(self)
@@ -212,8 +374,13 @@ end
 ;                           retrieve the graphic using bracket array notation.
 ;-
 function MrGrAtom::init, $
+BUFFER = buffer, $
+CURRENT = current, $
 HIDE = hide, $
-NAME = name
+NAME = name, $
+NOGUI = noGUI, $
+NOWINDOW = noWindow, $
+REFRESH = refresh
     compile_opt strictarr
     
     ;Error handling
@@ -224,9 +391,19 @@ NAME = name
         return, 0
     endif
 
+    ;Set default values
     if n_elements(hide) eq 0 then hide = 0 else hide = keyword_set(hide)
     if n_elements(name) eq 0 then name = Obj_Class(self)
+    if keyword_set(noWindow) then message, 'NOWINDOW keyword is disabled.', /INFORMATIONAL
+
+    ;Create a MrWindow widget in which to display the graphic?
+    self -> _SetWindow, BUFFER=buffer, CURRENT=current, NOGUI=noGUI
+    if n_elements(refresh) gt 0 then self.window -> Refresh, DISABLE=~keyword_set(refresh)
     
+    ;Add SELF to the window
+    self.window -> Add, self
+
+    ;Set properties
     self.hide = hide
     self.name = name
     
