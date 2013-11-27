@@ -338,6 +338,19 @@ end
 
 ;+
 ;
+; :Params:
+;       XCOORDS:            in, required, type=numeric
+;                           A vector or scalar argument providing the X components of the
+;                               points to be connected. If only one argument is specified,
+;                               X must be an array of either two or three vectors
+;                               (i.e., (2,*) or (3,*)). In this special case, X[0,*] are
+;                               taken as the X values, X[1,*] are taken as the `Y` values,
+;                               and X[2,*] are taken as the `Z` values.
+;       YCOORDS:            in, optional, type=numeric
+;                           Y coordinate(s) of the points to be connected.
+;       ZCOORDS:            in, optional, type=numeric
+;                           Z coordinate(s) of the points to be connected.
+;
 ; :Uses:
 ;   Uses the following external programs::
 ;       MrIDL_Container__Define.pro

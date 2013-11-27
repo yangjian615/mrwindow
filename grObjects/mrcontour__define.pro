@@ -851,7 +851,6 @@ DISABLE=disable
 
     ;Enable overplotting        
     endif else begin
-stop
         ;If not TARGET was specified, get the currently selected graphic
         if n_elements(target) eq 0 then target = self.window -> GetSelect()
 

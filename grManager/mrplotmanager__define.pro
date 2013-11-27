@@ -1328,8 +1328,8 @@ pro MrPlotManager__define, class
     define = { MrPlotManager, $
                inherits MrIDL_Container, $      ;An object container.
                inherits MrCreateGraphic, $      ;Plots, Images, Colorbars, Text, Arrows, etc.
-               inherits MrGrLayout, $         ;Manage plot layout.
+               inherits MrGrLayout, $           ;Manage plot layout.
                inherits IDL_Object, $
-               gTypes: ptr_new() $             ;Supported graphics types.
+               gTypes: ptr_new() $              ;Supported graphics types.
              }
 end

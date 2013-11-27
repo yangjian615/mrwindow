@@ -34,30 +34,46 @@
 .comp ./cdf-reader/utilities/mrisa.pro
 .comp ./cdf-reader/utilities/type_to_format_code.pro
 
-;Plot Management
-.comp ./PlotManagement/mrcontour__define.pro
-.comp ./PlotManagement/mrcreategraphic__define.pro
-.comp ./PlotManagement/mrdatacoords__define.pro
-.comp ./PlotManagement/mrgratom__define.pro
-.comp ./PlotManagement/mrgrlayout__define.pro
-.comp ./PlotManagement/mridl_container__define.pro
-.comp ./PlotManagement/mrimage__define.pro
-.comp ./PlotManagement/mrlayout__define.pro
-.comp ./PlotManagement/mrplot__define.pro
-.comp ./PlotManagement/mrplotmanager__define.pro
+;Graphic Manager
+.comp ./grManager/mrcreategraphic__define.pro
+.comp ./grManager/mrgrlayout__define.pro
+.comp ./grManager/mridl_container__define.pro
+.comp ./grManager/mrplotmanager__define.pro
 
-;Wile E. Graphics utils
+;Graphic Superclasses
+.comp ./grSuperclasses/mrdatacoords__define.pro
+.comp ./grSuperclasses/mrgratom__define.pro
+.comp ./grSuperclasses/mrlayout__define.pro
+.comp ./grSuperclasses/wegraphicskeywords__define.pro
+
+;Graphic Objects
+.comp ./grObjects/mrcontour__define.pro
+.comp ./grObjects/mrimage__define.pro
+.comp ./grObjects/mrplot__define.pro
+.comp ./grObjects/mrplots__define.pro
 .comp ./WileE/wearrow__define.pro
 .comp ./WileE/weaxis__define.pro
 .comp ./WileE/wecolorbar__define.pro
-.comp ./WileE/wegraphicskeywords__define.pro
-.comp ./WileE/welegend.pro
 .comp ./WileE/welegenditem__define.pro
-.comp ./WileE/weoplot.pro
 .comp ./WileE/weoverplot__define.pro
+.comp ./WileE/wetext__define.pro
+
+;Graphic Functions
+.comp ./mrarrow.pro
+.comp ./mraxis.pro
+.comp ./mrcolorbar.pro
+.comp ./mrcontour.pro
+.comp ./mrimage.pro
+.comp ./mrlegend.pro
+.comp ./mrplot.pro
+.comp ./mrplots.pro
+.comp ./mrtext.pro
+
+;Wile E. Graphics utils
+.comp ./WileE/welegend.pro
+.comp ./WileE/weoplot.pro
 .comp ./WileE/weoverplot.pro
 .comp ./WileE/weplot.pro
-.comp ./WileE/wetext__define.pro
 
 ;Utilities
 .comp ./utilities/color_trip.pro

@@ -1053,20 +1053,36 @@ end
 ;   The purpose of this method is to initialize the MrImages class.
 ;
 ; :Params:
-;       IMAGE:              in, required, type=any
-;                           The image to be displayed.
-;       X:                  in, optional, type=any
-;                           If `TV` is set, this is the x-position of the image, as
-;                               specified by the TV procedure. Otherwise, if `Y` is not
-;                               given, these are the coordinates of the second dimension
-;                               of `IMAGE`. IF `Y` is given, it represents the
-;                               coordinates of the first dimension of `IMAGE`
-;       Y:                  in, optional, type=any
-;                           If `TV` is set, this is the y-position of the image, as
-;                               specified by the TV procedure. Otherwise, it represents
-;                               the coodinates of the 2nd dimenion of `IMAGE`. X and Y
-;                               must have the same number of elements as the dimensions
-;                               of IMAGE.
+;       IMAGE:          in, required, type=NxM numeric array
+;                       Image to be displayed
+;       X:              in, optional, type=scalar, N-elements numeric
+;                       If a scalar, then positioning is that of IDL's TV function. If a
+;                           vector the same size as the first dimension of `IMAGE`, then
+;                           the data coordinates of each pixel. See also, `PAINT`.
+;       Y:              in, optional, type=scalar, N-elements numeric
+;                       If a scalar, then positioning is that of IDL's TV function. If a
+;                           vector the same size as the second dimension of `IMAGE`, then
+;                           the data coordinates of each pixel. See also, `PAINT`.
+;       X0:             in, optional, type=1D vector/2D array
+;                       The x-coordinate, in data coordinates, of the upper-right corner
+;                           if each pixel in `IMAGE`. If supplied, then `X` markes the
+;                           x-coordinate of the lower-left corner of each pixel in `IMAGE`.
+;                           Must be used with `Y0`. If given, `PAINT` will be set to 1.
+;       Y0:             in, optional, type=1D vector/2D array
+;                       The y-coordinate, in data coordinates, of the upper-right corner
+;                           if each pixel in `IMAGE`. If supplied, then `Y` markes the
+;                           y-coordinate of the lower-left corner of each pixel in `IMAGE`.
+;                           Must be used with `X0`. If given, `PAINT` will be set to 1.
+;       X1:             in, optional, type=scalar/1D vector/2D array
+;                       If provided, then `X` and `Y` are the "center" locations of each
+;                           pixel of `IMAGE`. `X0` and X1 mark the displacement to the
+;                           left and right edges of each pixel, respectively. X1 and `Y1`
+;                           must be supplied together. If provided, `PAINT` will be set.
+;       Y1:             in, optional, type=scalar/1D vector/2D array
+;                       If provided, then `X` and `Y` are the "center" locations of each
+;                           pixel of `IMAGE`. `Y0` and Y1 mark the displacement to the
+;                           bottom and top edges of each pixel, respectively. `X1` and Y1
+;                           must be supplied together. If provided, `PAINT` will be set.
 ;
 ; :Keywords:
 ;       AXES:               in, optional, type=boolean, default=0
