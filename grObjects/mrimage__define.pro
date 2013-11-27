@@ -246,7 +246,7 @@ NOERASE=noerase
 ;DATA POSITION? //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if self.paint eq 0 then begin
-        MrImage, (*self.image)[iData[0]:iData[2], iData[1]:iData[3], self.iDisplay], $
+        maImage, (*self.image)[iData[0]:iData[2], iData[1]:iData[3], self.iDisplay], $
                  (*self.indep)[iData[0]:iData[2]], (*self.dep)[iData[1]:iData[3]], $
                 
                  ;IMAGE_PLOTS Keywords
@@ -349,7 +349,7 @@ NOERASE=noerase
 ;---------------------------------------------------------------------
     endif else begin
     
-        MrImage, *self.image, Xmin, Ymin, Xmax, Ymax, $
+        maImage, *self.image, Xmin, Ymin, Xmax, Ymax, $
                 
                  ;IMAGE_PLOTS Keywords
                  AXES          = *self.axes, $

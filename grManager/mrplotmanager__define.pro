@@ -1278,7 +1278,6 @@ pro MrPlotManager::cleanup
     ;Destroy all weLegendItem objects
     self -> MrGrLayout::Cleanup
     self -> MrIDL_Container::Cleanup
-    self -> MrCreateGraphic::Cleanup
     
     ;Free pointers
     ptr_free, self.gTypes
@@ -1327,9 +1326,8 @@ pro MrPlotManager__define, class
     
     define = { MrPlotManager, $
                inherits MrIDL_Container, $      ;An object container.
-               inherits MrCreateGraphic, $      ;Plots, Images, Colorbars, Text, Arrows, etc.
                inherits MrGrLayout, $           ;Manage plot layout.
-               inherits IDL_Object, $
+               inherits IDL_Object, $           ;IDL 8.0 dot referencing.
                gTypes: ptr_new() $              ;Supported graphics types.
              }
 end

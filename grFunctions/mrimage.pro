@@ -92,7 +92,7 @@
 ;	Modification History::
 ;       2013/11/27  -   Written by Matthew Argall.
 ;-
-function MrCreateGraphic::Image, image, x, y, $
+function MrImage, image, x, y, $
  CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
