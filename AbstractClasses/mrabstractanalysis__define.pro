@@ -301,7 +301,7 @@ QUIET = quiet
 
     ;Get the object whose data is being analyzed
     if n_elements(location) eq 0 $
-        then theObj = self.focus $
+        then theObj = self -> GetSelect() $
         else theObj = self -> Get(LOCATION=location, PINDEX=plot_index)
     
 ;---------------------------------------------------------------------
@@ -313,7 +313,8 @@ QUIET = quiet
     !Null = self -> Data_Range(xrange, index, IRANGE=iRange)
 
     ;Retrieve the data and the dimension over which to take the mean
-    theObj -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
+    theObj -> GetData, indep, dep
+    theObj -> GetProperty, DIMENSION=dimension
     if n_elements(dimension) eq 0 then dimension = 0
     if dimension eq 2 && iRange[1] - iRange[0] + 1 eq 1 then dimension = 0
 
@@ -470,10 +471,11 @@ IRANGE = iRange
     
     ;Retrieve the data and the dimension over which to take the mean
     if n_elements(index) eq 0 $
-        then theObj = self.focus $
+        then theObj = self -> GetSelect() $
         else theObj = self -> Get(POSITION=index)
         
-    theObj -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
+    theObj -> GetData, indep, dep
+    theObj -> GetProperty, DIMENSION=dimension
     if n_elements(dimension) eq 0 then dimension = 0
     
     ;Find the closest data point
@@ -808,7 +810,8 @@ PLOT_INDEX=plot_index
     xy_data = self -> Data_Range(xrange, index, IRANGE=iRange)
 
     ;Retrieve the data and the dimension over which to take the mean
-    theObj -> GetProperty, INDEP=indep, DEP=dep, DIMENSION=dimension
+    theObj -> GetData, indep, dep
+    theObj -> GetProperty, DIMENSION=dimension
     if n_elements(dimension) eq 0 then begin
         dims = size(dep, /DIMENSIONS)
         dimension = where(dims eq 3, count) + 1
@@ -1123,8 +1126,8 @@ INVERSE = inverse
 
     ;Get the graphic object
     if n_elements(location) eq 0 $
-        then theObj = self.focus $
-        else theObj = self -> Get(LOCATION=location, PLOT_INDEX=plot_index)
+        then theObj = self -> GetSelect() $
+        else theObj = self -> Get(LOCATION=location, PINDEX=plot_index)
 
     ;Get the rotation matrix
     if n_elements(rotmat) ne 9 then begin
@@ -1140,13 +1143,15 @@ INVERSE = inverse
 ;Rotate the Data /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    theObj -> GetProperty, DEP=dep
+    theObj -> GetData, dep
     
     dep = rotate_vector(rotmat, dep)
     dMin = min(dep, max=dMax)
-    theObj -> SetProperty, DEP=dep, YRANGE=[dMin, dMax]
     
-    self -> Draw
+    self -> Refresh, /DISABLE
+    theObj -> SetData, dep
+    theObj -> SetProperty, YRANGE=[dMin, dMax]
+    self -> Refresh
 end
 
 
@@ -1338,7 +1343,8 @@ pro MrAbstractAnalysis::vHT, xrange, yrange
         xy_data = self -> Data_Range(xrange, iRange=vIndex)
 
         self.amode[2] += 1
-        self.intervals = ptr_new({index: vIndex, object:self.focus})
+        velObj = self -> GetSelect()
+        self.intervals = ptr_new({index: vIndex, object:velObj})
         return
     endif
     
@@ -1348,10 +1354,13 @@ pro MrAbstractAnalysis::vHT, xrange, yrange
 
     ;Retrieve the data and the dimension over which to take the mean
     velObj = (*self.intervals).object
-    magObj = self.focus
+    magObj = self -> GetSelect()
     
-    velObj -> GetProperty, INDEP=t_v, DEP=v, DIMENSION=v_dim
-    magObj -> GetProperty, INDEP=t_B, DEP=B, DIMENSION=B_dim
+    velObj -> GetData, t_v, v
+    magObj -> GetData, t_B, B
+    
+    velObj -> GetProperty, DIMENSION=v_dim
+    magObj -> GetProperty, DIMENSION=B_dim
     
     ;Get the index range for magnetic field data.
     iRange = (*self.intervals).vIndex

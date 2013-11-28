@@ -684,8 +684,7 @@ pro MrWindow::File_Menu_Events, event
             if display_type eq '3D_SPECTROGRAM' || display_type eq 'SPECTROGRAM' then begin
                 ;Make sure there is enough room for a colorbar.
                 if self.xmargin[1] lt 15 then self -> SetProperty, XMARGIN=[self.xmargin[0],15]
-            
-            endif else message, 'Display type "' + display_type + '" not recognized.'
+            endif
             
             ;Draw and destroy the object
             self -> Draw
