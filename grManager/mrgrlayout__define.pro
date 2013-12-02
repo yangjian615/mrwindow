@@ -168,7 +168,12 @@
 ;       2013/11/17  -   Added the CHARSIZE property. - MRA
 ;       2013/11/24  -   Inherit MrLayout__Define. Renamed from MrPlotLayout__Define to
 ;                           MrGrLayout__Define. Changed LAYOUT property to GRLAYOUT. - MRA
-;                           
+;       2013/11/29  -   Array and plot indices are now row-order. MakeFixedLocation and
+;                           Make_Location both return layouts as [ncol, nrow, index] so
+;                           that they can be directly passed to MrLayout. Plot indices
+;                           are now the primary means of identifying plots within the
+;                           current layout. IsAvailable accepts values outside of the
+;                           current layout so still uses invariant [col,row] locations. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -176,10 +181,16 @@
 ;   grid. This simulates adding an actual plot to the display.
 ;
 ; :Params:
-;       LOCATION:       in, out, optional, type=intarr(2\,*)
-;                       Plot location [col, row] of the plot position to remove. Location
-;                           [1,1] indicates the plot in the top-left corner. If not
-;                           provided, one will be generated and returned.
+;       LAYOUT:         in, out, optional, type=int/intarr(3)
+;                       A scalar plot "index" or a vector of the form [ncols, nrows, index],
+;                           where [ncols, nrows] is the number of columns and rows in the
+;                           plotting grid. "Index" is the plot index, starting with 1 and
+;                           increasing first right then down, of the location to be
+;                           created. If [ncols,nrows] cannot accommodate all of the plots
+;                           within the layout, it will be increased until it can. The final
+;                           layout will be returned in `OLAYOUT`. If a scalar is provided,
+;                           [ncols,nrows] is taken to be the current grid layout. If
+;                           undefined, a LAYOUT will be returned.
 ;       POSITION:       in, out, optional, type=fltarr(4)
 ;                       The position of the plot indicated by `LOCATION`. 
 ;                           The lower-left and upper-right corners of a plot in normal
@@ -187,9 +198,10 @@
 ;                           and returned.
 ;
 ; :Keywords:
-;       LAYOUT:         out, optional, type=boolean
-;                       The layout needed to accomodate `LOCATION` and `POSITION`. If
-;                           `UPDATE_LAYOUT`=1, this will be the same as "self.GrLayout"
+;       OLAYOUT:        out, optional, type=intarr(3)
+;                       If `LAYOUT` was provided and the grid layout needed to change in
+;                           order to accommodate it, then this will contain the new
+;                           layout: [ncols, nrows, index].
 ;       UPDATE_LAYOUT:  in, optional, type=boolean, default=1
 ;                       Set to 0 to simulate adding a position to they layout. In this
 ;                           case, an available location and position will be found, but
@@ -197,10 +209,10 @@
 ;                           (find and) assimilate `LOCATION` and `POSITION` into the
 ;                           layout.
 ;-
-pro MrGrLayout::AddToLayout, location, position, $
-LAYOUT=layout, $
+pro MrGrLayout::AddToLayout, layout, position, $
+OLAYOUT=oLayout, $
 UPDATE_LAYOUT=update_layout
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -210,19 +222,29 @@ UPDATE_LAYOUT=update_layout
         return
     endif
 
-    SetDefaultValue, update_layout, 1, /BOOLEAN
-    if n_elements(location) gt 0 && location[0] lt 0 then $
-        message, 'To add a fixed position, provide POSITION. LOCATION will be returned.'
+    init_grid = self.GrLayout
+    if n_elements(update_layout) eq 0 $
+        then update_layout = 1 $
+        else update_layout = keyword_set(update_layout)
+        
+    case n_elements(layout) of
+        0: ;Do nothing
+        1: oLayout = [self.GrLayout, layout]
+        3: oLayout = layout
+        else: message, 'LAYOUT: incorrect number of elements.'
+    endcase
+        
+    if n_elements(oLayout) gt 0 && oLayout[2] lt 0 then $
+        message, 'To add a fixed position, provide POSITION. LAYOUT will be returned.'
         
 ;---------------------------------------------------------------------
 ;Get a Location? /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    ;If no location was provided
-    if n_elements(location) eq 0 and n_elements(position) gt 0 then begin
+    ;If a position was provided, get a fixed location
+    if n_elements(layout) eq 0 and n_elements(position) gt 0 then begin
         ;Create the location
-        location = self -> MakeFixedLocation()
-        layout = self.GrLayout
+        layout = self -> MakeFixedLocation()
         if update_layout eq 0 then return
         
         ;Add to the layout
@@ -237,20 +259,20 @@ UPDATE_LAYOUT=update_layout
     endif else begin
         
         ;Make room for the location given.
-        self -> Make_Location, location, $
+        self -> Make_Location, oLayout, $
                                POSITION=position, $
-                               LAYOUT=layout, $
                                UPDATE_LAYOUT=update_layout
+        if n_elements(layout) eq 0 then layout = oLayout
         if update_layout eq 0 then return
         
         ;Add them to the layout
-        iList = self -> ConvertLocation(location)
-        (*self.posIsTaken)[iList] = 1
+        aIndex = self -> ConvertLocation(oLayout[2], /PINDEX, /TO_AINDEX)
+        (*self.posIsTaken)[aIndex] = 1
         
     endelse
     
     ;Increase the plot count
-    self.nplots += 1
+    self.nPlots += 1
 end
 
 
@@ -261,7 +283,7 @@ end
 ;   store them as an object property.
 ;-
 pro MrGrLayout::CalcPositions
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -312,7 +334,7 @@ end
 pro MrGrLayout::ClearLayout, $
 FIXED=fixed, $
 LAYOUT=layout
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -370,16 +392,18 @@ end
 ;                       Returns 1 if `LOCATION` exists within `LAYOUT` and 0 otherwise.
 ;                           If EXISTS is 0 and no named variable is present, an error 
 ;                           will occur.
-;       LIST_INDEX      in, optional, type=boolean, default=0
-;                       Indicate that `LOCATION` is actually a list-index.
-;       PLOT_INDEX:     in, optional, type=boolean, default=0
+;       COLROW:         in, optional, type=boolean
+;                       Indicate that `LOCATION` is a [col,row] location. This is assumed.
+;       AINDEX:         in, optional, type=boolean, default=0
+;                       Indicate that `LOCATION` is actually an array-index.
+;       PINDEX:         in, optional, type=boolean, default=0
 ;                       Indicate that `LOCATION` is actually a plot-index.
 ;       TO_COLROW:      in, optional, type=boolean
 ;                       Indicate that `LOCATION` is to be converted to a [col, row] location.
-;       TO_LIST_INDEX:  in, optional, type=boolean, default=0
-;                       Indicate that `LOCATION` is to be converted to a list-index.
-;                           This is the default.
-;       TO_PLOT_INDEX:  in, optional, type=boolean, default=0
+;       TO_AINDEX:      in, optional, type=boolean
+;                       Indicate that `LOCATION` is to be converted to an array-index.
+;                           This is assumed.
+;       TO_PINDEX:      in, optional, type=boolean, default=0
 ;                       Indicate that `LOCATION` is to be converted to a plot-index.
 ;       
 ;
@@ -388,40 +412,32 @@ end
 ;-
 function MrGrLayout::ConvertLocation, location, layout, $
 EXISTS=exists, $
-LIST_INDEX=list_index, $
-PLOT_INDEX=plot_index, $
-TO_LIST_INDEX=to_list_index, $
-TO_PLOT_INDEX=to_plot_index, $
+COLROW=colrow, $
+AINDEX=aIndex, $
+PINDEX=pIndex, $
+TO_AINDEX=to_aIndex, $
+TO_PINDEX=to_pIndex, $
 TO_COLROW=to_colrow
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, -1
-    endif
-
-;---------------------------------------------------------------------
-;Fixed Position //////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    
-    ;Fixed locations
-    if location[0] lt 0 then begin
-        result = location[1]-1
-        return, result
+        return, MrNull(-1)
     endif
 
 ;---------------------------------------------------------------------
 ;Defaults ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;Default to a [col, row] location.
-    SetDefaultValue, layout, self.GrLayout
-    plot_index = keyword_set(plot_index)
-    list_index = keyword_set(list_index)
-    to_plot_index = keyword_set(to_plot_index)
-    to_list_index = keyword_set(to_list_index)
+    if n_elements(layout) eq 0 then layout = self.GrLayout
+    aIndex = keyword_set(aIndex)
+    pIndex = keyword_set(pIndex)
+    colrow = keyword_set(colrow)
+    to_aIndex = keyword_set(to_aIndex)
+    to_pIndex = keyword_set(to_pIndex)
     to_colrow = keyword_set(to_colrow)
 
 ;---------------------------------------------------------------------
@@ -429,59 +445,81 @@ TO_COLROW=to_colrow
 ;---------------------------------------------------------------------
     
     ;Put restrictions.
-    if plot_index + list_index eq 2 then $
-        message, 'PLOT_INDEX and LIST_INDEX cannot be specified together.'
+    if aIndex + pIndex + colrow eq 0 then colrow = 1
+    if aIndex + pIndex + colrow ne 1 then $
+        message, 'AINDEX, PINDEX, and COLROW cannot be specified together.'
     
     ;Default to converting to a list index.
-    if to_plot_index + to_list_index + to_colrow eq 0 then to_list_index = 1
-    if to_plot_index + to_list_index + to_colrow ne 1 then $
-        message, 'One and only one of TO_PLOT_INDEX, TO_LIST_INDEX, and TO_COLROW are allowed.'
+    if to_pIndex + to_aIndex + to_colrow eq 0 then to_aIndex = 1
+    if to_pIndex + to_aIndex + to_colrow ne 1 then $
+        message, 'One and only one of TO_PINDEX, TO_AINDEX, and TO_COLROW are allowed.'
     
     ;Make sure the location exists
-    exists = self -> PlotExists(location, layout, PLOT_INDEX=plot_index, LIST_INDEX=list_index)
+    exists = self -> PlotExists(location, layout, PINDEX=pIndex, AINDEX=aIndex)
     if max(exists) eq 0 then if arg_present(exists) $
-        then return, !Null $
+        then return, MrNull(-1) $
         else message, 'Location does not exist within layout. Cannot convert.'
 
 ;---------------------------------------------------------------------
-;Convert /////////////////////////////////////////////////////////////
+;Convert Fixed Location //////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    ;
-    ;Note that:
-    ;   - PLOT_INDEX is row-major while LIST_INDEX is column-major.
-    ;   - COLROW and PLOT_INDEX are 1-based while LIST_INDEX is 0-based.
-    ;   - TWOD_TO_ONED_INDEX works with 0-based indices.
-    ;
+    if location[0] lt 0 then begin
+        nLoc = n_elements(location)
+        
+        ;TO PLOT INDEX
+        if to_pIndex then begin
+            case 1 of
+                aIndex: result = -location - 1
+                pIndex: result = location
+                colrow: result = -location[1,*]
+            endcase
+    
+        ;TO [COL, ROW]
+        endif else if to_colrow then begin
+            case 1 of
+                aIndex: result = transpose([replicate(-1, nLoc), [location+1]])
+                pIndex: result = transpose([replicate(-1, nLoc), [-location]])
+                colrow: result = location
+            endcase
+          
+        ;TO ARRAY INDEX
+        endif else if to_aIndex then begin
+            case 1 of
+                aIndex: result = location
+                pIndex: result = -location - 1
+                colrow: result = -location[1,*] + 1
+            endcase
+        endif
+        
+        return, result
+    endif
+
+;---------------------------------------------------------------------
+;Convert Layout Location /////////////////////////////////////////////
+;---------------------------------------------------------------------
 
     ;TO PLOT INDEX
-    if keyword_set(to_plot_index) then begin
+    if to_pIndex then begin
         case 1 of
-            keyword_set(list_index): begin
-                colrow = twoD_to_oneD_index(location, layout, /oneD_to_twoD, /COL_MAJOR) ;row-major location -> [col,row]
-                result = twoD_to_oneD_index(colrow, layout)+1                            ;[col,row] -> col-major index
-            endcase
-            keyword_set(plot_index): result = location
-            else                   : result = twoD_to_oneD_index(location-1, layout)+1
+            aIndex: result = location + 1
+            pIndex: result = location
+            colrow: result = layout[0]*(location[1,*]-1) + location[0,*]
         endcase
     
     ;TO [COL, ROW]
-    endif else if keyword_set(to_colrow) then begin
+    endif else if to_colrow then begin
         case 1 of
-            keyword_set(plot_index): result = twoD_to_oneD_index(location-1, layout, /oneD_to_twoD)+1
-            keyword_set(list_index): result = twoD_to_oneD_index(location,   layout, /oneD_to_twoD, /COL_MAJOR)+1
-            else                   : result = location
+            aIndex: result = array_indices(layout, location,   /DIMENSIONS) + 1
+            pIndex: result = array_indices(layout, location-1, /DIMENSIONS) + 1
+            colrow: result = location
         endcase
           
-    ;TO LIST INDEX
-    endif else if keyword_set(to_list_index) then begin
+    ;TO ARRAY INDEX
+    endif else if to_aIndex then begin
         case 1 of
-            keyword_set(plot_index): begin
-                colrow = twoD_to_oneD_index(location-1, layout, /oneD_to_twoD)
-                result = twoD_to_oneD_index(colrow, layout, /COL_MAJOR)
-            endcase
-            
-            keyword_set(list_index): result = location
-            else:                    result = twoD_to_oneD_index(location-1, layout, /COL_MAJOR)
+            aIndex: result = location
+            pIndex: result = location - 1
+            colrow: result = layout[0]*(location[1,*]-1) + location[0,*] - 1
         endcase
     endif
     
@@ -499,7 +537,7 @@ end
 ;                       Add this number of rows to the layout.
 ;-
 pro MrGrLayout::ExpandLayout, nCols, nRows
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -512,8 +550,8 @@ pro MrGrLayout::ExpandLayout, nCols, nRows
     if n_elements(nCols) eq 2 then nRows = nCols[1]
 
     ;Default to adding one row
-    SetDefaultValue, nCols, 1
-    SetDefaultValue, nRows, 1
+    if n_elements(nCols) eq 0 then nCols = 1
+    if n_elements(nRows) eq 0 then nRows = 1
     if nRows eq 0 && nCols[0] eq 0 then return
 
     ;Resposition all of the existing plots        
@@ -532,7 +570,7 @@ end
 ;-
 pro MrGrLayout::FillHoles, $
 TRIMLAYOUT=trimLayout
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -581,13 +619,14 @@ end
 ;                           and layout positions will be searched.
 ;
 ; :Returns:
-;       LOCATION:       The location of `POSITION`. If no match is found, [0,0] is returned.
+;       LOCATION:       The [col, row] location of `POSITION`. If no match is found,
+;                           [0,0] is returned.
 ;-
 function MrGrLayout::FindLocation, position, $
 EPSILON = epsilon, $
 FIXED = fixed, $
 NFOUND = nFound
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -597,9 +636,13 @@ NFOUND = nFound
         return, [0,0]
     endif
 
-    SetDefaultValue, epsilon, 1e-5
+    if n_elements(epsilon) eq 0 then epsilon = 1e-5
+    
+    ;If fixed is not defined, search through both fixed and layout positions
     if n_elements(fixed) eq 0 then fixed = 2 else fixed = keyword_set(fixed)
 
+    ;Keep track of the number of matches and the matched locations. NFOUND also
+    ;serves as an index into LOCATION for new matches.
     nFound = 0
     location = intarr(2,self.nPlots)
 
@@ -622,9 +665,6 @@ NFOUND = nFound
 ;Search Layout Positions? ////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if fixed ne 1 then begin
-        nLayout = self.GrLayout[0]*self.GrLayout[1]
-        pLayout = reform(*self.layout_positions, 4, nLayout)
-        
         ;Step through all of the layout positions
         for i = 0, self.GrLayout[0]*self.GrLayout[1] - 1 do begin
         
@@ -632,8 +672,8 @@ NFOUND = nFound
             if (*self.posIsTaken)[i] eq 0 then continue
 
             ;Look for a match.
-            if array_equal(position, pLayout[*,i]) then begin
-                location[*,nFound] = self -> ConvertLocation(i, /LIST_INDEX, /TO_COLROW)
+            if array_equal(position, (*self.layout_positions)[*,i]) then begin
+                location[*,nFound] = self -> ConvertLocation(i, /AINDEX, /TO_COLROW)
                 nFound += 1
             endif
         endfor
@@ -646,19 +686,24 @@ NFOUND = nFound
     if nFound eq 0 then begin
         ;Fixed Positions
         if fixed ne 0 and self.nFixed gt 0 then begin
-            ;Calculate the difference between the stored positions and the given positions
-            delta_fixed  = (*self.fixed_positions)  - rebin(position, 4, self.nFixed)
+            ;Calculate the difference between the stored positions and the given position.
+            ;Rebin the position NFIXED times to save a FOR loop.
+            delta_fixed = (*self.fixed_positions) - rebin(position, 4, self.nFixed)
         
             ;Find the almost-equal case.
             index = where(abs(mean(delta_fixed, DIMENSION=1)) le epsilon, nMatch)
             nFound += nMatch
         
-            ;Return the location of the match
+            ;Return the location of the match. Fixed positions take the form [-1, index].
+            ;There is one per match.
             if nMatch gt 0 then $
                 location[*,nFound:nFound+nMatch-1] = [replicate(-1, 1, nMatch), [index+1]]
         endif
         
         ;Layout positions
+        ;
+        ;   NOT IMPLEMENTED YET
+        ;
         nLayout = self.nPlots - self.nFixed
         if fixed ne 1 and nLayout gt 0 then begin
             delta_layout = (*self.layout_positions) - rebin(position, 4, self.nPlots-self.nFixed)
@@ -671,20 +716,19 @@ end
 
 
 ;+
-;   The purpose of this method is to change/replace the position and/or location of a
-;   plot that already exists within the 2D plotting grid.
+;   The purpose of this method is to obtain the position of a plot given its
+;   plot index location.
 ;
 ; :Params:
-;       LOCATION:           in, required, type=integer/intarr(2)
-;                           Either the 2-element [col, row] or, if the location is within
-;                               the auto-updating layout, the scalar plot-index location
-;                               of the plot whose position is to be returned.
+;       PINDEX:             in, required, type=integer
+;                           The plot index of the plot whose position is to be returned.
+;                               Fixed locations have a negative plot index.
 ;
 ; :Keywords:
-;       POSITION:           The position of the plot at `LOCATION`.
+;       POSITION:           The position of the plot at `PINDEX`.
 ;-
-function MrGrLayout::GetPosition, location
-    compile_opt idl2
+function MrGrLayout::GetPosition, pIndex
+    compile_opt strictarr
 
     ;Error handling
     catch, the_error
@@ -693,22 +737,21 @@ function MrGrLayout::GetPosition, location
         void = error_message()
         return, !Null
     endif
-
-    ;Get the [col, row] location.
-    case n_elements(location) of
-        1: colrow = self -> ConvertLocation(location, /PLOT_INDEX, /TO_COLROW)
-        2: colrow = location
-        else: message, 'LOCATION: Incorrect number of elements.'
-    endcase
+    
+    ;Ensure a single plot index was given.
+    if n_elements(pIndex) ne 1 then message, 'PINDEX must be a scalar.'
     
     ;Make sure it exists.
-    exists = self -> PlotExists(colrow)
+    exists = self -> PlotExists(pIndex, /PINDEX)
     if exists eq 0 then message, 'LOCATION does not exist. Cannot get its position.'
     
+    ;Convert to an array index
+    aIndex = self -> ConvertLocation(pIndex, /PINDEX, /TO_AINDEX)
+    
     ;Get the position
-    if location[0] lt 0 $
-        then position = (*self.fixed_positions)[*,location[1]-1] $
-        else position = (*self.layout_positions)[*, colrow[0]-1, colrow[1]-1]
+    if pIndex[0] lt 0 $
+        then position = (*self.fixed_positions)[*, aIndex] $
+        else position = (*self.layout_positions)[*, aIndex]
     
     return, position
 end
@@ -723,20 +766,19 @@ end
 ;                           and horizontal directions, [ncols, nrows].
 ;       LOCATION:       out, optional, type=fltarr(4)
 ;                       The position of the plot specified by `THISLOCATION`
-;       THISLOCATION:   in, optional, type=intarr(2)
-;                       A vector specifying the [col, row] of the plot position to be
-;                           returned. The position is returned in the variable `LOCATION`,
-;                           with [1,1] indicating the top, left plot.
+;       PINDEX:         in, optional, type=int
+;                       The plot index within the grid (starting with 1) of the plot whose
+;                           position is to be returned.
 ;       _REF_EXTRA:     out, optional, type=any
 ;                       Any keyword accepted by MrLayout::GetProperty is also accepted
 ;                           for keyword inheritance.
 ;-
 pro MrGrLayout::GetProperty, $
-LAYOUT = layout, $
-LOCATION = location, $
-THISLOCATION = thisLocation, $
+ LAYOUT = layout, $
+ LOCATION = location, $
+ PINDEX = pIndex, $
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -753,8 +795,8 @@ _REF_EXTRA = extra
     if arg_present(layout)   then layout   = self.GrLayout
     if arg_present(nplots)   then nplots   = self.nplots
     if arg_present(location) then $
-        if n_elements(thisLocation) ne 0 and n_elements(*self.layout_positions) ne 0 $
-            then location = (*self.layout_positions)[*, location[0]-1, location[1]-1]
+        if n_elements(pIndex) gt 0 and n_elements(*self.layout_positions) ne 0 $
+            then location = (*self.layout_positions)[*, pIndex]
 end
 
 
@@ -762,19 +804,22 @@ end
 ;   The purpose of this method is to provide a means of generating new plot locations
 ;   within the 2D plotting grid.
 ;
+;   A [col,row] location is required in case it lies outside of the current layout.
+;   [col,row] locations are independent of the grid layout.
+;
 ; :Params:
-;       LOCATION:           in, optional, type=long
-;                           The [col, row] location of the position that is being checked.
-;                               If LOCATION[0] < 0 then the Fixed positions will be
-;                               checked for availability. If not given, availability for
-;                               all plots will be returned in array-index order.
+;       COLROW:             in, optional, type=long
+;                           The [col,row] location of the position that is being checked.
+;                               If COLROW[0] < 0 then the fixed positions will be checked
+;                               for availability. If not given, availability for all plots
+;                               will be returned.
 ;
 ; :Keywords:
 ;       IFREE:              out, optional, type=intarr
 ;                           The array-index of each available layout position. Returned only
-;                               if `LOCATION` is not provided.
+;                               if `PINDEX_IN` is not provided.
 ;       INSIDE:             in, optional, type=boolean, default=0
-;                           Look only inside the plot layout. Normally, if `LOCATION` lies
+;                           Look only inside the plot layout. Normally, if `PINDEX_IN` lies
 ;                               outside the plot layout, `TF_AVAILABLE` will return True.
 ;                               If `INSIDE` is set, `TF_AVAILABLE` will return false.
 ;       ITAKEN:             out, optional, type=intarr
@@ -786,68 +831,62 @@ end
 ;       NTAKEN:             out, optional, type=intarr
 ;                           The number of unavailable layout positions. Returned only if
 ;                               `LOCATION` is not provided.
-;       PLOT_INDEX:         in, optional, type=boolean, default=0
-;                           If set and `LOCATION` is not provided, return availability
-;                               of all positions in plot-index order. Note that plot-index
-;                               order is 0-based while an actual plot index is 1-based.
-;                               Take care.... `IFREE` and `ITAKEN` will be converted to
-;                               plot-index values.
+;       PINDEX:             in, optional, type=boolean, default=0
+;                           If set and `LOCATION` is not provided, `ITAKEN` and `IFREE`
+;                               will be the plot-indices of the unavailable and available
+;                               positions, respectively.
 ;
 ; :Returns:
 ;       TF_AVAILABLE:       1     if the position indicated by `LOCATION` is avaialble,
 ;                           0     if not.
 ;                           !Null if no layout has been established.
 ;-
-function MrGrLayout::IsAvailable, location, $
+function MrGrLayout::IsAvailable, colrow, $
 IFREE = iFree, $
 INSIDE = inside, $
 ITAKEN = iTaken, $
 NFREE = nFree, $
 NTAKEN = nTaken, $
-PLOT_INDEX = plot_index
-    compile_opt idl2
+PINDEX = pIndex
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, !Null
+        return, MrNull(-1)
     endif
     
     ;Defaults
     inside = keyword_set(inside)
-    plot_index = keyword_set(plot_index)
+    pIndex = keyword_set(pIndex)
+       
+    ;Number of possible plots in the layout.
+    nLayout = self.GrLayout[0]*self.GrLayout[1]
     
 ;---------------------------------------------------------------------
 ;Availability of All Positions? //////////////////////////////////////
 ;---------------------------------------------------------------------
     if n_params() eq 0 then begin
         ;Has a layout been defined yet?
-        if n_elements(*self.posIsTaken) eq 0 then begin
+        if nLayout le 0 then begin
             nFree = 0
             nTaken = 0
-            return, !Null
+            return, 0
         endif
-        
-        ;Find the indices of each available/taken plot?
-        if arg_present(iFree)  || arg_present(nFree)  || $
-           arg_present(iTaken) || arg_present(nTaken) then findIndex = 1 else findIndex = 0
     
-        ;Check if the list index is available.
+        ;Check if the grid location is available.
         tf_available = ~*self.posIsTaken
+        
+        ;Find the indices of the available and unavailable grid locations 
         iFree = where(tf_available eq 1, nFree, COMPLEMENT=iTaken, NCOMPLEMENT=nTaken, /NULL)
 
         ;Convert from array-index order to plot-index order.
-        nLayout = n_elements(*self.posIsTaken)
-        if plot_index eq 1 && nLayout gt 0 then begin
+        if pIndex then begin
             ;Convert array indices to plot indices.
-            if nFree  gt 0 then iFree  = self -> ConvertLocation(iFree,  /LIST_INDEX, /TO_PLOT_INDEX)
-            if nTaken gt 0 then iTaken = self -> ConvertLocation(iTaken, /LIST_INDEX, /TO_PLOT_INDEX)
-            
-            ;Convert TF_AVAILBLE to plot-index availability
-            tf_available = intarr(nLayout) + 1
-            if nFree gt 0 then tf_available[iFree-1] = 0
+            if nFree  gt 0 then iFree  = self -> ConvertLocation(iFree,  /AINDEX, /TO_PINDEX)
+            if nTaken gt 0 then iTaken = self -> ConvertLocation(iTaken, /AINDEX, /TO_PINDEX)
         endif
         
         return, tf_available
@@ -857,25 +896,21 @@ PLOT_INDEX = plot_index
 ;Specific Positions? /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;Fixed locations.
-    if location[0] lt 0 then begin
-        tf_available = location[1] gt self.nFixed
+    if colrow[0] lt 0 then begin
+        ;Fixed locations are adjacent and numbered from 1 to nFixed
+        tf_available = colrow[1] gt self.nFixed
     
     ;Layout locations.
     endif else begin
 
-        ;If the layout is empty, then the location is avaialble
+        ;If COLROW is outside of the layout, then the location is available
         ;(unless INSIDE is set).
-        if array_equal(self.GrLayout, [0,0]) then $
-            if inside eq 1 then return, 0 else return, 1
-    
-        ;If LOCATION is outside of the layout, then the location is available
-        ;(unless INSIDE is set).
-        if self -> PlotExists(location) eq 0 then $
+        if self -> PlotExists(colrow) eq 0 then $
             if inside eq 1 then return, 0 else return, 1
     
         ;Check if the position has been taken already
-        iList = self -> ConvertLocation(location)
-        tf_available = ~(*self.posIsTaken)[iList]
+        aIndex = self -> ConvertLocation(colrow, /COLROW, /TO_AINDEX)
+        tf_available = ~(*self.posIsTaken)[aIndex]
     endelse
     
     return, tf_available
@@ -886,21 +921,24 @@ end
 ;   The purpose of this program is get the next available location for a fixed position.
 ;
 ; :Returns:
-;       LOCATION:           The next available location for a fixed position.
+;       LOCATION:           out, required, type=intarr(3)
+;                           A vector of the form [ncols, nrows, index], where [ncols, nrows]
+;                               is the number of columns and rows in the plotting grid.
+;                               Index is the next available fixed plot index location.
 ;-
 function MrGrLayout::MakeFixedLocation
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, !Null
+        return, MrNull(-1)
     endif
     
     ;Get a new location
-    location = [-1, self.nFixed+1]
+    location = [self.GrLayout, -self.nFixed-1]
     
     ;Output the location
     return, location
@@ -917,32 +955,23 @@ end
 ;           - An extra row will be added to make room, if necessary.
 ;
 ; :Params:
-;       LOCATION:           in, out, optional, type=lonarr(2)
-;                           If provided and defined, then this is a named variable
-;                               containing the [Col, Row] location of a plot. If the plot
-;                               does not fit within the current plot layout, the layout
-;                               will be expanded to contain the plot. If provided and 
-;                               undefined, then this is a named variable into which the
-;                               lowest available [Col, Row] plot location will be returned.
+;       LAYOUT:             in, out, optional, type=lonarr(3)
+;                           A vector of the form [ncols, nrows, index], where [ncols, nrows]
+;                               is the number of columns and rows in the plotting grid.
+;                               Index is the plot index, starting with 1 and increasing
+;                               first right then down, of the location to be created. If
+;                               not provided, a LAYOUT will be returned.
 ;
 ; :Keywords:
 ;       UPDATE_LAYOUT:      in, optional, type=boolean, default=0
 ;                           If set, the plot layout will be adjusted to accomodate the
 ;                               location and position being retrieved. Plot positions
 ;                               will be recalculated to fit the new layout.
-;       LAYOUT:             out, optional, type=intarr(2)
-;                           The layout needed to fit the `LOCATION`. Returned only if
-;                               `UPDATE_LAYOUT`=0
-;
-; :Uses:
-;   Uses the following external programs::
-;       SetDefaultValue.pro (Coyote Graphics)
 ;-
-pro MrGrLayout::Make_Location, location, $
+pro MrGrLayout::Make_Location, layout, $
 UPDATE_LAYOUT = update_layout, $
-LAYOUT = layout, $
 POSITION = position
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -955,114 +984,112 @@ POSITION = position
 ;---------------------------------------------------------------------
 ;Check Initial Condition /////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    n_loc = n_elements(location)
-
-    setDefaultValue, update_layout, 0, /BOOLEAN
+    n_loc = n_elements(layout)
+    update_layout = keyword_set(update_layout)
 
     ;SELF.GRLAYOUT is initialized to [0,0], which is an invalid plot location. If this
     ;is still the case, and LOCATION was not given, then make sure location is defined.
     if array_equal(self.GrLayout, [0,0]) && n_loc eq 0 then begin
-        location = [1,1]
-        n_loc = 2
+        layout = [1,1,1]
+        n_loc = 3
     endif
 
 ;---------------------------------------------------------------------
 ;Location Provided ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if n_loc eq 2 then begin
-
-        ;Check if there is a plot in this location
-        tf_free = self -> IsAvailable(location)
+    if n_loc eq 3 then begin    
+        ;Convert to a [col,row] location
+        colrow = self -> ConvertLocation(layout[2], layout[0:1], /PINDEX, /TO_COLROW)
+        
+        ;Check if it is available
+        tf_free = self -> IsAvailable(colrow)
 
     ;---------------------------------------------------------------------
-    ;Already Exists? /////////////////////////////////////////////////////
+    ;Location is Taken? //////////////////////////////////////////////////
     ;---------------------------------------------------------------------
+        ;
+        ;If the location is already available, then the only thing we have to check
+        ;is the grid layout. If the location is unavailable (TF_FREE=0), then we
+        ;also have to shift plots out of the way.
+        ;
         if tf_free eq 0 then begin
             ;Shift plots out of the way?
             if keyword_set(update_layout) then begin
-                self -> ShiftPlots, location
+                self -> ShiftPlots, layout[2]
+                
+                ;Get the plot index in case the layout changed.
+                pIndex = self -> ConvertLocation(colrow, /COLROW, /TO_PINDEX)
+                layout = [self.GrLayout, pIndex]
                 
             ;If not...
             endif else begin
-                ;Get the index of the desired location and all available locations.
-                pIndex = self -> ConvertLocation(location, /TO_PLOT_INDEX)
-                void = self -> IsAvailable(IFREE=pFree, NFREE=nFree, /PLOT_INDEX)
+                ;Get the index of all available locations.
+                void = self -> IsAvailable(IFREE=pFree, NFREE=nFree, /PINDEX)
                 
-                ;If there are no available locations after the desired one, add a row
-                ;so that current positions can be shifted out of the way to make room
-                ;for the new one.
-                if nFree eq 0 || (max(pFree gt pIndex) eq 0) $
-                    then layout = self.GrLayout + [0,1] $
-                    else layout = self.GrLayout
+                ;Plots have to be shifted out of the way. If there are no free
+                ;locations beyond the desired location, we must add a row. We must then
+                ;find the plot index in the new layout.
+                if nFree eq 0 || (max(pFree gt layout[2]) eq 0) then begin
+                    gridLayout = self.GrLayout + [0,1]
+                    pIndex = self -> ConvertLocation(colrow, gridLayout, /COLROW, /TO_PINDEX)
+                    layout = [gridLayout, pIndex]
+                endif
             endelse
+        endif
 
     ;---------------------------------------------------------------------
-    ;Does Not Exist? /////////////////////////////////////////////////////
+    ;Change the Grid Layout? /////////////////////////////////////////////
     ;---------------------------------------------------------------------
-        endif else begin
-            ;Are more columns needed?
-            if location[0] gt self.GrLayout[0] $
-                then nCols = location[0] - self.GrLayout[0] $
-                else nCols = 0
+        if array_equal(self.GrLayout, layout[0:1]) eq 0 then begin
+            ;Get the index of all taken locations
+            void = self -> IsAvailable(ITAKEN=iTaken, NTAKEN=nTaken)
             
-            ;Are more rows needed?
-            if location[1] gt self.GrLayout[1] $
-                then nRows = location[1] - self.GrLayout[1] $
-                else nRows = 0
-
-            ;Update the layout?
-            if keyword_set(update_layout) $
-                then self -> ExpandLayout, nCols, nRows $
-                else layout = self.GrLayout + [nCols, nRows]
-        endelse
+            ;If there are some
+            if nTaken gt 0 then begin
+                ;Find the largest column and row containing a plot
+                crTaken = self -> ConvertLocation(iTaken, layout[0:1], /AINDEX, /TO_COLROW)
+                crTaken = [max(colrow[0,*]), max(colrow[1,*])]
+                
+                ;Find a layout that includes all of the plots yet is closest to the
+                ;desired location.
+                gridLayout = crTaken > layout[0:1]
+                
+            ;If all locations are available, use the desired grid layout
+            endif else gridLayout = layout[0:1]
+            
+            ;Get the plot index in the potentially new layout
+            pIndex = self -> ConvertLocation(colrow, gridLayout, /COLROW, /TO_PINDEX)
+            layout = [gridLayout, pIndex]
+            
+            ;Update the grid layout?
+            if update_layout then self -> SetProperty, LAYOUT=gridLayout
+        endif
     
 ;---------------------------------------------------------------------
 ;Location Needed /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     endif else if n_loc eq 0 then begin
         ;Get availability 
-        void = self -> IsAvailable(IFREE=pFree, NFREE=nFree, ITAKEN=pIndex, NTAKEN=nTaken, /PLOT_INDEX)
+        void = self -> IsAvailable(IFREE=pFree, NFREE=nFree, ITAKEN=pIndex, NTAKEN=nTaken, /PINDEX)
         
-        ;
-        ;We want to return a position that is after the last unavailable position.
-        ;In this way, new positions are ways taken from the end of the line.
-        ;
-
     ;---------------------------------------------------------------------
-    ;Everything Available? ///////////////////////////////////////////////
+    ;A Location is Available? ////////////////////////////////////////////
     ;---------------------------------------------------------------------
-        if nTaken eq 0 then begin
-            ;Take the first one.
-            location = [1,1]
-            layout = self.GrLayout
+        if nFree gt 0 then begin
+            ;Take the lowest available plot location
+            layout = [self.GrLayout, pFree[0]]
             
     ;---------------------------------------------------------------------
-    ;Something Already Taken? ////////////////////////////////////////////
+    ;No Locations Available? /////////////////////////////////////////////
     ;---------------------------------------------------------------------
-        endif else if nFree gt 0 then begin
-            ;Take the highest available plot location
-            thisPI = pFree[0]
-            
-            location = self -> ConvertLocation(thisPI, /PLOT_INDEX, /TO_COLROW)
-            layout = self.GrLayout
-            
-        ;---------------------------------------------------------------------
-        ;Outside Current Layout? /////////////////////////////////////////////
-        ;---------------------------------------------------------------------
-        endif else if nFree eq 0 then begin
-            
-            ;Update the layout?
-            if keyword_set(update_layout) $
-                then self -> ExpandLayout, 0, 1 $
-                else layout = self.GrLayout + [0,1]
-            
-            ;Find the location in the new layout.
-            location = [1, self.GrLayout[1]]
-            
-        ;---------------------------------------------------------------------
-        ;Inside Current Layout? //////////////////////////////////////////////
-        ;---------------------------------------------------------------------
-        endif
+        endif else begin
+            ;Add another row
+            ;   Update the layout?
+            if keyword_set(update_layout) then begin
+                self -> ExpandLayout, 0, 1
+                layout = [self.GrLayout, self.GrLayout[1]]
+            endif else layout = [self.GrLayout + [0,1], self.GrLayout[1]+1]
+        endelse
         
     ;otherwise, throw an error message
     endif else message, 'LOCATION: incorrect number of elements.'
@@ -1073,10 +1100,10 @@ POSITION = position
     if arg_present(position) then begin
         ;Was the layout updated?
         if keyword_set(update_layout) then begin
-            position = (*self.layout_positions)[*, location[0]-1, location[1]-1]
+            aIndex = self -> ConvertLocation(layout[2], layout[0:1], /PINDEX, /TO_AINDEX)
+            position = (*self.layout_positions)[*, aIndex]
         endif else begin
-            position = MrLayout(layout, location, $
-                                ASPECT=*self.aspect, CHARSIZE=self.charsize, $
+            position = MrLayout(layout, ASPECT=*self.aspect, CHARSIZE=self.charsize, $
                                 OXMARGIN=self.oxmargin, XMARGIN=self.xmargin, XGAP=self.xgap, $
                                 OYMARGIN=self.oymargin, YMARGIN=self.ymargin, YGAP=self.ygap)
         endelse
@@ -1091,13 +1118,11 @@ end
 ;       LOCATION:       in, required, type=intarr(2\,*)
 ;                       the 1 based plot location [col, row] at which to check 
 ;                           for existence.
+;       LAYOUT:         in, optional, type=intarr(2), default=current layout
+;                       The layout used to check if `LOCATION` exists.
 ;
 ; :Keywords:
-;       LIST_INDEX:     in, optional, type=boolean, default=0
-;                       If set, `LOCATION` is a vector of list index locations. The list
-;                           index is the index at which the plot's object reference is
-;                           stored. See the "Plots_Present" method.
-;       PLOT_INDEX:     in, optional, type=boolean, default=0
+;       PINDEX:         in, optional, type=boolean, default=0
 ;                       If set, `LOCATION` is a vector of 1D plot locations. In this case,
 ;                           the upper left plot is index 1, and the index number increases
 ;                           first downward, then across.
@@ -1106,36 +1131,39 @@ end
 ;       EXISTS:         Tells whether the plot exists (1) or not (0).
 ;-
 function MrGrLayout::PlotExists, location, layout, $
-LIST_INDEX = list_index, $
-PLOT_INDEX = plot_index
-    compile_opt idl2
+AINDEX = aIndex, $
+PINDEX = pIndex
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
         void = error_message()
-        return, 0
+        return, MrNull(0)
     endif
     
     ;Default to current layout
-    SetDefaultValue, layout, self.GrLayout
+    if n_elements(layout) eq 0 then layout = self.GrLayout
+    pIndex = keyword_set(pIndex)
+    aIndex = keyword_set(aIndex)
 
     ;Layout Positions
     if location[0] ge 0 then begin
         ;The position does not exist if it is outside the layout
         case 1 of
-            keyword_set(list_index): exists = location le layout[0]*layout[1]-1
-            keyword_set(plot_index): exists = location le layout[0]*layout[1]
-            else                   : exists = (location[0,*] le layout[0]) and $
-                                              (location[1,*] le layout[1])
+            aIndex: exists = location le layout[0]*layout[1] - 1
+            pIndex: exists = location le layout[0]*layout[1]
+            else:   exists = (location[0,*] le layout[0]) and (location[1,*] le layout[1])
         endcase
     
     ;Fixed Positions
     endif else begin
-        if location[1] gt self.nFixed || location[1] le 0 $
-            then exists = 0 $
-            else exists = 1
+        case 1 of
+            aIndex: exists = -location le self.nFixed-1
+            pIndex: exists = -location le self.nFixed
+            else:   exists = location[1,*] le self.nFixed
+        endcase
     endelse
     
     return, exists
@@ -1147,9 +1175,8 @@ end
 ;   grid.
 ;
 ; :Params:
-;       LOCATION:       in, required, type=intarr(2\,*)
-;                       Plot location [col, row] of the plot position to remove. Location
-;                           [1,1] indicates the plot in the top-left corner.
+;       PINDEX:         in, required, type=intarr
+;                       Plot index of the plot to remove.
 ;
 ; :Keywords:
 ;       FILLHOLES:      in, optional, type=boolean, default=0
@@ -1157,9 +1184,9 @@ end
 ;                           holes in the layout. Set this keyword to 1 (one) to adjust
 ;                           plot locations so that those holes are filled.
 ;-
-pro MrGrLayout::RemoveFromLayout, location, $
+pro MrGrLayout::RemoveFromLayout, pIndex, $
 FILLHOLES = fillHoles
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1169,21 +1196,24 @@ FILLHOLES = fillHoles
         return
     endif
     
+    if n_elements(pIndex) ne 1 then message, 'PINDEX must be a scalar plot index.'
+    
     ;Defaults
     fillHoles = keyword_set(fillHoles)
-    nRemove = n_elements(location)/2
+    nRemove = n_elements(pIndex)
     
     ;Check if a position exists at the given location.
-    tf_free = self -> IsAvailable(location)
+    colrow = self -> ConvertLocation(pIndex, /PINDEX, /TO_COLROW)
+    tf_free = self -> IsAvailable(colrow)
     if tf_free eq 1 then return
 
 ;---------------------------------------------------------------------
 ;Fixed Positions /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if location[0] lt 0 then begin
-        iListAll = indgen(self.nFixed)
-        iList = self -> ConvertLocation(location)
-        void = isMember(iList, iListAll, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
+    if pIndex lt 0 then begin
+        aIndexAll = indgen(self.nFixed)
+        aIndex = self -> ConvertLocation(pIndex, /PINDEX, /TO_AINDEX)
+        void = isMember(aIndex, aIndexAll, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
 
         if nKeep eq 0 then begin
             self -> ClearLayout, /FIXED
@@ -1197,16 +1227,16 @@ FILLHOLES = fillHoles
 ;Layout Positions ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     endif else begin
-        iListAll = indgen(self.nPlots - self.nFixed)
+        aIndexAll = indgen(self.nPlots - self.nFixed)
         
-        iList = self -> ConvertLocation(location)
-        void = isMember(iList, iListAll, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
+        aIndex = self -> ConvertLocation(pIndex, /PINDEX, /TO_AINDEX)
+        void = isMember(aIndex, aIndexAll, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
         
         if nKeep eq 0 then begin
             self -> ClearLayout, /LAYOUT
         endif else begin
             self.nPlots -= nRemove
-            (*self.posIsTaken)[iList] = 0
+            (*self.posIsTaken)[aIndex] = 0
         endelse
     endelse
     
@@ -1220,11 +1250,11 @@ end
 ;   plot that already exists within the 2D plotting grid.
 ;
 ; :Params:
-;       OLD_POSITION:       in, required, type={1 | 2 | 4}-element vector
-;                           The plot-index, [col, row], or 4-element position of the plot
+;       OLD_POSITION:       in, required, type={1 | 4}-element vector
+;                           The plot-index or 4-element position of the plot
 ;                               whose position is to be changed.
-;       NEW_POSITION:       in, required, type={1 | 2 | 4}-element vector
-;                           The plot-index, [col, row], or 4-element position to where the
+;       NEW_POSITION:       in, required, type={1 | 3 | 4}-element vector
+;                           The plot-index, layout, or 4-element position to where the
 ;                               plot indicated by `OLD_POSITION` is to be moved. If a
 ;                               4-element position is provided, the plot will be placed
 ;                               at a fixed position, outside of the automatically-updating
@@ -1249,11 +1279,11 @@ end
 ;                               from the auto-updating layout and placed into a fixed
 ;                               location. Its actual position will not change.
 ;-
-pro MrGrLayout::SetPosition, old_position, new_position, $
+pro MrGrLayout::SetPosition, oldPIndex, newLayout, $
 OUTPOSITION = outPosition, $
 OUTLOCATION = outLocation, $
 TOFIXED = toFixed
-    compile_opt idl2
+    compile_opt strictarr
 
     ;Error handling
     catch, the_error
@@ -1270,36 +1300,34 @@ TOFIXED = toFixed
 ;---------------------------------------------------------------------
 
     ;Where is the plot being moved?
-    case n_elements(old_position) of
-        1: oldColRow = ConvertLocation(old_position, /PLOT_INDEX, /TO_COLROW)
-        2: oldColRow = old_position
+    case n_elements(oldPIndex) of
+        1: oldPI = oldPIndex
         4: oldPos = old_position
-        else: message, 'Incorrect number of elements: OLD_POSITION.'
+        else: message, 'Incorrect number of elements: OLDPINDEX.'
     endcase
 
     ;Where is it being moved to?
-    case n_elements(new_position) of
-        0: if keyword_set(toFixed) eq 0 then message, 'Incorrect number of elements: NEW_POSITION.'
+    case n_elements(newLayout) of
+        ;If not being moved to a fixed position, NEWLAYOUT must be defined.
+        0: if keyword_set(toFixed) eq 0 then message, 'Incorrect number of elements: NEWLAYOUT.'
     
         ;If a plot-index was given: It must exist within the current layout in order to
         ;know exactly where it is going.
         1: begin
-            tf_exist = self -> PlotExists(new_position, /PLOT_INDEX)
+            tf_exist = self -> PlotExists(newLayout, /PINDEX)
             if tf_exist eq 0 $
-                then message, 'NEW_POSITION lies outside the current layout. Provide a [col, row] location instead.' $
-                else newColRow = self -> ConvertLocation(new_position, /PLOT_INDEX, /TO_COLROW)
+                then message, 'NEWLAYOUT lies outside the current layout. Provide [ncols, nrows, index] instead.' $
+                else newLay = [self.GrLayout, newLayout]
         endcase
         
-        ;A [col, row] location: If a fixed-location, ensure it is the next available one.
-        2: begin
-            if new_position[0] gt 0 $
-                then newColRow = new_position $
-                else newColRow = self -> MakeFixedLocation()
-        endcase
+        ;[ncols, nrows, index] location: If a fixed-location, ensure it is the next available one.
+        3: if newLayout[2] gt 0 $
+            then newLay = newLayout $
+            else newLay = self -> MakeFixedLocation()
         
         ;A position was given.
-        4: newPos = new_position
-        else: message, 'Incorrect number of elements: NEW_POSITION.'
+        4: newPos = newLayout
+        else: message, 'Incorrect number of elements: NEWLAYOUT.'
     endcase
 
 ;---------------------------------------------------------------------
@@ -1307,9 +1335,10 @@ TOFIXED = toFixed
 ;---------------------------------------------------------------------
     
     ;Make sure a plot exists at the old position.
-    if n_elements(oldColRow) gt 0 then begin
+    if n_elements(oldPI) gt 0 then begin
+        oldColRow = self -> ConvertLocation(oldPI, /PINDEX, /TO_COLROW)
         isFree = self -> IsAvailable(oldColRow, /INSIDE)
-        if isFree eq 1 then message, 'No plot exists at OLD_POSITION. Cannot set its position.'
+        if isFree eq 1 then message, 'No plot exists at OLDPINDEX. Cannot set its position.'
     endif
         
     ;Turn a position into a [col, row] location. Make sure a plot can be found.
@@ -1321,21 +1350,22 @@ TOFIXED = toFixed
     
     ;Move a plot from an auto-updating position into a fixed position
     if keyword_set(toFixed) then begin
-        if oldColRow[0] lt 0 then message, 'OLD_POSITION is already a fixed position.'
-        void = temporary(newColRow)
-        newPos = (*self.layout_positions)[*, oldColRow[0]-1, oldColRow[1]-1]
+        if oldPI lt 0 then message, 'OLDPINDEX is already a fixed position.'
+        oldAIndex = self -> ConvertLocation(oldPI, /PINDEX, /TO_AINDEX)
+        void = temporary(newLay)
+        newPos = (*self.layout_positions)[*, oldAIndex]
     endif
 ;---------------------------------------------------------------------
 ;Set a [Col, Row] Location ///////////////////////////////////////////
 ;---------------------------------------------------------------------
 
     ;Remove the old position, add the new one.
-    self -> RemoveFromLayout, oldColRow
-    self -> AddToLayout, newColRow, newPos
+    self -> RemoveFromLayout, oldPI
+    self -> AddToLayout, newLay, newPos
     
-    ;Return the new position and [col, row] location.
+    ;Return the new position and layout location.
     outPosition = newPos
-    outLocation = newColRow
+    outLocation = newLay
 end
 
 
@@ -1358,8 +1388,8 @@ end
 ;       NEWISTAKEN:         An array indicating which positions are taken within the new
 ;                               layout scheme.
 ;-
-function MrGrLayout::RePosition, old_layout, new_layout, plot_index
-    compile_opt idl2
+function MrGrLayout::RePosition, old_layout, new_layout, pIndex
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1369,17 +1399,17 @@ function MrGrLayout::RePosition, old_layout, new_layout, plot_index
         return, !Null
     endif
 
-    ;If the old layout is empty, check if PLOT_INDEX fits in the new layout.
+    ;If the old layout is empty, check if PINDEX fits in the new layout.
     if array_equal(old_layout, [0,0]) then begin
         ;If no plot index was given, then there *should* be nothing to convert.
         if n_elements(plot_index) eq 0 then $
             if n_elements(*self.posIsTaken) eq 0 $
-                then return, !Null $
+                then return, MrNull(-1) $
                 else message, 'OLD_LAYOUT did not match posIsTaken. Report bug.'
     
-        if self -> PlotExists(plot_index, new_layout) $
-            then return, plot_index $
-            else message, 'PLOT_INDEX is outside of NEW_LAYOUT. Cannot Re-Position.'
+        if self -> PlotExists(pIndex, new_layout) $
+            then return, pIndex $
+            else message, 'PINDEX is outside of NEW_LAYOUT. Cannot Re-Position.'
     endif
     
     ;If the new layout is empty, 
@@ -1387,9 +1417,9 @@ function MrGrLayout::RePosition, old_layout, new_layout, plot_index
         then message, 'NEW_LAYOUT is invalid. Must have at least 1 column and 1 row.'
     
     ;Convert a plot index
-    if n_elements(plot_index) gt 0 then begin
-        old_colrow     = self -> ConvertLocation(plot_index, old_layout, /PLOT_INDEX, /TO_COLROW)
-        new_plot_index = self -> ConvertLocation(old_colrow, new_layout, /TO_PLOT_INDEX)
+    if n_elements(pIndex) gt 0 then begin
+        old_colrow     = self -> ConvertLocation(pIndex, old_layout, /PINDEX, /TO_COLROW)
+        new_plot_index = self -> ConvertLocation(old_colrow, new_layout, /TO_PINDEX)
         return, new_plot_index
     endif
     
@@ -1403,10 +1433,10 @@ function MrGrLayout::RePosition, old_layout, new_layout, plot_index
     ;If no positions were taken in the old layout, then none are taken in the new one.
     if nOldTaken eq 0 then return, newIsTaken
 
-    ;Convert the indices of the taken positions to plot index locations. Plot index
+    ;Convert the indices of the taken positions to [col,row] locations. [col,row]
     ;locations are invariant under change of layout.
-    oldTaken_colrow = self -> ConvertLocation(iOldTaken, old_layout, /LIST_INDEX, /TO_PLOT_INDEX)
-    iNewTaken = self -> ConvertLocation(oldTaken_colrow, new_layout, /PLOT_INDEX, /TO_LIST_INDEX)
+    oldTaken_colrow = self -> ConvertLocation(iOldTaken, old_layout, /AINDEX, /TO_COLROW)
+    iNewTaken = self -> ConvertLocation(oldTaken_colrow, new_layout, /COLROW, /TO_AINDEX)
 
     ;Record which positions are taken in the new layout.
     newIsTaken[iNewTaken] = 1
@@ -1432,7 +1462,7 @@ pro MrGrLayout::SetProperty, $
 LAYOUT = layout, $
 UPDATE_LAYOUT = update_layout, $
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1442,8 +1472,13 @@ _REF_EXTRA = extra
         return
     endif
 
+    if n_elements(update_layout) eq 0 $
+        then update_layout = 1 $
+        else update_layout = keyword_set(update_layout)
+
     ;Set Properties
-    if n_elements(extra) gt 0 then self -> MrLayout::SetProperty, _STRICT_EXTRA=extra
+    if n_elements(extra) gt 0 then $
+        self -> MrLayout::SetProperty, UPDATE_LAYOUT=0, _STRICT_EXTRA=extra
 
     ;Make sure plot locations are invariant to changes in the layout
     if n_elements(layout) gt 0 then begin
@@ -1459,19 +1494,20 @@ _REF_EXTRA = extra
             if layout[0] eq 0 xor layout[1] eq 0 then $
                 message, 'LAYOUT must have at least 1 column and 1 row.'
 
-            ;Make sure the new layout is big enough. Get the largest plot index and
-            ;compare it to the layout given.
-            void = self -> IsAvailable(ITAKEN=pTaken, NTAKE=nTaken, /PLOT_INDEX)
+            ;Make sure the new layout is big enough.
+            void = self -> IsAvailable(ITAKEN=pTaken, NTAKE=nTaken, /PINDEX)
             if nTaken gt 0 then begin
-                void = max(pTaken, imax)
-                if layout[0]*layout[1] lt pTaken[imax] then $
+                colrow = self -> ConvertLocation(pTaken, /PINDEX, /TO_COLROW)
+                colrow = [max(colrow[0,*]), max(colrow[1,*])]
+                
+                if (layout[0] lt colrow[0]) || (layout[1] lt colrow[1]) then $
                     message, 'LAYOUT is not big enough to contain the current set of plots. ' + $
-                             'Try theObj -> FillHoles, /TRIMLAYOUT first.'
+                             'Try theObj -> FillHoles, /TRIMLAYOUT to.'
             endif
 
             ;Resposition all of the existing plots        
             *self.posIsTaken = self -> RePosition(self.GrLayout, layout)
-            if *self.posIsTaken eq !Null then *self.posIsTaken = bytarr(layout[0]*layout[1])
+            if MrIsNull(*self.posIsTaken, 'POINTER') then *self.posIsTaken = bytarr(layout[0]*layout[1])
 
             ;Change the layout
             self.GrLayout = layout
@@ -1479,7 +1515,7 @@ _REF_EXTRA = extra
     endif
     
     ;Calculate the positions of the plots within the new layout
-    self -> CalcPositions
+    if update_layout then self -> CalcPositions
 end
 
 
@@ -1490,12 +1526,11 @@ end
 ;
 ; :Params:
 ;
-;       LOCATION:           in, required, type=lonarr(2)
-;                           The 1-based plot location [col, row] at which to begin 
-;                               shifting plots.
+;       PINDEX:             in, required, type=lonarr(2)
+;                           The plot-index location at which to begin shifting plots.
 ;-
-pro MrGrLayout::ShiftPlots, location
-    compile_opt idl2
+pro MrGrLayout::ShiftPlots, pIndex
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1507,26 +1542,26 @@ pro MrGrLayout::ShiftPlots, location
 
     ;get the [Col, Row] location of where to start shifting plots and convert it to a
     ;1-based, 1D plot number.
-    iList = self -> ConvertLocation(location, /TO_LIST_INDEX)
+    aIndex = self -> ConvertLocation(pIndex, /PINDEX, /TO_AINDEX)
     
     ;Find the positions that are not yet taken
-    iNotTaken = where((*self.posIsTaken)[iList:*] eq 0, nNotTaken)
+    iNotTaken = where((*self.posIsTaken)[aIndex:*] eq 0, nNotTaken)
 
     ;If all positions are taken, add another row to the layout
     if nNotTaken eq 0 then begin
         self -> ExpandLayout, 0, 1
-        iList = self -> ConvertLocation(location, /TO_LIST_INDEX)
-        iNotTaken = min(where((*self.posIsTaken)[iList:*] eq 0))+iList
+        aIndex = self -> ConvertLocation(pIndex, /PINDEX, /TO_AINDEX)
+        iNotTaken = min(where((*self.posIsTaken)[aIndex:*] eq 0))+aIndex
         
     ;Otherwise pick the first available location that is after the given location.
     endif else begin
-        iNotTaken = iNotTaken[0]+iList
+        iNotTaken = iNotTaken[0]+aIndex
     endelse
     
     ;Make the first available position unavailable, then make the chosen position
     ;available. All positions in between remain unavailable.
     (*self.posIsTaken)[iNotTaken] = 1
-    (*self.posIsTaken)[iList] = 0
+    (*self.posIsTaken)[aIndex] = 0
 end
 
 
@@ -1534,7 +1569,7 @@ end
 ;   Remove unused columns and rows.
 ;-
 pro MrGrLayout::TrimLayout
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1545,12 +1580,12 @@ pro MrGrLayout::TrimLayout
     endif
 
     ;Get plot availablility.
-    tf_free = self -> IsAvailable(/PLOT_INDEX, ITAKEN=pTaken, NTAKE=nTaken, NFREE=nFree)
+    tf_free = self -> IsAvailable(/PINDEX, ITAKEN=pTaken, NTAKE=nTaken, NFREE=nFree)
     if nFree  eq 0 then return
     if nTaken eq 0 then return
     
     ;Find the maximum taken column and row
-    ColRow = self -> ConvertLocation(pTaken, /PLOT_INDEX, /TO_COLROW)
+    ColRow = self -> ConvertLocation(pTaken, /PINDEX, /TO_COLROW)
     maxCol = max(ColRow[0,pTaken])
     maxRow = max(ColRow[1,pTaken])
 
@@ -1565,7 +1600,7 @@ end
 ;   positions of the plots currently stored in it.
 ;-
 pro MrGrLayout::whichLayout
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1586,6 +1621,8 @@ pro MrGrLayout::whichLayout
     print, FORMAT='(%"  nPlots:    %i")', self.nPlots
     print, FORMAT='(%"  nFixed:    %i")', self.nFixed
     if n_elements(*self.aspect) ne 0 then print, FORMAT='(%"  Aspect:     %f")', *self.aspect
+    print, FORMAT='(%"  OXMARGIN:  [%i, %i]")', self.oxmargin
+    print, FORMAT='(%"  OYMARGIN:  [%i, %i]")', self.oymargin
     print, FORMAT='(%"  XMargin:   [%i, %i]")', self.xmargin
     print, FORMAT='(%"  YMargin:   [%i, %i]")', self.ymargin
     print, FORMAT='(%"  XGap:      %i")', self.xgap
@@ -1595,14 +1632,17 @@ pro MrGrLayout::whichLayout
 ;LAYOUT POSITIONS & LOCATIONS ////////////////////////////////////////
 ;---------------------------------------------------------------------
     void = self -> IsAvailable(ITAKEN=iTaken, NTAKEN=nTaken)
-    if nTaken gt 0 then colrow = self -> ConvertLocation(iTaken, /LIST_INDEX, /TO_COLROW)
+    if nTaken gt 0 then begin
+        pIndex = self -> ConvertLocation(iTaken, /AINDEX, /TO_PINDEX)
+        colrow = self -> ConvertLocation(iTaken, /AINDEX, /TO_COLROW)
+    endif
 
     if nTaken gt 0 then begin
         print, ''
-        print, '--LOCATIONS--               --POSITIONS--'
+        print, '--PINDEX--  --LOCATIONS--             --POSITIONS--'
         for i = 0, nTaken - 1 do begin
-            print, FORMAT='(%"   [ %i, %i]          [%6.4f, %6.4f, %6.4f, %6.4f]")', $
-                   colrow[*,i], (*self.layout_positions)[*, colrow[0,i]-1, colrow[1,i]-1]
+            print, FORMAT='(%"     %i         [ %i, %i]      [%6.4f, %6.4f, %6.4f, %6.4f]")', $
+                   pIndex[i], colrow[*,i], (*self.layout_positions)[*, iTaken[i]]
         endfor
     endif
 
@@ -1610,11 +1650,11 @@ pro MrGrLayout::whichLayout
 ;FIXED POSITIONS & LOCATIONS /////////////////////////////////////////
 ;---------------------------------------------------------------------
     if self.nFixed gt 0 then begin
-        if nTaken eq 0 then print, '--LOCATIONS--               --POSITIONS--'
+        if nTaken eq 0 then print, '--PINDEX--  --LOCATIONS--             --POSITIONS--'
     
         for i = 0, self.nFixed - 1 do begin
-            print, FORMAT='(%"   [%i, %i]          [%6.4f, %6.4f, %6.4f, %6.4f]")', $
-                   [-1,i+1], (*self.fixed_positions)[*,i]
+            print, FORMAT='(%"    %2i         [%2i,%2i]      [%6.4f, %6.4f, %6.4f, %6.4f]")', $
+                   -i-1, [-1,i+1], (*self.fixed_positions)[*,i]
         endfor
     endif
 
@@ -1640,7 +1680,7 @@ end
 ;   Clean up after the object is destroyed.
 ;-
 pro MrGrLayout::cleanup
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1661,46 +1701,21 @@ end
 ;+
 ;   This method initializes the MrGrLayout object.
 ;
-; :Params:
-;       LAYOUT:         in, required, type=intarr(2)
+; :Keywords:
+;       LAYOUT:         in, optional, type=intarr(2), default=[0,0]
 ;                       A 2 element vector specifying the number of plots in the vertical
 ;                           and horizontal directions, [ncols, nrows].
-;
-; :Keywords:
-;       ASPECT:         in, optional, type=float
-;                       The aspect ratio (plot height/plot width) of each plot. For square
-;                           plots, ASPECT=1.0, for plots that are twice as wide as the are
-;                           long, ASPECT=0.5.
-;       CALCULATE:      in, optional, type=boolean, default=0
+;       UPDATE_LAYOUT:  in, optional, type=boolean, default=0
 ;                       If set, recalculate the plot positions after updating the layout.
-;       CHARSIZE:       in, optional, type=float, default=1.5
-;                       Fraction of IDL's default character size. Used to determine size
-;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
-;       XMARGIN:        in, optional, type=fltarr(2), default="[10, 3]"
-;                       The x-margins in character widths. [left margin, right margin]
-;                           The margins specify the distance between the edge of the plot 
-;                           axes and the edge of the plotting window.
-;       YMARGIN:        in, optional, type=fltarr(2), default="[4, 2]"
-;                       The y-margins in character heights. [bottom, top]
-;                           The margins specify the distance between the edge of the plot 
-;                           axes and the edge of the plotting window
-;       XGAP:           in, optional, type=float, default=14
-;                       The horizontal gap between plots in character widths (!D.y_ch_size)
-;       YGAP:           in, optional, type=float, default=6
-;                       The vertical gap between plots in character heights (!D.y_ch_size)
 ;       _REF_EXTRA:     in, optional, type=any
 ;                       Any keyword accepted by MrLayout::Init is also accepted
 ;                           for keyword inheritance.
 ;-
 function MrGrLayout::init, $
-;ASPECT = aspect, $
-UPDATE_LAYOUT = update_layout
-LAYOUT = layout
-;XMARGIN = xmargin, $
-;XGAP = xgap, $
-;YMARGIN = ymargin, $
-;YGAP = ygap
-    compile_opt idl2
+UPDATE_LAYOUT = update_layout, $
+LAYOUT = layout, $
+_REF_EXTRA = extra
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1714,26 +1729,18 @@ LAYOUT = layout
         message, 'Unable to initialize MrLayout.'
 
     ;Set default values
-    setDefaultValue, layout, [0,0]
-;    setDefaultValue, calculate, 1, /BOOLEAN
-;    setDefaultValue, charsize, 1.5
-;    setDefaultValue, layout, [0, 0]
-;    setDefaultValue, xmargin, [10, 3]
-;    setDefaultValue, ymargin, [4, 2]
-;    setDefaultValue, xgap, 14
-;    setDefaultValue, ygap, 6
-    
-    ;Set object Properties
-;    self.charsize = charsize
-;    self.layout = layout
-;    self.xmargin = xmargin
-;    self.ymargin = ymargin
-;    self.xgap = xgap
-;    self.ygap = ygap
-    self.GrLayout = layout
+    if n_elements(layout) eq 0 then layout = [0,0]
     self.fixed_positions = ptr_new(/ALLOCATE_HEAP)
     self.layout_positions = ptr_new(/ALLOCATE_HEAP)
     self.posIsTaken = ptr_new(/ALLOCATE_HEAP)
+        
+    
+    ;Set layout an indicate that no positions have been taken.
+    self.GrLayout = layout
+    if layout[0]*layout[1] gt 0 then begin
+        (*self.posIsTaken) = bytarr(layout[0]*layout[1])
+        self -> CalcPositions
+    endif
     
     if n_elements(aspect) eq 0 $
         then self.aspect = ptr_new(/ALLOCATE_HEAP) $
@@ -1751,21 +1758,15 @@ end
 ;   The class definition
 ;-
 pro MrGrLayout__define
-    compile_opt idl2
+    compile_opt strictarr
     
     class = {MrGrLayout, $
              inherits MrLayout, $
-;             aspect: ptr_new(), $           ;Aspect ratio of the plots.
-;             charsize: 0.0, $               ;Character size
              fixed_positions: ptr_new(), $  ;Fixed, non-layout-related positions.
              GrLayout: [0,0], $               ;Layout of the plot area [ncols, nrows].
              layout_positions: ptr_new(), $ ;Positions outlined by the 2D plot-layout grid.
              nplots: 0, $                   ;Number of plots displayed.
              nfixed: 0, $                   ;Number of fixed positions.
              posIsTaken: ptr_new() $       ;Is the Layout_Position filled?
-;             xgap: 0, $                     ;Size of the gap between plots in the x-direction.
-;             xmargin: [0,0], $              ;Size of the [left, right] margins.
-;             ygap: 0, $                     ;Size of the gap between plots in the y-direction.
-;             ymargin: [0,0]}                ;Size of the [top, bottom] margins.
             }
 end

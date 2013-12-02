@@ -337,7 +337,7 @@ QUIET = quiet
     if nObj eq 0 then return
         
     ;Allocate memory for the positions and locations.
-    outLocation = intarr(2, nObj)
+    outLocation = intarr(3, nObj)
     outPosition = fltarr(4, nObj)
     
     ;Make sure a location and position is defined for each plot
@@ -373,9 +373,7 @@ QUIET = quiet
         theObjects[i] -> GetProperty, POSITION=pos, LAYOUT=layout
         
         ;Record the initial position for comparison.
-        if n_elements(pos) eq 0 $
-            then pos_init = !Null $
-            else pos_init = pos
+        if n_elements(pos) eq 0 then pos_init = pos
         
     ;---------------------------------------------------------------------
     ;Check Location //////////////////////////////////////////////////////
@@ -385,33 +383,19 @@ QUIET = quiet
         ;the position of the graphic.
         if total(layout[0:1]) eq 0 then begin
             
-            ;Check for the default Coyote Graphics location (see MrGraphicAtom__Define).
+            ;Check for the default Coyote Graphics location (see MrGrAtom__Define).
             if (n_elements(pos) gt 0) && (array_equal(pos, [0.125, 0.125, 0.925, 0.9]) || $
                 (total(pos) eq 0)) then void = temporary(pos)
         
-        ;If the [col,row] location was not specified, but a position was given,
-        ;make LOC undefined to indicate that the graphic will be placed at a fixed
-        ;position.
-        endif else if (total(layout[2:*]) eq 0) and n_elements(pos) gt 0 then begin
+        ;If a plot index was given, make LOC undefined to indicate that the graphic will
+        ;be placed at a fixed position.
+        endif else if layout[2] eq 0 and n_elements(pos) gt 0 then begin
             void = temporary(loc)
 
-        ;Otherwise, a layout has been establed. Check LAYOUT[3] for a plot index number.
-        ;If it is non-zero, then that is the location of the plot. Otherwise, we need to
-        ;generate a location.
-        endif else if n_elements(layout) eq 3 then begin
-            if  layout[2] gt 0 then loc = layout[2]
-        
-        ;If a layout has been established and LAYOUT[2:3] is a [col,row] location, then
-        ;use it. Otherwise, a location will be generated later.
-        endif else if n_elements(layout) eq 4 then begin
-            if (layout[2] gt 0) and (layout[3] gt 0) then loc = layout[2:3]
-            
-        ;If none of the above are true, then the position is ill defined.
+        ;Otherwise, check LAYOUT[3] for a plot index number. If it is > 0, then that is
+        ;the location of the plot. Otherwise, we need to generate a location.
         endif else begin
-            print, FOMRAT='(%"Cannot add object %s at index %i". Improper layout)', $
-                   typename(theObjects[i]), i
-            print, 'Layout = ', layout
-            continue
+            if layout[2] gt 0 then loc = layout
         endelse
 
     ;---------------------------------------------------------------------
@@ -433,7 +417,7 @@ QUIET = quiet
 
         ;Set the location and position as object properties. Set UPDATE_LAYOUT=0 to
         ;prevent the graphic from trying to calculate a new position for itself.
-        theObjects[i] -> SetLayout, LAYOUT=[self.GrLayout[0:1], loc], POSITION=pos, $
+        theObjects[i] -> SetLayout, LAYOUT=loc, POSITION=pos, $
                                     ASPECT=*self.aspect, CHARSIZE=self.charsize, $
                                     OXMARGIN=self.oxmargin, OYMARGIN=self.oymargin, $
                                     XMARGIN=self.xmargin, XGAP=self.xgap, $
@@ -445,7 +429,7 @@ QUIET = quiet
         outPosition[*,i] = temporary(pos)
 
         ;Add the object to the container.
-        self -> MrIDL_Container::Add, theObjects[i], POSITION=thisIndex
+        self -> MrIDL_Container::Add, theObjects[i]
     endfor
     
 ;---------------------------------------------------------------------
@@ -491,30 +475,21 @@ pro MrPlotManager::ApplyPositions
         nLayout = n_elements(layout)
         if nLayout eq 0 || layout[2] eq -1 then continue
         
-        ;Get the [col,row] location of the plot. Ensure that the object's layout matches
-        ;the current layout.
-        case nLayout of
-            3: begin
-                if array_equal(self.GrLayout, layout[0:1]) eq 0 then begin
-                    dataObjs[i] -> SetLayout, LAYOUT=[self.GrLayout, layout[2]], UPDATE_LAYOUT=0
-                    thisColRow = self -> ConvertLocation(layout[2], self.GrLayout, /PLOT_INDEX, /TO_COLROW)
-                endif else thisColRow = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
-            endcase
-            
-            4: begin
-                if (array_equal(self.GrLayout, layout[0:1]) eq 0) and (total(layout[2:*]) gt 0) then begin
-                    thisPIndex = self -> ConvertLocation(layout[2:3], layout[0:1], /TO_PLOT_INDEX)
-                    thisColRow = self -> ConvertLocation(thisPIndex, self.GrLayout, /PLOT_INDEX, /TO_COLROW)
-                    dataObjs[i] -> SetLayout, LAYOUT=[self.GrLayout, thisColRow], UPDATE_LAYOUT=0
-                endif else thisColRow = layout[2:3]
-            endcase
-            
-            else: message, 'Layout has incorrect format.'
-        endcase
-
-        ;Update the positions of each plot.
-        position = (*self.layout_positions)[*, thisColRow[0]-1, thisColRow[1]-1]
-        dataObjs[i] -> SetLayout, POSITION=position, UPDATE_LAYOUT=0, $
+        ;If GrLayout[0:1] does not match LAYOUT[0:1], then LAYOUT[2] might not be in
+        ;the same location when placed in GRLAYOUT. To fix this, first, convert to a
+        ;[col,row] in the old layout, then to a plot index in the new layout.
+        if array_equal(self.GrLayout, layout[0:1]) eq 0 then begin
+            oldColRow = self -> ConvertLocation(layout[2], layout[0:1], /PINDEX, /TO_COLROW)
+            pIndex    = self -> ConvertLocation(oldColRow, self.GrLayout, /COLROW, /TO_PINDEX)
+            layout = [self.GrLayout, pIndex]
+        endif
+        
+        ;Get the array index at which the position is stored.
+        thisAIndex = self -> ConvertLocation(layout[2], self.GrLayout, /PINDEX, /TO_AINDEX)
+        
+        ;Update the layout and position of each plot.
+        position = (*self.layout_positions)[*, thisAIndex]
+        dataObjs[i] -> SetLayout, LAYOUT=layout, POSITION=position, UPDATE_LAYOUT=0, $
                                   ASPECT=*self.aspect, CHARSIZE=self.charsize, $
                                   OXMARGIN=self.oxmargin, OYMARGIN=self.oymargin, $
                                   XMARGIN=self.xmargin, XGAP=self.xgap, $
@@ -549,13 +524,14 @@ DRAW=draw
 ;---------------------------------------------------------------------
     
     ;Which are available?
-    tf_available = self -> IsAvailable(/PLOT_INDEX)
-    if tf_available eq !Null then return
+    tf_available = self -> IsAvailable()
+    if MrIsNull(tf_available, -1) then return
     
-    ;Where are the holes? pHoles is in plot-index order, but is 0-based.
-    ;We need 1-based to have plot-indices.
-    pHoles = where(tf_available eq 0, nHoles) + 1
-    if nHoles eq 0 then return
+    ;Where are the holes? Convert array indices to plot indices.
+    pHoles = where(tf_available eq 1, nHoles)
+    if nHoles gt 0 $
+        then pHoles = self -> ConvertLocation(pHoles, /AINDEX, /TO_PINDEX) $
+        else return
     
 ;---------------------------------------------------------------------
 ;Fill Holes //////////////////////////////////////////////////////////
@@ -569,23 +545,17 @@ DRAW=draw
         theseObj[i] -> GetProperty, LAYOUT=layout
         nLayout = n_elements(layout)
         if nLayout eq 0 || layout[2] eq -1 then continue
-        
-        case nLayout of
-            3: thisPIndex = layout[2]
-            4: thisPIndex = self -> ConvertLocation(layout[2:3], self.GrLayout, /TO_PLOT_INDEX)
-            else: message, 'Layout has incorrect format. Cannot be shifted.'
-        endcase
 
         ;If the plot is before the hole, then skip it.
-        if thisPIndex le pHoles[0] then continue
+        if layout[2] le pHoles[0] then continue
 
         ;If we make it to here, fill a hole.
-        newLocation = self -> ConvertLocation(pHoles[0], /PLOT_INDEX, /TO_COLROW)
-        newPosition = (*self.layout_positions)[*, newLocation[0]-1, newLocation[1]-1]
-        theseObj[i] -> SetLayout, LAYOUT=[self.GrLayout, newLocation], POSITION=newPosition, UPDATE_LAYOUT=0
+        newAIndex = self -> ConvertLocation(pHoles[0], /PINDEX, /TO_AINDEX)
+        newPosition = (*self.layout_positions)[*, newAIndex]
+        theseObj[i] -> SetLayout, LAYOUT=[self.GrLayout, pHoles[0]], POSITION=newPosition, UPDATE_LAYOUT=0
         
         ;Now there is a hole in the old location
-        pHoles[0] = thisPIndex
+        pHoles[0] = layout[2]
         pHoles = pHoles[sort(pHoles)]
     endfor
     
@@ -609,7 +579,7 @@ end
 ;       - Filter objects based on their location in the 2D plotting grid.
 ;
 ; :Params:
-;       THEOBJECTS:            in, optional, type=object/obj_arr(N)
+;       THEOBJECTS:             in, optional, type=object/obj_arr(N)
 ;                               The plot object(s) to add to the display.
 ;
 ;   :Keywords:
@@ -634,7 +604,7 @@ ALL = All, $
 FIXED = fixed, $
 ISA = IsA, $
 LOCATION = location, $
-PINDEX = plot_index, $
+PINDEX = pIndex, $
 POSITION = index, $
 COUNT = count, $
 ;TYPE
@@ -661,11 +631,11 @@ TEXT = text
     endif
     
     ;Defaults
-    SetDefaultValue, fixed, 0
-    plot_index = keyword_set(plot_index)
+    fixed = keyword_set(fixed)
+    pIndex = keyword_set(pIndex)
 
     ;Make sure at most one of these keywords is set.
-    if fixed + plot_index gt 1 then message, 'FIXED and PLOT_INDEX are mutually exclusive.'
+    if fixed + pIndex gt 1 then message, 'FIXED and PLOT_INDEX are mutually exclusive.'
 
 ;---------------------------------------------------------------------
 ;Find by Fixed Location //////////////////////////////////////////////
@@ -692,14 +662,14 @@ TEXT = text
             message, 'Invalid LOCATION. Use /FIXED with 4-elements position.'
         
         ;Determine what LOCATION means.
-        if keyword_set(plot_index) then begin
+        if keyword_set(pIndex) then begin
             PIndex_in = location
             nIn = n_elements(PIndex_in)
         endif else if keyword_set(fixed) then begin
             pos_in = location
             nIn = n_elements(pos_in[0,*])
         endif else begin
-            PIndex_in = self -> ConvertLocation(location, /TO_PLOT_INDEX)
+            PIndex_in = self -> ConvertLocation(location, /COLROW, /TO_PINDEX)
             nIn = n_elements(PIndex_in)
         endelse
 
@@ -742,21 +712,18 @@ TEXT = text
             
             ;Find the plot index of the object
             nLayout = n_elements(oLayout)
-            case nLayout of
-                0: if n_elements(oPosition) eq 0 $
-                       then skip = 1 $
-                       else location = self -> FindLocation(oPosition, /FIXED)
-                3: pIndex = oLayout[2]
-                4: pIndex = self -> ConvertLocation(oLayout[2:3], /TO_PLOT_INDEX)
-                else: skip = 1
-            endcase
+            if nLayout eq 0 then begin
+                if n_elements(oPosition) eq 0 $
+                    then skip = 1 $
+                    else location = self -> FindLocation(oPosition, /FIXED)
+            endif else oPIndex = oLayout[2]
             
             ;If no valid layout or position was provided, then go to the next object.
             if skip eq 1 then continue
 
             ;Return this object? If the plot-index of the current graphic matches any
             ;of the inputs plot-indices, then yes.
-            tf_get = isMember(pIndex_in, pIndex, N_MATCHES=nGet)
+            tf_get = isMember(pIndex_in, oPIndex, N_MATCHES=nGet)
             if nGet eq 0 || tf_get eq 0 $
                 then continue $
                 else Result[count] = AllObj[i]
@@ -769,7 +736,7 @@ TEXT = text
     ;Trim Results ////////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
         case count of
-            0: return, !Null
+            0: return, MrNull('OBJREF')
             1: Result = Result[0]
             else: Result = Result[0:count-1]
         endcase
@@ -806,7 +773,7 @@ end
 ;
 ; :Params:
 ;       LOCATION:               in, optional, type=intarr(2\,N), default=[1\,1]
-;                               The [col, row] location of the plot to replace
+;                               The [col, row] location of the plots to replace
 ;
 ;   :Keywords:
 ;       ALL:                    in, optional, type=boolean, default=0
@@ -833,7 +800,7 @@ FILLHOLES=fillHoles, $
 POSITION = index, $
 TRIMLAYOUT = trimLayout, $
 TYPE = type
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -844,10 +811,10 @@ TYPE = type
     endif
     
     ;Defaults
-    SetDefaultValue, draw, 0, /BOOLEAN
-    SetDefaultValue, destroy, 1, /BOOLEAN
-    SetDefaultValue, fillHoles, 0, /BOOLEAN
-    SetDefaultValue, trimLayout, 0, /BOOLEAN
+    draw = keyword_set(draw)
+    if n_elements(destroy) eq 0 then destroy = 1 else destroy = keyword_set(destroy)
+    fillHoles = keyword_set(fillHoles)
+    trimLayout = keyword_set(trimLayout)
         
 ;---------------------------------------------------------------------
 ;Remove All //////////////////////////////////////////////////////////
@@ -909,16 +876,8 @@ TYPE = type
                 ;Get their position and layout.
                 Child_Object[i] -> GetProperty, LAYOUT=layout, POSITION=position
             
-                ;Get their [col, row] location.
-                case n_elements(layout) of
-                    0: thisLoc = self -> FindFixedLocation(position)
-                    3: thisLoc = self -> ConvertLocation(layout[2:3], layout, /PLOT_INDEX, /TO_COLROW)
-                    4: thisLoc = layout[2:3]
-                    else: message, 'Layout has incorrect format. Cannot be removed.'
-                endcase
-                
                 ;Remove from the layout
-                self -> RemoveFromLayout, thisLoc
+                self -> RemoveFromLayout, layout[2]
             endif
             
             ;Remove from the container.
@@ -947,11 +906,11 @@ TYPE = type
 ;   plot that already exists within the 2D plotting grid.
 ;
 ; :Params:
-;       OLD_POSITION:       in, required, type=object/{1 | 2 | 4}-element vector
+;       OLDLOCATION:        in, required, type=object/{1 | 2 | 4}-element vector
 ;                           The plot-index, [col, row], or 4-element position of the plot
 ;                               whose position is to be changed. If an object is provided,
 ;                               then the old position will be take from it.
-;       NEW_POSITION:       in, required, type={1 | 2 | 4}-element vector
+;       NEWCOLROW:          in, required, type={1 | 2 | 4}-element vector
 ;                           The plot-index, [col, row], or 4-element position to where the
 ;                               plot indicated by `OLD_POSITION` is to be moved. If a
 ;                               4-element position is provided, the plot will be placed
@@ -977,7 +936,7 @@ TYPE = type
 ;                               from the auto-updating layout and placed into a fixed
 ;                               location. Its actual position will not change.
 ;-
-pro MrPlotManager::SetPosition, old_position, new_position, $
+pro MrPlotManager::SetPosition, oldLocation, newLocation, $
 DRAW = draw, $
 OUTPOSITION = outPosition, $
 OUTLOCATION = outLocation, $
@@ -996,66 +955,47 @@ TOFIXED = toFixed
     draw    = keyword_set(draw)
     toFixed = keyword_set(toFixed)
     
-    oldType = size(old_position, /TYPE)
-    
-;---------------------------------------------------------------------
-;Was an Object Given? ////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    if oldType eq 11 then begin
-        theObj = old_position
-        theObj -> GetProperty, LAYOUT=layout, POSITION=position
-        
-        ;Turn the layout position into a [col, row] location.
-        case n_elements(layout) of
-            0: oldColRow = self -> FindLocation(position, /FIXED)
-            3: oldColRow = self -> ConvertLocation(layout[2], /PLOT_INDEX, /TO_COLROW)
-            4: oldColRow = layout[2:3]
-            else: message, 'LAYOUT has incorrect format of object provided.'
-        endcase
-        
 ;---------------------------------------------------------------------
 ;Get the Object? /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    endif else begin
-
-        case n_elements(old_position) of
-            1: oldColRow = self -> ConvertLocation(old_position, /PLOT_INDEX, /TO_COL_ROW)
-            2: begin
-                oldColRow = old_position
-;                if oldColRow[0] eq -1 then begin
-;                    oldColRow = self -> GetPosition(oldColRow)
-;                    fixed = 1
-;                endif
-            endcase
-            4: begin
-                oldColRow = self -> FindLocation(old_position)
-                if count eq 0 then message, 'No object found at OLD_LOCATION. Cannot set position.'
-                if count gt 1 then message, 'More than one graphic found. Supply [col, row] instead.'
-            endcase
-            else: message, 'OLD_POSITION: Incorrect number of elements.'
-        endcase
-        
-        ;Get the object
-        theObj = self -> Get(LOCATION=oldColRow, FIXED=fixed)
-    endelse
-            
+    case n_elements(oldLocation) of
+        1: oldPIndex = oldLocation
+        2: oldPIndex = self -> ConvertLocation(oldLocation, /COLROW, /TO_PINDEX)
+        else: message, 'OLDLOCATION: Incorrect number of elements.'
+    endcase
+    
+    ;Get the object
+    theObj = self -> Get(LOCATION=oldPIndex, /PINDEX)
 
     ;If toFixed is set, then the actual position will not change. The plot will simply
     ;be removed from the layout and put into a fixed location.
-    if toFixed eq 1 then begin
-        theObj -> GetProperty, POSITION=position
-        new_position = position
-    endif
+    if toFixed eq 1 then theObj -> GetProperty, POSITION=newLocation
+
+    case n_elements(newLocation) of
+        2: begin
+            ;Find a grid that will fit the new location. If a fixed location was given,
+            ;make sure it is the next available one.
+            if newLocation[0] lt 0 then begin
+                newLocation = self -> MakeFixedLocation()
+                newGrid = self.GrLayout
+            endif else newGrid = newLocation > self.GrLayout
+            
+            ;Find the plot-index in the new grid
+            newPIndex = self -> ConvertLocation(newLocation, newGrid, /COLROW, /TO_PINDEX)
+            newLayout = [newGrid, newPIndex]
+        endcase
+        4: newLayout = newLocation
+        else: message, 'NEWLOCATION: Incorrect number of elements.'
+    endcase
         
 ;---------------------------------------------------------------------
 ;Update the Layout ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-
     ;Use the superclass to set the position within the layout. An added benefit of
     ;this is that it will check if the locations provided are legitimate. If the interface
     ;between MrWindow and MrGrLayout is sound, then this will also mean that the graphics
     ;object that OLD_POSITION refers to is also legit.
-    self -> MrGrLayout::SetPosition, oldColRow, new_position, $
+    self -> MrGrLayout::SetPosition, oldPIndex, newLayout, $
                                      OUTPOSITION = outPosition, $
                                      OUTLOCATION = outLocation, $
                                      TOFIXED = toFixed
@@ -1067,7 +1007,7 @@ TOFIXED = toFixed
 ;Set the Position ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;Update the position and layout    
-    theObj -> SetLayout, LAYOUT=[self.GrLayout, outLocation], POSITION=outPosition, UPDATE_LAYOUT=0
+    theObj -> SetLayout, LAYOUT=outLocation, POSITION=outPosition, UPDATE_LAYOUT=0
         
     ;Draw?
     If keyword_set(draw) then self -> Draw
@@ -1075,16 +1015,14 @@ end
 
 
 ;+
-;   Shift all plots located at and after LOCATION up one index value.
+;   Shift all plots located at and after COLROW up one index value.
 ;
 ; :Params:
-;
-;       LOCATION:           in, required, type=lonarr(2)
-;                           The 1-based plot location [col, row] at which to begin 
-;                               shifting plots.
+;       PINDEX:             in, required, type=int
+;                           The plot index location at which to begin shifting plots.
 ;-
-pro MrPlotManager::ShiftPlots, location
-    compile_opt idl2
+pro MrPlotManager::ShiftPlots, pIndex
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1100,18 +1038,20 @@ pro MrPlotManager::ShiftPlots, location
 ;Start and Stop Shift ////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
-    ;Convert LOCATION to a plot index
-    pStartShift = self -> ConvertLocation(location, /TO_PLOT_INDEX)
+    ;Start shifting at the given plot index. Get an invariant [col,row] location
+    pStartShift = pIndex
+    colrow = self -> ConvertLocation(pIndex, /PINDEX, /TO_COLROW)
     
     ;Get the available list indices
-    void = self -> IsAvailable(IFREE=pFree, NFREE=nFree, /PLOT_INDEX)
+    void = self -> IsAvailable(IFREE=pFree, NFREE=nFree, /PINDEX)
     
     ;Which interval is being shifted? If a new row needs to be added,
-    ;re-calculate the starting plot index within the new layout.
+    ;re-calculate the starting plot index within the new layout. Anticipate
+    ;what MrGrLayout::ShiftPlots will do by adding a row to the layout.
     if nFree eq 0 || max(pFree gt pStartShift) eq 0 then begin
         layout = self.GrLayout + [0,1]
-        pStartShift = self -> ConvertLocation(location, layout, /TO_PLOT_INDEX)
-        pStopShift = self -> ConvertLocation([1, layout[1]], layout, /TO_PLOT_INDEX)
+        pStartShift = self -> ConvertLocation(colrow, layout, /COLROW, /TO_PINDEX)
+        pStopShift = self -> ConvertLocation([1, layout[1]], layout, /COLROW, /TO_PINDEX)
     endif else begin
         layout = self.GrLayout
         pStopShift = pFree[min(where((pFree gt pStartShift) eq 1))]
@@ -1122,7 +1062,7 @@ pro MrPlotManager::ShiftPlots, location
 ;---------------------------------------------------------------------
     
     ;Shift the layout so that the layout_positions are up-to-date.
-    self -> MrGrLayout::ShiftPlots, location
+    self -> MrGrLayout::ShiftPlots, pIndex
 
 ;---------------------------------------------------------------------
 ;Shift Plots /////////////////////////////////////////////////////////
@@ -1134,24 +1074,15 @@ pro MrPlotManager::ShiftPlots, location
     ;Start shifting them
     for i = 0, nObj - 1 do begin
         theseObj[i] -> GetProperty, LAYOUT=objLayout
-        nLayout = n_elements(objLayout)
-        if nLayout eq 0 then continue
-        
-        case nLayout of
-            3: thisPIndex = objLayout[2]
-            4: thisPIndex = self -> ConvertLocation(objLayout[2:3], layout, /TO_PLOT_INDEX)
-            else: message, 'Layout has incorrect format. Cannot be shifted.'
-        endcase
         
         ;THESEOBJ are in no particular order. Must check them all.
-        if thisPIndex lt pStartShift then continue
-        if thisPIndex ge pStopShift then continue
+        if objLayout[2] lt pStartShift || objLayout[2] ge pStopShift then continue
 
         ;If we make it to here, shift the plot
-        thisPIndex += 1
-        newLocation = self -> ConvertLocation(thisPIndex, layout, /PLOT_INDEX, /TO_COLROW)
-        newPosition = (*self.layout_positions)[*, newLocation[0]-1, newLocation[1]-1]
-        theseObj[i] -> SetLayout, LAYOUT=[layout, newLocation], POSITION=newPosition, UPDATE_LAYOUT=0
+        thisPIndex = objLayout[2] + 1
+        aIndex = self -> ConvertLocation(thisPIndex, /PINDEX, /TO_AINDEX)
+        newPosition = (*self.layout_positions)[*, aIndex]
+        theseObj[i] -> SetLayout, LAYOUT=[self.GrLayout, thisPIndex], POSITION=newPosition, UPDATE_LAYOUT=0
     endfor
 end
 

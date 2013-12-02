@@ -1605,10 +1605,11 @@ pro MrWindow::whichObjects
                               
         ;Get the object's position and layout
         dataObj[i] -> GetProperty, LAYOUT=layout
+        colrow = self -> ConvertLocation(layout[2], /PINDEX, /TO_COLROW)
 
         ;Print the type-name, location, and position
         sIndex    = string(index[i], FORMAT='(i2)')
-        sLocation = string(layout[2:3], FORMAT='(%"[%3i,%3i]")')
+        sLocation = string(colrow, FORMAT='(%"[%3i,%3i]")')
         sName = dataObj[i] -> GetName()
 
         print, FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0, 5x, a0)', $

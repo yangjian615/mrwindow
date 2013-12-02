@@ -51,6 +51,7 @@
 ;       2013/11/20  -   Written by Matthew Argall
 ;       2013/11/22  -   Added the O[XY]MARGIN, [XY]_REGION, and [XY]_WINDOW properties. - MRA
 ;       2013/11/24  -   Forgot to add O[XY]MARGIN keywords to Set/GetProperty. Fixed. - MRA
+;       2013/11/28  -   LAYOUT property is strictly a 3-element array. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -71,18 +72,18 @@ function MrLayout::CalcPosition
     
     ;If the [nCols,nRows] = [0,0] or [col,row] = [0,0] then return current position.
     ;This means the layout or the location within that layout has not be defined.
-    if ((*self.layout)[0] eq 0 and (*self.layout)[1]      eq 0) || $
-       ((*self.layout)[2] eq 0 and (*self.layout)[nLay-1] eq 0) then return, self.position
+    if (self.layout[0] eq 0 and self.layout[1]      eq 0) || $
+       (self.layout[2] eq 0 and self.layout[nLay-1] eq 0) then return, self.position
     
     ;Make sure the layout is valid.
-    if ((*self.layout)[0] lt 0) or ((*self.layout)[1] lt 0) then begin
+    if (self.layout[0] lt 0) or (self.layout[1] lt 0) then begin
         message, 'Layout must have at least one column and one row. ' + $
                  'Returning current position.', /INFORMATIONAL
         return, self.position
     endif
 
     ;Calculate positions
-    position = MrPlotLayout(*self.layout, $
+    position = MrPlotLayout(self.layout, $
                             ASPECT   = *self.aspect, $
                             CHARSIZE =  self.charsize, $
                             OXMARGIN =  self.oxmargin, $
@@ -111,10 +112,10 @@ end
 ;       ASPECT:         out, optional, type=float
 ;                       Aspect ratio of the plot.
 ;       LAYOUT:         out, optional, type=intarr(3)/intarr(4)
-;                       [nCols, nRows, col, row]: The layout of the display and the
-;                           graphic's location within that layout. OR [nCols,nRows,index]:
-;                           Here "index" is the plot index location, where 0 indicates
-;                           the upper-left plot and increases first down the right.
+;                       [nCols, nRows, index]. [nCols,nRows] is the number of columns and
+;                           rows in the display. "index" is the plot index at which to
+;                           place the plot, beginning with 1,1], 1 in the upper-left
+;                           corner and incrementing first right then down.
 ;       MARGIN:         out, optional, type=int/intarr(4)
 ;                       Size of the [left, bottom, right, top] margins, in character
 ;                           units. If a scalar is provided, all margins will be equal.
@@ -172,7 +173,7 @@ Y_WINDOW=y_window
     ;Set GraphicAtom properties
     if arg_present(aspect)   then aspect   = *self.aspect
     if arg_present(charsize) then charsize =  self.charsize
-    if arg_present(layout)   then layout   = *self.layout
+    if arg_present(layout)   then layout   =  self.layout
     if arg_present(oxmargin) then oxmargin =  self.oxmargin
     if arg_present(oymargin) then oymargin =  self.oymargin
     if arg_present(position) then position =  self.position
@@ -199,10 +200,10 @@ end
 ;                       Fraction of IDL's default character size. Used to determine size
 ;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
 ;       LAYOUT:         in, optional, type=intarr(3)/intarr(4)
-;                       [nCols, nRows, col, row]: The layout of the display and the
-;                           graphic's location within that layout. OR [nCols,nRows,index]:
-;                           Here "index" is the plot index location, where 0 indicates
-;                           the upper-left plot and increases first down the right. If
+;                       [nCols, nRows, index]. [nCols,nRows] is the number of columns and
+;                           rows in the display. "index" is the plot index at which to
+;                           place the plot, beginning with 1,1], 1 in the upper-left
+;                           corner and incrementing first right then down. If
 ;                           proveded, then `POSITION` will be calculated, unless
 ;                           `UPDATEPOSITION`=0.
 ;       MARGIN:         in, optional, type=int/intarr(4)
@@ -276,7 +277,7 @@ YGAP=ygap
     ;Set Properties. Make sure layout elements are always >= 0.
     if n_elements(aspect)   ne 0 then *self.aspect   = aspect
     if n_elements(charsize) gt 0 then  self.charsize = charsize
-    if n_elements(layout)   ne 0 then *self.layout   = layout
+    if n_elements(layout)   ne 0 then  self.layout   = layout
     if n_elements(oxmargin) gt 0 then  self.oxmargin = oxmargin
     if n_elements(oymargin) gt 0 then  self.oymargin = oymargin
     if n_elements(xmargin)  ne 0 then  self.xmargin  = xmargin
@@ -294,7 +295,7 @@ YGAP=ygap
     ;If a position was given, then reset the layout
     if n_elements(position) ne 0 then begin
         ;Update the layout to reflect a user-defined position has been given. 
-        if update_layout eq 1 then *self.layout = [(*self.layout)[0:1],0,0]
+        if update_layout eq 1 then *self.layout = [(*self.layout)[0:1],0]
         
         ;Update the position.
         self.position = position
@@ -307,7 +308,6 @@ end
 ;-
 pro MrLayout::cleanup
     ptr_free, self.aspect
-    ptr_free, self.layout
 end
 
 
@@ -321,12 +321,10 @@ end
 ;                       Fraction of IDL's default character size. Used to determine size
 ;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
 ;       LAYOUT:         in, optional, type=intarr(3)/intarr(4), default=[1,1,1,1]
-;                       [nCols, nRows, col, row] or [nCols, nRows, index]. [nCols,nRows]
-;                           is the number of columns and rows in the display. [col,row]
-;                           is the column and row in which to place the plot. "index" is
-;                           the plot index at which to place the plot. [col,row] locations
-;                           begin at [1,1], "index" 0-based plot index, with 0 being the
-;                           upper-left corner, then incrementing first down, then right.
+;                       [nCols, nRows, index]. [nCols,nRows] is the number of columns and
+;                           rows in the display. "index" is the plot index at which to
+;                           place the plot, beginning with 1,1], 1 in the upper-left
+;                           corner and incrementing first right then down.
 ;       MARGIN:         in, optional, type=int/intarr(4), default=[10,4,3,2]
 ;                       Size of the [left, bottom, right, top] margins, in character
 ;                           units. If a scalar is provided, all margins will be equal.
@@ -398,12 +396,11 @@ YGAP=ygap
     
     ;Default pointers
     self.aspect = ptr_new(/ALLOCATE_HEAP)
-    self.layout = ptr_new(/ALLOCATE_HEAP)
-    if n_elements(layout) gt 0 then *self.layout = layout else *self.layout = [0,0,0,0]
+    if n_elements(layout) gt 0 then  self.layout = layout else self.layout = [0,0,0]
     if n_elements(aspect) gt 0 then *self.aspect = aspect
     
     ;Default position
-    if array_equal(*self.layout, [0,0,0,0]) then begin
+    if array_equal(self.layout, [0,0,0]) then begin
         if n_elements(position) eq 0 then begin
             position = [0.125, 0.125, 0.925, 0.9]
             update_layout = 0
@@ -425,12 +422,10 @@ end
 ;       ASPECT:         Aspect ratio of the plot.
 ;       CHARSIZE:       Fraction of IDL's default character size. Used to determine size
 ;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
-;       LAYOUT:         [nCols, nRows, col, row] or [nCols, nRows, index]. [nCols,nRows]
-;                           is the number of columns and rows in the display. [col,row]
-;                           is the column and row in which to place the plot. "index" is
-;                           the plot index at which to place the plot. [col,row] locations
-;                           begin at [1,1], "index" 0-based plot index, with 0 being the
-;                           upper-left corner, then incrementing first down, then right.
+;       LAYOUT:         [nCols, nRows, index]. [nCols,nRows] is the number of columns and
+;                           rows in the display. "index" is the plot index at which to
+;                           place the plot, beginning with 1,1], 1 in the upper-left
+;                           corner and incrementing first right then down.
 ;       OXMARGIN:       Size of the left and right outer margins, in units of !D.X_CH_Size.
 ;                           Acts as a matte around the [XY]_REGION.
 ;       OYMARGIN:       Size of the bottom and top outer margins, in units of !D.Y_CH_Size.
@@ -454,7 +449,7 @@ pro MrLayout__define, class
     define = { MrLayout, $
                aspect: ptr_new(), $
                charsize: 0.0, $
-               layout: ptr_new(), $
+               layout: intarr(3), $
                oxmargin: [0,0], $
                oymargin: [0,0], $
                position: fltarr(4), $

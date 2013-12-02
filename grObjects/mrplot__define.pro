@@ -474,7 +474,7 @@ DISABLE=disable
     ;Disable overplotting
     if keyword_set(disable) then begin
         self.window -> Make_Location, location
-        self.window -> SetPosition, (*self.layout)[2:*], location
+        self.window -> SetPosition, self.layout[2], location
         self.target = obj_new()
         self.overplot = 0B
 
@@ -492,7 +492,7 @@ DISABLE=disable
         target -> GetProperty, POSITION=position
         
         ;Remove SELF from layout.
-        self.window -> SetPosition, (*self.layout)[2:*], position
+        self.window -> SetPosition, self.layout[2], position
         self.overplot = 1B
         self.target = target
     endelse
@@ -579,7 +579,7 @@ pro MrPlot::SetLayout, layout, $
 POSITION=position, $
 UPDATE_LAYOUT=update_layout, $
 _REF_EXTRA=extra
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -601,8 +601,8 @@ _REF_EXTRA=extra
     ;If we are updating the layout, let the window take care of things.
     if update_layout then begin
         if n_elements(position) gt 0 $
-            then self.window -> SetPosition, (*self.layout)[2:*], position $
-            else self.window -> SetPosition, (*self.layout)[2:*], layout
+            then self.window -> SetPosition, self.layout[2], position $
+            else self.window -> SetPosition, self.layout[2], layout
         
         ;Adjust other aspects of the layout.
         if n_elements(extra) gt 0 then self.window -> SetProperty, _EXTRA=extra

@@ -399,7 +399,7 @@ REFRESH = refresh
     ;Create a MrWindow widget in which to display the graphic?
     self -> _SetWindow, BUFFER=buffer, CURRENT=current, NOGUI=noGUI
     if n_elements(refresh) gt 0 then self.window -> Refresh, DISABLE=~keyword_set(refresh)
-    
+
     ;Add SELF to the window
     self.window -> Add, self
 
