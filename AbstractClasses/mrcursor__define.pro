@@ -148,7 +148,7 @@ NONE = none
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -196,7 +196,7 @@ pro MrCursor::Cursor_Menu_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -271,7 +271,7 @@ pro MrCursor::Cross_Hairs, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -310,7 +310,7 @@ pro MrCursor::Draw_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -345,7 +345,7 @@ pro MrZoom::Error_Handler
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -368,7 +368,7 @@ pro MrCursor::Get_Point, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -396,7 +396,7 @@ CMODE = cmode
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -421,7 +421,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -470,7 +470,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -517,7 +517,7 @@ CMODE = cmode
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -540,7 +540,7 @@ pro MrCursor::Show_XY, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = Error_Message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -569,7 +569,7 @@ pro MrCursor::Turn_Everything_Off, tlb
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -624,7 +624,7 @@ CMODE = cmode
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
     

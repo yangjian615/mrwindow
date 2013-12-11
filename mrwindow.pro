@@ -110,7 +110,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
     

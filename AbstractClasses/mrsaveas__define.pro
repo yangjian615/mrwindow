@@ -93,10 +93,10 @@ PRO MrSaveAs::AutoPostScriptFile, filename
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = Error_Message()
+        void = cgErrorMsg()
         
         ; Close the PostScript file.
-        PS_END, /NoFix     
+        cgPS_Close, /NoFix     
 
         ; Set the window index number back.
         IF N_Elements(currentWindow) NE 0 THEN BEGIN
@@ -113,7 +113,7 @@ PRO MrSaveAs::AutoPostScriptFile, filename
     IF N_Elements(filename) EQ 0 THEN filename='cgwindow.ps'
 
     ; Allow the user to configure the PostScript file.
-    PS_Start, GUI=0, $
+    cgPS_Open, GUI=0, $
         FILENAME=filename, $
         DECOMPOSED=self.ps_decomposed, $
         EUROPEAN=self.ps_metric, $
@@ -129,7 +129,7 @@ PRO MrSaveAs::AutoPostScriptFile, filename
     self -> ExecuteCommands
     
     ; Clean up.
-    PS_End, NOMESSAGE=self.ps_quiet
+    cgPS_Close, NOMESSAGE=self.ps_quiet
 
     ; Set the window index number back.
     IF WindowAvailable(currentWindow) THEN WSet, currentWindow ELSE WSet, -1
@@ -155,10 +155,10 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = Error_Message()
+        void = cgErrorMsg()
         
         ; Close the PostScript file.
-        PS_END, /NoFix     
+        cgPS_Close, /NoFix     
 
         ; Set the window index number back.
         IF N_Elements(currentWindow) NE 0 THEN BEGIN
@@ -174,7 +174,7 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
 
     IF N_Elements(filetype) EQ 0 then filetype = 'PNG'
     IF N_Elements(filename) EQ 0 THEN filename = 'cgwindow.' + StrLowCase(filetype)
-    IF StrUpCase(filetype) EQ 'PDF' THEN rastertype = -1 ELSE rastertype = 0 ;self.im_raster
+    IF StrUpCase(filetype) EQ 'PDF' THEN rastertype = -1 ELSE rastertype = self.im_raster ;rastertype = 0
     
     ; Strip the extension off the filename.
     outname = cgRootName(filename, DIRECTORY=dirName)
@@ -190,7 +190,7 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
        
            thisname = outputFilename + '.ps'
            outname = outputFilename + '.pdf'
-           PS_Start, $
+           cgPS_Open, $
                 DECOMPOSED=self.ps_decomposed, $
                 FILENAME=thisname, $
                 GROUP_LEADER=self.tlb, $
@@ -227,7 +227,7 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
         
            ; Create a PostScript file first.
            thisname = outputFilename + '.ps'
-           PS_Start, $
+           cgPS_Open, $
                 DECOMPOSED=self.ps_decomposed, $
                 FILENAME=thisname, $
                 GROUP_LEADER=self.tlb, $
@@ -252,27 +252,27 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
 
            ; Close the file and convert to proper file type.
             CASE filetype OF
-                'BMP':  PS_END, /BMP, DELETE_PS=self.ps_delete, $
+                'BMP':  cgPS_Close, /BMP, DELETE_PS=self.ps_delete, $
                             ALLOW_TRANSPARENT=self.im_transparent, $
                             DENSITY=self.im_density, RESIZE=self.im_resize, $
                             IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
                             WIDTH=self.im_width, NOMESSAGE=self.ps_quiet
-                'GIF':  PS_END, /GIF, DELETE_PS=self.ps_delete, $
+                'GIF':  cgPS_Close, /GIF, DELETE_PS=self.ps_delete, $
                             ALLOW_TRANSPARENT=self.im_transparent, $
                             DENSITY=self.im_density, RESIZE=self.im_resize, $
                             IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
                             WIDTH=self.im_width, NOMESSAGE=self.ps_quiet
-                'JPEG': PS_END, /JPEG, DELETE_PS=self.ps_delete, $
+                'JPEG': cgPS_Close, /JPEG, DELETE_PS=self.ps_delete, $
                             ALLOW_TRANSPARENT=self.im_transparent, $
                             DENSITY=self.im_density, RESIZE=self.im_resize, $
                             IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
                             WIDTH=self.im_width, NOMESSAGE=self.ps_quiet
-                'PNG':  PS_END, /PNG,  DELETE_PS=self.ps_delete, $
+                'PNG':  cgPS_Close, /PNG,  DELETE_PS=self.ps_delete, $
                             ALLOW_TRANSPARENT=self.im_transparent, $
                             DENSITY=self.im_density, RESIZE=self.im_resize, $
                             IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
                             WIDTH=self.im_width, NOMESSAGE=self.ps_quiet
-                'TIFF': PS_END, /TIFF, DELETE_PS=self.ps_delete, $
+                'TIFF': cgPS_Close, /TIFF, DELETE_PS=self.ps_delete, $
                             ALLOW_TRANSPARENT=self.im_transparent, $
                             DENSITY=self.im_density, RESIZE=self.im_resize, $
                             IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
@@ -301,7 +301,7 @@ pro MrSaveAs::Create_SaveAs_Menu, parent
 	catch, theError
 	if theError ne 0 then begin
 	    catch, /cancel
-	    void = error_message()
+	    void = cgErrorMsg()
 	    return
 	endif
 
@@ -425,7 +425,7 @@ PS_TT_FONT=ps_tt_font                         ; Select the true-type font to use
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = Error_Message()
+        void = cgErrorMsg()
         RETURN
     ENDIF
 
@@ -471,10 +471,10 @@ PRO MrSaveAs::CreatePostScriptFile, event
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = Error_Message()
+        void = cgErrorMsg()
         
         ; Close the PostScript file.
-        PS_END, /NoFix     
+        cgPS_Close, /NoFix     
 
         ; Set the window index number back.
         IF N_Elements(currentWindow) NE 0 THEN BEGIN
@@ -498,7 +498,7 @@ PRO MrSaveAs::CreatePostScriptFile, event
     ENDELSE
 
     ; Allow the user to configure the PostScript file.
-    PS_Start, /GUI, $
+    cgPS_Open, /GUI, $
         CANCEL=cancelled, $
         CHARSIZE=self.ps_charsize, $
         DECOMPOSED=self.ps_decomposed, $
@@ -546,7 +546,7 @@ PRO MrSaveAs::Output, filename
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = Error_Message()
+        void = cgErrorMsg()
         RETURN
     ENDIF
     
@@ -586,10 +586,10 @@ PRO MrSaveAs::SaveAsRaster, event
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = Error_Message()
+        void = cgErrorMsg()
         
         ; Close the PostScript file.
-        PS_END, /NoFix     
+        cgPS_Close, /NoFix     
 
         ; Set the window index number back.
         IF N_Elements(currentWindow) NE 0 THEN BEGIN
@@ -668,7 +668,7 @@ PRO MrSaveAs::SaveAsRaster, event
        
            thisname = outname + '.ps'
            outname = outname + '.pdf'
-           PS_Start, $
+           cgPS_Open, $
                 DECOMPOSED=self.ps_decomposed, $
                 FILENAME=thisname, $
                 GROUP_LEADER=self.tlb, $
@@ -705,7 +705,7 @@ PRO MrSaveAs::SaveAsRaster, event
         
            ; Create a PostScript file first.
            thisname = outname + '.ps'
-           PS_Start, $
+           cgPS_Open, $
                 DECOMPOSED=self.ps_decomposed, $
                 FILENAME=thisname, $
                 GROUP_LEADER=self.tlb, $
@@ -730,27 +730,27 @@ PRO MrSaveAs::SaveAsRaster, event
            
            ; Close the file and convert to proper file type.
            CASE filetype OF
-                'BMP':  PS_END, /BMP, DELETE_PS=self.ps_delete, $
+                'BMP':  cgPS_Close, /BMP, DELETE_PS=self.ps_delete, $
                             ALLOW_TRANSPARENT=self.im_transparent, $
                             DENSITY=self.im_density, RESIZE=self.im_resize, $
                             IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
                             WIDTH=self.im_width
-                'GIF':  PS_END, /GIF, DELETE_PS=self.ps_delete, $
+                'GIF':  cgPS_Close, /GIF, DELETE_PS=self.ps_delete, $
                             ALLOW_TRANSPARENT=self.im_transparent, $
                             DENSITY=self.im_density, RESIZE=self.im_resize, $
                             IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
                             WIDTH=self.im_width
-                'JPEG': PS_END, /JPEG, DELETE_PS=self.ps_delete, $
+                'JPEG': cgPS_Close, /JPEG, DELETE_PS=self.ps_delete, $
                             ALLOW_TRANSPARENT=self.im_transparent, $
                             DENSITY=self.im_density, RESIZE=self.im_resize, $
                             IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
                             WIDTH=self.im_width
-                'PNG':  PS_END, /PNG,  DELETE_PS=self.ps_delete, $
+                'PNG':  cgPS_Close, /PNG,  DELETE_PS=self.ps_delete, $
                             ALLOW_TRANSPARENT=self.im_transparent, $
                             DENSITY=self.im_density, RESIZE=self.im_resize, $
                             IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
                             WIDTH=self.im_width
-                'TIFF': PS_END, /TIFF, DELETE_PS=self.ps_delete, $
+                'TIFF': cgPS_Close, /TIFF, DELETE_PS=self.ps_delete, $
                             ALLOW_TRANSPARENT=self.im_transparent, $
                             DENSITY=self.im_density, RESIZE=self.im_resize, $
                             IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
@@ -788,7 +788,7 @@ DIRECTORY=directory
 	catch, theError
 	if theError ne 0 then begin
 	    catch, /cancel
-	    void = error_message()
+	    void = cgErrorMsg()
 	    return
 	endif
 
@@ -889,7 +889,7 @@ PRO MrSaveAs_SaveAs_Events, event
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = Error_Message()
+        void = cgErrorMsg()
         RETURN
     ENDIF
     
@@ -988,7 +988,7 @@ PS_TT_FONT=ps_tt_font                         ; Select the true-type font to use
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = Error_Message()
+        void = cgErrorMsg()
         RETURN
     ENDIF
     
@@ -1034,7 +1034,7 @@ function MrSaveAs::init
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
      

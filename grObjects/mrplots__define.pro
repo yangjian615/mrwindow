@@ -93,7 +93,7 @@ NOERASE  = noerase
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -119,7 +119,7 @@ NOERASE=noerase
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -183,7 +183,7 @@ ZVALUE=zvalue
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -250,7 +250,7 @@ ZVALUE=zvalue
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -302,7 +302,7 @@ pro MrPlotS::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -381,7 +381,7 @@ ZVALUE=zvalue
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
 

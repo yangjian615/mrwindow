@@ -88,7 +88,7 @@ REPLACE = replace
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -153,7 +153,7 @@ DESTROY = destroy
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
             
@@ -195,7 +195,7 @@ function MrAbstractCDF::Open_CDF, filename
     if the_error ne 0 then begin
         catch, /cancel
         if obj_valid(cdfObject) then obj_destroy, cdfObject
-        void = error_message()
+        void = cgErrorMsg()
         return, obj_new()
     endif
     
@@ -218,7 +218,7 @@ function MrAbstractCDF::getFilenames
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, ''
     endif
     
@@ -285,7 +285,7 @@ VARIABLE = variable
         if obj_valid(displayObj) then obj_destroy, displayObj
         if obj_valid(oColorbar) then obj_destroy, oColorbar
         
-        void = error_message()
+        void = cgErrorMsg()
         return, obj_new()
     endif
             
@@ -346,7 +346,7 @@ DESTROY = destroy
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
             
@@ -405,7 +405,7 @@ DESTROY = destroy
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -432,7 +432,7 @@ pro MrAbstractCDF::whichCDF
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -480,7 +480,7 @@ function MrAbstractCDF::init
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
 

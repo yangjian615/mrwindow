@@ -89,7 +89,7 @@ NORMAL = normal
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
 
@@ -144,7 +144,7 @@ DISABLE=disable
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -183,7 +183,7 @@ NOGUI=noGUI
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -254,7 +254,7 @@ DESTROY=destroy
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -302,7 +302,7 @@ WINDOW=window
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -332,7 +332,7 @@ NAME=name
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -387,7 +387,7 @@ REFRESH = refresh
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
 

@@ -228,7 +228,7 @@ YSIZE = ysize
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -315,7 +315,7 @@ pro MrWindow::Draw
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -409,7 +409,7 @@ pro MrWindow::Draw_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -562,7 +562,7 @@ pro MrWindow::Focus, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -629,7 +629,7 @@ pro MrWindow::Error_Handler, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -655,7 +655,7 @@ pro MrWindow::File_Menu_Events, event
         if obj_valid(cdf_obj) then obj_destroy, cdf_obj
         if (obj_valid(thePlot)     eq 1) && (self -> IsContained(thePlot)     eq 0) then obj_destroy, thePlot
         if (obj_valid(theColorbar) eq 1) && (self -> IsContained(theColorbar) eq 0) then obj_destroy, theColorbar
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -709,7 +709,7 @@ function MrWindow::GetName
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, ''
     endif
     
@@ -760,7 +760,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -850,7 +850,7 @@ function MrWindow::GetSelect
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, obj_new()
     endif
     
@@ -875,7 +875,7 @@ function MrWindow::IsZoomable
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
     
@@ -899,7 +899,7 @@ pro MrWindow::Notify_Realize
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -933,7 +933,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -977,7 +977,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1047,7 +1047,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1075,7 +1075,7 @@ DISABLE=disable
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1105,7 +1105,7 @@ pro MrWindow::ResizeDrawWidget, xsize, ysize
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1176,7 +1176,7 @@ pro MrWindow::SetCurrent
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1243,7 +1243,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1370,7 +1370,7 @@ pro MrWindow::SysVAdd, object
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1400,7 +1400,7 @@ function MrWindow::SysVExists
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
     
@@ -1421,7 +1421,7 @@ pro MrWindow::SysVRemove, object
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1460,7 +1460,7 @@ pro MrWindow::TLB_Resize_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1505,7 +1505,7 @@ pro MrWindow::Turn_Everything_Off, tlb
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1543,7 +1543,7 @@ pro MrWindow::Wheel_Zoom, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1580,7 +1580,7 @@ pro MrWindow::whichObjects
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
         
@@ -1661,7 +1661,7 @@ pro MrWindow_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1705,7 +1705,7 @@ pro MrWindow::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1796,7 +1796,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
     

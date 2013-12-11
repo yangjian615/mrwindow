@@ -103,7 +103,7 @@ NOERASE = noerase
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -133,10 +133,10 @@ NOERASE=noerase
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
-    
+
     if n_elements(noerase) eq 0 then noerase = *self.noerase
 
     ;Draw the plot.
@@ -241,7 +241,7 @@ pro MrPlot::doOverplot
     catch, theerror
     if theerror ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -292,7 +292,7 @@ pro MrPlot::GetData, x, y
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -325,7 +325,7 @@ function MrPlot::GetOverplot, target
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0B
     endif
     
@@ -404,7 +404,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -426,7 +426,7 @@ _REF_EXTRA = extra
     if arg_present(YLOG)      and n_elements(*self.YLOG)      ne 0 then ylog = *self.ylog
     if arg_present(POLAR)     and n_elements(*self.POLAR)     ne 0 then polar = *self.polar
     if arg_present(YNOZERO)   and n_elements(*self.YNOZERO)   ne 0 then ynozero = *self.ynozero
-    
+
     ;Get all of the remaining keywords from weGraphicsKeywords
     if n_elements(EXTRA) gt 0 then begin
         self -> MrGrAtom::GetProperty, _EXTRA=extra
@@ -462,7 +462,7 @@ DISABLE=disable
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         if n_elements(init_refresh) gt 0 then self.window -> Refresh, DISABLE=~init_refresh
         return
     endif
@@ -490,11 +490,14 @@ DISABLE=disable
 
         ;Get the position
         target -> GetProperty, POSITION=position
-        
+
         ;Remove SELF from layout.
         self.window -> SetPosition, self.layout[2], position
         self.overplot = 1B
         self.target = target
+        
+        ;Fill and trim holes
+        self.window -> FillHoles, /TRIMLAYOUT
     endelse
     
     ;Re-enable refreshing
@@ -524,7 +527,7 @@ pro MrPlot::SetData, x, y
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -585,7 +588,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         if n_elements(init_refresh) gt 0 $
             then self.window -> Refresh, DISABLE=~init_refresh
         return
@@ -657,6 +660,7 @@ end
 ;-
 pro MrPlot::SetProperty, $
 ;MrPlot Properties
+CHARSIZE = charsize, $
 DIMENSION = dimension, $
 LABEL = label, $
 
@@ -683,7 +687,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -706,6 +710,7 @@ _REF_EXTRA = extra
     if n_elements(ystyle)    ne 0 then *self.ystyle = ~(ystyle and 1) + ystyle
     
     if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
+    if n_elements(charsize) gt 0 then self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
 
 ;---------------------------------------------------------------------
 ;Superclass Properties ///////////////////////////////////////////////
@@ -736,7 +741,7 @@ pro MrPlot::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -852,7 +857,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
 
@@ -898,11 +903,14 @@ _REF_EXTRA = extra
 
     ;If REFRESH=1 three things happen: If the call to MrGrAtom is
     ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
-    ;      cause errors.
-    ;   2. here, then when MrGrAtom calls the SetProperty
-    ;      method, none of the data will be loaded into the object.
+    ;      cause "Invalid pointer" errors.
+    ;   2. here, then when MrGrAtom::_SetWindow creates a window, MrPlotManager will call
+    ;      the SetProperty method, which in turn calls the self.window -> Draw method.
+    ;      Since the data properties have not yet been set, an error will occur when trying
+    ;      to display it.
     ;   3. after the call to SetProperty so that all of the data is loaded, the initial
-    ;      call to SetProperty will not have a valid self.window property
+    ;      call to SetProperty will not have a valid self.window property. This is a
+    ;      problem because at the end of SetProperty, self.window -> Draw is called.
     ;
     ;To fix problem 1 and 3, put the call to MrGrAtom here. To fix problem 2,
     ;turn Refresh off.

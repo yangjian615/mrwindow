@@ -64,7 +64,7 @@ function MrLayout::CalcPosition
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, fltarr(4)
     endif
     
@@ -147,6 +147,7 @@ end
 ;-
 pro MrLayout::GetProperty, $
 ASPECT=aspect, $
+CHARSIZE=charsize, $
 LAYOUT=layout, $
 MARGIN=margin, $
 OXMARGIN=oxmargin, $
@@ -166,7 +167,7 @@ Y_WINDOW=y_window
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -251,7 +252,7 @@ YGAP=ygap
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -367,7 +368,7 @@ YGAP=ygap
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
 

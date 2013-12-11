@@ -130,6 +130,9 @@
 ;       2013/11/17  -   ApplyPosition and Add method now set ASPECT, CHARSIZE, XMARGIN,
 ;                           XGAP, YMARGIN and YGAP so that they layout is uniform. - MRA
 ;       2013/11/24  -   MrPlotLayout__Define was renamed to MrGrLayout__Define. - MRA
+;       2013/12/10  -   Added the SetGlobal method. CHARSIZE affects the layout of the
+;                           plotting grid, but is no longer applied to the individual
+;                           graphics. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -143,7 +146,7 @@ pro MrPlotManager::AdjustLayout_Property, event
     if the_error ne 0 then begin
         catch, /cancel
         if ptr_valid(new_layout) then ptr_free, new_layout
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -182,7 +185,7 @@ pro MrPlotManager::AdjustLayout_Move, event
     if the_error ne 0 then begin
         catch, /cancel
         if ptr_valid(colrow) then ptr_free, colrow
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -211,7 +214,7 @@ pro MrPlotManager::AdjustLayout_Remove, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -244,7 +247,7 @@ function MrPlotManager::_OverloadBracketsRightSide, isRange, subscript1
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, obj_new()
     endif
 
@@ -320,7 +323,7 @@ QUIET = quiet
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -418,7 +421,7 @@ QUIET = quiet
         ;Set the location and position as object properties. Set UPDATE_LAYOUT=0 to
         ;prevent the graphic from trying to calculate a new position for itself.
         theObjects[i] -> SetLayout, LAYOUT=loc, POSITION=pos, $
-                                    ASPECT=*self.aspect, CHARSIZE=self.charsize, $
+                                    ASPECT=*self.aspect, $
                                     OXMARGIN=self.oxmargin, OYMARGIN=self.oymargin, $
                                     XMARGIN=self.xmargin, XGAP=self.xgap, $
                                     YMARGIN=self.ymargin, YGAP=self.ygap, $
@@ -456,7 +459,7 @@ pro MrPlotManager::ApplyPositions
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
         
@@ -472,8 +475,7 @@ pro MrPlotManager::ApplyPositions
     
         ;Check to see that it has a LAYOUT specified
         dataObjs[i] -> GetProperty, LAYOUT=layout
-        nLayout = n_elements(layout)
-        if nLayout eq 0 || layout[2] eq -1 then continue
+        if layout[2] le 0 then continue
         
         ;If GrLayout[0:1] does not match LAYOUT[0:1], then LAYOUT[2] might not be in
         ;the same location when placed in GRLAYOUT. To fix this, first, convert to a
@@ -490,7 +492,7 @@ pro MrPlotManager::ApplyPositions
         ;Update the layout and position of each plot.
         position = (*self.layout_positions)[*, thisAIndex]
         dataObjs[i] -> SetLayout, LAYOUT=layout, POSITION=position, UPDATE_LAYOUT=0, $
-                                  ASPECT=*self.aspect, CHARSIZE=self.charsize, $
+                                  ASPECT=*self.aspect, $
                                   OXMARGIN=self.oxmargin, OYMARGIN=self.oymargin, $
                                   XMARGIN=self.xmargin, XGAP=self.xgap, $
                                   YMARGIN=self.ymargin, YGAP=self.ygap
@@ -515,7 +517,7 @@ DRAW=draw
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
         
@@ -543,8 +545,7 @@ DRAW=draw
     ;Start shifting them
     for i = 0, nObj - 1 do begin
         theseObj[i] -> GetProperty, LAYOUT=layout
-        nLayout = n_elements(layout)
-        if nLayout eq 0 || layout[2] eq -1 then continue
+        if layout[2] le 0 then continue
 
         ;If the plot is before the hole, then skip it.
         if layout[2] le pHoles[0] then continue
@@ -625,7 +626,7 @@ TEXT = text
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         Count = 0
         return, obj_new()
     endif
@@ -806,7 +807,7 @@ TYPE = type
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -947,7 +948,7 @@ TOFIXED = toFixed
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1015,6 +1016,124 @@ end
 
 
 ;+
+;   The purpose of this method is to provide a means of changing graphics objects
+;   globally, like setting the ![PXYZ] system variables.
+;-
+pro MrPlotManager::SetGlobal, $
+CHARSIZE = charsize, $
+CHARTHICK = charthick, $
+TICKLEN = ticklen, $
+THICK = thick, $
+XCHARSIZE = xcharsize, $
+XGRIDSTYLE = xgridstyle, $
+XMINOR = xminor, $
+XSTYLE = xstyle, $
+XTHICK = xthick, $
+XTICKFORMAT = xtickformat, $
+XTICKLAYOUT = xticklayout, $
+XTICKLEN = xticklen, $
+XTICKNAME = xtickname, $
+XTICKUNITS = xtickunits, $
+XTICKV = xtickv, $
+YCHARSIZE = ycharsize, $
+YGRIDSTYLE = ygridstyle, $
+YMINOR = yminor, $
+YSTYLE = ystyle, $
+YTHICK = ythick, $
+YTICKFORMAT = ytickformat, $
+YTICKLAYOUT = yticklayout, $
+YTICKLEN = yticklen, $
+YTICKNAME = ytickname, $
+YTICKUNITS = ytickunits, $
+YTICKV = ytickv, $
+ZCHARSIZE = zcharsize, $
+ZGRIDSTYLE = zgridstyle, $
+ZMINOR = zminor, $
+ZSTYLE = zstyle, $
+ZTHICK = zthick, $
+ZTICKFORMAT = ztickformat, $
+ZTICKLAYOUT = zticklayout, $
+ZTICKLEN = zticklen, $
+ZTICKNAME = ztickname, $
+ZTICKUNITS = ztickunits, $
+ZTICKV = ztickv
+    compile_opt idl2
+
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Refresh, DISABLE=~refresh_in
+        void = cgErrorMsg()
+        return
+    endif
+
+    ;Disable refresh
+    self -> GetProperty, REFRESH=refresh_in
+    self -> Refresh, /DISABLE
+
+    ;Get all of the objects
+    allObjs = self -> Get(/ALL, COUNT=nObjs)
+    
+    ;Step through each object and set the pertinent values
+    for i = 0, nObjs - 1 do begin
+        oClass = obj_class(allObjs[i])
+    
+        ;If the object is in the data layer
+        if IsMember((*self.gTypes).data, oClass) then begin
+            allObjs[i] -> SetProperty, CHARSIZE = charsize, $
+                                       CHARTHICK = charthick, $
+                                       TICKLEN = ticklen, $
+                                       THICK = thick, $
+                                       XCHARSIZE = xcharsize, $
+                                       XGRIDSTYLE = xgridstyle, $
+                                       XMINOR = xminor, $
+                                       XSTYLE = xstyle, $
+                                       XTHICK = xthick, $
+                                       XTICKFORMAT = xtickformat, $
+                                       XTICKLAYOUT = xticklayout, $
+                                       XTICKLEN = xticklen, $
+                                       XTICKNAME = xtickname, $
+                                       XTICKUNITS = xtickunits, $
+                                       XTICKV = xtickv, $
+                                       YCHARSIZE = ycharsize, $
+                                       YGRIDSTYLE = ygridstyle, $
+                                       YMINOR = yminor, $
+                                       YSTYLE = ystyle, $
+                                       YTHICK = ythick, $
+                                       YTICKFORMAT = ytickformat, $
+                                       YTICKLAYOUT = yticklayout, $
+                                       YTICKLEN = yticklen, $
+                                       YTICKNAME = ytickname, $
+                                       YTICKUNITS = ytickunits, $
+                                       YTICKV = ytickv, $
+                                       ZCHARSIZE = zcharsize, $
+                                       ZGRIDSTYLE = zgridstyle, $
+                                       ZMINOR = zminor, $
+                                       ZSTYLE = zstyle, $
+                                       ZTHICK = zthick, $
+                                       ZTICKFORMAT = ztickformat, $
+                                       ZTICKLAYOUT = zticklayout, $
+                                       ZTICKLEN = zticklen, $
+                                       ZTICKNAME = ztickname, $
+                                       ZTICKUNITS = ztickunits, $
+                                       ZTICKV = ztickv
+
+        ;Otherwise, for select annotation layer objects...
+        endif else if IsMember(['WETEXT', 'WECOLORBAR', 'WELEGENDITEM'], oClass) then begin
+            allObjs[i] -> SetProperty, CHARSIZE = charsize, $
+                                       CHARTHICK = charthick, $
+                                       TICKLEN = ticklen, $
+                                       THICK = thick
+        endif
+    endfor
+        
+    ;Reset the refresh state.
+    self -> Refresh, DISABLE=~refresh_in
+end
+
+
+;+
 ;   Shift all plots located at and after COLROW up one index value.
 ;
 ; :Params:
@@ -1028,7 +1147,7 @@ pro MrPlotManager::ShiftPlots, pIndex
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1096,13 +1215,13 @@ end
 ;-
 pro MrPlotManager::TrimLayout, $
 DRAW = draw
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
         
@@ -1139,7 +1258,7 @@ function MrPlotManager::WhatAmI, objRef
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, ''
     endif
     
@@ -1173,14 +1292,14 @@ pro MrPlotManager::Config
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
     ;Class names of the supported graphics types
-    types = { plot: ['PLOT', 'MRPLOT'], $
-              image: ['IMAGE', 'MRIMAGE'], $
-              contour: ['CONTOUR', 'MRCONTOUR'], $
+    types = { plot: ['MRPLOT'], $
+              image: ['MRIMAGE'], $
+              contour: ['MRCONTOUR'], $
               colorbar: ['WECOLORBAR'], $
               axis: ['WEAXIS'], $
               legend: ['WELEGENDITEM'], $
@@ -1189,7 +1308,7 @@ pro MrPlotManager::Config
               overplot: ['WEOVERPLOT'], $
               plots: ['MRPLOTS'], $
               ImAData: ['PLOT', 'IMAGE', 'CONTOUR'], $     ;TO BE USED WITH ::WHATAMI
-              data: ['PLOT', 'MRPLOT', 'IMAGE', 'MRIMAGE', 'CONTOUR', 'MRCONTOUR'], $
+              data: ['MRPLOT', 'MRIMAGE', 'MRCONTOUR'], $
               annotate: ['WECOLORBAR', 'WEAXIS', 'WELEGENDITEM', 'WEARROW', 'WETEXT', 'MRPLOTS', 'WEOVERPLOT'], $
               files: ['CDF_PLOT'] $
             }
@@ -1231,7 +1350,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
 

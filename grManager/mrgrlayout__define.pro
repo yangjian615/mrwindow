@@ -218,7 +218,7 @@ UPDATE_LAYOUT=update_layout
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -289,7 +289,7 @@ pro MrGrLayout::CalcPositions
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -340,7 +340,7 @@ LAYOUT=layout
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -424,7 +424,7 @@ TO_COLROW=to_colrow
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, MrNull(-1)
     endif
 
@@ -543,7 +543,7 @@ pro MrGrLayout::ExpandLayout, nCols, nRows
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -576,7 +576,7 @@ TRIMLAYOUT=trimLayout
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -632,7 +632,7 @@ NFOUND = nFound
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, [0,0]
     endif
 
@@ -734,7 +734,7 @@ function MrGrLayout::GetPosition, pIndex
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, !Null
     endif
     
@@ -784,7 +784,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -854,7 +854,7 @@ PINDEX = pIndex
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, MrNull(-1)
     endif
     
@@ -933,7 +933,7 @@ function MrGrLayout::MakeFixedLocation
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, MrNull(-1)
     endif
     
@@ -977,7 +977,7 @@ POSITION = position
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1139,7 +1139,7 @@ PINDEX = pIndex
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, MrNull(0)
     endif
     
@@ -1192,7 +1192,7 @@ FILLHOLES = fillHoles
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1289,7 +1289,7 @@ TOFIXED = toFixed
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1395,7 +1395,7 @@ function MrGrLayout::RePosition, old_layout, new_layout, pIndex
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, !Null
     endif
 
@@ -1468,7 +1468,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1536,7 +1536,7 @@ pro MrGrLayout::ShiftPlots, pIndex
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1575,7 +1575,7 @@ pro MrGrLayout::TrimLayout
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1606,7 +1606,7 @@ pro MrGrLayout::whichLayout
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1686,7 +1686,7 @@ pro MrGrLayout::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1721,7 +1721,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
 

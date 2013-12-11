@@ -165,7 +165,7 @@ pro MrZoom::AddToBindingList, bindingList, theObjects
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -223,7 +223,7 @@ ZAXIS = zaxis
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -385,7 +385,7 @@ ZAXIS = zaxis
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -462,7 +462,7 @@ pro MrZoom::Box_Zoom, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -569,7 +569,7 @@ ZAXIS = zaxis
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -699,7 +699,7 @@ ZOOM_Y = zoom_y
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -806,7 +806,7 @@ DRAW = draw
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -883,7 +883,7 @@ ZOOMFACTOR = zoomfactor
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -905,7 +905,7 @@ pro MrZoom::Error_Handler
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -931,7 +931,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -978,7 +978,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1034,7 +1034,7 @@ ZOOMFACTOR = zoomfactor
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1081,7 +1081,7 @@ pro MrZoom::Turn_Zoom_Off, tlb
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1134,7 +1134,7 @@ pro MrZoom::Pan, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1231,7 +1231,7 @@ pro MrZoom::UnBind, bindingList, theObjects
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1264,7 +1264,7 @@ pro MrZoom::UnZoom, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1290,7 +1290,7 @@ pro MrZoom::whichBindings
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1369,7 +1369,7 @@ pro MrZoom::Wheel_Zoom_XY, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1415,7 +1415,7 @@ pro MrZoom::Wheel_Zoom_Color, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1456,7 +1456,7 @@ pro MrZoom::Wheel_Zoom_Page, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1501,7 +1501,7 @@ pro MrZoom::XY_Zoom, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1580,7 +1580,7 @@ pro MrZoom::Zoom_Menu_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -1649,7 +1649,7 @@ pro MrZoom::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1688,7 +1688,7 @@ ZOOMFACTOR = zoomfactor
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
     

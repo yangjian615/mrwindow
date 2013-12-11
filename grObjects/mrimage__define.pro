@@ -99,7 +99,7 @@ NOERASE=noerase
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -126,7 +126,7 @@ NOERASE=noerase
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -539,7 +539,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -622,7 +622,7 @@ pro MrImage::GetData, image, x, y, x1, y1
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -630,10 +630,12 @@ pro MrImage::GetData, image, x, y, x1, y1
     case n_params() of
         1: image = *self.image
         3: begin
+            image = *self.image
             x = *self.indep
             y = *self.dep
         endcase
         5: begin
+            image = *self.image
             x = *self.Xmin
             y = *self.Ymin
             x1 = *self.Xmax
@@ -658,7 +660,7 @@ YLOG=ylog
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
  
@@ -724,13 +726,13 @@ end
 ;                           right corner of each pixel.
 ;-
 pro MrImage::SetData, image, x, y, x1, y1
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -797,7 +799,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         if n_elements(init_refresh) gt 0 $
             then self.window -> Refresh, DISABLE=~init_refresh
         return
@@ -896,6 +898,7 @@ X_POS = x_pos, $
 Y_POS = y_pos, $
 
 ;MrImage Keywords
+CHARSIZE = charsize, $
 HIDE = hide, $
 IDISPLAY = iDisplay, $
 NAME = name, $
@@ -928,7 +931,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -958,9 +961,11 @@ _REF_EXTRA = extra
     ;Graphics Properties
     if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
     if n_elements(MIN_VALUE) ne 0 then *self.min_value = min_value
-    if n_elements(position)  gt 0 then  self -> SetLayout, POSITION=position
     if n_elements(XLOG)      ne 0 then  self.xlog = keyword_set(xlog)
     if n_elements(YLOG)      ne 0 then  self.ylog = keyword_set(ylog)
+    
+    if n_elements(position)  gt 0 then  self -> SetLayout, POSITION=position
+    if n_elements(charsize)  gt 0 then  self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
     
     ;Check PAINT after XLOG and YLOG have been set
     if n_elements(paint) gt 0 then self.paint = keyword_set(paint)
@@ -992,7 +997,7 @@ function MrImage::_TF_Paint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
     
@@ -1014,7 +1019,7 @@ pro MrImage::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1210,7 +1215,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
     
@@ -1226,6 +1231,7 @@ _REF_EXTRA = extra
     setDefaultValue, xsize, 600
     setDefaultValue, xlog, 0, /BOOLEAN
     setDefaultValue, ylog, 0, /BOOLEAN
+    setDefaultValue, center, 0, /BOOLEAN
     setDefaultValue, ysize, 340
     setDefaultValue, paint, 0, /BOOLEAN
     if xlog + ylog gt 0 || n_params() gt 3 then paint = 1
@@ -1411,7 +1417,8 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     case n_params() of
         1: ;Do nothing
-        3: self -> SetPixelLocations, indep, dep, CENTER=center, XLOG=xlog, YLOG=ylog
+        3: if xlog + ylog + center gt 0 $
+            then self -> SetPixelLocations, indep, dep, CENTER=center, XLOG=xlog, YLOG=ylog
         5: self -> SetPixelLocations, indep, dep, x0, y0
         7: self -> SetPixelLocations, indep, dep, x0, y0, x1, y1
     endcase

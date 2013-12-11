@@ -60,6 +60,7 @@
 ;                           now finds the class names correctly. - MRA
 ;       08/23/2013  -   Added the GetIndex method. - MRA
 ;       2013/11/19  -   Inherit IDL_Object, added the _OverloadBracketsRightSide method. - MRA
+;       2013/12/10  -   Added the _OverloadForeach method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -83,7 +84,7 @@ function MrIDL_Container::_OverloadBracketsRightSide, isRange, subscript1
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, obj_new()
     endif
 
@@ -111,6 +112,48 @@ function MrIDL_Container::_OverloadBracketsRightSide, isRange, subscript1
 
     return, result
 end
+
+;+
+;   The purpose of this method is to allow for iteration through the objects within the
+;   container via the FOREACH operator.
+;
+; :Params:
+;       VALUE:              in, out, required, type=object
+;                           The current object.
+;       KEY:                in, out, required, type=int/string
+;                           The index of the current object.
+;
+; :Returns:
+;       RESULT:             1 if there is a current element to retrieve, 0 if there are
+;                               no more elements.
+;-
+function MrIDL_Container::_OverloadForeach, value, key
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, obj_new()
+    endif
+    
+    ;Get all of the objects
+    allObjs = self -> Get(/ALL, COUNT=nObjs)
+
+    ;Return the current object
+    if n_elements(key) eq 0 then key = 0 else key += 1
+    
+    ;Stop if there are no more objects.
+    if key ge nObjs then return, 0
+
+    ;Return the current object
+    value = allObjs[key]
+
+    ;Go to the next iteration
+    return, 1
+end
+
 
 
 ;+
@@ -145,7 +188,7 @@ POSITION = Index
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -178,7 +221,7 @@ function MrIDL_Container::GetIndex, Objects
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, -1
     endif
     
@@ -211,7 +254,7 @@ DESTROY = destroy
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -239,9 +282,8 @@ end
 ;+
 ;   The purpose of this method is to add functionality to the IDL_Container class.
 ;   Additions include::
-;       - Position has been renamed to Index
 ;       - Specific classes of objects can be removed.
-;       - Child_Object, Index, and Type can be supplied together
+;       - Child_Object, Position, and Type can be supplied together
 ;       - Objects can be destroyed while being removed.
 ;
 ; :Params:
@@ -274,7 +316,7 @@ TYPE = type
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -331,7 +373,6 @@ TYPE = type
         self -> IDL_Container::Remove
         if destroy then obj_destroy, theObj
     endif
-    
 end
 
 
@@ -346,7 +387,7 @@ pro MrIDL_Container::WhichObjects
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -373,7 +414,7 @@ pro MrIDL_Container::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -392,7 +433,7 @@ function MrIDL_Container::init
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
 

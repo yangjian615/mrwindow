@@ -80,7 +80,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         if n_elements(P_current) gt 0 then !P = P_current
         if n_elements(X_current) gt 0 then !X = X_current
         if n_elements(Y_current) gt 0 then !Y = Y_current
@@ -126,7 +126,7 @@ pro MrDataCoords::RestoreCoords
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -165,7 +165,7 @@ pro MrDataCoords::SaveCoords
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     

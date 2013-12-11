@@ -99,6 +99,7 @@
 ;                           methods. cgContour throws an error if MAP_OBJECT is an invalid
 ;                           object reference. Fixed by changing the class property from
 ;                           an object to a pointer. - MRA
+;       2013/12/02  -   Added the GetPath method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -107,41 +108,25 @@
 ;   to copy from the pixmap instead of redrawing the plot, the image does not flicker).
 ;-
 pro MrContour::Draw, $
-NOERASE=noerase, $
-OLEVELS=oLevels, $
-PATH_INFO=path_info, $
-PATH_XY=path_xy
+NOERASE=noerase
     compile_opt idl2
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
-    endif
-
-    GetOLevels = Arg_Present(oLevels)
-    GetPath_Info = Arg_Present(path_info)
-    GetPath_XY = Arg_Present(path_xy)
-    
-    ;Get path information without drawing anything
-    if GetPath_Info || GetPath_XY then begin
-        self -> doContour, NOERASE=noerase, $
-                           OLEVELS=oLevels, $
-                           PATH_INFO=path_info, $
-                           PATH_XY=path_xy
     endif
     
     ;Return if we are hiding
     if self.hide then return
     
     ;Overplot?
-    if obj_valid(self.overplot) then begin
+    if self.overplot then begin
         self.target -> RestoreCoords
         self -> doContour, NOERASE=noerase, $
-                           OLEVELS=oLevels, $
-                           /OVERPLOT
+                           OLEVELS=oLevels
         self -> SaveCoords
 
     ;Normal contour?
@@ -160,6 +145,9 @@ end
 pro MrContour::doContour, $
 NOERASE=noerase, $
 OLEVELS=oLevels, $
+PATH_DATA_COORDS=path_data_coords, $
+PATH_DOUBLE=path_double, $
+PATH_FILENAME=path_filename, $
 PATH_INFO=path_info, $
 PATH_XY=path_xy
 
@@ -169,12 +157,12 @@ PATH_XY=path_xy
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
-    GetPath_Info = Arg_Present(path_info)
-    GetPath_XY = Arg_Present(path_xy)
+    tf_GetPath = arg_present(path_info) || arg_present(path_xy) || n_elements(path_filename) gt 0
+    
 
     if n_elements(noerase) eq 0 then noerase = *self.noerase
 
@@ -186,7 +174,7 @@ PATH_XY=path_xy
     ; cgContour without them.
     ;
 
-    if GetPath_Info eq 0 && GetPath_XY eq 0 then begin
+    if tf_getpath eq 0 then begin
         cgContour, *self.c_data, *self.xcoords, *self.ycoords, $
                 
                    ;cgContour Keywords
@@ -226,9 +214,6 @@ PATH_XY=path_xy
                    MAX_VALUE        = *self.max_value, $
                    MIN_VALUE        = *self.min_value, $
                    MISSINGVALUE     = *self.missingvalue, $
-                   PATH_DATA_COORDS = *self.path_data_coords, $
-                   PATH_DOUBLE      = *self.path_double, $
-                   PATH_FILENAME    = *self.path_filename, $
                    RESOLUTION       = *self.resolution, $
                    TRIANGULATION    = *self.triangulation, $
                    XLOG             = *self.xlog, $
@@ -323,7 +308,7 @@ PATH_XY=path_xy
                ;cgContour Keywords
                ASPECT           = *self.aspect, $
                LABEL            =  self.label, $
-               LAYOUT           = *self.layout, $
+               LAYOUT           =  self.layout, $
                MAP_OBJECT       =  self.map_object, $
                OLEVELS          =       oLevels, $
                ONIMAGE          =  self.onImage, $
@@ -357,20 +342,20 @@ PATH_XY=path_xy
                MAX_VALUE        = *self.max_value, $
                MIN_VALUE        = *self.min_value, $
                MISSINGVALUE     = *self.missingvalue, $
-               PATH_DATA_COORDS = *self.path_data_coords, $
-               PATH_DOUBLE      = *self.path_double, $
-               PATH_FILENAME    = *self.path_filename, $
-               RESOLUTION       = *self.resolution, $
-               TRIANGULATION    = *self.triangulation, $
+               PATH_DATA_COORDS =       path_data_coords, $
+               PATH_DOUBLE      =       path_double, $
+               PATH_FILENAME    =       path_filename, $
                PATH_INFO        =       path_info, $
                PATH_XY          =       path_xy, $
+               RESOLUTION       = *self.resolution, $
+               TRIANGULATION    = *self.triangulation, $
                XLOG             = *self.xlog, $
                YLOG             = *self.ylog, $
           
                ;weGraphicsKeywords
                AXISCOLOR     = *self.axiscolor, $
                BACKGROUND    = *self.background, $
-               CHARSIZE      = *self.charsize, $
+               CHARSIZE      =  self.charsize, $
                CHARTHICK     = *self.charthick, $
                CLIP          = *self.clip, $
                COLOR         = *self.color, $
@@ -381,7 +366,7 @@ PATH_XY=path_xy
                NOCLIP        = *self.noclip, $
                NODATA        = *self.nodata, $
                NOERASE       = *self.noerase, $
-               POSITION      = *self.position, $
+               POSITION      =  self.position, $
 ;               PSYM          = *self.psym, $
                SUBTITLE      = *self.subtitle, $
 ;               SYMSIZE       = *self.symsize, $
@@ -410,9 +395,9 @@ PATH_XY=path_xy
                YMINOR        = *self.yminor, $
                YRANGE        = *self.yrange, $
                YSTYLE        = *self.ystyle, $
-               YTHICK        = *self.ythick, $
-               YTICK_GET     = *self.ytick_get, $
-               YTICKFORMAT   = *self.ytickformat;, $
+;               YTHICK        = *self.ythick, $
+;               YTICK_GET     = *self.ytick_get, $
+               YTICKFORMAT   = *self.ytickformat, $
 ;               YTICKINTERVAL = *self.ytickinterval, $
 ;               YTICKLAYOUT   = *self.yticklayout, $
 ;               YTICKLEN      = *self.yticklen, $
@@ -420,7 +405,7 @@ PATH_XY=path_xy
 ;               YTICKS        = *self.yticks, $
 ;               YTICKUNITS    = *self.ytickunits, $
 ;               YTICKV        = *self.ytickv, $
-;               YTITLE        = *self.ytitle, $
+               YTITLE        = *self.ytitle;, $
 ;               ZCHARSIZE     = *self.zcharsize, $
 ;               ZGRIDSTYLE    = *self.zgridstyle, $
 ;               ZMARGIN       = *self.zmargin, $
@@ -472,7 +457,7 @@ pro MrContour::GetData, z, x, y
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -506,7 +491,7 @@ function MrContour::GetOverplot, target
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0B
     endif
     
@@ -515,6 +500,52 @@ function MrContour::GetOverplot, target
     if tf_overplot then if arg_present(target) then target = self.target
     
     return, tf_overplot
+end
+
+
+;+
+;   The purpose of this method is to get contour path information.
+;
+; :Params:
+;       TARGET:             out, optional, type=object
+;                           If `TF_OVERPLOT`=1, then the overplot target will be returned.
+;
+; :Returns:
+;       TF_OVERPLOT:        True (1) if overplotting, false (0) if not.
+;-
+pro MrContour::GetPath, path_info, path_xy, $
+OLEVELS=oLevels, $
+PATH_DATA_COORDS=path_data_coords, $
+PATH_DOUBLE=path_double, $
+PATH_FILENAME=path_filename
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        if windowavailable(tempPix) then wdelete, tempPix
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Defaults
+    path_data_coords = keyword_set(path_data_coords)
+    path_double = keyword_set(path_double)
+    
+    ;Create a temporary pixmap window so that the empty axes generated by Contour
+    ;does not interfere with what is already plotted.
+    tempPix = MrGetWindow(/FREE, /PIXMAP)
+    
+    ;Get path information without drawing anything
+    self -> doContour, OLEVELS=oLevels, $
+                       PATH_DATA_COORDS=path_data_coords, $
+                       PATH_FILENAME=path_filename, $
+                       PATH_INFO=path_info, $
+                       PATH_XY=path_xy
+    
+    ;Delete the pixmap window
+    wdelete, tempPix
 end
 
 
@@ -743,7 +774,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
 
@@ -833,7 +864,7 @@ DISABLE=disable
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         if n_elements(init_refresh) gt 0 then self.window -> Refresh, DISABLE=~init_refresh
         return
     endif
@@ -857,15 +888,18 @@ DISABLE=disable
         ;Make we can overplot on top of the target graphic
         oplottable = ['MrPlot', 'MrImage', 'MrContour']
         if IsMember(oplottable, obj_class(target), /FOLD_CASE) eq 0 || obj_valid(target) eq 0 $
-            then message, 'TARGET must be valid and of class ' + strjoin(oplottable, ' ')
+            then message, 'TARGET must be valid and of class ' + strjoin(oplottable, ', ')
 
         ;Get the position
         target -> GetProperty, POSITION=position
         
         ;Remove SELF from layout.
-        self.window -> SetPosition, (*self.layout)[2:*], position
+        self.window -> SetPosition, self.layout[2], position
         self.overplot = 1B
         self.target = target
+        
+        ;Fill and trim holes
+        self.window -> FillHoles, /TRIMLAYOUT
     endelse
     
     ;Re-enable refreshing
@@ -915,7 +949,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         if n_elements(init_refresh) gt 0 $
             then self.window -> Refresh, DISABLE=~init_refresh
         return
@@ -973,7 +1007,7 @@ pro MrContour::SetData, z, x, y
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
     
@@ -1185,6 +1219,7 @@ XLOG=xlog, $
 YLOG=ylog, $
 
 ;Graphics Keywords
+CHARSIZE = charsize, $
 POSITION = position, $
 XSTYLE   = xstyle, $
 YSTYLE   = ystyle, $
@@ -1195,7 +1230,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif
         
@@ -1246,6 +1281,7 @@ _REF_EXTRA=extra
     if n_elements(path_data_coords)   ne 0 then *self.path_data_coords = path_data_coords
     
     if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
+    if n_elements(charsize) gt 0 then self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
 
     ;Map Object
     if n_elements(map_object) gt 0 and obj_valid(map_object) then begin
@@ -1284,7 +1320,7 @@ pro MrContour::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return
     endif              
     
@@ -1585,7 +1621,7 @@ _REF_EXTRA=extra
     catch, theerror
     if theerror ne 0 then begin
         catch, /cancel
-        void = error_message()
+        void = cgErrorMsg()
         return, 0
     endif
 
@@ -1659,14 +1695,17 @@ _REF_EXTRA=extra
     ;Initialize Objects
     self.target           = Obj_New()
     self.map_object       = Ptr_New(/ALLOCATE_HEAP)
-
+    
     ;If REFRESH=1 three things happen: If the call to MrGrAtom is
     ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
-    ;      cause errors.
-    ;   2. here, then when MrGrAtom calls the SetProperty
-    ;      method, none of the data will be loaded into the object.
+    ;      cause "Invalid pointer" errors.
+    ;   2. here, then when MrGrAtom::_SetWindow creates a window, MrPlotManager will call
+    ;      the SetProperty method, which in turn calls the self.window -> Draw method.
+    ;      Since the data properties have not yet been set, an error will occur when trying
+    ;      to display it.
     ;   3. after the call to SetProperty so that all of the data is loaded, the initial
-    ;      call to SetProperty will not have a valid self.window property
+    ;      call to SetProperty will not have a valid self.window property. This is a
+    ;      problem because at the end of SetProperty, self.window -> Draw is called.
     ;
     ;To fix problem 1 and 3, put the call to MrGrAtom here. To fix problem 2,
     ;turn Refresh off.
@@ -1697,7 +1736,6 @@ _REF_EXTRA=extra
     SetDefaultValue, outfilename, ''
     SetDefaultValue, outline, 0B, /BOOLEAN
     SetDefaultValue, output, ''
-    SetDefaultValue, overplot, 0B, /BOOLEAN
     SetDefaultValue, traditional, 0B, /BOOLEAN
     
 ;---------------------------------------------------------------------
@@ -1801,20 +1839,16 @@ _REF_EXTRA=extra
 ;Draw ////////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
+    ;Get the path information, if requested.
+    if GetPath_Info || GetPath_XY $
+        then self -> GetPath, path_info, path_xy, OLEVELS=oLevels, $
+                              PATH_DATA_COORDS=path_data_coords, PATH_DOUBLE=path_double, $
+                              PATH_FILENAME=path_filename
+
     ;Refresh the graphics?
     if keyword_set(current) $
         then theWin -> Refresh, DISABLE=~init_refresh $
         else self.window -> Draw
-    
-;    if keyword_set(draw) then begin
-;        if GetPath_Info || GetPath_XY then begin
-;            self -> draw, OLEVELS=oLevels, $
-;                          PATH_INFO=path_info, $
-;                          PATH_XY=path_xy
-;        endif else begin
-;            self -> draw, OLEVELS=oLevels
-;        endelse
-;    endif
 
     return, 1
 end
