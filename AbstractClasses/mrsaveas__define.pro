@@ -174,14 +174,14 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
 
     IF N_Elements(filetype) EQ 0 then filetype = 'PNG'
     IF N_Elements(filename) EQ 0 THEN filename = 'cgwindow.' + StrLowCase(filetype)
-    IF StrUpCase(filetype) EQ 'PDF' THEN rastertype = -1 ELSE rastertype = self.im_raster ;rastertype = 0
+    IF StrUpCase(filetype) EQ 'PDF' THEN rastertype = -1 ELSE rastertype = 0 ;rastertype = {0 | self.im_raster}
     
     ; Strip the extension off the filename.
     outname = cgRootName(filename, DIRECTORY=dirName)
     
     ; Put it back together without an extension.
     outputFilename = Filepath(ROOT_DIR=dirName, outname)
-    
+
     ; What kind of raster file.
     CASE rasterType OF
     
@@ -195,7 +195,7 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
                 FILENAME=thisname, $
                 GROUP_LEADER=self.tlb, $
                 METRIC=self.ps_metric, $
-                KEYWORDS=keywords, $ ; Returned PSConfig keywords.
+                KEYWORDS=keywords, $ ; Returned cgPS_Config keywords.
                 SCALE_FACTOR=self.ps_scale_factor, $
                 CHARSIZE=self.ps_charsize, $
                 FONT=self.ps_font, $
@@ -206,7 +206,7 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
            self -> Draw
            
            ; Close the file and make a PDF file.
-           PS_End
+           cgPS_Close
            cgPS2PDF, thisname, outname, DELETE_PS=self.ps_delete, /SILENT, SUCCESS=success, $
               UNIX_CONVERT_CMD=self.pdf_unix_convert_cmd, GS_PATH=self.pdf_path
            IF ~success THEN BEGIN
@@ -218,6 +218,7 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
     
         ; Normal raster.
         0: BEGIN
+
            void = cgSnapshot(TYPE=fileType, FILENAME=outputFilename, /NODIALOG)
            Print, 'Output file is located here: ' + outputFilename 
            ENDCASE
@@ -232,7 +233,7 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
                 FILENAME=thisname, $
                 GROUP_LEADER=self.tlb, $
                 METRIC=self.ps_metric, $
-                KEYWORDS=keywords, $ ; Returned PSConfig keywords.
+                KEYWORDS=keywords, $ ; Returned cgPS_Config keywords.
                 SCALE_FACTOR=self.ps_scale_factor, $
                 CHARSIZE=self.ps_charsize, $
                 FONT=self.ps_font, $
@@ -521,7 +522,7 @@ PRO MrSaveAs::CreatePostScriptFile, event
     self -> Draw
     
     ; Clean up.
-    PS_End
+    cgPS_Close
     
     ; Set the window index number back.
     IF WindowAvailable(currentWindow) THEN WSet, currentWindow ELSE WSet, -1
@@ -552,7 +553,7 @@ PRO MrSaveAs::Output, filename
     
     ; Need a filename?
     IF N_Elements(filename) EQ 0 THEN filename = 'idl.ps'
-
+stop
     ; The type of file is determined by the filename extension.
     rootname = cgRootName(filename, DIRECTORY=dir, EXTENSION=ext)
     CASE StrUpCase(ext) OF
@@ -659,7 +660,7 @@ PRO MrSaveAs::SaveAsRaster, event
     ; Save this name.
     self.saveFile = root_name
     self.saveDir = dirName
-    
+
     ; What kind of raster file.
     CASE rasterType OF
     
@@ -684,7 +685,7 @@ PRO MrSaveAs::SaveAsRaster, event
            self -> Draw
            
            ; Close the file and make a PDF file.
-           PS_End
+           cgPS_Close
            cgPS2PDF, thisname, outname, DELETE_PS=self.ps_delete, /SILENT, SUCCESS=success, $
               UNIX_CONVERT_CMD=self.pdf_unix_convert_cmd, GS_PATH=self.pdf_path
            IF ~success THEN BEGIN

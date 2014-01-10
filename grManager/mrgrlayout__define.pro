@@ -1763,10 +1763,10 @@ pro MrGrLayout__define
     class = {MrGrLayout, $
              inherits MrLayout, $
              fixed_positions: ptr_new(), $  ;Fixed, non-layout-related positions.
-             GrLayout: [0,0], $               ;Layout of the plot area [ncols, nrows].
+             GrLayout: [0,0], $             ;Layout of the plot area [ncols, nrows].
              layout_positions: ptr_new(), $ ;Positions outlined by the 2D plot-layout grid.
              nplots: 0, $                   ;Number of plots displayed.
              nfixed: 0, $                   ;Number of fixed positions.
-             posIsTaken: ptr_new() $       ;Is the Layout_Position filled?
+             posIsTaken: ptr_new() $        ;Is the Layout_Position filled?
             }
 end

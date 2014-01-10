@@ -493,7 +493,7 @@ pro MrZoom::Box_Zoom, event
             ;Draw from the first clicked point to the current position
             x = [self.x0, self.x0, event.x, event.x, self.x0]
             y = [self.y0, event.y, event.y, self.y0, self.y0]
-            plots, x, y, color=load_color('blue'), /DEVICE
+            plots, x, y, color=cgColor('blue'), /DEVICE
         endcase
         
         1: begin    ;Button up
@@ -1155,7 +1155,7 @@ pro MrZoom::Pan, event
             ;Store the clicked coordinates
             self.x0 = event.x
             self.y0 = event.y
-            
+
             ;Hide the plot being panned. Setting the property will casue the
             ;graphic window to be refreshed with the FOCUS graphic hidden.
             self.focus -> SetProperty, HIDE=1   ;;;;;;;;;;;;;
@@ -1461,14 +1461,16 @@ pro MrZoom::Wheel_Zoom_Page, event
     endif
 
     ;Get the current x- and y-range
-    self.focus -> GetProperty, IMAGE=image, IDISPLAY=iDisplay
+    self.focus -> GetData, image
+    self.focus -> GetProperty, IDISPLAY=iDisplay
 
     ;Make sure the image has more than 2 dimensions
-    ndims = n_elements(image)
+    ndims = size(image, /N_DIMENSIONS)
     if ndims lt 3 then return
     
     ;How many pages are there?
-    nPages = n_elements(image[0,0,*])
+    nPages = size(image, /DIMENSIONS)
+    nPages = nPages[ndims-1]
     
     ;Change pages. Stop at beginning and at the end
     iDisplay += event.clicks

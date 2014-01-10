@@ -90,6 +90,7 @@
 ;                           done automatically. Call the Refresh method with the DISABLE
 ;                           keyword set to temporarily turn of Refresh. - MRA
 ;       2013/11/23  -   Added the SetLayout and Overplot methods. - MRA
+;       2013/12/26  -   Accept multiple targets for overplotting. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -111,9 +112,15 @@ NOERASE = noerase
 
     ;Draw the plot
     if self.overplot then begin
-        self.target -> RestoreCoords
-        self -> doOverplot
-        self -> SaveCoords
+        ;Step through all of the overplotted objects
+        for i = 0, n_elements(*self.target) - 1 do begin
+            ;Skip invalid targets
+            if obj_valid((*self.target)[i]) eq 0 then continue
+            
+            ;Overplot
+            (*self.target)[i] -> RestoreCoords
+            self -> doOverplot
+        endfor
     endif else begin
         self -> doPlot, NOERASE=noerase
         self -> SaveCoords
@@ -331,7 +338,7 @@ function MrPlot::GetOverplot, target
     
     ;Get the overplot state and the target.
     tf_overplot = self.overplot
-    if tf_overplot then if arg_present(target) then target = self.target
+    if tf_overplot then if arg_present(target) then target = *self.target
     
     return, tf_overplot
 end
@@ -475,7 +482,8 @@ DISABLE=disable
     if keyword_set(disable) then begin
         self.window -> Make_Location, location
         self.window -> SetPosition, self.layout[2], location
-        self.target = obj_new()
+        ptr_free, self.target
+        self.target = ptr_new(/ALLOCATE_HEAP)
         self.overplot = 0B
 
     ;Enable overplotting        
@@ -485,16 +493,17 @@ DISABLE=disable
 
         ;Ensure we can overplot on top of the target graphic
         oplottable = ['MrPlot', 'MrImage', 'MrContour']
-        if IsMember(oplottable, obj_class(target), /FOLD_CASE) eq 0 || obj_valid(target) eq 0 $
-            then message, 'TARGET must be valid and of class ' + strjoin(oplottable, ' ')
+        if min(IsMember(oplottable, MrObj_Class(target), /FOLD_CASE)) eq 0 || $
+           min(obj_valid(target)) eq 0 $
+        then message, 'TARGET must be valid and of class ' + strjoin(oplottable, ' ')
 
-        ;Get the position
-        target -> GetProperty, POSITION=position
+        ;Get a position
+        target[0] -> GetProperty, POSITION=position
 
         ;Remove SELF from layout.
         self.window -> SetPosition, self.layout[2], position
         self.overplot = 1B
-        self.target = target
+        *self.target = target
         
         ;Fill and trim holes
         self.window -> FillHoles, /TRIMLAYOUT
@@ -755,6 +764,7 @@ pro MrPlot::cleanup
     ptr_free, self.ylog
     ptr_free, self.polar
     ptr_free, self.symcolor
+    ptr_free, self.target
     
     ;Cleanup the superclass.
     self -> weGraphicsKeywords::CLEANUP
@@ -893,18 +903,17 @@ _REF_EXTRA = extra
     self.min_value = ptr_new(/ALLOCATE_HEAP)
     self.max_value = ptr_new(/ALLOCATE_HEAP)
     self.nsum = ptr_new(/ALLOCATE_HEAP)
+    self.target = ptr_new(/ALLOCATE_HEAP)
     self.xlog = ptr_new(/ALLOCATE_HEAP)
     self.ylog = ptr_new(/ALLOCATE_HEAP)
     self.polar = ptr_new(/ALLOCATE_HEAP)
     self.symcolor = ptr_new(/ALLOCATE_HEAP)
     self.ynozero = ptr_new(/ALLOCATE_HEAP)
-    
-    self.target = obj_new()
 
     ;If REFRESH=1 three things happen: If the call to MrGrAtom is
     ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
     ;      cause "Invalid pointer" errors.
-    ;   2. here, then when MrGrAtom::_SetWindow creates a window, MrPlotManager will call
+    ;   2. here, then, when MrGrAtom::_SetWindow creates a window, MrPlotManager will call
     ;      the SetProperty method, which in turn calls the self.window -> Draw method.
     ;      Since the data properties have not yet been set, an error will occur when trying
     ;      to display it.
@@ -1015,7 +1024,7 @@ _REF_EXTRA = extra
     ;Refresh the graphics?
     if keyword_set(current) $
         then theWin -> Refresh, DISABLE=~init_refresh $
-        else self.window -> Draw
+        else self -> Refresh
 
     return, 1
 end
@@ -1048,7 +1057,7 @@ pro MrPlot__define, class
              ;cgPlot Properties
              overplot: 0B, $                   ;Overplot?
              symcolor: ptr_new(), $            ;color of each symbol
-             target: obj_new(), $              ;Overplot target
+             target: ptr_new(), $              ;Overplot target
              label: '', $                      ;*
              
              ;MrPlot Properties

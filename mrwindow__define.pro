@@ -280,7 +280,9 @@ YSIZE = ysize
 
     ;Make the draw widget. We still need to get the Window ID in which the plot
     ;is drawn, so get that when the window is realized (see note within ::init).
-    self.drawID = widget_draw(self.tlb, XSIZE=xsize, YSIZE=ysize, $
+    if !version.os_family eq 'unix' then retain = 2 else retain = 1
+
+    self.drawID = widget_draw(self.tlb, XSIZE=xsize, YSIZE=ysize, RETAIN=retain, $
                               /BUTTON_EVENTS, /WHEEL_EVENTS, $
                               UVALUE={object: self, method: 'Draw_Events'}, $
                               NOTIFY_REALIZE='MrWindow_Notify_Realize', $
@@ -909,7 +911,7 @@ pro MrWindow::Notify_Realize
     ;Get the window ID of the draw widget
     widget_control, self.drawID, GET_VALUE=winID
     self.winID = winID
-    
+
     ;Draw the plot now that the window is realized.
     self -> Draw
 end
@@ -1159,10 +1161,11 @@ pro MrWindow::ResizeDrawWidget, xsize, ysize
     self.ysize = ysize
 
     ;Recalculate and apply positions in resized window.
+    refresh_in = self._refresh
     self -> Refresh, /DISABLE
     self -> CalcPositions
     self -> ApplyPositions
-    self -> Refresh
+    self -> Refresh, DISABLE=~refresh_in
 end
 
 

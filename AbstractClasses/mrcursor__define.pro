@@ -112,6 +112,7 @@
 ;                           IDL_Container or MrIDL_Container. Removed the Focus method
 ;                           because it did not fit conceptually. Moved to MrWindow__Define. - MRA
 ;       09/23/2013  -   Removed the IFOCUS property. - MRA
+;       2013/12/19  -   Now use cgColor to load colors into the color table. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -280,8 +281,8 @@ pro MrCursor::Cross_Hairs, event
     horiz_y = [event.y, event.y]
     vert_x = [event.x, event.x]
     vert_y = [0, self.ysize]
-    plots, horiz_x, horiz_y, color=load_color('blue'), /DEVICE
-    plots, vert_x, vert_y, color=load_color('blue'), /DEVICE
+    plots, horiz_x, horiz_y, color=cgColor('blue'), /DEVICE
+    plots, vert_x, vert_y, color=cgColor('blue'), /DEVICE
 end
 
 

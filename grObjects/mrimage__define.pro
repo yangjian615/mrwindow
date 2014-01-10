@@ -84,6 +84,9 @@
 ;       2013/11/22  -   Renamed DRAW to REFRESH. Refreshing is now done automatically.
 ;                           Call the Refresh method with the DISABLE keyword set to
 ;                           temporarily turn of Refresh. - MRA
+;       2013/12/30  -   CTIndex takes precedence over PALETTE when both were present. Now,
+;                           if PALETTE is set, CTINDEX is cleared, and vice versa. - MRA
+;                           
 ;-
 ;*****************************************************************************************
 ;+
@@ -704,7 +707,7 @@ end
 ;+
 ;   The purpose of this method is to retrieve data
 ;
-; :Calling Sequence:
+; Calling Sequence::
 ;       myGraphic -> GetData, image
 ;       myGraphic -> GetData, image, x, y
 ;       myGraphic -> GetData, image, x, y, x1, y1
@@ -744,16 +747,16 @@ pro MrImage::SetData, image, x, y, x1, y1
             *self.indep = x
             *self.dep = y
         endcase
-        4: begin
+        5: begin
             *self.Xmin = x
             *self.Ymin = y
-            *self.Xmax = y2
+            *self.Xmax = x1
             *self.Ymax = y1
         endcase
         else: message, 'Incorrect number of parameters.'
     endcase
     
-    self.window.draw
+    self.window -> draw
 end
 
 
@@ -953,10 +956,16 @@ _REF_EXTRA = extra
     if n_elements(MISSING_VALUE) ne 0 then *self.missing_value = missing_value
     if n_elements(MISSING_COLOR) ne 0 then *self.missing_color = missing_color
     if n_elements(NAN)           ne 0 then *self.nan = keyword_set(nan)
-    if n_elements(PALETTE)       ne 0 then *self.palette = palette
     if n_elements(RANGE)         ne 0 then *self.range = range
     if n_elements(SCALE)         ne 0 then *self.scale = keyword_set(scale)
     if n_elements(TOP)           ne 0 then *self.top = top
+    
+    ;CTIndex takes precedence over PALETTE, so it must be reset.
+    if n_elements(PALETTE) gt 0 then begin
+        *self.palette = palette
+        ptr_free, self.ctIndex
+        self.ctIndex = ptr_new(/ALLOCATE_HEAP)
+    endif
     
     ;Graphics Properties
     if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
@@ -1445,7 +1454,7 @@ _REF_EXTRA = extra
     ;Refresh the graphics?
     if keyword_set(current) $
         then theWin -> Refresh, DISABLE=~init_refresh $
-        else self.window -> Draw
+        else self -> Refresh
 
     return, 1
 end

@@ -1848,7 +1848,7 @@ _REF_EXTRA=extra
     ;Refresh the graphics?
     if keyword_set(current) $
         then theWin -> Refresh, DISABLE=~init_refresh $
-        else self.window -> Draw
+        else self -> Refresh
 
     return, 1
 end

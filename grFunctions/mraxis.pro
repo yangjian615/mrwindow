@@ -69,7 +69,7 @@
 ;       2013/11/27  -   Written by Matthew Argall.
 ;-
 ;*****************************************************************************************
-function MrCreateGraphic::Axis, xloc, yloc, zloc, $
+function MrAxis, xloc, yloc, zloc, $
  CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2

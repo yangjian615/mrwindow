@@ -1023,40 +1023,50 @@ pro MrPlotManager::SetGlobal, $
 CHARSIZE = charsize, $
 CHARTHICK = charthick, $
 TICKLEN = ticklen, $
+TITLE = title, $
 THICK = thick, $
 XCHARSIZE = xcharsize, $
 XGRIDSTYLE = xgridstyle, $
 XMINOR = xminor, $
+XRANGE = xrange, $
 XSTYLE = xstyle, $
 XTHICK = xthick, $
 XTICKFORMAT = xtickformat, $
 XTICKLAYOUT = xticklayout, $
 XTICKLEN = xticklen, $
 XTICKNAME = xtickname, $
+XTICKS = xticks, $
 XTICKUNITS = xtickunits, $
 XTICKV = xtickv, $
+XTITLE = xtitle, $
 YCHARSIZE = ycharsize, $
 YGRIDSTYLE = ygridstyle, $
 YMINOR = yminor, $
+YRANGE = yrange, $
 YSTYLE = ystyle, $
 YTHICK = ythick, $
 YTICKFORMAT = ytickformat, $
 YTICKLAYOUT = yticklayout, $
 YTICKLEN = yticklen, $
 YTICKNAME = ytickname, $
+YTICKS = yticks, $
 YTICKUNITS = ytickunits, $
 YTICKV = ytickv, $
+YTITLE = ytitle, $
 ZCHARSIZE = zcharsize, $
 ZGRIDSTYLE = zgridstyle, $
 ZMINOR = zminor, $
+ZRANGE = zrange, $
 ZSTYLE = zstyle, $
 ZTHICK = zthick, $
 ZTICKFORMAT = ztickformat, $
 ZTICKLAYOUT = zticklayout, $
 ZTICKLEN = zticklen, $
 ZTICKNAME = ztickname, $
+ZTICKS = zticks, $
 ZTICKUNITS = ztickunits, $
-ZTICKV = ztickv
+ZTICKV = ztickv, $
+ZTITLE = ztitle
     compile_opt idl2
 
     ;Error handling
@@ -1071,6 +1081,9 @@ ZTICKV = ztickv
     ;Disable refresh
     self -> GetProperty, REFRESH=refresh_in
     self -> Refresh, /DISABLE
+    
+    ;If we are changing CHARSIZE, set the character size of the window, too
+    if n_elements(charsize) gt 0 then self -> SetProperty, CHARSIZE=charsize
 
     ;Get all of the objects
     allObjs = self -> Get(/ALL, COUNT=nObjs)
@@ -1083,47 +1096,56 @@ ZTICKV = ztickv
         if IsMember((*self.gTypes).data, oClass) then begin
             allObjs[i] -> SetProperty, CHARSIZE = charsize, $
                                        CHARTHICK = charthick, $
-                                       TICKLEN = ticklen, $
                                        THICK = thick, $
+                                       TICKLEN = ticklen, $
+                                       TITLE = title, $
                                        XCHARSIZE = xcharsize, $
                                        XGRIDSTYLE = xgridstyle, $
                                        XMINOR = xminor, $
+                                       XRANGE = xrange, $
                                        XSTYLE = xstyle, $
                                        XTHICK = xthick, $
                                        XTICKFORMAT = xtickformat, $
                                        XTICKLAYOUT = xticklayout, $
                                        XTICKLEN = xticklen, $
                                        XTICKNAME = xtickname, $
+                                       XTICKS = xticks, $
                                        XTICKUNITS = xtickunits, $
                                        XTICKV = xtickv, $
+                                       XTITLE = xtitle, $
                                        YCHARSIZE = ycharsize, $
                                        YGRIDSTYLE = ygridstyle, $
                                        YMINOR = yminor, $
+                                       YRANGE = yrange, $
                                        YSTYLE = ystyle, $
                                        YTHICK = ythick, $
                                        YTICKFORMAT = ytickformat, $
                                        YTICKLAYOUT = yticklayout, $
                                        YTICKLEN = yticklen, $
                                        YTICKNAME = ytickname, $
+                                       YTICKS = yticks, $
                                        YTICKUNITS = ytickunits, $
                                        YTICKV = ytickv, $
+                                       YTITLE = ytitle, $
                                        ZCHARSIZE = zcharsize, $
                                        ZGRIDSTYLE = zgridstyle, $
                                        ZMINOR = zminor, $
+                                       ZRANGE = zrange, $
                                        ZSTYLE = zstyle, $
                                        ZTHICK = zthick, $
                                        ZTICKFORMAT = ztickformat, $
                                        ZTICKLAYOUT = zticklayout, $
                                        ZTICKLEN = zticklen, $
                                        ZTICKNAME = ztickname, $
+                                       ZTICKS = zticks, $
                                        ZTICKUNITS = ztickunits, $
-                                       ZTICKV = ztickv
+                                       ZTICKV = ztickv, $
+                                       ZTITLE = ztitle
 
         ;Otherwise, for select annotation layer objects...
         endif else if IsMember(['WETEXT', 'WECOLORBAR', 'WELEGENDITEM'], oClass) then begin
             allObjs[i] -> SetProperty, CHARSIZE = charsize, $
                                        CHARTHICK = charthick, $
-                                       TICKLEN = ticklen, $
                                        THICK = thick
         endif
     endfor
