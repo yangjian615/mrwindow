@@ -603,7 +603,7 @@ end
 ;   The purpose of this method is to find the [col,row] location of a plot given its
 ;   position. For plots in fixed positions, col=-1.
 ;
-; :Keywords:
+; :Params:
 ;       POSITION:       in, required, type=flarr(4)
 ;                       A position for which the location is to be found.
 ;
@@ -617,6 +617,9 @@ end
 ;                       If set, only fixed positions will be searched. If set to 0, only
 ;                           layout positions will be searched. If undefined, both fixed
 ;                           and layout positions will be searched.
+;       NFOUND:         out, optional, type=integer
+;                       A named variable into which the number of found locations will
+;                           be returned.
 ;
 ; :Returns:
 ;       LOCATION:       The [col, row] location of `POSITION`. If no match is found,
@@ -724,7 +727,7 @@ end
 ;                           The plot index of the plot whose position is to be returned.
 ;                               Fixed locations have a negative plot index.
 ;
-; :Keywords:
+; :Returns:
 ;       POSITION:           The position of the plot at `PINDEX`.
 ;-
 function MrGrLayout::GetPosition, pIndex
@@ -1250,10 +1253,10 @@ end
 ;   plot that already exists within the 2D plotting grid.
 ;
 ; :Params:
-;       OLD_POSITION:       in, required, type={1 | 4}-element vector
+;       OLDPINDEX:          in, required, type={1 | 4}-element vector
 ;                           The plot-index or 4-element position of the plot
 ;                               whose position is to be changed.
-;       NEW_POSITION:       in, required, type={1 | 3 | 4}-element vector
+;       NEWLAYOUT:          in, required, type={1 | 3 | 4}-element vector
 ;                           The plot-index, layout, or 4-element position to where the
 ;                               plot indicated by `OLD_POSITION` is to be moved. If a
 ;                               4-element position is provided, the plot will be placed
@@ -1702,7 +1705,7 @@ end
 ;   This method initializes the MrGrLayout object.
 ;
 ; :Keywords:
-;       LAYOUT:         in, optional, type=intarr(2), default=[0,0]
+;       LAYOUT:         in, optional, type=intarr(2), default=[0\,0]
 ;                       A 2 element vector specifying the number of plots in the vertical
 ;                           and horizontal directions, [ncols, nrows].
 ;       UPDATE_LAYOUT:  in, optional, type=boolean, default=0

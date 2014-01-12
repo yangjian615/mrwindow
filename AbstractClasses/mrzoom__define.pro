@@ -865,7 +865,7 @@ end
 ;                           The zoom mode associated with the left mouse button.
 ;       RMODE:              out, optional, type=int
 ;                           The zoom mode associated with the right mouse button.
-;       WMODE:              out, optiona, type=int
+;       WMODE:              out, optional, type=int
 ;                           The zoom mode associated with the mouse wheel.
 ;       ZOOMFACTOR:         out, optional, type=float/fltarr(2)
 ;                           The zoom factor with which the mouse wheel will cause the
@@ -1016,7 +1016,7 @@ end
 ;                           The zoom mode associated with the left mouse button.
 ;       RMODE:              in, optional, type=int
 ;                           The zoom mode associated with the right mouse button.
-;       WMODE:              in, optiona, type=int
+;       WMODE:              in, optional, type=int
 ;                           The zoom mode associated with the mouse wheel.
 ;       ZOOMFACTOR:         in, optional, type=float/fltarr(2)
 ;                           The zoom factor with which the mouse wheel will cause the
@@ -1672,7 +1672,7 @@ end
 ;                           The zoom mode associated with the left mouse button.
 ;       RMODE:              in, optional, type=int
 ;                           The zoom mode associated with the right mouse button.
-;       WMODE:              in, optiona, type=int
+;       WMODE:              in, optional, type=int
 ;                           The zoom mode associated with the mouse wheel.
 ;       ZOOMFACTOR:         in, optional, type=float/fltarr(2)
 ;                           The zoom factor with which the mouse wheel will cause the

@@ -102,12 +102,12 @@
 ;                           are to be drawn.
 ;
 ; :Keywords:
-;       DATA:           in, optional, tyep=boolean
+;       DATA:           in, optional, type=boolean
 ;                       Indicate that `POSITION` are provided in data coordinates.
-;       DEVICE:         in, optional, tyep=boolean
+;       DEVICE:         in, optional, type=boolean
 ;                       Indicate that `POSITION` are provided in device coordinates. This
 ;                           is the default.
-;       NORMAL:         in, optional, tyep=boolean
+;       NORMAL:         in, optional, type=boolean
 ;                       Indicate that `POSITION` are provided in normal coordinates.
 ;-
 function MrManipulate::ClickedInside, x, y, position, $
@@ -184,12 +184,12 @@ end
 ;       TRANSLATE:      in, optional, type=boolean
 ;                       If set, points for translation will be selected.
 ;
-;       DATA:           in, optional, tyep=boolean
+;       DATA:           in, optional, type=boolean
 ;                       Indicate that `POINTS` are provided in data coordinates.
-;       DEVICE:         in, optional, tyep=boolean
+;       DEVICE:         in, optional, type=boolean
 ;                       Indicate that `POINTS` are provided in device coordinates. This
 ;                           is assumed.
-;       NORMAL:         in, optional, tyep=boolean
+;       NORMAL:         in, optional, type=boolean
 ;                       Indicate that `POINTS` are provided in normal coordinates.
 ;-
 pro MrManipulate::DrawBoxAroundPoints, points, $
@@ -408,11 +408,6 @@ end
 ;   Determine which "Manipulate Menu" button was pressed and tell the draw widget which
 ;   type of events to pay attention to.
 ;
-; :Params:
-;       POINTS:         in, required, type=2xN numeric
-;                       The [x,y]-coordinates of the points around which 4x4 pixel boxes
-;                           are to be drawn.
-;
 ; :Keywords:
 ;       ROTATE:         in, optional, type=boolean
 ;                       If set, points for rotation will be selected.
@@ -420,6 +415,10 @@ end
 ;                       If set, points for stretching will be selected.
 ;       TRANSLATE:      in, optional, type=boolean
 ;                       If set, points for translation will be selected.
+;
+; :Returns:
+;       POINTSTOBOX:    The [x,y]-coordinates of the points around which 4x4 pixel boxes
+;                           are to be drawn.
 ;-
 function MrManipulate::GetPointsToBox, $
 TRANSLATE = translate, $

@@ -97,12 +97,14 @@ NOERASE  = noerase
         return
     endif
 
-    ;Now draw the plot to the pixmap
-    self -> doPlot, NOERASE=noerase, CONTINUE=continue
+    ;Return if we are hiding
+    if self.hide then return
     
-    ;Draw the other items
-    oContained = self -> Get(/ALL, COUNT=count)
-    if count gt 0 then for i = 0, count - 1 do oContained[i] -> Draw, /NOERASE
+    ;If data coordinates were chosen, then restore the target's coordinate system.
+    if self.data then self.target -> RestoreCoords
+
+    ;Now draw the plot to the pixmap
+    self -> doPlotS, NOERASE=noerase, CONTINUE=continue
 end
 
 
@@ -110,7 +112,7 @@ end
 ;   The purpose of this method is to do the actual plotting. Basically, having this here
 ;   merely to saves space in the Draw method.
 ;-
-pro MrPlotS::doPlot, $
+pro MrPlotS::doPlotS, $
 CONTINUE=continue, $
 NOERASE=noerase
     compile_opt idl2
@@ -122,30 +124,65 @@ NOERASE=noerase
         void = cgErrorMsg()
         return
     endif
-    
-    if n_elements(noerase) eq 0 then noerase = *self.noerase
 
-    ;Draw the plot.
-    cgPlotS, *self.xcoords, *self.ycoords, *self.zcoords, $
+    nparams = 0
+    if n_elements(*self.xcoords) gt 0 then nparams += 1
+    if n_elements(*self.ycoords) gt 0 then nparams += 1
+    if n_elements(*self.zcoords) gt 0 then nparams += 1
 
-             ;cgPlotS Properties
-             COLOR      = *self.color, $
-             MAP_OBJECT =  self.map_object, $
-             PSYM       = *self.psym, $
-             SYMCOLOR   = *self.symcolor, $
-             SYMSIZE    = *self.symsize, $
-
-             ;PlotS Properties
-             CONTINUE   =       continue, $
-             CLIP       = *self.clip, $
-             DATA       = *self.data, $
-             DEVICE     = *self.device, $
-             NORMAL     = *self.normal, $
-             LINESTYLE  = *self.linestyle, $
-             NOCLIP     = *self.noclip, $
-             T3D        = *self.t3d, $
-             THICK      = *self.thick, $
-             Z          = *self.zvalue
+    ;cgPlotS
+    case nparams of
+        1: cgPlotS, *self.xcoords, $
+                    COLOR      = *self.color, $
+                    MAP_OBJECT =  self.map_object, $
+                    PSYM       =  self.psym, $
+                    SYMCOLOR   = *self.symcolor, $
+                    SYMSIZE    =  self.symsize, $
+                    CONTINUE   =       continue, $
+                    CLIP       = *self.clip, $
+                    DATA       =  self.data, $
+                    DEVICE     =  self.device, $
+                    NORMAL     =  self.normal, $
+                    LINESTYLE  =  self.linestyle, $
+                    NOCLIP     =  self.noclip, $
+                    T3D        =  self.t3d, $
+                    THICK      =  self.thick, $
+                    Z          =  self.zvalue
+                    
+        2: cgPlotS, *self.xcoords, *self.ycoords, $
+                    COLOR      = *self.color, $
+                    MAP_OBJECT =  self.map_object, $
+                    PSYM       =  self.psym, $
+                    SYMCOLOR   = *self.symcolor, $
+                    SYMSIZE    =  self.symsize, $
+                    CONTINUE   =       continue, $
+                    CLIP       = *self.clip, $
+                    DATA       =  self.data, $
+                    DEVICE     =  self.device, $
+                    NORMAL     =  self.normal, $
+                    LINESTYLE  =  self.linestyle, $
+                    NOCLIP     =  self.noclip, $
+                    T3D        =  self.t3d, $
+                    THICK      =  self.thick, $
+                    Z          =  self.zvalue
+                    
+        3: cgPlotS, *self.xcoords, *self.ycoords, *self.zcoords, $
+                    COLOR      = *self.color, $
+                    MAP_OBJECT =  self.map_object, $
+                    PSYM       =  self.psym, $
+                    SYMCOLOR   = *self.symcolor, $
+                    SYMSIZE    =  self.symsize, $
+                    CONTINUE   =       continue, $
+                    CLIP       = *self.clip, $
+                    DATA       =  self.data, $
+                    DEVICE     =  self.device, $
+                    NORMAL     =  self.normal, $
+                    LINESTYLE  =  self.linestyle, $
+                    NOCLIP     =  self.noclip, $
+                    T3D        =  self.t3d, $
+                    THICK      =  self.thick, $
+                    Z          =  self.zvalue
+    endcase
 end
 
 
@@ -153,11 +190,71 @@ end
 ;   The purpose of this method is to retrieve object properties
 ;
 ; :Keywords:
+;       XCOORDS:        out, required, type=numeric
+;                       A vector or scalar argument providing the X components of the
+;                           points to be connected. If only one argument is specified,
+;                           X must be an array of either two or three vectors
+;                           (i.e., (2,*) or (3,*)). In this special case, X[0,*] are
+;                           taken as the X values, X[1,*] are taken as the `Y` values,
+;                           and X[2,*] are taken as the `Z` values.
+;       YCOORDS:        out, optional, type=numeric
+;                       Y coordinate(s) of the points to be connected.
+;       ZCOORDS:        out, optional, type=numeric
+;                       Z coordinate(s) of the points to be connected.
+;       CLIP:           out, optional, type=fltarr(4)
+;                       The coordinates of a rectangle used to clip the graphics output.
+;                           Coordinates are specified in data units unless `NORMAL` or
+;                           `DEVICE` is specified.
+;       COLOR:          out, optional, type=string/byte/integer/long
+;                       The name of the fill color. Color names are those used with cgColor. 
+;                           This value can also be a long integer or an index into the
+;                           current color table.
+;       DATA:           out, optional, type=boolean
+;                       Indicate that polygon vertices are in data coordinates. This is
+;                           the default.
+;       DEVICE:         out, optional, type=boolean
+;                       Set to indicate the polygon vertices are in device coordinates.
+;       LINESYTLE:      out, optiona, type=integer
+;                       Line style used to draw lines when `LINE_FILL` is set.
+;       MAP_OBJECT:     out, optional, type=object
+;                       If you are drawing on a map projection set up with Map_Proj_Init
+;                           and using projected meter space, rather than lat/lon space,
+;                           then you can use this keyword to provide a cgMap object that
+;                           will allow you to convert the `x` and `y` parameters from
+;                           longitude and latitude, respectively, to projected meter space
+;                           before drawing. X and Y must both be present.
+;       NOCLIP:         out, optional, type=boolean
+;                       If set, suppresses clipping of the polygons.
+;       NORMAL:         out, optional, type=boolean
+;                       Set to indicate the polygon vertices are in normalized coordinates.
+;       PSYM:           out, optional, type=integer
+;                       Any normal IDL PSYM values, plus any value supported by the Coyote
+;                           Library routine cgSYMCAT. An integer between 0 and 46. May
+;                           also be specified as a symbol names. See `cgSymCat` for details.
+;       SYMCOLOR:       out, optional, type=string/integer/vector
+;                       If this keyword is a string, the name of the symbol color. By
+;                           default, same as COLOR. Otherwise, the keyword is assumed to
+;                           be a color index into the current color table. May be a vector
+;                           of the same length as X.
+;       SYMSIZE:        out, optional, type=float/vector
+;                       A scalar or vector of symbol sizes. Default is 1.0. May be a
+;                           vector of the same length as X.
+;       TARGET:         out, optional, type=object
+;                       If coordinates are given in data units, set this to the graphic
+;                           object that defines the data space.
+;       T3D:            out, optional, type=boolean
+;                       If set, the generalized transformation matrix in !P.T will be used.
+;       THICK:          out, optional, type=float
+;                       Thickness of the lines when `POLY_FILL` is set.
+;       ZVALUE:         out, optional, type=float
+;                       Provides the Z coordinate if a Z parameter is not present in the
+;                           call. This is of use only if `T3D` is set.
 ;-
 pro MrPlotS::GetProperty, $
 XCOORDS=xcoords, $
 YCOORDS=ycoords, $
 ZCOORDS=zcoords, $
+TARGET=target, $
 
 ;cgPlotS Properties
 COLOR=color, $
@@ -194,25 +291,29 @@ ZVALUE=zvalue
 
     ;cgPlotS Properties
     if arg_present(color)     ne 0 then color     = *self.color
-    if arg_present(psym)      ne 0 then psym      = *self.psym
+    if arg_present(psym)      ne 0 then psym      =  self.psym
     if arg_present(symcolor)  ne 0 then symcolor  = *self.symcolor
-    if arg_present(symsize)   ne 0 then symsize   = *self.symsize
+    if arg_present(symsize)   ne 0 then symsize   =  self.symsize
     
     ;PlotS Properties
     if arg_present(clip)      ne 0 then clip      = *self.clip
-    if arg_present(data)      ne 0 then data      = *self.data
-    if arg_present(device)    ne 0 then device    = *self.device
-    if arg_present(normal)    ne 0 then normal    = *self.normal
-    if arg_present(linestyle) ne 0 then linestyle = *self.linestyle
-    if arg_present(noclip)    ne 0 then noclip    = *self.noclip
-    if arg_present(t3d)       ne 0 then t3d       = *self.t3d
-    if arg_present(thick)     ne 0 then thick     = *self.thick
-    if arg_present(zvalue)    ne 0 then zvalue    = *self.zvalue
+    if arg_present(data)      ne 0 then data      =  self.data
+    if arg_present(device)    ne 0 then device    =  self.device
+    if arg_present(normal)    ne 0 then normal    =  self.normal
+    if arg_present(linestyle) ne 0 then linestyle =  self.linestyle
+    if arg_present(noclip)    ne 0 then noclip    =  self.noclip
+    if arg_present(t3d)       ne 0 then t3d       =  self.t3d
+    if arg_present(thick)     ne 0 then thick     =  self.thick
+    if arg_present(zvalue)    ne 0 then zvalue    =  self.zvalue
     
     ;Map Object
     if arg_present(map_object) ne 0 then if obj_valid(self.map_object) $
         then map_object = self.map_object $
         else map_object = obj_new()
+
+    IF Arg_Present(target) GT 0 THEN IF Obj_Valid(self.target) GT 0 $
+        THEN target = self.target $
+        ELSE target = Obj_New()
 end
 
 
@@ -220,12 +321,71 @@ end
 ;   The purpose of this method is to set object properties. 
 ;
 ; :Keywords:
+;       XCOORDS:        in, required, type=numeric
+;                       A vector or scalar argument providing the X components of the
+;                           points to be connected. If only one argument is specified,
+;                           X must be an array of either two or three vectors
+;                           (i.e., (2,*) or (3,*)). In this special case, X[0,*] are
+;                           taken as the X values, X[1,*] are taken as the `Y` values,
+;                           and X[2,*] are taken as the `Z` values.
+;       YCOORDS:        in, optional, type=numeric
+;                       Y coordinate(s) of the points to be connected.
+;       ZCOORDS:        in, optional, type=numeric
+;                       Z coordinate(s) of the points to be connected.
+;       CLIP:           in, optional, type=fltarr(4)
+;                       The coordinates of a rectangle used to clip the graphics output.
+;                           Coordinates are specified in data units unless `NORMAL` or
+;                           `DEVICE` is specified.
+;       COLOR:          in, optional, type=string/byte/integer/long
+;                       The name of the fill color. Color names are those used with cgColor. 
+;                           This value can also be a long integer or an index into the
+;                           current color table.
+;       DATA:           in, optional, type=boolean
+;                       Indicate that polygon vertices are in data coordinates. This is
+;                           the default.
+;       DEVICE:         in, optional, type=boolean
+;                       Set to indicate the polygon vertices are in device coordinates.
+;       LINESYTLE:      in, optiona, type=integer
+;                       Line style used to draw lines when `LINE_FILL` is set.
+;       MAP_OBJECT:     in, optional, type=object
+;                       If you are drawing on a map projection set up with Map_Proj_Init
+;                           and using projected meter space, rather than lat/lon space,
+;                           then you can use this keyword to provide a cgMap object that
+;                           will allow you to convert the `x` and `y` parameters from
+;                           longitude and latitude, respectively, to projected meter space
+;                           before drawing. X and Y must both be present.
+;       NOCLIP:         in, optional, type=boolean
+;                       If set, suppresses clipping of the polygons.
+;       NORMAL:         in, optional, type=boolean
+;                       Set to indicate the polygon vertices are in normalized coordinates.
+;       PSYM:           in, optional, type=integer
+;                       Any normal IDL PSYM values, plus any value supported by the Coyote
+;                           Library routine cgSYMCAT. An integer between 0 and 46. May
+;                           also be specified as a symbol names. See `cgSymCat` for details.
+;       SYMCOLOR:       in, optional, type=string/integer/vector
+;                       If this keyword is a string, the name of the symbol color. By
+;                           default, same as COLOR. Otherwise, the keyword is assumed to
+;                           be a color index into the current color table. May be a vector
+;                           of the same length as X.
+;       SYMSIZE:        in, optional, type=float/vector
+;                       A scalar or vector of symbol sizes. Default is 1.0. May be a
+;                           vector of the same length as X.
+;       TARGET:         in, optional, type=object
+;                       If coordinates are given in data units, set this to the graphic
+;                           object that defines the data space.
+;       T3D:            in, optional, type=boolean
+;                       If set, the generalized transformation matrix in !P.T will be used.
+;       THICK:          in, optional, type=float
+;                       Thickness of the lines when `POLY_FILL` is set.
+;       ZVALUE:         in, optional, type=float
+;                       Provides the Z coordinate if a Z parameter is not present in the
+;                           call. This is of use only if `T3D` is set.
 ;-
 pro MrPlotS::SetProperty, $
 XCOORDS=xcoords, $
 YCOORDS=ycoords, $
 ZCOORDS=zcoords, $
-DRAW=draw, $
+TARGET=target, $
 
 ;cgPlotS Properties
 COLOR=color, $
@@ -261,22 +421,61 @@ ZVALUE=zvalue
 
     ;cgPlotS Properties
     if n_elements(color)     ne 0 then *self.color = color
-    if n_elements(psym)      ne 0 then *self.psym = psym
+    if n_elements(psym)      ne 0 then  self.psym = psym
     if n_elements(symcolor)  ne 0 then *self.symcolor = symcolor
-    if n_elements(symsize)   ne 0 then *self.symsize = symsize
+    if n_elements(symsize)   ne 0 then  self.symsize = symsize
     
     ;PlotS Properties
     if n_elements(clip)      ne 0 then *self.clip = clip
-    if n_elements(data)      ne 0 then *self.data = data
-    if n_elements(device)    ne 0 then *self.device = device
-    if n_elements(normal)    ne 0 then *self.normal = normal
-    if n_elements(linestyle) ne 0 then *self.linestyle = linestyle
-    if n_elements(noclip)    ne 0 then *self.noclip = noclip
-    if n_elements(t3d)       ne 0 then *self.t3d = t3d
-    if n_elements(thick)     ne 0 then *self.thick = thick
-    if n_elements(zvalue)    ne 0 then *self.zvalue = zvalue
+    if n_elements(linestyle) ne 0 then  self.linestyle = linestyle
+    if n_elements(noclip)    ne 0 then  self.noclip = noclip
+    if n_elements(t3d)       ne 0 then  self.t3d = t3d
+    if n_elements(thick)     ne 0 then  self.thick = thick
+    if n_elements(zvalue)    ne 0 then  self.zvalue = zvalue
+
+    IF N_Elements(target) GT 0 THEN IF Obj_Valid(target) $
+        THEN self.target = target $
+        ELSE self.target = Obj_New()
+
+;-----------------------------------------------------
+;Data, Device, Normal \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
+    ;They depend on one another.
+    if n_elements(data) gt 0 then begin
+        data = keyword_set(data)
+        if data then begin
+            self.normal = 0B
+            self.device = 0B
+        endif
+        
+        self.data = data
+    endif
     
-    ;Map Object
+    if n_elements(device) gt 0 then begin
+        device = keyword_set(device)
+        if device then begin
+            self.data = 0B
+            self.normal = 0B
+        endif
+        
+        self.device = device
+    endif
+    
+    if n_elements(normal) gt 0 then begin
+        normal = keyword_set(normal)
+        if normal then begin
+            self.data = 0B
+            self.device = 0B
+        endif
+        
+        self.normal = normal
+    endif
+    
+    if self.data + self.device + self.normal eq 0 then self.data = 1B
+
+;-----------------------------------------------------
+;Map Object \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
     if n_elements(map_object) ne 0 then begin
         ;Destroy the current map object
         obj_destroy, self.map_object
@@ -287,8 +486,10 @@ ZVALUE=zvalue
             else self.map_object = obj_new()
     endif
     
-    ;Draw?
-    if keyword_set(draw) then self -> draw
+;-----------------------------------------------------
+;Finish Up \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
+    self.window -> Draw
 end
 
 
@@ -310,56 +511,87 @@ pro MrPlotS::cleanup
     ptr_free, self.xcoords
     ptr_free, self.ycoords
     ptr_free, self.zcoords
-
-    ;cgPlotS Properties
     ptr_free, self.color
-    ptr_free, self.psym
     ptr_free, self.symcolor
-    ptr_free, self.symsize
-
-    ;PlotS Properties
     ptr_free, self.clip
-    ptr_free, self.data
-    ptr_free, self.device
-    ptr_free, self.normal
-    ptr_free, self.linestyle
-    ptr_free, self.noclip
-    ptr_free, self.t3d
-    ptr_free, self.thick
-    ptr_free, self.zvalue
     
     ;Destroy Map Objects
     if obj_valid(self.map_object) then obj_destroy, self.map_object
-
-    ;Cleanup the superclass.
-    self -> MrIDL_Container::Cleanup
 end
 
 
 ;+
+;   The purpose of this method is to initialize the object.
 ;
 ; :Params:
-;       XCOORDS:            in, required, type=numeric
-;                           A vector or scalar argument providing the X components of the
-;                               points to be connected. If only one argument is specified,
-;                               X must be an array of either two or three vectors
-;                               (i.e., (2,*) or (3,*)). In this special case, X[0,*] are
-;                               taken as the X values, X[1,*] are taken as the `Y` values,
-;                               and X[2,*] are taken as the `Z` values.
-;       YCOORDS:            in, optional, type=numeric
-;                           Y coordinate(s) of the points to be connected.
-;       ZCOORDS:            in, optional, type=numeric
-;                           Z coordinate(s) of the points to be connected.
+;       XCOORDS:        in, required, type=numeric
+;                       A vector or scalar argument providing the X components of the
+;                           points to be connected. If only one argument is specified,
+;                           X must be an array of either two or three vectors
+;                           (i.e., (2,*) or (3,*)). In this special case, X[0,*] are
+;                           taken as the X values, X[1,*] are taken as the `Y` values,
+;                           and X[2,*] are taken as the `Z` values.
+;       YCOORDS:        in, optional, type=numeric
+;                       Y coordinate(s) of the points to be connected.
+;       ZCOORDS:        in, optional, type=numeric
+;                       Z coordinate(s) of the points to be connected.
 ;
-; :Uses:
-;   Uses the following external programs::
-;       MrIDL_Container__Define.pro
-;       error_message.pro (Coyote Graphics)
+; :Keywords:
+;       CLIP:           in, optional, type=fltarr(4)
+;                       The coordinates of a rectangle used to clip the graphics output.
+;                           Coordinates are specified in data units unless `NORMAL` or
+;                           `DEVICE` is specified.
+;       COLOR:          in, optional, type=string/byte/integer/long, default='rose'
+;                       The name of the fill color. Color names are those used with cgColor. 
+;                           This value can also be a long integer or an index into the
+;                           current color table.
+;       DATA:           in, optional, type=boolean, default=1
+;                       Indicate that polygon vertices are in data coordinates. This is
+;                           the default.
+;       DEVICE:         in, optional, type=boolean, default=0
+;                       Set to indicate the polygon vertices are in device coordinates.
+;       LINESYTLE:      in, optiona, type=integer, default=0
+;                       Line style used to draw lines when `LINE_FILL` is set.
+;       MAP_OBJECT:     in, optional, type=object
+;                       If you are drawing on a map projection set up with Map_Proj_Init
+;                           and using projected meter space, rather than lat/lon space,
+;                           then you can use this keyword to provide a cgMap object that
+;                           will allow you to convert the `x` and `y` parameters from
+;                           longitude and latitude, respectively, to projected meter space
+;                           before drawing. X and Y must both be present.
+;       NOCLIP:         in, optional, type=boolean, default=0
+;                       If set, suppresses clipping of the polygons.
+;       NORMAL:         in, optional, type=boolean, default=0
+;                       Set to indicate the polygon vertices are in normalized coordinates.
+;       PSYM:           in, optional, type=integer
+;                       Any normal IDL PSYM values, plus any value supported by the Coyote
+;                           Library routine cgSYMCAT. An integer between 0 and 46. May
+;                           also be specified as a symbol names. See `cgSymCat` for details.
+;       SYMCOLOR:       in, optional, type=string/integer/vector, default=COLOR
+;                       If this keyword is a string, the name of the symbol color. By
+;                           default, same as COLOR. Otherwise, the keyword is assumed to
+;                           be a color index into the current color table. May be a vector
+;                           of the same length as X.
+;       SYMSIZE:        in, optional, type=float/vector, default=1.0
+;                       A scalar or vector of symbol sizes. Default is 1.0. May be a
+;                           vector of the same length as X.
+;       TARGET:         in, optional, type=object
+;                       If coordinates are given in data units, set this to the graphic
+;                           object that defines the data space.
+;       T3D:            in, optional, type=boolean, default=0
+;                       If set, the generalized transformation matrix in !P.T will be used.
+;       THICK:          in, optional, type=float, default=1.0
+;                       Thickness of the lines when `POLY_FILL` is set.
+;       ZVALUE:         in, optional, type=float
+;                       Provides the Z coordinate if a Z parameter is not present in the
+;                           call. This is of use only if `T3D` is set.
 ;-
 function MrPlotS::init, xcoords, ycoords, zcoords, $
+CURRENT=current, $
+TARGET=target, $
+
 ;cgPlotS Properties
 COLOR=color, $
-DRAW=draw, $
 MAP_OBJECT=map_object, $
 PSYM=psym, $
 SYMCOLOR=symcolor, $
@@ -369,13 +601,14 @@ SYMSIZE=symsize, $
 CLIP=clip, $
 DATA=data, $
 DEVICE=device, $
-NORMAL=normal, $
 LINESTYLE=linestyle, $
 NOCLIP=noclip, $
+NORMAL=normal, $
+TARGET=target, $
 T3D=t3d, $
 THICK=thick, $
 ZVALUE=zvalue
-    compile_opt idl2
+    compile_opt strictarr
 
     ;Error handling
     catch, the_error
@@ -386,39 +619,51 @@ ZVALUE=zvalue
     endif
 
 ;---------------------------------------------------------------------
-;Superclass Properties ///////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    if self -> MrIDL_Container::Init() eq 0 then return, 0
-
-;---------------------------------------------------------------------
 ;Keywords ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+    
+    setDefaultValue, symsize, 1.0
+    setDefaultValue, thick, 1.0
+    setDefaultValue, data, 0, /BOOLEAN
+    setDefaultValue, device, 0, /BOOLEAN
+    setDefaultValue, normal, 0, /BOOLEAN
+    if normal + device eq 0 then data = 1B
     
     ;Allocate heap for the variables
     self.xcoords    = ptr_new(/ALLOCATE_HEAP)
     self.ycoords    = ptr_new(/ALLOCATE_HEAP)
     self.zcoords    = ptr_new(/ALLOCATE_HEAP)
-
-    ;cgPlotS Properties
     self.color      = ptr_new(/ALLOCATE_HEAP)
-    self.psym       = ptr_new(/ALLOCATE_HEAP)
     self.symcolor   = ptr_new(/ALLOCATE_HEAP)
-    self.symsize    = ptr_new(/ALLOCATE_HEAP)
-  
-    ;PlotS Properties
     self.clip       = ptr_new(/ALLOCATE_HEAP)
-    self.data       = ptr_new(/ALLOCATE_HEAP)
-    self.device     = ptr_new(/ALLOCATE_HEAP)
-    self.normal     = ptr_new(/ALLOCATE_HEAP)
-    self.linestyle  = ptr_new(/ALLOCATE_HEAP)
-    self.noclip     = ptr_new(/ALLOCATE_HEAP)
-    self.t3d        = ptr_new(/ALLOCATE_HEAP)
-    self.thick      = ptr_new(/ALLOCATE_HEAP)
-    self.zvalue     = ptr_new(/ALLOCATE_HEAP)
     
     ;Objects
     self.map_object = obj_new()
+    self.target = obj_new()
+
+    ;If REFRESH=1 three things happen: If the call to MrGrAtom is
+    ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
+    ;      cause "Invalid pointer" errors.
+    ;   2. here, then, when MrGrAtom::_SetWindow creates a window, MrPlotManager will call
+    ;      the SetProperty method, which in turn calls the self.window -> Draw method.
+    ;      Since the data properties have not yet been set, an error will occur when trying
+    ;      to display it.
+    ;   3. after the call to SetProperty so that all of the data is loaded, the initial
+    ;      call to SetProperty will not have a valid self.window property. This is a
+    ;      problem because at the end of SetProperty, self.window -> Draw is called.
+    ;
+    ;To fix problem 1 and 3, put the call to MrGrAtom here. To fix problem 2,
+    ;turn Refresh off.
+    refresh_in = 1
+    if keyword_set(current) then begin
+        theWin = GetMrWindows(/CURRENT)
+        theWin -> GetProperty, REFRESH=refresh_in
+        theWin -> Refresh, /DISABLE
+    endif
+
+    ;Graphic Atom
+    if self -> MrGrAtom::INIT(CURRENT=current, _STRICT_EXTRA=extra) eq 0 then $
+        message, 'Unable to initialize MrGrAtom.'
 
 ;---------------------------------------------------------------------
 ;Set Object Properties ///////////////////////////////////////////////
@@ -442,11 +687,12 @@ ZVALUE=zvalue
                          LINESTYLE=linestyle, $
                          NOCLIP=noclip, $
                          T3D=t3d, $
+                         TARGET=target, $
                          THICK=thick, $
                          ZVALUE=zvalue
 
     ;Draw?
-    if keyword_set(draw) then self -> draw
+    self.window -> draw
 
     return, 1
 end
@@ -463,8 +709,8 @@ pro MrPlotS__define, class
     compile_opt idl2
     
     class = { MrPlotS, $
-              inherits MrIDL_Container, $
-             
+              inherits MrGrAtom, $
+
               ;Data Properties
               xcoords: ptr_new(), $         ;x-coordinates
               ycoords: ptr_new(), $         ;y-coordinates
@@ -473,19 +719,20 @@ pro MrPlotS__define, class
               ;cgPlotS Properties
               color: ptr_new(), $
               map_object: obj_new(), $
-              psym: ptr_new(), $
+              psym: 0B, $
               symcolor: ptr_new(), $
-              symsize: ptr_new(), $
+              symsize: 0.0, $
               
               ;PlotS Properties
               clip: ptr_new(), $
-              data: ptr_new(), $
-              device: ptr_new(), $
-              normal: ptr_new(), $
-              linestyle: ptr_new(), $
-              noclip: ptr_new(), $
-              t3d: ptr_new(), $
-              thick: ptr_new(), $
-              zvalue: ptr_new() $
+              data: 0B, $
+              device: 0B, $
+              normal: 0B, $
+              linestyle: 0B, $
+              noclip: 0B, $
+              t3d: 0B, $
+              target: obj_new(), $
+              thick: 0.0, $
+              zvalue: 0B $
             }
 end

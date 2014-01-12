@@ -37,11 +37,11 @@
 ; :Params:
 ;       IMAGE:          in, required, type=NxM numeric array
 ;                       Image to be displayed
-;       X:              in, optional, type=scalar, N-elements numeric
+;       X:              in, optional, type=scalar/Nx1 numeric
 ;                       If a scalar, then positioning is that of IDL's TV function. If a
 ;                           vector the same size as the first dimension of `IMAGE`, then
 ;                           the data coordinates of each pixel. See also, `PAINT`.
-;       Y:              in, optional, type=scalar, N-elements numeric
+;       Y:              in, optional, type=scalar/Mx1 numeric
 ;                       If a scalar, then positioning is that of IDL's TV function. If a
 ;                           vector the same size as the second dimension of `IMAGE`, then
 ;                           the data coordinates of each pixel. See also, `PAINT`.
@@ -92,7 +92,7 @@
 ;	Modification History::
 ;       2013/11/27  -   Written by Matthew Argall.
 ;-
-function MrImage, image, x, y, $
+function MrImage, image, x, y, x0, y0, x1, y1, $
  CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
@@ -106,7 +106,13 @@ _REF_EXTRA = extra
     endif
 
     ;Create the color bar
-    theImage = obj_new('MrImage', image, x, y, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
+    case n_params() of
+        1: theImage = obj_new('MrImage', image, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
+        3: theImage = obj_new('MrImage', image, x, y, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
+        5: theImage = obj_new('MrImage', image, x, y, x0, y0, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
+        7: theImage = obj_new('MrImage', image, x, y, x0, y0, x1, y1, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
+        else: message, 'Incorrect number of parameters.'
+    endcase
     
     return, theImage
 end

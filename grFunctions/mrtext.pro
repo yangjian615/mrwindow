@@ -79,7 +79,6 @@
 ;	Modification History::
 ;       2013/11/27  -   Written by Matthew Argall.
 ;-
-;*****************************************************************************************
 function MrText, xloc, yloc, text, $
  CURRENT=current, $
  OUTLOC = outloc, $

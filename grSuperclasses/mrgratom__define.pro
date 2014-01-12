@@ -82,6 +82,7 @@
 function MrGrAtom::IsInside, x, y, position, $
 DATA = data, $
 DELTA = delta, $
+DEVICE = device, $
 NORMAL = normal
     compile_opt idl2
     
@@ -167,11 +168,6 @@ end
 ;                           If set, a MrWindow object will be created to manage all
 ;                               graphics activities, but the display window will be a
 ;                               normal IDL direct graphics window.
-;       NOWINDOW:           in, optional, type=boolean, default=0
-;                           If set, no MrWindow object will be created and `THEWINDOW`
-;                               will be an invalid object reference. In this case, graphics
-;                               are displayed and handled in the normal Direct Graphics
-;                               manner.
 ;-
 pro MrGrAtom::_SetWindow, $
 BUFFER=buffer, $
@@ -283,7 +279,7 @@ end
 ;+
 ;   Set properties of the object.
 ;
-; :Params:
+; :Keywords:
 ;       HIDE:           out, optional, type=boolean
 ;                       If set, the graphic will not be displayed.
 ;       NAME:           out, optional, type=string
@@ -362,11 +358,6 @@ end
 ;                           not, a new window will be created.
 ;       NOGUI:          in, optional, type=boolean, default=0
 ;                       If set, graphics will be displayed in a normal IDL window.
-;       NOWINDOW:       in, optional, type=boolean, default=0
-;                       If set, no MrWindow object will be created and `THEWINDOW`
-;                           will be an invalid object reference. In this case, graphics
-;                           are displayed and handled in the normal Direct Graphics
-;                           manner.
 ;       HIDE:           in, optional, type=boolean, default=0
 ;                       If set, the graphic will not be displayed.
 ;       NAME:           in, optional, type=string, default=Obj_Class(self)
@@ -379,7 +370,6 @@ CURRENT = current, $
 HIDE = hide, $
 NAME = name, $
 NOGUI = noGUI, $
-NOWINDOW = noWindow, $
 REFRESH = refresh
     compile_opt strictarr
     

@@ -35,7 +35,7 @@
 ;+
 ;   The purpose of this method is to create an object out of the cgContour routine.
 ;
-; :Example:
+; :Examples:
 ;   Reproduce the "Filled Contour Plot" example in the 
 ;   `Coyote Graphics Gallery <http://www.idlcoyote.com/gallery/>`::
 ;
@@ -504,14 +504,27 @@ end
 
 
 ;+
-;   The purpose of this method is to get contour path information.
+;   The purpose of this method is to get contour path information. See IDL's `Contour
+;   Procedure <http://exelisvis.com/docs/CONTOUR_Procedure.html>` for more information
 ;
 ; :Params:
-;       TARGET:             out, optional, type=object
-;                           If `TF_OVERPLOT`=1, then the overplot target will be returned.
+;       PATH_INFO:          out, required, type=structure
+;                           Named variable that will return path information for the
+;                               contours.
+;       PATH_XY:            out, optional, type=structure
+;                           named variable that returns the coordinates of a set of closed
+;                               polygons defining the closed paths of the contours.
 ;
-; :Returns:
-;       TF_OVERPLOT:        True (1) if overplotting, false (0) if not.
+; :Keywords:
+;       OLEVELS:            out, optional, type=fltarr
+;                           Set to a named variable to return the actual contour levels
+;                               used in the program.
+;       PATH_DATA_COORDS:   in, optional, type=boolean, default=0
+;                           If set, path info will be returned in data coordinates.
+;       PATH_DOUBLE:        in, optional, type=boolean, default=0
+;                           If set, path information will be returned in double precision.
+;       PATH_FILENAME:      in, optional, type=string
+;                           If provided, path information will be output to this file.
 ;-
 pro MrContour::GetPath, path_info, path_xy, $
 OLEVELS=oLevels, $
@@ -553,11 +566,6 @@ end
 ;   The purpose of this method is to set object properties. 
 ;
 ; :Keywords:
-;       ASPECT:         out, optional, type=float
-;                       Set this keyword to a floating point ratio that represents the aspect ratio 
-;                           (ysize/xsize) of the resulting plot. The plot position may change as a result
-;                           of setting this keyword. Note that `Aspect` cannot be used when plotting with
-;                           !P.MULTI.
 ;       AXISCOLOR:      out, optional, type=string/integer
 ;                       If this keyword is a string, the name of the axis color. 
 ;                           Otherwise, the keyword is assumed to be a color index into the current color table.
@@ -601,9 +609,6 @@ end
 ;                       Close contours that intersect the plot boundaries. Set CLOSED=0
 ;                           along with `PATH_INFO` and/or `PATH_XY` to return path
 ;                           information for contours that are not closed.
-;       COLOR:          out, optional, type=string/integer
-;                       If this keyword is a string, the name of the data color. By default, same as AXISCOLOR.
-;                           Otherwise, the keyword is assumed to be a color index into the current color table.
 ;       FILL:           out, optional, type=boolean
 ;                       Set to indicate filled contours should be created.
 ;       IRREGULAR:      out, optional, type=boolean
@@ -618,13 +623,6 @@ end
 ;                           no contour levels are labelled. A 1 (the default) means all contour levels are
 ;                           labelled. A 2 means label every 2nd contour level is labelled. A 3 means every 
 ;                           3rd contour level is labelled, and so on.
-;       LAYOUT:         out, optional, type=intarr(3)
-;                       This keyword specifies a grid with a graphics window and determines where the
-;                           graphic should appear. The syntax of LAYOUT is three numbers: [ncolumns, nrows, location].
-;                           The grid is determined by the number of columns (ncolumns) by the number of 
-;                           rows (nrows). The location of the graphic is determined by the third number. The
-;                           grid numbering starts in the upper left (1) and goes sequentually by column and then
-;                           by row.
 ;       LEVELS:         out, optional, type=any
 ;                       A vector of data levels to contour. If used, NLEVELS is ignored. If missing, 
 ;                           NLEVELS is used to construct N equally-spaced contour levels.
@@ -642,8 +640,6 @@ end
 ;                       Data points with values below this value are ignored.
 ;       MISSINGVALUE:   out, optional, type=any
 ;                       Use this keyword to identify any missing data in the input data values.
-;       NAME:           out, optional, type=string
-;                       Name of the graphic.
 ;       NLEVELS:        out, optional, type=integer
 ;                       If the Contour plot LEVELS keyword is not used, this keyword will produce this
 ;                           number of equally spaced contour intervals. Unlike the Contour NLEVELS keyword,
@@ -876,7 +872,7 @@ DISABLE=disable
     ;Disable overplotting
     if keyword_set(disable) then begin
         self.window -> Make_Location, location
-        self.window -> SetPosition, (*self.layout)[2:*], location
+        self.window -> SetPosition, self.layout[2:*], location
         self.overplot = 0B
         self.target = obj_new()
 
@@ -1073,9 +1069,6 @@ end
 ;                       Close contours that intersect the plot boundaries. Set CLOSED=0
 ;                           along with `PATH_INFO` and/or `PATH_XY` to return path
 ;                           information for contours that are not closed.
-;       COLOR:          in, optional, type=string/integer
-;                       If this keyword is a string, the name of the data color. By default, same as AXISCOLOR.
-;                           Otherwise, the keyword is assumed to be a color index into the current color table.
 ;       FILL:           in, optional, type=boolean
 ;                       Set to indicate filled contours should be created.
 ;       IRREGULAR:      in, optional, type=boolean
@@ -1279,7 +1272,7 @@ _REF_EXTRA=extra
     if n_elements(xlog)          ne 0 then  self.xlog          = xlog
     if n_elements(ylog)          ne 0 then  self.ylog          = ylog
     if n_elements(path_data_coords)   ne 0 then *self.path_data_coords = path_data_coords
-    
+
     if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
     if n_elements(charsize) gt 0 then self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
 
@@ -1395,11 +1388,6 @@ end
 ;                           the contour surface.
 ;       
 ; :Keywords:
-;       ASPECT:         in, optional, type=float, default=none
-;                       Set this keyword to a floating point ratio that represents the aspect ratio 
-;                           (ysize/xsize) of the resulting plot. The plot position may change as a result
-;                           of setting this keyword. Note that `Aspect` cannot be used when plotting with
-;                           !P.MULTI.
 ;       AXISCOLOR:      in, optional, type=string/integer, default='opposite'
 ;                       If this keyword is a string, the name of the axis color. 
 ;                           Otherwise, the keyword is assumed to be a color index into the current color table.
@@ -1443,15 +1431,8 @@ end
 ;                       Close contours that intersect the plot boundaries. Set CLOSED=0
 ;                           along with `PATH_INFO` and/or `PATH_XY` to return path
 ;                           information for contours that are not closed.
-;       COLOR:          in, optional, type=string/integer, default='black'
-;                       If this keyword is a string, the name of the data color. By default, same as AXISCOLOR.
-;                           Otherwise, the keyword is assumed to be a color index into the current color table.
 ;       FILL:           in, optional, type=boolean, default=0
 ;                       Set to indicate filled contours should be created.
-;       TARGET:         in, optional, type=object, default=obj_new()
-;                       If this keyword is set equal to a graphics object, then the
-;                           contour plot will determine the location of the graphic in
-;                           display window and overplot itself onto that image.
 ;       IRREGULAR:      in, optional, type=boolean
 ;                       If this keyword is set, the data, x, and y input parameters are taken to be
 ;                           irregularly gridded data, the the data is gridded for use in the contour plot
@@ -1481,8 +1462,6 @@ end
 ;                       Data points with values below this value are ignored.
 ;       MISSINGVALUE:   in, optional, type=any
 ;                       Use this keyword to identify any missing data in the input data values.
-;       NAME:           in, optional, type=string, default='MrContour'
-;                       Specifies the name of the graphic.
 ;       NLEVELS:        in, optional, type=integer, default=6
 ;                       If the Contour plot LEVELS keyword is not used, this keyword will produce this
 ;                           number of equally spaced contour intervals. Unlike the Contour NLEVELS keyword,
@@ -1594,8 +1573,6 @@ PATH_INFO=path_info, $
 PATH_XY=path_xy, $
 RESOLUTION=resolution, $
 TRIANGULATION=triangulation, $
-XLOG=xlog, $
-YLOG=ylog, $
 
 ;cgContour Keywords
 AXISCOLOR=axiscolor, $
@@ -1614,6 +1591,10 @@ PALETTE=palette, $
 TRADITIONAL=traditional, $
 
 ;weGraphicsKeywords
+XLOG=xlog, $
+XRANGE=xrange, $
+YLOG=ylog, $
+YRANGE=yrange, $
 _REF_EXTRA=extra
     
     Compile_Opt idl2
@@ -1737,24 +1718,65 @@ _REF_EXTRA=extra
     SetDefaultValue, outline, 0B, /BOOLEAN
     SetDefaultValue, output, ''
     SetDefaultValue, traditional, 0B, /BOOLEAN
-    
+
 ;---------------------------------------------------------------------
-;Define Data /////////////////////////////////////////////////////////
+;Input Parameters ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    ;If X and Y and not defined, plot DATA against its subscripts.
+    ;Assign dependent and independent variables.
     nx = n_elements(x)
     ny = n_elements(y)
-    if nx eq 0 && ny eq 0 then begin
-        dims = size(data, /DIMENSIONS)
-        xcoords = lindgen(dims[0])
-        ycoords = lindgen(dims[1])
-            
-     endif else if nx gt 0 && ny gt 0 then begin   
-        xcoords = x
+    if nx gt 0 and ny gt 0 then begin
+        xcoods = x
         ycoords = y
+    endif
 
-    endif else message, 'Incorrect number of parameters.'
+;---------------------------------------------------------------------
+;Set Dependent Variable and XRANGE ///////////////////////////////////
+;---------------------------------------------------------------------
+    ;
+    ; The goal is to create an contour class that is zoomable. As such, [XY]RANGE must
+    ; be defined so that data coordinate system is establishable (even if the coordinates
+    ; simply span the image size). Independent and Dependent variables must be defined
+    ; so that a map exists between the data coordinates and the image's pixel/index
+    ; locations.
+    ;
+
+    cdims = size(data, /DIMENSIONS)
+
+    ;---------------
+    ;X-COORDINATES |
+    ;---------------
+    if n_elements(xcoords) eq 0 then begin
+        ;Make sure XRANGE is defined.
+        if n_elements(xrange) eq 0 then $
+            if keyword_set(xlog) then xrange = [1, cdims[0]-1] $
+                                 else xrange = [0, cdims[0]-1]
+    
+        ;Create DEP such that it is the size of IMAGE[*,i] and spans XRANGE
+        if keyword_set(xlog) $
+            then setDefaultValue, xcoords, logspace(alog10(xrange[0]), alog10(xrange[1]), imDims[0]) $
+            else setDefaultValue, xcoords, linspace(xrange[0], xrange[1], cdims[0])
+
+    ;Otherwise, make the xrange span all of DEP
+    endif else if n_elements(xrange) eq 0 then xrange = [xcoords[0], xcoords[cdims[0]-1]]
+
+    ;---------------
+    ;Y-COORDINATES |
+    ;---------------
+    if n_elements(ycoords) eq 0 then begin
+        ;Make sure YRANGE is defined.
+        if n_elements(yrange) eq 0 then $
+            if keyword_set(ylog) then yrange = [1, cdims[1]-1] $
+                                 else yrange = [0, cdims[1]-1]
+                                 
+        ;Create INDEP such that it is the size of IMAGE[i,*] and spans YRANGE
+        if keyword_set(ylog) $
+            then setDefaultValue, ycoords, logspace(alog10(yrange[0]), alog10(yrange[1]), imDims[1]) $
+            else setDefaultValue, ycoords, linspace(yrange[0], yrange[1], cdims[1])
+            
+    ;Otherwise, make the yrange span all of INDEP
+    endif else if n_elements(yrange) eq 0 then yrange = [ycoords[0], ycoords[cdims[1]-1]]
     
 ;---------------------------------------------------------------------
 ;Set Object Properties ///////////////////////////////////////////////

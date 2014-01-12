@@ -72,7 +72,6 @@
 ;	Modification History::
 ;       2013/11/27  -   Written by Matthew Argall.
 ;-
-;*****************************************************************************************
 function MrPlot, x, y, $
  CURRENT=current, $
 _REF_EXTRA = extra

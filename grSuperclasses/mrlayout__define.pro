@@ -52,6 +52,7 @@
 ;       2013/11/22  -   Added the O[XY]MARGIN, [XY]_REGION, and [XY]_WINDOW properties. - MRA
 ;       2013/11/24  -   Forgot to add O[XY]MARGIN keywords to Set/GetProperty. Fixed. - MRA
 ;       2013/11/28  -   LAYOUT property is strictly a 3-element array. - MRA
+;       2014/01/10  -   Forgot to set the POSITION property within INIT. Fixed. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -108,7 +109,7 @@ end
 ;+
 ;   Set properties of the object.
 ;
-; :Params:
+; :Keywords:
 ;       ASPECT:         out, optional, type=float
 ;                       Aspect ratio of the plot.
 ;       LAYOUT:         out, optional, type=intarr(3)/intarr(4)
@@ -194,7 +195,7 @@ end
 ;+
 ;   Set properties of the object.
 ;
-; :Params:
+; :Keywords:
 ;       ASPECT:         in, optional, type=float
 ;                       Aspect ratio of the plot.
 ;       CHARSIZE:       in, optional, type=float
@@ -315,37 +316,37 @@ end
 ;+
 ;   The initialization method.
 ;
-; :Params:
+; :Keywords:
 ;       ASPECT:         in, optional, type=float
 ;                       Aspect ratio of the plot.
 ;       CHARSIZE:       in, optional, type=float, default=1.5
 ;                       Fraction of IDL's default character size. Used to determine size
 ;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
-;       LAYOUT:         in, optional, type=intarr(3)/intarr(4), default=[1,1,1,1]
+;       LAYOUT:         in, optional, type=intarr(3)/intarr(4), default="[1,1,1,1]"
 ;                       [nCols, nRows, index]. [nCols,nRows] is the number of columns and
 ;                           rows in the display. "index" is the plot index at which to
 ;                           place the plot, beginning with 1,1], 1 in the upper-left
 ;                           corner and incrementing first right then down.
-;       MARGIN:         in, optional, type=int/intarr(4), default=[10,4,3,2]
+;       MARGIN:         in, optional, type=int/intarr(4), default="[10,4,3,2]"
 ;                       Size of the [left, bottom, right, top] margins, in character
 ;                           units. If a scalar is provided, all margins will be equal.
 ;                           This keyword takes precedence over `XMARGIN` and `YMARGIN`.
-;       OXMARGIN:       in, optional, type=intarr, default=[0,0]
+;       OXMARGIN:       in, optional, type=intarr, default="[0,0]"
 ;                       Size of the left and right outer margins, in units of !D.X_CH_Size.
 ;                           Acts as a matte around the [XY]_REGION.
-;       OYMARGIN:       in, optional, type=intarr, default=[0,0]
+;       OYMARGIN:       in, optional, type=intarr, default="[0,0]"
 ;                       Size of the bottom and top outer margins, in units of !D.Y_CH_Size.
 ;                           Acts as a matte around the [XY]_REGION.
-;       POSITION:       in, optional, type=intarr(4), default=[1,1,1,1]
+;       POSITION:       in, optional, type=intarr(4), default="[1,1,1,1]"
 ;                       The position at which the plot is located. An array of the form
 ;                           [x0,y0,x1,y1], where (x0,y0) are the normalized coordinates
 ;                           of the lower-left corner and (x1,y1) are the coordinates of
 ;                           the upper-right corner fo the plot.
-;       XMARGIN:        in, optional, type=intarr(2), default=[10,3]
+;       XMARGIN:        in, optional, type=intarr(2), default="[10,3]"
 ;                       Width of the left and right margins in character units.
 ;       XGAP:           in, optional, type=integer, default=14
 ;                       Horizontal space between plots, in character units.
-;       YMARGIN:        in, optional, type=intarr(2), default=[4,2]
+;       YMARGIN:        in, optional, type=intarr(2), default="[4,2]"
 ;                       Height of the top and bottom margins in character units.
 ;       YGAP:           in, optional, type=integer, default=6
 ;                       Vertical space between plots in character units.
@@ -402,10 +403,9 @@ YGAP=ygap
     
     ;Default position
     if array_equal(self.layout, [0,0,0]) then begin
-        if n_elements(position) eq 0 then begin
-            position = [0.125, 0.125, 0.925, 0.9]
-            update_layout = 0
-        endif
+        if n_elements(position) eq 0 $
+            then self.position = [0.125, 0.125, 0.925, 0.9] $
+            else self.position = position
     endif
     
     return, 1

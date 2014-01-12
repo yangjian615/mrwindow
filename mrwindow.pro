@@ -40,23 +40,30 @@
 ; :Params:
 ;       PARENT:             in, optional, type=int
 ;                           The widget ID of a parent widget in which to place the draw
-;                               window.
+;                               window. If not provided, the draw window will be placed
+;                               in a MrWindow widget unless `NOGUI`=1.
 ;
 ; :Keywords:
-;       CMODE:              in, optional, type=int, default=0
-;                           The default cursor mode in which to start
-;       BUILD:              in, optional, type=Boolean, default=1
-;                           Build the GUI. This gives the option to construct the GUI
-;                               without having to realize it yet.
-;       LMODE:              in, optional, type=int, default=4 (Box Zoom)
-;                           The zoom mode associated with the left mouse button.
-;       REALIZE:            in, optional, type=boolean, default=1
-;                           If set and `PARENT` is not given, then the GUI will be realized
-;                               imediately after it is built. If not set, the GUI will be
-;                               built but not realized. Realization causes a calls the
-;                               Draw method via "Notify_Realize". This sets `BUILD`=1
-;       RMODE:              in, optional, type=int, default=8 (Pan)
-;                           The zoom mode associated with the right mouse button.
+;       ARROWS:             in, optional, type=object/objarr
+;                           MrArrow object(s) to be added to the diplay window.
+;       BUFFER:             in, optional, type=boolean, default=0
+;                           If set, graphics will be directed to an invisible pixmap window
+;                               instead of generating a widget window.
+;       DRAW:               in, optional, type=boolean, default=1
+;                           If set, the Draw method will be called. Widgets will be
+;                               realized at this time.
+;       NAME:               in, optional, type=string, default='MrWindow'
+;                           Name to be given to the window. Windows can be accessed by
+;                               name via the GetMrWindows function.
+;       NOGUI:              in, optional, type=boolean, default=0
+;                           If set, graphics will be created in a normal IDL window, unless
+;                               `PARENT` is provided.
+;       PLOTOBJECTS:        in, optional, type=object/objarr
+;                           MrPlot object(s) to be added to the display.
+;       REFRESH:            in, optional, type=boolean, default=0
+;                           If set, the display will be refreshed after the window is
+;                               created. This will cause the widget to be realized and
+;                               the contents to be drawn.
 ;       SAVEDIR:            in, optional, type=string, default=current
 ;                           The directory in which to save files. When the display is
 ;                               saved via the ::saveImage method, if no filename is given,
@@ -68,14 +75,10 @@
 ;                           The width of the draw window in pixels
 ;       YSIZE:              in, optional, type=long, default=512
 ;                           The height of the draw window in pixels
-;       ZOOMFACTOR:         in, optional, type=float/fltarr(2), default=[0.05\, 0.05]
-;                           The zoom factor with which the mouse wheel will cause the
-;                               x- and y-ranges to be adjusted. If only one value is given,
-;                               it will be applied to both axes.
 ;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by MrPlotLayout__Define and 
-;                               MrAbstractSaveAs__Define is also accepted for keyword
-;                               inheritance.
+;                           Any keyword accepted by the superclasses is also accepted for
+;                               keyword inheritance.
+;
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
@@ -94,11 +97,14 @@
 ;                           of _EXTRA. Fixed.
 ;-
 function MrWindow, parent, $
+;MrWindow Keywords
 ARROWS = arrows, $
 DRAW = draw, $
+NAME = name, $
 NOGUI = noGUI, $
 BUFFER = buffer, $
 PLOTOBJECTS = plotObjects, $
+REFRESH = refresh, $
 SAVEDIR = savedir, $
 TEXT = text, $
 XSIZE = xsize, $

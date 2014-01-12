@@ -206,6 +206,10 @@
 ;       2013/11/22  -   Renamed DISPLAY to BUFFER, removed the BUILD option, changed
 ;                           REALIZE to DRAW, renamed CREATEGUI to NOGUI. Input options
 ;                           have been simplified sigificantly. Added NAME keyword. - MRA
+;       2014/01/10  -   Prevent the graphics from drawing twice upon realization by updating
+;                           the _realized property in ::Notify_Realize and by putting a
+;                           Return after calling ::Realize in ::Draw. Two draws were
+;                           occurring because ::Notify_Realize calls ::Draw. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -324,8 +328,12 @@ pro MrWindow::Draw
     ;Return if we are not refreshing.
     if self._refresh eq 0B then return
     
-    ;Realize the widget if need be.
-    if self.buffer eq 0 and self._realized eq 0 then self -> Realize
+    ;Realize the widget if need be. This will cause Notify_Realize to call the
+    ;Draw method. Thus, after realizing, we can exit.
+    if self.buffer eq 0 and self._realized eq 0 then begin
+        self -> Realize
+        return
+    endif
     
     ;Set the current window to the pixmap window and erase it
     if (!d.flags and 256) ne 0 then begin
@@ -730,13 +738,17 @@ end
 ;                               the whichObjects method.
 ;
 ; :Keywords:
-;
-;       AMODE:              out, optional, type=int
-;                           The analysis mode(s) presently enabled.
-;       THEOBJ:             out, optional, type=boolean, default=0
-;                           The object reference of the object referred to by `INDEX`.
+;       NAME:               out, optional, type=string
+;                           Name to be given to the window. Windows can be accessed by
+;                               name via the GetMrWindows function.
+;       REFRESH:            out, optional, type=boolean
+;                           If set, the display will be refreshed after the window is
+;                               created. This will cause the widget to be realized and
+;                               the contents to be drawn.
 ;       SAVEDIR:            out, optional, type=string
 ;                           The directory in which plots will be saved.
+;       THEOBJ:             out, optional, type=boolean, default=0
+;                           The object reference of the object referred to by `INDEX`.
 ;       XSIZE:              out, optional, type=long, default=512
 ;                           The width of the draw window in pixels
 ;       YSIZE:              out, optional, type=long, default=512
@@ -911,6 +923,9 @@ pro MrWindow::Notify_Realize
     ;Get the window ID of the draw widget
     widget_control, self.drawID, GET_VALUE=winID
     self.winID = winID
+    
+    ;Indicate that the widget has been realized. This must come before calling Draw
+    self._realized = 1B
 
     ;Draw the plot now that the window is realized.
     self -> Draw
@@ -1035,8 +1050,6 @@ end
 ;   the GUI can be closed then opened again).
 ;
 ; :Keywords:
-;       BUILD:          in, optional, type=Boolean, default=1
-;                       Build the GUI before realizing it.
 ;       _REF_EXTRA:     in, optional, type=any
 ;                       Any keyword accepted by the BUILD method is also excepted for
 ;                           keyword inheritance.
@@ -1060,9 +1073,6 @@ _REF_EXTRA = extra
     widget_control, self.tlb, /REALIZE
     xmanager, 'MrWindow', self.tlb, /NO_BLOCK, EVENT_HANDLER='MrWindow_Events', $
               CLEANUP='MrWindow_CleanUp'
-    
-    ;Indicate that the widget has been realized
-    self._realized = 1B
 end
 
 
@@ -1204,8 +1214,6 @@ end
 ; :Keywords:
 ;       AMODE:              in, optional, type=int
 ;                           The analysis mode(s) to be enabled.
-;       DRAW:               in, optional, type=boolean
-;                           Call the Draw method after setting properties.
 ;       POSITION:           in, optional, type=fltarr(4)
 ;                           If `INDEX` is also provided, then this is the new position of
 ;                               the object. POSITION can be a 2-element [col,row] location
@@ -1231,9 +1239,9 @@ end
 ;-
 pro MrWindow::SetProperty, index, $
 AMODE = amode, $
-RANGE = range, $
 NAME = name, $
 POSITION = position, $
+RANGE = range, $
 SAVEDIR = savedir, $
 XSIZE = xsize, $
 XRANGE = xrange, $
@@ -1745,15 +1753,26 @@ end
 ;                               in a MrWindow widget unless `NOGUI`=1.
 ;
 ; :Keywords:
-;       NOGUI:              in, optional, type=boolean, default=0
-;                           If set, graphics will be created in a normal IDL window, unless
-;                               `PARENT` is provided.
+;       ARROWS:             in, optional, type=object/objarr
+;                           MrArrow object(s) to be added to the diplay window.
 ;       BUFFER:             in, optional, type=boolean, default=0
 ;                           If set, graphics will be directed to an invisible pixmap window
 ;                               instead of generating a widget window.
 ;       DRAW:               in, optional, type=boolean, default=1
 ;                           If set, the Draw method will be called. Widgets will be
 ;                               realized at this time.
+;       NAME:               in, optional, type=string, default='MrWindow'
+;                           Name to be given to the window. Windows can be accessed by
+;                               name via the GetMrWindows function.
+;       NOGUI:              in, optional, type=boolean, default=0
+;                           If set, graphics will be created in a normal IDL window, unless
+;                               `PARENT` is provided.
+;       PLOTOBJECTS:        in, optional, type=object/objarr
+;                           MrPlot object(s) to be added to the display.
+;       REFRESH:            in, optional, type=boolean, default=0
+;                           If set, the display will be refreshed after the window is
+;                               created. This will cause the widget to be realized and
+;                               the contents to be drawn.
 ;       SAVEDIR:            in, optional, type=string, default=current
 ;                           The directory in which to save files. When the display is
 ;                               saved via the ::saveImage method, if no filename is given,
@@ -1766,9 +1785,8 @@ end
 ;       YSIZE:              in, optional, type=long, default=512
 ;                           The height of the draw window in pixels
 ;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by MrPlotLayout__Define and 
-;                               MrSaveAs__Define is also accepted for keyword
-;                               inheritance.
+;                           Any keyword accepted by the superclasses is also accepted for
+;                               keyword inheritance.
 ;
 ; :Uses:
 ;   Uses the following external programs::
@@ -1782,10 +1800,10 @@ end
 function MrWindow::init, parent, $
 ;MrWindow Keywords
 ARROWS = arrows, $
+BUFFER = buffer, $
 DRAW = draw, $
 NAME = name, $
 NOGUI = noGUI, $
-BUFFER = buffer, $
 PLOTOBJECTS = plotObjects, $
 REFRESH = refresh, $
 SAVEDIR = savedir, $

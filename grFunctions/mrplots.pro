@@ -32,7 +32,7 @@
 ;*****************************************************************************************
 ;
 ;+
-;   Create a MrPlot object.
+;   Create a MrPlotS object.
 ;
 ; :Params:
 ;       X:                  in, required, type=numeric
@@ -55,7 +55,7 @@
 ;                           Any keyword accepted by MrPlotS__define.
 ;
 ; :Returns:
-;       THEPLOT:            out, required, type=object
+;       THEPLOTS:           out, required, type=object
 ;                           A MrPlotS object reference.
 ;
 ; :Author:
@@ -73,8 +73,7 @@
 ;	Modification History::
 ;       2013/11/27  -   Written by Matthew Argall.
 ;-
-;*****************************************************************************************
-function MrCreateGraphic::PlotS, x, y, z, $
+function MrPlotS, x, y, z, $
  CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2

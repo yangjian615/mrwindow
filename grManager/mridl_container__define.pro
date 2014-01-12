@@ -61,6 +61,7 @@
 ;       08/23/2013  -   Added the GetIndex method. - MRA
 ;       2013/11/19  -   Inherit IDL_Object, added the _OverloadBracketsRightSide method. - MRA
 ;       2013/12/10  -   Added the _OverloadForeach method. - MRA
+;       2014/01/10  -   Added negative indexing to _OverloadBRS for single indices. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -92,8 +93,15 @@ function MrIDL_Container::_OverloadBracketsRightSide, isRange, subscript1
 ;Integer Subscripts \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
     if MrIsA(subscript1, /INTEGER) then begin
+    
         ;If a scalar or array was given, get what was asked for.
         if isRange[0] eq 0 then begin
+            ;Negative index?
+            if subscript1 lt 0 then begin
+                nObj = self -> Count()
+                subscript1 += nObj
+            endif
+        
             result = self -> Get(POSITION=subscript1)
         
         ;If a range was given, create an index array.

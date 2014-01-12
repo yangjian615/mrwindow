@@ -60,7 +60,6 @@
 ;	Modification History::
 ;       2013/11/27  -   Written by Matthew Argall.
 ;-
-;*****************************************************************************************
 function MrColorbar, $
 CURRENT=current, $
 _REF_EXTRA = extra

@@ -68,7 +68,6 @@
 ;	Modification History::
 ;       2013/11/27  -   Written by Matthew Argall.
 ;-
-;*****************************************************************************************
 function MrAxis, xloc, yloc, zloc, $
  CURRENT=current, $
 _REF_EXTRA = extra

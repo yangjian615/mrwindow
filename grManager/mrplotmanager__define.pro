@@ -579,26 +579,55 @@ end
 ;   to the MrIDL_Container::Get method::
 ;       - Filter objects based on their location in the 2D plotting grid.
 ;
-; :Params:
-;       THEOBJECTS:             in, optional, type=object/obj_arr(N)
-;                               The plot object(s) to add to the display.
-;
 ;   :Keywords:
-;       DRAW:                   in, optional, type=boolean, default=0
-;                               Call the Draw method after adding.
-;       POSITION:               in, optional, type=int/intarr, default=[last]
-;                               The index location(s) into the container at which to add
-;                                   the object(s). The default is to put the objects at
-;                                   the end of the container.
-;       PLOT_POSITION:          out, optional, type=fltarr(4\,N)
-;                               The standard 4-element plot position for each object in
-;                                   `THEOBJECTS`. If an object is not a "data" object,
-;                                   then the position will be [0,0,0,0].
-;       PLOT_LOCATION:          out, optional, type=intarr(2\,N)
-;                               The [col, row] location of each object in `THEOBJECTS`
-;                                   where each plot will be placed in the 2D plotting grid.
-;                                   If the object is not a "data" object, then its location
-;                                   will be [0,0]
+;       ALL:            in, optional, type=boolean, default=0
+;                       If set, all objects within the container will be returned.
+;       FIXED:          in, optional, type=boolean, default=0
+;                       If set, indicate `LOCATION` is a fixed location.
+;       ISA:            in, optional, type=string/strarr
+;                       Names of the object classes to be retrieved. Use in conjunction
+;                           with `ALL` to retrieve all objects specified classes.
+;       LOCATION:       in, optional, type=intarr
+;                       Return the object at this [col,row] location.
+;       PINDEX:         in, optional, type=boolean, default=0
+;                       If set, specifies that `LOCATION` is a plot index.
+;       COUNT:          out, optional, type=integer
+;                       A named variable that will store the number of returned objects.
+;       ANNOTATE:       in, optional, type=boolean, default=0
+;                       If set, return all annotate objects.
+;                       A named variable that will store the number of returned objects.
+;       ARROW:          in, optional, type=boolean, default=0
+;                       If set, return all arrow objects.
+;                       A named variable that will store the number of returned objects.
+;       AXIS:           in, optional, type=boolean, default=0
+;                       If set, return all axis objects.
+;                       A named variable that will store the number of returned objects.
+;       COLORBAR:       in, optional, type=boolean, default=0
+;                       If set, return all colorbar objects.
+;                       A named variable that will store the number of returned objects.
+;       CONTOUR:        in, optional, type=boolean, default=0
+;                       If set, return all contour objects.
+;                       A named variable that will store the number of returned objects.
+;       DATA:           in, optional, type=boolean, default=0
+;                       If set, return all data objects.
+;                       A named variable that will store the number of returned objects.
+;       IMAGE:          in, optional, type=boolean, default=0
+;                       If set, return all image objects.
+;                       A named variable that will store the number of returned objects.
+;       LEGEND:         in, optional, type=boolean, default=0
+;                       If set, return all legend objects.
+;                       A named variable that will store the number of returned objects.
+;       OVERPLOT:       in, optional, type=boolean, default=0
+;                       If set, return all overplot objects.
+;                       A named variable that will store the number of returned objects.
+;       PLOT:           in, optional, type=boolean, default=0
+;                       If set, return all plot objects.
+;                       A named variable that will store the number of returned objects.
+;       TEXT:           in, optional, type=boolean, default=0
+;                       If set, return all text objects.
+;
+; :Returns:
+;       RESULT:         An object array containing the desired objects.
 ;-
 function MrPlotManager::Get, $
 ALL = All, $
@@ -773,10 +802,10 @@ end
 ;   Remove a Plot or Image object from the list of objects being displayed.
 ;
 ; :Params:
-;       LOCATION:               in, optional, type=intarr(2\,N), default=[1\,1]
-;                               The [col, row] location of the plots to replace
+;       Child_Object:           in, optional, type=object/objarr
+;                               The object(s) to be removed.
 ;
-;   :Keywords:
+; :Keywords:
 ;       ALL:                    in, optional, type=boolean, default=0
 ;                               Remove all objects from the container.
 ;       DESTROY:                in, optional, type=boolean, default=1
@@ -792,6 +821,8 @@ end
 ;                                   removed.
 ;       TRIMLAYOUT:             in, optional, type=int, default=0
 ;                               If set, empty rows and columns will be removed.
+;       TYPE:                   in, optional, type=string/strarr
+;                               An array of object class names of the objects to be removed.
 ;-
 pro MrPlotManager::Remove, Child_object, $
 ALL = all, $
@@ -911,7 +942,7 @@ TYPE = type
 ;                           The plot-index, [col, row], or 4-element position of the plot
 ;                               whose position is to be changed. If an object is provided,
 ;                               then the old position will be take from it.
-;       NEWCOLROW:          in, required, type={1 | 2 | 4}-element vector
+;       NEWLOCATION:        in, required, type={1 | 2 | 4}-element vector
 ;                           The plot-index, [col, row], or 4-element position to where the
 ;                               plot indicated by `OLD_POSITION` is to be moved. If a
 ;                               4-element position is provided, the plot will be placed
@@ -923,6 +954,8 @@ TYPE = type
 ;                               position will be fixed, outside of the layout.
 ;
 ; :Keywords:
+;       DRAW:               in, optional, type=boolean, default=0
+;                           Refresh the draw window when finished.
 ;       OUTPOSITION:        out, optional, type=fltarr(4)
 ;                           The resulting position. If `NEW_POSITION` is a 4-element
 ;                               position, then `OUTPOSITION` will equal `NEW_POSITION`.
@@ -1288,8 +1321,10 @@ function MrPlotManager::WhatAmI, objRef
     className = typename(objRef)
     case className of
         'MRPLOT':       ImA = 'PLOT'
+        'MRPLOTS':      ImA = 'PLOTS'
         'MRIMAGE':      ImA = 'IMAGE'
         'MRCONTOUR':    ImA = 'CONTOUR'
+        'MRCOLORFILL':  ImA = 'COLORFILL'
         'WECOLORBAR':   ImA = 'COLORBAR'
         'WETEXT':       ImA = 'TEXT'
         'WEARROW':      ImA = 'ARROW'
@@ -1329,9 +1364,10 @@ pro MrPlotManager::Config
               text: ['WETEXT'], $
               overplot: ['WEOVERPLOT'], $
               plots: ['MRPLOTS'], $
+              polyfill: ['MRCOLORFILL'], $
               ImAData: ['PLOT', 'IMAGE', 'CONTOUR'], $     ;TO BE USED WITH ::WHATAMI
               data: ['MRPLOT', 'MRIMAGE', 'MRCONTOUR'], $
-              annotate: ['WECOLORBAR', 'WEAXIS', 'WELEGENDITEM', 'WEARROW', 'WETEXT', 'MRPLOTS', 'WEOVERPLOT'], $
+              annotate: ['WECOLORBAR', 'WEAXIS', 'WELEGENDITEM', 'WEARROW', 'WETEXT', 'MRPLOTS', 'WEOVERPLOT', 'MRCOLORFILL'], $
               files: ['CDF_PLOT'] $
             }
     

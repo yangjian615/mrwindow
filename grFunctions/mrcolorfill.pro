@@ -1,7 +1,7 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;       MrLegend
+;       MrColorFill
 ;
 ;*****************************************************************************************
 ;   Copyright (c) 2013, Matthew Argall                                                   ;
@@ -32,18 +32,31 @@
 ;*****************************************************************************************
 ;
 ;+
-;   Create a weLegendItem object.
+;   Create a MrColorFill object.
+;
+; :Params:
+;       X:                  in, required, type=numeric
+;                           A vector or scalar argument providing the X components of the
+;                               points to be connected. If only one argument is specified,
+;                               X must be an array of either two or three vectors
+;                               (i.e., (2,*) or (3,*)). In this special case, X[0,*] are
+;                               taken as the X values, X[1,*] are taken as the `Y` values,
+;                               and X[2,*] are taken as the `Z` values.
+;       Y:                  in, optional, type=numeric
+;                           Y coordinate(s) of the points to be connected.
+;       Z:                  in, optional, type=numeric
+;                           Z coordinate(s) of the points to be connected.
 ;
 ; :Keywords:
 ;       CURRENT:            in, optional, type=boolean, default=0
 ;                           If set, the plot will be added to the current MrWindow
 ;                               graphics window.
 ;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by weLegendItem__define.
+;                           Any keyword accepted by MrColorFill__define.
 ;
 ; :Returns:
-;       THELEGEND:          out, required, type=object
-;                           A weLegendItem object reference.
+;       THECOLORFILL:       out, required, type=object
+;                           A MrColorFill object reference.
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -58,9 +71,9 @@
 ;
 ; :History:
 ;	Modification History::
-;       2013/11/27  -   Written by Matthew Argall.
+;       2014/01/12  -   Written by Matthew Argall.
 ;-
-function MrLegend, $
+function MrColorFill, x, y, z, $
  CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
@@ -76,8 +89,8 @@ _REF_EXTRA = extra
     ;Add to the current window?
     current = keyword_set(current)
 
-    ;Create the legend
-    theLegend = obj_new('weLegendItem', CURRENT=current, _STRICT_EXTRA=extra)
+    ;Create the plot
+    theColorFill = obj_new('MrPlotS', x, y, z, CURRENT=current, _STRICT_EXTRA=extra)
     
-    return, theLegend
+    return, theColorFill
 end

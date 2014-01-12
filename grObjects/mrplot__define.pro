@@ -120,6 +120,7 @@ NOERASE = noerase
             ;Overplot
             (*self.target)[i] -> RestoreCoords
             self -> doOverplot
+            self -> SaveCoords
         endfor
     endif else begin
         self -> doPlot, NOERASE=noerase
@@ -800,9 +801,6 @@ end
 ;                               will be overplotted on top of each other, one for each
 ;                               DATA[i,*]. If DIMENSION=0, then a single plot of all
 ;                               points will be made.
-;       DRAW:               in, optional, type=boolean, default=1
-;                           If set, the data will be drawn to the plot. DRAW=1 always if
-;                               `GUI`=1.
 ;       MAX_VALUE:          in, optional, type=float
 ;                           The maximum value plotted. Any values larger than this are
 ;                               treated as missing.
@@ -812,10 +810,6 @@ end
 ;       POLAR:              in, optional, type=boolean
 ;                           Indicates that X and Y are actually R and Theta and that the
 ;                               plot is in polar coordinates.
-;       POSITION:           in, optional, type=fltarr(4)
-;                           A vector of the form [x0, y0, x1, y1], where [x0,y0] and [x1,y1]
-;                               specify the position of the lower-left and upper-right
-;                               corner of the plotting region, respectively.
 ;       XLOG:               in, optional, type=boolean
 ;                           Indicates that a log scale is used on the x-axis
 ;       XRANGE:             in, optional, type=fltarr(2), default=[min(`X`)\, max(`X`)]

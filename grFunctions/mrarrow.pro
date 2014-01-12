@@ -74,7 +74,6 @@
 ;	Modification History::
 ;       2013/11/27  -   Written by Matthew Argall.
 ;-
-;*****************************************************************************************
 function MrCreateGraphic::Arrow, x0, y0, x1, y1, $
  CURRENT=current, $
 _REF_EXTRA = extra

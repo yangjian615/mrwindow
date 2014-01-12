@@ -257,7 +257,7 @@ end
 ;   Print the average value in a given interval.
 ;
 ; :Params:
-;       XRANGE:             in, required, type=fltarr(3,3)
+;       XRANGE:             in, required, type=fltarr(3\,3)
 ;                           The data range along the abscissa axis over which the average
 ;                               is to be taken.
 ;       LOCATION:           in, optional, type=intarr(2)
@@ -545,10 +545,6 @@ end
 ;+
 ;   Determine which "Analsyis Menu" button was pressed and tell the draw widget which
 ;   type of events to pay attention to.
-;
-; :Params:
-;       EVENT:              in, required, type=structure
-;                           An event structure returned by the windows manager.
 ;-
 pro MrAbstractAnalysis::Error_Handler
     compile_opt idl2
@@ -761,7 +757,7 @@ end
 ;   The average value in a given interval.
 ;
 ; :Params:
-;       XRANGE:             in, required, type=fltarr(3,3)
+;       XRANGE:             in, required, type=fltarr(3\,3)
 ;                           The data range along the abscissa axis over which the average
 ;                               is to be taken.
 ;       LOCATION:           in, optional, type=intarr(2)
@@ -863,23 +859,13 @@ end
 ;   The average value in a given interval.
 ;
 ; :Params:
-;       XRANGE:             in, required, type=fltarr(3,3)
+;       XRANGE:             in, required, type=fltarr(3\,3)
 ;                           The data range along the abscissa axis over which the average
 ;                               is to be taken.
-;       LOCATION:           in, optional, type=intarr(2)
-;                           The [col, row] location of the plot whose data is to be averaged.
-;                               If not provided, the currently selected plot will be
-;                               rotated (i.e. self.focus).
-;
-; :Keywords:
-;       PLOT_INDEX:             in, optional, type=int, default=0
-;                               If set, then `LOCATION` is actually the 1D plot index of
-;                                   the plot. The upper-left-most plot has a plot index of
-;                                   1, and the plot index increases as you go down the
-;                                   column, then across the row.
+;       AVERAGE:            in, optional, type=intarr(2)
+;                           Data averaged over XRANGE.
 ;-
-pro MrAbstractAnalysis::MVA_Cross, xrange, average, $
-PLOT_INDEX=plot_index
+pro MrAbstractAnalysis::MVA_Cross, xrange, average
     compile_opt idl2
     
     ;Error handling
@@ -890,13 +876,6 @@ PLOT_INDEX=plot_index
         void = cgErrorMsg()
         return
     endif
-    
-;---------------------------------------------------------------------
-;Check Inputs ////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    ;Defaults
-    plot_index = keyword_set(plot_index)
     
 ;---------------------------------------------------------------------
 ;Keep the First Averaged Interval ////////////////////////////////////
@@ -1085,7 +1064,7 @@ end
 ;   Transform 3-component time series data from one coordinate system to anoteh.
 ;
 ; :Params:
-;       ROTMAT:             in, required, type=fltarr(3,3)
+;       ROTMAT:             in, required, type=fltarr(3\,3)
 ;                           A rotation matrix used in rotating the data found at `LOCATION`.
 ;       LOCATION:           in, optional, type=intarr(2)
 ;                           The [col, row] location of the plot whose data is to be rotated.

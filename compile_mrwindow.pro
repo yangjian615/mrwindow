@@ -5,13 +5,7 @@
 ;Abstract Classes
 .comp ./AbstractClasses/mrabstractanalysis__define.pro
 .comp ./AbstractClasses/mrabstractarrow__define.pro
-.comp ./AbstractClasses/mrabstractaxis__define.pro
 .comp ./AbstractClasses/mrabstractcdf__define.pro
-.comp ./AbstractClasses/mrabstractcolorbar__define.pro
-.comp ./AbstractClasses/mrabstractimage__define.pro
-.comp ./AbstractClasses/mrabstractlegend__define.pro
-.comp ./AbstractClasses/mrabstractoverplot__define.pro
-.comp ./AbstractClasses/mrabstractplot__define.pro
 .comp ./AbstractClasses/mrsaveas__define.pro
 .comp ./AbstractClasses/mrabstracttext__define.pro
 .comp ./AbstractClasses/mrmanipulate__define.pro
@@ -51,12 +45,12 @@
 .comp ./grObjects/mrimage__define.pro
 .comp ./grObjects/mrplot__define.pro
 .comp ./grObjects/mrplots__define.pro
-.comp ./WileE/wearrow__define.pro
-.comp ./WileE/weaxis__define.pro
-.comp ./WileE/wecolorbar__define.pro
-.comp ./WileE/welegenditem__define.pro
-.comp ./WileE/weoverplot__define.pro
-.comp ./WileE/wetext__define.pro
+.comp ./grObjects/wearrow__define.pro
+.comp ./grObjects/weaxis__define.pro
+.comp ./grObjects/wecolorbar__define.pro
+.comp ./grObjects/welegenditem__define.pro
+.comp ./grObjects/weoverplot__define.pro
+.comp ./grObjects/wetext__define.pro
 
 ;Graphic Functions
 .comp ./mrarrow.pro
@@ -85,7 +79,7 @@
 .comp ./utilities/ismember.pro
 .comp ./utilities/load_color.pro
 .comp ./utilities/moveplot_gui.pro
-.comp ./utilities/mrimage.pro
+.comp ./utilities/maimage.pro
 .comp ./utilities/mrpixelcorners.pro
 .comp ./utilities/mrpixeldeltas.pro
 .comp ./utilities/mrpixelpoints.pro

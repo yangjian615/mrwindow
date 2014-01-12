@@ -106,11 +106,11 @@ NOERASE=noerase
         return
     endif
     
-    ;Now draw the plot
-    if self.hide eq 0 then begin
-        self -> doImage, NOERASE=noerase
-        self -> SaveCoords
-    endif
+    if self.hide then return
+    
+    ;Now display the image
+    self -> doImage, NOERASE=noerase
+    self -> SaveCoords
 end
 
 
@@ -469,11 +469,9 @@ end
 ;       NAN:                out, optional, type=boolean
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
-;       PALETTE:            out, optional, type=bytarr(3,256)
+;       PALETTE:            out, optional, type=bytarr(3\,256)
 ;                           An [r,g,b] Color table to be loaded before the image is displayed.
 ;                               This takes precedence over `CTINDEX`.
-;       P_SYSVAR:           out, optional, type=structure
-;                           The !P system variable state associated with this plot.
 ;       RANGE:              out, optional, type=fltarr(2)
 ;                           The [minimum, maximum] values of the image to be displayed.
 ;                               Setting this will cause the color bars to saturated at
@@ -844,8 +842,6 @@ end
 ;                               scaled image.
 ;       CTINDEX:            in, optional, type=int
 ;                           The color table index of a color table to be loaded.
-;       IMAGE:              in, optional, type=any
-;                           The image to be displayed.
 ;       IDISPLAY:           in, optional, type=boolean, default=0
 ;                           The index at which a 2D cut is to be taken. Applicable only
 ;                               for > 2D image data.
@@ -865,10 +861,8 @@ end
 ;       NAN:                in, optional, type=boolean
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
-;       PALETTE:            in, optional, type=bytarr(3,256)
+;       PALETTE:            in, optional, type=bytarr(3\,256)
 ;                           Color table to be loaded before the image is displayed.
-;       P_SYSVAR:           in, optional, type=structure
-;                           The !P system variable state associated with this plot.
 ;       RANGE:              in, optional, type=fltarr(2)
 ;                           The [minimum, maximum] values of the image to be displayed.
 ;                               Setting this will cause the color bars to saturated at
@@ -1069,11 +1063,11 @@ end
 ; :Params:
 ;       IMAGE:          in, required, type=NxM numeric array
 ;                       Image to be displayed
-;       X:              in, optional, type=scalar, N-elements numeric
+;       X:              in, optional, type=scalar/Nx1 numeric
 ;                       If a scalar, then positioning is that of IDL's TV function. If a
 ;                           vector the same size as the first dimension of `IMAGE`, then
 ;                           the data coordinates of each pixel. See also, `PAINT`.
-;       Y:              in, optional, type=scalar, N-elements numeric
+;       Y:              in, optional, type=scalar/Mx1 numeric
 ;                       If a scalar, then positioning is that of IDL's TV function. If a
 ;                           vector the same size as the second dimension of `IMAGE`, then
 ;                           the data coordinates of each pixel. See also, `PAINT`.
@@ -1106,9 +1100,6 @@ end
 ;                               scaled image.
 ;       CTINDEX:            in, optional, type=int
 ;                           The color table index of a color table to be loaded.
-;       DRAW:               in, optional, type=boolean, default=1
-;                           If set, the data will be drawn to the plot. DRAW=1 always if
-;                               `GUI`=1.
 ;       IDISPLAY:           in, optional, type=boolean, default=0
 ;                           Normally, `IMAGE` is assumed to be 2D with the dimensions 
 ;                               ordered as [x,y]. If `IMAGE` is >2D, data dimensions are
@@ -1129,12 +1120,8 @@ end
 ;       NAN:                in, optional, type=boolean, default=0
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
-;       PALETTE:            in, optional, type=bytarr(3,256)
+;       PALETTE:            in, optional, type=bytarr(3\,256)
 ;                           Color table to be loaded before the image is displayed.
-;       POSITION:           in, optional, type=fltarr(4)
-;                           A vector of the form [x0, y0, x1, y1], where [x0,y0] and [x1,y1]
-;                               specify the position of the lower-left and upper-right
-;                               corner of the plotting region, respectively.
 ;       RANGE:              in, optional, type=fltarr(2)
 ;                           The [minimum, maximum] values of the image to be displayed.
 ;                               Setting this will cause the color bars to saturated at
@@ -1315,10 +1302,13 @@ _REF_EXTRA = extra
     ;Assign dependent and independent variables.
     nx = n_elements(x)
     ny = n_elements(y)
-    if ny ne 0 then begin
+    if ny gt 0 then begin
         indep = x
         dep = y
-    endif else if nx ne 0 then indep = x
+    endif else if nx gt 0 then begin
+        dep = x
+        indep = lindgen(imDims[0])
+    endif
 
 ;---------------------------------------------------------------------
 ;TV Positioning? /////////////////////////////////////////////////////

@@ -128,8 +128,6 @@
 ;                           If set, all buttons will be placed under a "Cursor" submenu.
 ;       CROSS_HAIRS:        in, optional, type=boolean, default=0
 ;                           Create the "Cross Hairs" button.
-;       FOCUS:              in, optional, type=boolean, default=0
-;                           Create the "Focus" button.
 ;       GET_POINT:          in, optional, type=boolean, default=0
 ;                           Create the "Get Point" button.
 ;       SHOW_XY:            in, optional, type=boolean, default=0
