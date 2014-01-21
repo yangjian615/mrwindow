@@ -604,7 +604,6 @@ DEVICE=device, $
 LINESTYLE=linestyle, $
 NOCLIP=noclip, $
 NORMAL=normal, $
-TARGET=target, $
 T3D=t3d, $
 THICK=thick, $
 ZVALUE=zvalue

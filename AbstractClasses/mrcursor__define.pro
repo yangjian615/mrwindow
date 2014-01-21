@@ -134,7 +134,6 @@
 ;                           Create the "Show [X,Y]" button.
 ;       NONE:               in, optional, type=boolean, default=0
 ;                           Create the "None" button.
-;-
 pro MrCursor::Create_Cursor_Menu, parent, $
 MENU = menu, $
 CROSS_HAIRS = cross_hairs, $

@@ -127,6 +127,7 @@ _REF_EXTRA = extra
                                     NOGUI = noGUI, $
                                     BUFFER = buffer, $
                                     PLOTOBJECTS = plotObjects, $
+                                    REFRESH = refresh, $
                                     SAVEDIR = savedir, $
                                     TEXT = text, $
                                     XSIZE = xsize, $

@@ -131,7 +131,8 @@ pro MrDataCoords::RestoreCoords
     endif
     
     ;Message if there is nothing to restore.
-    if self._data_saved eq 0 then message, 'No data coordinates have been saved.'
+    if self._data_saved eq 0 then $
+        message, 'Data coordinate system not established.'
     
     ;Restore the saved system variables required for converting coordinates
     !P.Clip   = self._p_clip

@@ -213,9 +213,44 @@
 ;-
 ;*****************************************************************************************
 ;+
+;   The purpose of this method is to provide output when the PRINT procedure is used.
+;
+; :Private:
+;-
+function MrWindow::_OverloadPrint
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, ''
+    endif
+    
+    ;Get the class name and the heap identifier of the object
+    objClass = obj_class(self)
+    heapNum = obj_valid(self, /GET_HEAP_IDENTIFIER)
+    objStr = string(FORMAT='(%"%s  <%i>")', objClass, heapNum)
+    
+    ;Get descriptions
+    self -> whichDataObjects, dataText
+    self -> whichAnnotateObjects, annText
+    infoStr = [[dataText], [annText]]
+
+    ;Combine the results
+    outText = [[objStr], [infoStr]]
+
+    return, outText
+end
+
+
+;+
 ;   Build the GUI. This is separate from the realization method so that custom GUI
 ;   configurations can be used. Also, so that the GUI can be build in the background
 ;   without being realized right away.
+;
+; :Private:
 ;
 ; :Keywords:
 ;       XSIZE:          in, optional, type=boolean, default=600
@@ -226,7 +261,7 @@
 pro MrWindow::BuildGUI, $
 XSIZE = xsize, $
 YSIZE = ysize
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -299,9 +334,11 @@ end
 
 ;+
 ;   Copy the pixmap to the display window.
+;
+; :Private:
 ;-
 pro MrWindow::copyPixmap
-    compile_opt idl2
+    compile_opt strictarr
     
     ;copy the pixmap to the draw window
     wset, self.winID
@@ -314,8 +351,9 @@ end
 ;   first buffered into the pixmap for smoother opteration (by allowing motion events
 ;   to copy from the pixmap instead of redrawing the plot, the image does not flicker).
 ;-
-pro MrWindow::Draw
-    compile_opt idl2
+pro MrWindow::Draw, $
+ERASE=erase
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -408,12 +446,14 @@ end
 ;           2) Motion       -- COPYPIXMAP, draw text
 ;           3) Button Up    -- Fix text, turn off motion events, DRAW
 ;
+; :Private:
+;
 ; :Params:
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrWindow::Draw_Events, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -542,12 +582,14 @@ end
 ;+
 ;   Destroy the object and, if it exists, the widget.
 ;
+; :Private:
+;
 ; :Params:
 ;       EVENT:              in, optional, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrWindow::destroy, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Destroy the object and the widget, if it still exists
     obj_destroy, self
@@ -557,6 +599,8 @@ end
 ;+
 ;   Event handler for Focus events. Find the closest plot to the clicked point.
 ;
+; :Private:
+;
 ; :Params:
 ;   EVENT:              in, optional, type=structure/int
 ;                       The event returned by the windows manager. If not given, the
@@ -565,7 +609,7 @@ end
 ;                           object within the container on which to focus.
 ;-
 pro MrWindow::Focus, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -628,12 +672,14 @@ end
 ;+
 ;   Destroy the object and, if it exists, the widget.
 ;
+; :Private:
+;
 ; :Params:
 ;       EVENT:              in, optional, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrWindow::Error_Handler, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -651,12 +697,14 @@ end
 ;+
 ;   Handle events triggered by the File Menu.
 ;
+; :Private:
+;
 ; :Params:
 ;       EVENT:              in, optional, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrWindow::File_Menu_Events, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -713,7 +761,7 @@ end
 ;       NAME:           The name of the window
 ;-
 function MrWindow::GetName
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -768,7 +816,7 @@ THEOBJ = theObj, $
 XSIZE = xsize, $
 YSIZE = ysize, $
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -858,7 +906,7 @@ end
 ;       theSelected:            The currently selected graphic.
 ;-
 function MrWindow::GetSelect
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -878,12 +926,14 @@ end
 ;+
 ;   Determines if the object indicated by self.focus is zoomable or not.
 ;
+; :Private:
+;
 ;   :Returns:
 ;       TF_ZOOMABLE:            Returns true (1) if the object indicated by self.Focus
 ;                                   is able to be zoomed, false (0) if not.
 ;-
 function MrWindow::IsZoomable
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -905,9 +955,11 @@ end
 ;+
 ;   Because the draw widget can be added to an external GUI, we must know when that GUI
 ;   is realized in order to obtain the widget ID of the draw widget.
+;
+; :Private:
 ;-
 pro MrWindow::Notify_Realize
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -935,6 +987,8 @@ end
 ;+
 ;   Turn DRAW_BUTTON_EVENTS on or off.
 ;
+; :Private:
+;
 ; :Keywords:
 ;       ON:                     in, required, type=boolean, default=0
 ;                               Turn motion events on.
@@ -944,7 +998,7 @@ end
 pro MrWindow::On_Off_Button_Events, $
 ON = on, $
 OFF = off
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -979,6 +1033,8 @@ end
 ;   Turn DRAW_MOTION_EVENTS on or off. When motion events are turned off, all events
 ;   are cleared.
 ;
+; :Private:
+;
 ; :Keywords:
 ;       ON:                     in, required, type=boolean, default=0
 ;                               Turn motion events on.
@@ -988,7 +1044,7 @@ end
 pro MrWindow::On_Off_Motion_Events, $
 ON = on, $
 OFF = off
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1032,12 +1088,14 @@ end
 ;+
 ;   Destroy the widget without destroying the object.
 ;
+; :Private:
+;
 ; :Params:
 ;       EVENT:              in, optional, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrWindow::quit, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Destroy the widget
     widget_control, event.top, /DESTROY
@@ -1056,7 +1114,7 @@ end
 ;-
 pro MrWindow::Realize, $
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
 
     ;Error handling
     catch, the_error
@@ -1104,6 +1162,8 @@ end
 ;+
 ;   This method resizes the draw window and redraws the plot to the adjusted size.
 ;
+; :Private:
+;
 ; :Params:
 ;       XSIZE:              in, required, type=long
 ;                           The width of the draw window in pixels
@@ -1111,7 +1171,7 @@ end
 ;                           The height of the draw window in pixels
 ;-
 pro MrWindow::ResizeDrawWidget, xsize, ysize
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1248,7 +1308,7 @@ XRANGE = xrange, $
 YRANGE = yrange, $
 YSIZE = ysize, $
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1373,6 +1433,8 @@ end
 ;+
 ;   The purpose of this method is to add a MrWindow object to the !MrWindow_Array system
 ;   variable. If the system variable does not exist, it will be created.
+;
+; :Private:
 ;-
 pro MrWindow::SysVAdd, object
     compile_opt strictarr
@@ -1401,6 +1463,8 @@ end
 ;+
 ;   The purpose of this method is to check if the !MrWindow_Array system variable exists.
 ;
+; :Private:
+;
 ; :Returns:
 ;       EXISTS:             True (1) if !MrWindow_Array exists. False (0) if not.
 ;-
@@ -1424,6 +1488,8 @@ end
 ;+
 ;   The purpose of this method is to remove a MrWindow object from the !MrWindow_Array
 ;   system variable.
+;
+; :Private:
 ;-
 pro MrWindow::SysVRemove, object
     compile_opt strictarr
@@ -1460,6 +1526,8 @@ end
 ;   This method resizes the top level base, then updates the contents of the draw widget
 ;   to be proportioned appropriately.
 ;
+; :Private:
+;
 ; :Params:
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
@@ -1494,10 +1562,11 @@ pro MrWindow::TLB_Resize_Events, event
     
     ;Recalculate the normalized positions based on the new window size.
     ;Draw the plot to the new size
+    refresh_in = self._refresh
     self -> Refresh, /DISABLE
     self -> CalcPositions
     self -> ApplyPositions
-    self -> Refresh
+    self -> Refresh, DISABLE=~refresh_in
 end
 
 
@@ -1505,12 +1574,14 @@ end
 ;   A method for temporarily turning off everything that would otherwise cause a
 ;   draw widget event.
 ;
+; :Private:
+;
 ; :Params:
 ;       TLB:        in, optional, type=int
 ;                   The widget ID of the top level base.
 ;-
 pro MrWindow::Turn_Everything_Off, tlb
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1543,12 +1614,14 @@ end
 ;+
 ;   Hanle wheel zoom event.
 ;
+; :Private:
+;
 ; :Params:
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrWindow::Wheel_Zoom, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1582,10 +1655,12 @@ end
 
 
 ;+
-;   Print which objects are present and the index at which they are stored.
+;   Print which data objects are present and the index at which they are stored.
+;
+; :Private:
 ;-
-pro MrWindow::whichObjects
-    compile_opt idl2
+pro MrWindow::whichDataObjects, text
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1601,9 +1676,15 @@ pro MrWindow::whichObjects
     
     ;Get all of the data objects
     dataObj = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nData)
+    
+    ;Description plus header
+    outText = strarr(nData + 1)
+    
+    ;Get the container indices of each object.
     if nData gt 0 $
         then index = self -> GetIndex(dataObj) $
-        else print, 'None'
+        else outText = ['No Data object in the container']
+        
     
     ;The string length of the longest type
     typeLen = string(max(strlen((*self.gTypes).data)), FORMAT='(i0)')
@@ -1611,8 +1692,8 @@ pro MrWindow::whichObjects
     ;Step through each object
     for i = 0, nData - 1 do begin
         ;Print a header.
-        if i eq 0 then print, '--Index--', '--Type--', '-Location-', '--Name--', $
-                              FORMAT='(a9, 4x, a' + typeLen + ', 4x, a10, 4x, a8)'
+        if i eq 0 then outText[0] = string('--Index--', '--Type--', '-Location-', '--Name--', $
+                                           FORMAT='(a9, 4x, a' + typeLen + ', 4x, a10, 4x, a8)')
                               
         ;Get the object's position and layout
         dataObj[i] -> GetProperty, LAYOUT=layout
@@ -1623,50 +1704,110 @@ pro MrWindow::whichObjects
         sLocation = string(colrow, FORMAT='(%"[%3i,%3i]")')
         sName = dataObj[i] -> GetName()
 
-        print, FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0, 5x, a0)', $
-               sIndex, obj_class(dataObj[i]), sLocation, sName
+        outText[i+1] = string(FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0, 5x, a0)', $
+                              sIndex, obj_class(dataObj[i]), sLocation, sName)
     
     endfor
-    print, ''
+    
+    ;Output the text
+    case n_params() of
+        0: print, transpose(outText)
+        1: text = transpose(temporary(outText))
+        else: message, 'Incorrect number of parameters.'
+    endcase
+end
 
+
+;+
+;   Print which annotate objects are present and the index at which they are stored.
+;
+; :Private:
+;-
+pro MrWindow::whichAnnotateObjects, text
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+     
 ;---------------------------------------------------------------------
 ;Annotation Objects //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     annObj = self -> Get(/ALL, ISA=(*self.gTypes).annotate, COUNT=nAnn)
-    if nAnn eq 0 then return
+
+    ;Desctription plus header
+    outText = strarr(nAnn + 1)
     
-    index = self -> GetIndex(annObj)
-    
+    ;Get the container indices of each object.
+    if nAnn gt 0 $
+        then index = self -> GetIndex(annObj) $
+        else outText = ['No annotate objects in the container']
+
     ;The string length of the longest type
     typeLen = string(max(strlen((*self.gTypes).annotate)), FORMAT='(i0)')
     
-    
+    ;Step through each annotate object
     for i = 0, nAnn - 1 do begin
         ;Print a header.
-        if i eq 0 then print, '--Index--', '--Type--', '--Name--', $
-                              FORMAT='(a9, 4x, a' + typeLen + ', 4x, a12)'
-        
+        if i eq 0 then outText[0] = string('--Index--', '--Type--', '--Name--', $
+                                           FORMAT='(a9, 4x, a' + typeLen + ', 4x, a12)')
+    
         ;Print the type-name, location, and position
         sIndex = string(index[i], FORMAT='(i2)')
         sName  = annObj[i] -> GetName()
 
-        print, FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0)', $
-               sIndex, obj_class(annObj[i]), sName
+        outText[i+1] = string(FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0)', $
+                              sIndex, obj_class(annObj[i]), sName)
     
     endfor
-    print, ''
+    
+    ;Output the text
+    case n_params() of
+        0: print, transpose(outText)
+        1: text = transpose(temporary(outText))
+        else: message, 'Incorrect number of parameters.'
+    endcase
+end
+
+
+;+
+;   Print which objects are present and the index at which they are stored.
+;-
+pro MrWindow::whichObjects
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+        
+    ;Get information about the data and annotate objects
+    self -> whichDataObjects, dataText
+    self -> whichAnnotateObjects, annText
+    
+    outText = [['DATA OBJECTS:'], [dataText], [''], ['ANNOTATE OBJECTS:'], [annText]]
+    print, outText
 end
 
 
 ;+
 ;   The purpose of this method is to foward events to the proper event handler.
 ;
+; :Private:
+;
 ; :Params:
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrWindow_Events, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1687,9 +1828,11 @@ end
 ;+
 ;   The "Notify Realize" event handler is separate from the "Event Pro" event handler.
 ;   Thus, this program forwards the Notify Realize event to its event handling method.
+;
+; :Private:
 ;-
 pro MrWindow_Notify_Realize, id
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Call the Notify_Realize method
     widget_control, id, GET_UVALUE=uvalue
@@ -1700,6 +1843,8 @@ end
 
 ;+
 ;   Clean up after the widget is destroyed.
+;
+; :Private:
 ;-
 pro MrWindow_Cleanup, tlb
     ;Do nothing. Cleanup is done when the object is destroyed.
@@ -1710,7 +1855,7 @@ end
 ;   Clean up after the object is destroyed -- destroy pointers and object references.
 ;-
 pro MrWindow::cleanup
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1811,7 +1956,7 @@ TEXT = text, $
 XSIZE = xsize, $
 YSIZE = ysize, $
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
 
     ;Error handling
     catch, the_error
@@ -1841,7 +1986,7 @@ _REF_EXTRA = extra
     setDefaultValue, savedir, current
     setDefaultvalue, xsize, 600
     setDefaultValue, ysize, 340
-    
+
     ;Set properties
     self.amode = amode
     self.buffer = buffer
@@ -1955,7 +2100,7 @@ end
 ;       YSIZE:          y-size of the draw window
 ;-
 pro MrWindow__define, class
-    compile_opt idl2
+    compile_opt strictarr
     
     class = { MrWindow, $
               ;In order of importance.

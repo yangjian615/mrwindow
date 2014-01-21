@@ -35,12 +35,11 @@
 ;   Create a weAxis object.
 ;
 ; :Params:
-;       XLOC:               in, optional, type=depends
-;                           The X location of the axis. 
-;       YLOC:               in, optional, type=depends
-;                           The Y location of the axis. 
-;       ZLOC:               in, optional, type=depends
-;                           The Z location of the axis. 
+;       DIRECTION:          in, required, type=string, default='X'
+;                           The direction of the axis. Options are::
+;                               'X' - x-axis
+;                               'Y' - y-axis
+;                               'Z' - z-axis
 ;
 ; :Keywords:
 ;       CURRENT:            in, optional, type=boolean, default=0
@@ -67,8 +66,9 @@
 ; :History:
 ;	Modification History::
 ;       2013/11/27  -   Written by Matthew Argall.
+;       2014/01/20  -   Inputs to MrAxis__Define changed. Updated. - MRA
 ;-
-function MrAxis, xloc, yloc, zloc, $
+function MrAxis, direction, $
  CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
@@ -85,7 +85,7 @@ _REF_EXTRA = extra
     current = keyword_set(current)
 
     ;Create a cgOverPlot object
-    theAxis = obj_new('weAxis', xloc, yloc, zloc, CURRENT=current, _STRICT_EXTRA=extra)
+    theAxis = obj_new('MrAxis', direction, CURRENT=current, _STRICT_EXTRA=extra)
 
     return, theAxis
 end

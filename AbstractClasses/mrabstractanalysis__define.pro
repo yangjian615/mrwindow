@@ -111,6 +111,7 @@
 ;       07/15/2013  -   Set the NaN flag when taking the MEAN. - MRA
 ;       09/25/2013  -   Added MVA_CROSS capabilities. Added the AVERAGE parameter and
 ;                           QUIET keyword to the Average method. - MRA
+;       2014/01/21  -   Use cgColor to load colors into the color table. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -122,7 +123,7 @@
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrAbstractAnalysis::Analysis_Menu_Events, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -280,7 +281,7 @@ end
 pro MrAbstractAnalysis::Average, xrange, location, average, $
 PLOT_INDEX = plot_index, $
 QUIET = quiet
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -376,7 +377,7 @@ MVA_CROSS = mva_cross, $
 NONE = none, $
 VERTICAL_CUT = vertical_cut, $
 VHT = vHT
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -459,7 +460,7 @@ end
 ;-
 function MrAbstractAnalysis::Data_Range, xrange, index, $
 IRANGE = iRange
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -509,7 +510,7 @@ end
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrAbstractAnalysis::Draw_Events, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -547,7 +548,7 @@ end
 ;   type of events to pay attention to.
 ;-
 pro MrAbstractAnalysis::Error_Handler
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -574,7 +575,7 @@ end
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrAbstractAnalysis::Get_Interval, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -618,9 +619,9 @@ pro MrAbstractAnalysis::Get_Interval, event
             x_stem = [self.x0, event.x]
             y_stem = [self.y0, event.y]
             
-            plots, x_right_bar, y_right_bar, color=load_color('blue'), /DEVICE
-            plots, x_left_bar, y_left_bar, color=load_color('blue'), /DEVICE
-            plots, x_stem, y_stem, color=load_color('blue'), /DEVICE
+            plots, x_right_bar, y_right_bar, color=cgColor('blue'), /DEVICE
+            plots, x_left_bar, y_left_bar, color=cgColor('blue'), /DEVICE
+            plots, x_stem, y_stem, color=cgColor('blue'), /DEVICE
         endcase
         
         1: begin    ;Button up
@@ -675,7 +676,7 @@ end
 ;                               interval is to be printed.
 ;-
 pro MrAbstractAnalysis::Interval, xrange, yrange
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -718,7 +719,7 @@ end
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrAbstractAnalysis::Get_Data_Point, event
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -774,7 +775,7 @@ end
 ;-
 pro MrAbstractAnalysis::MVAB, xrange, location, $
 PLOT_INDEX=plot_index
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -866,7 +867,7 @@ end
 ;                           Data averaged over XRANGE.
 ;-
 pro MrAbstractAnalysis::MVA_Cross, xrange, average
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -974,7 +975,7 @@ end
 pro MrAbstractAnalysis::On_Off_Button_Events, $
 ON = on, $
 OFF = off
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1022,7 +1023,7 @@ end
 pro MrAbstractAnalysis::On_Off_Motion_Events, $
 ON = on, $
 OFF = off
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1083,7 +1084,7 @@ end
 pro MrAbstractAnalysis::Rotate, rotmat, location, $
 PLOT_INDEX = plot_index, $
 INVERSE = inverse
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1142,7 +1143,7 @@ end
 ;                   The widget ID of the top level base.
 ;-
 pro MrAbstractAnalysis::Turn_Everything_Off, tlb
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1209,7 +1210,7 @@ end
 ;                               variance coordinate system is to be found.
 ;-
 pro MrAbstractAnalysis::VerticalCut, xrange, yrange
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1302,7 +1303,7 @@ end
 ;                               variance coordinate system is to be found.
 ;-
 pro MrAbstractAnalysis::vHT, xrange, yrange
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1422,7 +1423,7 @@ end
 ;   in an error.
 ;-
 function MrAbstractAnalysis::init
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1444,7 +1445,7 @@ end
 ;                       The class definition structure.
 ;-
 pro MrAbstractAnalysis__define, class
-    compile_opt idl2
+    compile_opt strictarr
     
     class = {MrAbstractAnalysis, $
              amode: intarr(3), $            ;[text mode, active, npts]

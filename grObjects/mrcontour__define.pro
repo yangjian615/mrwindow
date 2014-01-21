@@ -109,7 +109,7 @@
 ;-
 pro MrContour::Draw, $
 NOERASE=noerase
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -151,7 +151,7 @@ PATH_FILENAME=path_filename, $
 PATH_INFO=path_info, $
 PATH_XY=path_xy
 
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -229,9 +229,9 @@ PATH_XY=path_xy
                    CHARTHICK     = *self.charthick, $
                    CLIP          = *self.clip, $
                    COLOR         = *self.color, $
-                   DATA          = *self.data, $
-                   DEVICE        = *self.device, $
-                   NORMAL        = *self.normal, $
+                   DATA          =  self.data, $
+                   DEVICE        =  self.device, $
+                   NORMAL        =  self.normal, $
                    FONT          = *self.font, $
                    NOCLIP        = *self.noclip, $
                    NODATA        = *self.nodata, $
@@ -854,7 +854,7 @@ end
 ;-
 pro MrContour::Overplot, target, $
 DISABLE=disable
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -997,7 +997,7 @@ end
 ;                           for the contour surface.
 ;-
 pro MrContour::SetData, z, x, y
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1597,7 +1597,7 @@ YLOG=ylog, $
 YRANGE=yrange, $
 _REF_EXTRA=extra
     
-    Compile_Opt idl2
+    compile_opt strictarr
 
     catch, theerror
     if theerror ne 0 then begin
@@ -1884,7 +1884,7 @@ end
 ;                       The class definition structure.
 ;-
 pro MrContour__define, class
-    compile_opt idl2
+    compile_opt strictarr
     on_error, 2
     
     class = { MrContour, $

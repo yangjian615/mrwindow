@@ -135,7 +135,7 @@ end
 ;-
 pro MrPlot::doPlot, $
 NOERASE=noerase
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -173,9 +173,9 @@ NOERASE=noerase
             CHARTHICK     = *self.charthick, $
             CLIP          = *self.clip, $
             COLOR         = *self.color, $
-            DATA          = *self.data, $
-            DEVICE        = *self.device, $
-            NORMAL        = *self.normal, $
+            DATA          =  self.data, $
+            DEVICE        =  self.device, $
+            NORMAL        =  self.normal, $
             FONT          = *self.font, $
             NOCLIP        = *self.noclip, $
             NODATA        = *self.nodata, $
@@ -294,7 +294,7 @@ END
 ;                       If present, the dependent variable's data will be returned
 ;-
 pro MrPlot::GetData, x, y
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -406,7 +406,7 @@ YNOZERO = ynozero, $
 
 ;weGraphicsKeywords Properties
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -464,7 +464,7 @@ end
 ;-
 pro MrPlot::Overplot, target, $
 DISABLE=disable
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -531,7 +531,7 @@ end
 ;                       The dependent variable data.
 ;-
 pro MrPlot::SetData, x, y
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -691,7 +691,7 @@ POSITION = position, $
 XSTYLE = xstyle, $          ;Check explicitly so that the 2^0 bit is always set
 YSTYLE = ystyle, $          ;Check explicitly so that the 2^0 bit is always set
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -745,7 +745,7 @@ end
 ;   Clean up after the object is destroyed -- destroy pointers and object references.
 ;-
 pro MrPlot::cleanup
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -855,7 +855,7 @@ YLOG = ylog, $
 YNOZERO = ynozero, $
 YRANGE = yrange, $
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
 
     ;Error handling
     catch, the_error
@@ -1032,7 +1032,7 @@ end
 ;                       The class definition structure.
 ;-
 pro MrPlot__define, class
-    compile_opt idl2
+    compile_opt strictarr
     
     class = {MrPlot, $
              ;Data Properties

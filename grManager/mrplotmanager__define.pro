@@ -137,6 +137,8 @@
 ;*****************************************************************************************
 ;+
 ;   Event handler for the EDIT | Layout menu.
+;
+; :Private:
 ;-
 pro MrPlotManager::AdjustLayout_Property, event
     compile_opt idl2
@@ -176,6 +178,8 @@ end
 
 ;+
 ;   Event handler for the EDIT | Move menu.
+;
+; :Private:
 ;-
 pro MrPlotManager::AdjustLayout_Move, event
     compile_opt idl2
@@ -206,6 +210,8 @@ end
 
 ;+
 ;   Event handler for the EDIT | Remove menu.
+;
+; :Private:
 ;-
 pro MrPlotManager::AdjustLayout_Remove, event
     compile_opt idl2
@@ -230,6 +236,8 @@ end
 ;   The purpose of this method is to provide an array-like means of accessing graphics
 ;   objects within the container. Two options are avaible: the object index within the
 ;   container or the name of the graphic object.
+;
+; :Private:
 ;
 ; :Params:
 ;       ISRANGE:            in, required, type=intarr
@@ -1055,6 +1063,7 @@ end
 pro MrPlotManager::SetGlobal, $
 CHARSIZE = charsize, $
 CHARTHICK = charthick, $
+FONT = font, $
 TICKLEN = ticklen, $
 TITLE = title, $
 THICK = thick, $
@@ -1125,57 +1134,143 @@ ZTITLE = ztitle
     for i = 0, nObjs - 1 do begin
         oClass = obj_class(allObjs[i])
     
-        ;If the object is in the data layer
+;---------------------------------------------------------------------
+;Data Objects ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
         if IsMember((*self.gTypes).data, oClass) then begin
-            allObjs[i] -> SetProperty, CHARSIZE = charsize, $
-                                       CHARTHICK = charthick, $
-                                       THICK = thick, $
-                                       TICKLEN = ticklen, $
-                                       TITLE = title, $
-                                       XCHARSIZE = xcharsize, $
-                                       XGRIDSTYLE = xgridstyle, $
-                                       XMINOR = xminor, $
-                                       XRANGE = xrange, $
-                                       XSTYLE = xstyle, $
-                                       XTHICK = xthick, $
+            allObjs[i] -> SetProperty, CHARSIZE    = charsize, $
+                                       CHARTHICK   = charthick, $
+                                       FONT        = font, $
+                                       THICK       = thick, $
+                                       TICKLEN     = ticklen, $
+                                       TITLE       = title, $
+                                       XCHARSIZE   = xcharsize, $
+                                       XGRIDSTYLE  = xgridstyle, $
+                                       XMINOR      = xminor, $
+                                       XRANGE      = xrange, $
+                                       XSTYLE      = xstyle, $
+                                       XTHICK      = xthick, $
                                        XTICKFORMAT = xtickformat, $
                                        XTICKLAYOUT = xticklayout, $
-                                       XTICKLEN = xticklen, $
-                                       XTICKNAME = xtickname, $
-                                       XTICKS = xticks, $
-                                       XTICKUNITS = xtickunits, $
-                                       XTICKV = xtickv, $
-                                       XTITLE = xtitle, $
-                                       YCHARSIZE = ycharsize, $
-                                       YGRIDSTYLE = ygridstyle, $
-                                       YMINOR = yminor, $
-                                       YRANGE = yrange, $
-                                       YSTYLE = ystyle, $
-                                       YTHICK = ythick, $
+                                       XTICKLEN    = xticklen, $
+                                       XTICKNAME   = xtickname, $
+                                       XTICKS      = xticks, $
+                                       XTICKUNITS  = xtickunits, $
+                                       XTICKV      = xtickv, $
+                                       XTITLE      = xtitle, $
+                                       YCHARSIZE   = ycharsize, $
+                                       YGRIDSTYLE  = ygridstyle, $
+                                       YMINOR      = yminor, $
+                                       YRANGE      = yrange, $
+                                       YSTYLE      = ystyle, $
+                                       YTHICK      = ythick, $
                                        YTICKFORMAT = ytickformat, $
                                        YTICKLAYOUT = yticklayout, $
-                                       YTICKLEN = yticklen, $
-                                       YTICKNAME = ytickname, $
-                                       YTICKS = yticks, $
-                                       YTICKUNITS = ytickunits, $
-                                       YTICKV = ytickv, $
-                                       YTITLE = ytitle, $
-                                       ZCHARSIZE = zcharsize, $
-                                       ZGRIDSTYLE = zgridstyle, $
-                                       ZMINOR = zminor, $
-                                       ZRANGE = zrange, $
-                                       ZSTYLE = zstyle, $
-                                       ZTHICK = zthick, $
+                                       YTICKLEN    = yticklen, $
+                                       YTICKNAME   = ytickname, $
+                                       YTICKS      = yticks, $
+                                       YTICKUNITS  = ytickunits, $
+                                       YTICKV      = ytickv, $
+                                       YTITLE      = ytitle, $
+                                       ZCHARSIZE   = zcharsize, $
+                                       ZGRIDSTYLE  = zgridstyle, $
+                                       ZMINOR      = zminor, $
+                                       ZRANGE      = zrange, $
+                                       ZSTYLE      = zstyle, $
+                                       ZTHICK      = zthick, $
                                        ZTICKFORMAT = ztickformat, $
                                        ZTICKLAYOUT = zticklayout, $
-                                       ZTICKLEN = zticklen, $
-                                       ZTICKNAME = ztickname, $
-                                       ZTICKS = zticks, $
-                                       ZTICKUNITS = ztickunits, $
-                                       ZTICKV = ztickv, $
-                                       ZTITLE = ztitle
-
-        ;Otherwise, for select annotation layer objects...
+                                       ZTICKLEN    = zticklen, $
+                                       ZTICKNAME   = ztickname, $
+                                       ZTICKS      = zticks, $
+                                       ZTICKUNITS  = ztickunits, $
+                                       ZTICKV      = ztickv, $
+                                       ZTITLE      = ztitle
+                                       
+;---------------------------------------------------------------------
+;Axis Objects ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+        endif else if oClass eq 'MRAXIS' then begin
+            allObjs[i] -> GetProperty, DIRECTION=direction
+            
+            case direction of
+                'X': begin
+                    allObjs[i] -> SetProperty, AXIS_RANGE   = xrange, $
+                                               CHARSIZE     = charsize, $
+                                               CHARTHICK    = charthick, $
+                                               COLOR        = color, $
+                                               FONT         = font, $
+                                               GRIDSTYLE    = xgridstyle, $
+                                               LOG          = xlog, $
+                                               MINOR        = xminor, $
+                                               SUBTITLE     = xsubtitle, $
+                                               STYLE        = xsytle, $
+                                               THICK        = xthick, $
+                                               TICKFORMAT   = xtickformat, $
+                                               TICKINTERVAL = xtickinterval, $
+                                               TICKLAYOUT   = xticklayout, $
+                                               TICKLEN      = xticklen, $
+                                               TICKNAME     = xtickname, $
+                                               TICKS        = xticks, $
+                                               TICKUNITS    = xtickunits, $
+                                               TICKVALUES   = xtickvalues, $
+                                               TITLE        = xtitle, $
+                                               XCHARSIZE    = xcharsize
+                endcase
+                
+                'Y': begin
+                    allObjs[i] -> SetProperty, AXIS_RANGE   = xrange, $
+                                               CHARSIZE     = charsize, $
+                                               CHARTHICK    = charthick, $
+                                               COLOR        = color, $
+                                               FONT         = font, $
+                                               GRIDSTYLE    = ygridstyle, $
+                                               LOG          = ylog, $
+                                               MINOR        = yminor, $
+                                               SUBTITLE     = ysubtitle, $
+                                               STYLE        = ysytle, $
+                                               THICK        = ythick, $
+                                               TICKFORMAT   = ytickformat, $
+                                               TICKINTERVAL = ytickinterval, $
+                                               TICKLAYOUT   = yticklayout, $
+                                               TICKLEN      = yticklen, $
+                                               TICKNAME     = ytickname, $
+                                               TICKS        = yticks, $
+                                               TICKUNITS    = ytickunits, $
+                                               TICKVALUES   = ytickvalues, $
+                                               TITLE        = ytitle, $
+                                               XCHARSIZE    = ycharsize
+                
+                endcase
+                
+                'Z': begin
+                    allObjs[i] -> SetProperty, AXIS_RANGE   = xrange, $
+                                               CHARSIZE     = charsize, $
+                                               CHARTHICK    = charthick, $
+                                               COLOR        = color, $
+                                               FONT         = font, $
+                                               GRIDSTYLE    = zgridstyle, $
+                                               LOG          = zlog, $
+                                               MINOR        = zminor, $
+                                               SUBTITLE     = zsubtitle, $
+                                               STYLE        = zsytle, $
+                                               THICK        = zthick, $
+                                               TICKFORMAT   = ztickformat, $
+                                               TICKINTERVAL = ztickinterval, $
+                                               TICKLAYOUT   = zticklayout, $
+                                               TICKLEN      = zticklen, $
+                                               TICKNAME     = ztickname, $
+                                               TICKS        = zticks, $
+                                               TICKUNITS    = ztickunits, $
+                                               TICKVALUES   = ztickvalues, $
+                                               TITLE        = ztitle, $
+                                               XCHARSIZE    = zcharsize
+                endcase
+            endcase
+                                       
+;---------------------------------------------------------------------
+;Other Annotation Objects ////////////////////////////////////////////
+;---------------------------------------------------------------------
         endif else if IsMember(['WETEXT', 'WECOLORBAR', 'WELEGENDITEM'], oClass) then begin
             allObjs[i] -> SetProperty, CHARSIZE = charsize, $
                                        CHARTHICK = charthick, $
@@ -1294,6 +1389,8 @@ end
 ;+
 ;   Determine which type of object was given.
 ;
+; :Private:
+;
 ; :Params:
 ;       OBJREF:             in, required, type=Object
 ;                           An object reference whose "type" is to be determined. Will
@@ -1320,6 +1417,7 @@ function MrPlotManager::WhatAmI, objRef
     ;What type of object is it?
     className = typename(objRef)
     case className of
+        'MRAXIS':       ImA = 'AXIS'
         'MRPLOT':       ImA = 'PLOT'
         'MRPLOTS':      ImA = 'PLOTS'
         'MRIMAGE':      ImA = 'IMAGE'
@@ -1330,7 +1428,7 @@ function MrPlotManager::WhatAmI, objRef
         'WEARROW':      ImA = 'ARROW'
         'WEOVERPLOT':   ImA = 'OVERPLOT'
         'WELEGENDITEM': ImA = 'LEGEND'
-        'WEAXIS':       ImA = 'AXIS'
+        'MRAXIS':       ImA = 'AXIS'
         else:           ImA = ''
     endcase
     
@@ -1341,6 +1439,9 @@ end
 ;+
 ;   The purpose of this method is to create a structure of supported classes for each
 ;   graphics type.
+;
+; :Private:
+;
 ;-
 pro MrPlotManager::Config
     compile_opt idl2
@@ -1358,7 +1459,7 @@ pro MrPlotManager::Config
               image: ['MRIMAGE'], $
               contour: ['MRCONTOUR'], $
               colorbar: ['WECOLORBAR'], $
-              axis: ['WEAXIS'], $
+              axis: ['MRAXIS'], $
               legend: ['WELEGENDITEM'], $
               arrow: ['WEARROW'], $
               text: ['WETEXT'], $
@@ -1367,7 +1468,7 @@ pro MrPlotManager::Config
               polyfill: ['MRCOLORFILL'], $
               ImAData: ['PLOT', 'IMAGE', 'CONTOUR'], $     ;TO BE USED WITH ::WHATAMI
               data: ['MRPLOT', 'MRIMAGE', 'MRCONTOUR'], $
-              annotate: ['WECOLORBAR', 'WEAXIS', 'WELEGENDITEM', 'WEARROW', 'WETEXT', 'MRPLOTS', 'WEOVERPLOT', 'MRCOLORFILL'], $
+              annotate: ['WECOLORBAR', 'MRAXIS', 'WELEGENDITEM', 'WEARROW', 'WETEXT', 'MRPLOTS', 'WEOVERPLOT', 'MRCOLORFILL'], $
               files: ['CDF_PLOT'] $
             }
     
