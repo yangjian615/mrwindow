@@ -222,7 +222,7 @@ PATH_XY=path_xy
                    ;MrGraphicsAtom Keywords
                    POSITION      = self.position, $
               
-                   ;weGraphicsKeywords
+                   ;MrGraphicsKeywords
                    AXISCOLOR     = *self.axiscolor, $
                    BACKGROUND    = *self.background, $
                    CHARSIZE      =  self.charsize, $
@@ -352,7 +352,7 @@ PATH_XY=path_xy
                XLOG             = *self.xlog, $
                YLOG             = *self.ylog, $
           
-               ;weGraphicsKeywords
+               ;MrGraphicsKeywords
                AXISCOLOR     = *self.axiscolor, $
                BACKGROUND    = *self.background, $
                CHARSIZE      =  self.charsize, $
@@ -829,7 +829,7 @@ _REF_EXTRA=extra
     if n_elements(extra) ne 0 then begin
         self -> MrLayout::GetProperty, _EXTRA=extra
         self -> MrGrAtom::GetProperty, _EXTRA=extra
-        self -> weGraphicsKeywords::GetProperty, _EXTRA=extra
+        self -> MrGraphicsKeywords::GetProperty, _EXTRA=extra
     endif
 end
 
@@ -1292,8 +1292,8 @@ _REF_EXTRA=extra
         void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
         if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
     
-        ;weGraphicsKeywords Properties
-        if nExtra gt 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
+        ;MrGraphicsKeywords Properties
+        if nExtra gt 0 then self -> MrGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
     endif
     
     if n_elements(xstyle) ne 0 then *self.xstyle = ~(xstyle and 1) + xstyle
@@ -1361,7 +1361,7 @@ pro MrContour::cleanup
 
     ;Cleanup the remaining keywords by calling the superclass. This must be done because
     ;the superclasses method has been over-ridden here.
-    self -> weGraphicsKeywords::CleanUp
+    self -> MrGraphicsKeywords::CleanUp
     self -> MrGrAtom::CleanUp
     self -> MrLayout::CleanUp
 end
@@ -1590,7 +1590,7 @@ OUTPUT=output, $
 PALETTE=palette, $
 TRADITIONAL=traditional, $
 
-;weGraphicsKeywords
+;MrGraphicsKeywords
 XLOG=xlog, $
 XRANGE=xrange, $
 YLOG=ylog, $
@@ -1615,8 +1615,8 @@ _REF_EXTRA=extra
     ;EXTRA structure
     ;
 
-    ;weGraphicsKeywords
-    if self -> weGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
+    ;MrGraphicsKeywords
+    if self -> MrGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrGraphicsKeywords.'
         
     ;MrLayout
@@ -1890,7 +1890,7 @@ pro MrContour__define, class
     class = { MrContour, $
               inherits MrLayout, $
               inherits MrGrAtom, $
-              inherits weGraphicsKeywords, $
+              inherits MrGraphicsKeywords, $
               
               ;Data properties
               c_data: Ptr_New(), $

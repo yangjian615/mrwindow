@@ -274,7 +274,7 @@ NOERASE=noerase
                  MAX_VALUE     = max_value, $
                  MIN_VALUE     = min_value, $
                 
-                 ;weGraphicsKeywords
+                 ;MrGraphicsKeywords
 ;                 AXISCOLOR     = *self.axiscolor, $
                  BACKGROUND    = *self.background, $
                  CHARSIZE      =  self.charsize, $
@@ -378,7 +378,7 @@ NOERASE=noerase
                  XLOG          = self.xlog, $
                  YLOG          = self.ylog, $
                 
-                 ;weGraphicsKeywords
+                 ;MrGraphicsKeywords
 ;                 AXISCOLOR     = *self.axiscolor, $
                  BACKGROUND    = *self.background, $
                  CHARSIZE      =  self.charsize, $
@@ -581,11 +581,11 @@ _REF_EXTRA = extra
     if arg_present(center) then center = self.center
     if arg_present(paint)  then paint  =  self.paint
     
-    ;weGraphicsKeywords Properties
+    ;MrGraphicsKeywords Properties
     if n_elements(EXTRA) ne 0 then begin
         self -> MrLayout::GetProperty, _EXTRA=extra
         self -> MrGrAtom::GetProperty, _EXTRA=extra
-        self -> weGraphicsKeywords::GetProperty, _EXTRA=extra
+        self -> MrGraphicsKeywords::GetProperty, _EXTRA=extra
     endif
 end
 
@@ -985,8 +985,8 @@ _REF_EXTRA = extra
         void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
         if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
     
-        ;weGraphicsKeywords Properties
-        if nExtra gt 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
+        ;MrGraphicsKeywords Properties
+        if nExtra gt 0 then self -> MrGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
     endif
         
     ;Refresh the window
@@ -1057,7 +1057,7 @@ pro MrImage::cleanup
     ptr_free, self.Ymax
     
     ;Superclasses
-    self -> weGraphicsKeywords::CleanUp
+    self -> MrGraphicsKeywords::CleanUp
     self -> MrGrAtom::CleanUp
     self -> MrLayout::CleanUp
 end
@@ -1156,7 +1156,7 @@ end
 ;   Uses the following external programs::
 ;       setDefaultValue.pro (Coyote Graphics)
 ;       error_message.pro (Coyote Graphics)
-;       weGraphicsKeywords__define.pro
+;       MrGraphicsKeywords__define.pro
 ;       MrGetWindow.pro
 ;       linspace.pro
 ;       logspace.pro
@@ -1247,8 +1247,8 @@ _REF_EXTRA = extra
     ;EXTRA structure
     ;
 
-    ;weGraphicsKeywords
-    if self -> weGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
+    ;MrGraphicsKeywords
+    if self -> MrGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrGraphicsKeywords.'
         
     ;MrLayout
@@ -1465,7 +1465,7 @@ pro MrImage__define
     define = {MrImage, $
               inherits MrGrAtom, $
               inherits MrLayout, $
-              inherits weGraphicsKeywords, $
+              inherits MrGraphicsKeywords, $
               
               ;Data
               x_pos: ptr_new(), $               ;the x-position (see TV)

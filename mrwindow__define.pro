@@ -210,6 +210,10 @@
 ;                           the _realized property in ::Notify_Realize and by putting a
 ;                           Return after calling ::Realize in ::Draw. Two draws were
 ;                           occurring because ::Notify_Realize calls ::Draw. - MRA
+;       2014/01/22  -   ::TLB_Resize_Events renamed to ::TLB_Events. TLB_Kill_Request_Events
+;                           now destroys the window when the native OS (x)=close button
+;                           is pressed. "File | Close" now destroys the widget as well.
+;                           "File | Destroy" was removed. Removed unused keywords. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -279,15 +283,15 @@ YSIZE = ysize
     
     ;Make a top-level base with a menu bar
     self.tlb = widget_base(title='MrWindow', /COLUMN, /TLB_SIZE_EVENTS, $
-                           UVALUE={object: self, method: 'TLB_Resize_Events'}, $
-                           MBAR=menuID, XOFFSET=100, YOFFSET=0, UNAME='tlb')
+                           UVALUE={object: self, method: 'TLB_Events'}, $
+                           MBAR=menuID, XOFFSET=100, YOFFSET=0, UNAME='tlb', $
+                           /TLB_KILL_REQUEST_EVENTS)
     self.menuID = menuID
 
     ;Make the file menu.
     fileID = widget_button(menuID, VALUE='File', /MENU, EVENT_PRO=butto)
     button = widget_button(fileID, VALUE='Open CDF', UVALUE={object: self, method: 'File_Menu_Events'})
-    button = widget_button(fileID, VALUE='Destroy', UVALUE={object: self, method: 'destroy'}, /SEPARATOR)
-    button = widget_button(fileID, VALUE='Close', UVALUE={object: self, method: 'quit'}, /SEPARATOR)
+    button = widget_button(fileID, VALUE='Close', UVALUE={object: self, method: 'Destroy'}, /SEPARATOR)
 
     ;Create a "Save As" menu for the menu bar.
     self -> Create_SaveAs_Menu, menuID
@@ -1534,7 +1538,7 @@ end
 ;       EVENT:              in, required, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrWindow::TLB_Resize_Events, event
+pro MrWindow::TLB_Events, event
     compile_opt strictarr
     
     ;Error handling
@@ -1545,30 +1549,40 @@ pro MrWindow::TLB_Resize_Events, event
         return
     endif
     
-    ;Get the geometry of the menu and status bars.
-    gMenu = widget_info(self.menuID, /GEOMETRY)
-    gStatus = widget_info(self.statusID, /GEOMETRY)
+    sname = tag_names(event, /STRUCTURE_NAME)
     
-    ;Subtract the height of the menu and status bars from the size of the top level base
-    xNew = event.x
-    yNew = event.y - gMenu.ysize - 2*gMenu.margin - gStatus.ysize - gStatus.margin
+    case sname of
+        'WIDGET_KILL_REQUEST': self -> Destroy
+        
+        'WIDGET_BASE': begin
+            ;Get the geometry of the menu and status bars.
+            gMenu = widget_info(self.menuID, /GEOMETRY)
+            gStatus = widget_info(self.statusID, /GEOMETRY)
     
-    ;Delete the pixmap, then create a new pixmap window at the new size
-    wdelete, self.pixID
-    self.pixID = MrGetWindow(XSIZE=xNew, YSIZE=yNew, /FREE, /PIXMAP)
+            ;Subtract the height of the menu and status bars from the size of the top level base
+            xNew = event.x
+            yNew = event.y - gMenu.ysize - 2*gMenu.margin - gStatus.ysize - gStatus.margin
     
-    ;Set the new size of the draw widget
-    widget_control, self.drawID, DRAW_XSIZE=xNew, DRAW_YSIZE=yNew
-    self.xsize = xNew
-    self.ysize = yNew
+            ;Delete the pixmap, then create a new pixmap window at the new size
+            wdelete, self.pixID
+            self.pixID = MrGetWindow(XSIZE=xNew, YSIZE=yNew, /FREE, /PIXMAP)
     
-    ;Recalculate the normalized positions based on the new window size.
-    ;Draw the plot to the new size
-    refresh_in = self._refresh
-    self -> Refresh, /DISABLE
-    self -> CalcPositions
-    self -> ApplyPositions
-    self -> Refresh, DISABLE=~refresh_in
+            ;Set the new size of the draw widget
+            widget_control, self.drawID, DRAW_XSIZE=xNew, DRAW_YSIZE=yNew
+            self.xsize = xNew
+            self.ysize = yNew
+    
+            ;Recalculate the normalized positions based on the new window size.
+            ;Draw the plot to the new size
+            refresh_in = self._refresh
+            self -> Refresh, /DISABLE
+            self -> CalcPositions
+            self -> ApplyPositions
+            self -> Refresh, DISABLE=~refresh_in
+        endcase
+        
+        else: Message, 'TLB_Event not recognized: ' + sname
+    endcase
 end
 
 
@@ -1946,15 +1960,12 @@ end
 ;-
 function MrWindow::init, parent, $
 ;MrWindow Keywords
-ARROWS = arrows, $
 BUFFER = buffer, $
 DRAW = draw, $
 NAME = name, $
 NOGUI = noGUI, $
-PLOTOBJECTS = plotObjects, $
 REFRESH = refresh, $
 SAVEDIR = savedir, $
-TEXT = text, $
 XSIZE = xsize, $
 YSIZE = ysize, $
 _REF_EXTRA = extra

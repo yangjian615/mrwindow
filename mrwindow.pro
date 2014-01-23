@@ -95,18 +95,16 @@
 ;       06/29/2013  -   Written by Matthew Argall
 ;       07/05/2013  -   Was accidentally calling MrWindow::Init with _REF_EXTRA instead
 ;                           of _EXTRA. Fixed.
+;       2014/01/22  -   Removed unused TEXT, PLOTOBJECTS, and ARROWS keywords - MRA
 ;-
 function MrWindow, parent, $
 ;MrWindow Keywords
-ARROWS = arrows, $
 DRAW = draw, $
 NAME = name, $
 NOGUI = noGUI, $
 BUFFER = buffer, $
-PLOTOBJECTS = plotObjects, $
 REFRESH = refresh, $
 SAVEDIR = savedir, $
-TEXT = text, $
 XSIZE = xsize, $
 YSIZE = ysize, $
 _REF_EXTRA = extra
@@ -122,14 +120,11 @@ _REF_EXTRA = extra
     
     ;Create a MrWindow object reference.
     oMrWindow = obj_new('MrWindow', parent, $
-                                    ARROWS = arrows, $
                                     DRAW = draw, $
                                     NOGUI = noGUI, $
                                     BUFFER = buffer, $
-                                    PLOTOBJECTS = plotObjects, $
                                     REFRESH = refresh, $
                                     SAVEDIR = savedir, $
-                                    TEXT = text, $
                                     XSIZE = xsize, $
                                     YSIZE = ysize, $
                                     _EXTRA = extra)

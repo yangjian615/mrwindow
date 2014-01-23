@@ -168,7 +168,7 @@ NOERASE=noerase
             YLOG      = *self.ylog, $
             YNOZERO   = *self.ynozero, $
                
-            ;weGraphicsKeywords
+            ;MrGraphicsKeywords
             AXISCOLOR     = *self.axiscolor, $
             BACKGROUND    = *self.background, $
             CHARSIZE      =  self.charsize, $
@@ -406,7 +406,7 @@ XLOG = xlog, $
 YLOG = ylog, $
 YNOZERO = ynozero, $
 
-;weGraphicsKeywords Properties
+;MrGraphicsKeywords Properties
 _REF_EXTRA = extra
     compile_opt strictarr
     
@@ -437,11 +437,11 @@ _REF_EXTRA = extra
     if arg_present(POLAR)     and n_elements(*self.POLAR)     ne 0 then polar = *self.polar
     if arg_present(YNOZERO)   and n_elements(*self.YNOZERO)   ne 0 then ynozero = *self.ynozero
 
-    ;Get all of the remaining keywords from weGraphicsKeywords
+    ;Get all of the remaining keywords from MrGraphicsKeywords
     if n_elements(EXTRA) gt 0 then begin
         self -> MrGrAtom::GetProperty, _EXTRA=extra
         self -> MrLayout::GetProperty, _EXTRA=extra
-        self -> weGraphicsKeywords::GetProperty, _EXTRA=extra
+        self -> MrGraphicsKeywords::GetProperty, _EXTRA=extra
     endif
 end
 
@@ -667,7 +667,7 @@ end
 ;                           Inhibit setting the y  axis value to zero when all Y > 0 and
 ;                               no explicit minimum is set.
 ;       _REF_EXTRA:         in, optional, type=any
-;                           Keyword accepted by the MrGrAtom and weGraphicsKeywords are
+;                           Keyword accepted by the MrGrAtom and MrGraphicsKeywords are
 ;                               also accepted for keyword inheritance.
 ;-
 pro MrPlot::SetProperty, $
@@ -734,8 +734,8 @@ _REF_EXTRA = extra
         void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
         if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
     
-        ;weGraphicsKeywords Properties
-        if nExtra gt 0 then self -> weGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
+        ;MrGraphicsKeywords Properties
+        if nExtra gt 0 then self -> MrGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
     endif
     
     ;Refresh the graphics window
@@ -770,7 +770,7 @@ pro MrPlot::cleanup
     ptr_free, self.target
     
     ;Cleanup the superclass.
-    self -> weGraphicsKeywords::CLEANUP
+    self -> MrGraphicsKeywords::CLEANUP
     self -> MrGrAtom::CleanUp
     self -> MrLayout::CleanUp
 end
@@ -830,7 +830,7 @@ end
 ; :Uses:
 ;   Uses the following external programs::
 ;       binary.pro (Coyote Graphics)
-;       weGraphicsKeywords__define.pro (Coyote Graphics)
+;       MrGraphicsKeywords__define.pro (Coyote Graphics)
 ;       error_message.pro (Coyote Graphics)
 ;       MrDrawWindow__define.pro
 ;       MrPlotLayout.pro
@@ -882,8 +882,8 @@ _REF_EXTRA = extra
     ;EXTRA structure
     ;
 
-    ;weGraphicsKeywords
-    if self -> weGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
+    ;MrGraphicsKeywords
+    if self -> MrGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrGraphicsKeywords.'
         
     ;MrLayout
@@ -1065,6 +1065,6 @@ pro MrPlot__define, class
              ;                it calls the superclass methods.
              inherits MrGrAtom, $
              inherits MrLayout, $
-             inherits weGraphicsKeywords $
+             inherits MrGraphicsKeywords $
             }
 end

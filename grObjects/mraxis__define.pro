@@ -543,7 +543,7 @@ _REF_EXTRA=extra
     
     ;Superclass properties
     self -> MrGrAtom::GetProperty, _STRICT_EXTRA=extra
-    self -> weGraphicsKeywords::GetProperty, CHARTHICK=charthick, $
+    self -> MrGraphicsKeywords::GetProperty, CHARTHICK=charthick, $
                                              COLOR=color, $
                                              DATA=data, $
                                              DEVICE=device, $
@@ -1001,7 +1001,7 @@ _REF_EXTRA=extra
 
     ;Superclass properties
     self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra
-    self -> weGraphicsKeywords::SetProperty, CHARTHICK=charthick, $
+    self -> MrGraphicsKeywords::SetProperty, CHARTHICK=charthick, $
                                              COLOR=color, $
                                              DATA=data, $
                                              DEVICE=device, $
@@ -1100,7 +1100,7 @@ PRO MrAxis::cleanup
     Ptr_Free, self.zmargin
     
     ;Cleanup the superclasses
-    self -> weGraphicsKeywords::CLEANUP
+    self -> MrGraphicsKeywords::CLEANUP
     self -> MrGrAtom::CLEANUP
 END
 
@@ -1209,7 +1209,7 @@ _REF_EXTRA=extra
     ENDIF
 
     ;cgGraphicsKeywords
-    IF self -> weGraphicsKeywords::init(_EXTRA=extra) EQ 0 THEN $
+    IF self -> MrGraphicsKeywords::init(_EXTRA=extra) EQ 0 THEN $
         Message, 'Unable to initialize cgGraphicsKeywords.'
 
 ;---------------------------------------------------------------------
@@ -1335,7 +1335,7 @@ PRO MrAxis__define, class
     
     class = { MrAxis, $
               inherits MrGrAtom, $
-              inherits weGraphicsKeywords, $
+              inherits MrGraphicsKeywords, $
             
               xloc: Ptr_New(), $
               yloc: Ptr_New(), $
