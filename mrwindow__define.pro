@@ -1107,6 +1107,8 @@ end
 ;   Realize the GUI. This method can be called as long as the object still exists (i.e.
 ;   the GUI can be closed then opened again).
 ;
+; :Private:
+;
 ; :Keywords:
 ;       _REF_EXTRA:     in, optional, type=any
 ;                       Any keyword accepted by the BUILD method is also excepted for

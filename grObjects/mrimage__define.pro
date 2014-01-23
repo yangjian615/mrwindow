@@ -117,6 +117,8 @@ end
 ;+
 ;   The purpose of this method is to do the actual plotting.
 ;
+; :Private:
+;
 ; :History:
 ;   Modification History::
 ;       05/04/2013  -   Do not allow zooming outside of the data range. - MRA
@@ -383,9 +385,9 @@ NOERASE=noerase
                  CHARTHICK     = *self.charthick, $
                  CLIP          = *self.clip, $
                  COLOR         = *self.color, $
-                 DATA          = *self.data, $
-                 DEVICE        = *self.device, $
-                 NORMAL        = *self.normal, $
+                 DATA          =  self.data, $
+                 DEVICE        =  self.device, $
+                 NORMAL        =  self.normal, $
                  FONT          = *self.font, $
                  NOCLIP        = *self.noclip, $
                  NODATA        = *self.nodata, $
@@ -649,6 +651,8 @@ end
 
 ;+
 ;   The purpose of this method is to calculate pixel locations.
+;
+; :Private:
 ;-
 pro MrImage::SetPixelLocations, x, y, x0, y0, x1, y1, $
 CENTER=center, $
@@ -992,6 +996,8 @@ end
 
 ;+
 ;   The purpose of this method is to determine if an image is to be painted or not.
+;
+; :Private:
 ;-
 function MrImage::_TF_Paint
     compile_opt strictarr

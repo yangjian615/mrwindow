@@ -70,6 +70,7 @@
 ;                           and GetProperty methods now use axis-neutral keywords. Input
 ;                           parameters have changed and MrAxis now behaves more like the
 ;                           Axis function graphic. - MRA
+;       2014/01/21  -   OFFSET is now a float, not an integer. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -100,7 +101,9 @@ END
 
 
 ;+
-; This method draws the axis object.
+;   This method draws the axis object.
+;
+; :Private:
 ;-
 PRO MrAxis::doAxis, $
 NOERASE=noerase
@@ -496,7 +499,7 @@ MINOR=minor, $
 NODATA=noData, $
 NORMAL=normal, $
 SUBTITLE=subtitle, $
-STYLE=sytle, $
+STYLE=style, $
 T3D=t3d, $
 THICK=thick, $
 TICKFORMAT=tickformat, $
@@ -549,61 +552,61 @@ _REF_EXTRA=extra
                                              YCHARSIZE=ycharsize, $
                                              ZCHARSIZE=zcharsize, $
                                              ZVALUE=zvalue    
-    
+
     ;Set other axis properties
     CASE self.direction OF
         'X': BEGIN
-            IF N_Elements(gridstyle)    GT 0 THEN gridstyle    = *self.xgridstyle
-            IF N_Elements(log)          GT 0 THEN log          =  self.xlog
-            IF N_Elements(minor)        GT 0 THEN minor        = *self.xminor
-            IF N_Elements(axis_range)   GT 0 THEN axis         = *self.xrange_range
-            IF N_Elements(style)        GT 0 THEN style        = *self.xstyle
-            IF N_Elements(thick)        GT 0 THEN thick        = *self.xthick
-            IF N_Elements(tickformat)   GT 0 THEN tickformat   = *self.xtickformat
-            IF N_Elements(tickinterval) GT 0 THEN tickinterval = *self.xtickinterval
-            IF N_Elements(ticklayout)   GT 0 THEN ticklayout   = *self.xticklayout
-            IF N_Elements(ticklen)      GT 0 THEN ticklen      = *self.xticklen
-            IF N_Elements(tickname)     GT 0 THEN tickname     = *self.xtickname
-            IF N_Elements(ticks)        GT 0 THEN ticks        = *self.xticks
-            IF N_Elements(tickunits)    GT 0 THEN tickunits    = *self.xtickunits
-            IF N_Elements(tickvalues)   GT 0 THEN tickvalues   = *self.xtickvalues
-            IF N_Elements(title)        GT 0 THEN title        = *self.xtitle
+            IF Arg_Present(gridstyle)    GT 0 THEN gridstyle    = *self.xgridstyle
+            IF Arg_Present(log)          GT 0 THEN log          =  self.xlog
+            IF Arg_Present(minor)        GT 0 THEN minor        = *self.xminor
+            IF Arg_Present(axis_range)   GT 0 THEN axis_range   = *self.xrange
+            IF Arg_Present(style)        GT 0 THEN style        = *self.xstyle
+            IF Arg_Present(thick)        GT 0 THEN thick        = *self.xthick
+            IF Arg_Present(tickformat)   GT 0 THEN tickformat   = *self.xtickformat
+            IF Arg_Present(tickinterval) GT 0 THEN tickinterval = *self.xtickinterval
+            IF Arg_Present(ticklayout)   GT 0 THEN ticklayout   = *self.xticklayout
+            IF Arg_Present(ticklen)      GT 0 THEN ticklen      = *self.xticklen
+            IF Arg_Present(tickname)     GT 0 THEN tickname     = *self.xtickname
+            IF Arg_Present(ticks)        GT 0 THEN ticks        = *self.xticks
+            IF Arg_Present(tickunits)    GT 0 THEN tickunits    = *self.xtickunits
+            IF Arg_Present(tickvalues)   GT 0 THEN tickvalues   = *self.xtickvalues
+            IF Arg_Present(title)        GT 0 THEN title        = *self.xtitle
         ENDCASE
         
         'Y': BEGIN
-            IF N_Elements(gridstyle)    GT 0 THEN gridstyle    = *self.ygridstyle
-            IF N_Elements(log)          GT 0 THEN log          =  self.ylog
-            IF N_Elements(minor)        GT 0 THEN minor        = *self.yminor
-            IF N_Elements(axis_range)   GT 0 THEN axis         = *self.yrange_range
-            IF N_Elements(style)        GT 0 THEN style        = *self.ystyle
-            IF N_Elements(thick)        GT 0 THEN thick        = *self.ythick
-            IF N_Elements(tickformat)   GT 0 THEN tickformat   = *self.ytickformat
-            IF N_Elements(tickinterval) GT 0 THEN tickinterval = *self.ytickinterval
-            IF N_Elements(ticklayout)   GT 0 THEN ticklayout   = *self.yticklayout
-            IF N_Elements(ticklen)      GT 0 THEN ticklen      = *self.yticklen
-            IF N_Elements(tickname)     GT 0 THEN tickname     = *self.ytickname
-            IF N_Elements(ticks)        GT 0 THEN ticks        = *self.yticks
-            IF N_Elements(tickunits)    GT 0 THEN tickunits    = *self.ytickunits
-            IF N_Elements(tickvalues)   GT 0 THEN tickvalues   = *self.ytickvalues
-            IF N_Elements(title)        GT 0 THEN title        = *self.ytitle
+            IF Arg_Present(gridstyle)    GT 0 THEN gridstyle    = *self.ygridstyle
+            IF Arg_Present(log)          GT 0 THEN log          =  self.ylog
+            IF Arg_Present(minor)        GT 0 THEN minor        = *self.yminor
+            IF Arg_Present(axis_range)   GT 0 THEN axis_range   = *self.yrange
+            IF Arg_Present(style)        GT 0 THEN style        = *self.ystyle
+            IF Arg_Present(thick)        GT 0 THEN thick        = *self.ythick
+            IF Arg_Present(tickformat)   GT 0 THEN tickformat   = *self.ytickformat
+            IF Arg_Present(tickinterval) GT 0 THEN tickinterval = *self.ytickinterval
+            IF Arg_Present(ticklayout)   GT 0 THEN ticklayout   = *self.yticklayout
+            IF Arg_Present(ticklen)      GT 0 THEN ticklen      = *self.yticklen
+            IF Arg_Present(tickname)     GT 0 THEN tickname     = *self.ytickname
+            IF Arg_Present(ticks)        GT 0 THEN ticks        = *self.yticks
+            IF Arg_Present(tickunits)    GT 0 THEN tickunits    = *self.ytickunits
+            IF Arg_Present(tickvalues)   GT 0 THEN tickvalues   = *self.ytickvalues
+            IF Arg_Present(title)        GT 0 THEN title        = *self.ytitle
         ENDCASE
         
         'Z': BEGIN
-            IF N_Elements(gridstyle)    GT 0 THEN gridstyle    = *self.zgridstyle
-            IF N_Elements(log)          GT 0 THEN log          =  self.zlog
-            IF N_Elements(minor)        GT 0 THEN minor        = *self.zminor
-            IF N_Elements(axis_range)   GT 0 THEN axis         = *self.zrange_range
-            IF N_Elements(style)        GT 0 THEN style        = *self.zstyle
-            IF N_Elements(thick)        GT 0 THEN thick        = *self.zthick
-            IF N_Elements(tickformat)   GT 0 THEN tickformat   = *self.ztickformat
-            IF N_Elements(tickinterval) GT 0 THEN tickinterval = *self.ztickinterval
-            IF N_Elements(ticklayout)   GT 0 THEN ticklayout   = *self.zticklayout
-            IF N_Elements(ticklen)      GT 0 THEN ticklen      = *self.zticklen
-            IF N_Elements(tickname)     GT 0 THEN tickname     = *self.ztickname
-            IF N_Elements(ticks)        GT 0 THEN ticks        = *self.zticks
-            IF N_Elements(tickunits)    GT 0 THEN tickunits    = *self.ztickunits
-            IF N_Elements(tickvalues)   GT 0 THEN tickvalues   = *self.ztickvalues
-            IF N_Elements(title)        GT 0 THEN title        = *self.ztitle
+            IF Arg_Present(gridstyle)    GT 0 THEN gridstyle    = *self.zgridstyle
+            IF Arg_Present(log)          GT 0 THEN log          =  self.zlog
+            IF Arg_Present(minor)        GT 0 THEN minor        = *self.zminor
+            IF Arg_Present(axis_range)   GT 0 THEN axis_range   = *self.zrange
+            IF Arg_Present(style)        GT 0 THEN style        = *self.zstyle
+            IF Arg_Present(thick)        GT 0 THEN thick        = *self.zthick
+            IF Arg_Present(tickformat)   GT 0 THEN tickformat   = *self.ztickformat
+            IF Arg_Present(tickinterval) GT 0 THEN tickinterval = *self.ztickinterval
+            IF Arg_Present(ticklayout)   GT 0 THEN ticklayout   = *self.zticklayout
+            IF Arg_Present(ticklen)      GT 0 THEN ticklen      = *self.zticklen
+            IF Arg_Present(tickname)     GT 0 THEN tickname     = *self.ztickname
+            IF Arg_Present(ticks)        GT 0 THEN ticks        = *self.zticks
+            IF Arg_Present(tickunits)    GT 0 THEN tickunits    = *self.ztickunits
+            IF Arg_Present(tickvalues)   GT 0 THEN tickvalues   = *self.ztickvalues
+            IF Arg_Present(title)        GT 0 THEN title        = *self.ztitle
         ENDCASE
     ENDCASE
 END
@@ -927,7 +930,7 @@ MINOR=minor, $
 NODATA=noData, $
 NORMAL=normal, $
 SUBTITLE=subtitle, $
-STYLE=sytle, $
+STYLE=style, $
 T3D=t3d, $
 THICK=thick, $
 TICKFORMAT=tickformat, $
@@ -1007,7 +1010,7 @@ _REF_EXTRA=extra
                                              YCHARSIZE=ycharsize, $
                                              ZCHARSIZE=zcharsize, $
                                              ZVALUE=zvalue
-    
+
     ;Set other axis properties
     CASE self.direction OF
         'X': BEGIN
@@ -1340,7 +1343,7 @@ PRO MrAxis__define, class
               charsize: 0.0, $
               direction: '', $
               location: Ptr_New(), $
-              offset: 0, $
+              offset: 0.0, $
               save: 0B, $
               target: Obj_New(), $
               tickdir: 0B, $

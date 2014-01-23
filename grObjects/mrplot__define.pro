@@ -132,6 +132,8 @@ end
 ;+
 ;   The purpose of this method is to do the actual plotting. Basically, having this here
 ;   merely to saves space in the Draw method.
+;
+; :Private:
 ;-
 pro MrPlot::doPlot, $
 NOERASE=noerase
@@ -243,6 +245,8 @@ end
 ;+
 ;   The purpose of this method is to do the actual overplotting. Basically, having this
 ;   here merely to saves space in the Draw method.
+;
+; :Private:
 ;-
 pro MrPlot::doOverplot
 
@@ -254,9 +258,10 @@ pro MrPlot::doOverplot
     endif
     
     ;Get the dimensions of the independent variable.
-    weoplot, *self.indep, *self.dep, $
+    weOPlot, *self.indep, *self.dep, $
 
              ;weOPlot Keywords
+             CHARSIZE  =  self.charsize, $
              COLOR     = *self.color, $
              DIMENSION =  self.dimension, $
              LINESTYLE = *self.linestyle, $
@@ -264,9 +269,6 @@ pro MrPlot::doOverplot
              SYMCOLOR  = *self.symcolor, $
              SYMSIZE   = *self.symsize, $
              THICK     = *self.thick, $
-
-             ;cgOPlot Keywords
-             CHARSIZE  =  self.charsize, $
 
              ;OPlot Keywords
              NSUM      = *self. nsum, $
