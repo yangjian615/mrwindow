@@ -246,7 +246,7 @@ NORMAL = normal
                         [pts[0,i]-2, pts[1,i]+2]]
         
         ;Draw the boxes
-        plots, pts[0,*,i], pts[1,*,i], /DEVICE, COLOR=load_color('blue')
+        plots, pts[0,*,i], pts[1,*,i], /DEVICE, COLOR=cgColor('blue')
     endfor
     
     ;Store the boxes

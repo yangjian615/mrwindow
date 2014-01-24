@@ -1,1 +1,0 @@
-/Users/argall/Documents/Work/Programs/MyLibraryIDL/index_utils/twod_to_oned_index.pro

@@ -807,7 +807,7 @@ DIRECTORY=directory
 
     ;If a file name was given, figure out how to save from the extension
 	if n_elements(filename) ne 0 then begin
-	    file_type = file_extension(filename)
+	    void = cgRootName(filename, EXTENSION=file_type)
 	    saveDir = MrFile_Path(filename)
 	
 	;If no file name was given, ask for one
@@ -815,7 +815,7 @@ DIRECTORY=directory
         ;Open to the previously chosen directory or the present working directory
         if n_elements(directory) eq 0 then $
             if self.saveDir eq '' $
-                then MrPWD, directory, /PATH_SEP $
+                then void = cgRootName(DIRECTORY=directory) $
                 else directory = self.saveDir
         
         ;Initial file name
@@ -833,7 +833,7 @@ DIRECTORY=directory
         
         ;Get the file extension so we know how to save. If the extension was given, do
         ;not append another to the file name.
-	    ext = file_extension(filename)
+        void = cgRooName(filename, EXTENSION=ext)
 	    if ext ne file_type and file_type ne '' then filename += '.' + strlowcase(file_type)
     endelse
     

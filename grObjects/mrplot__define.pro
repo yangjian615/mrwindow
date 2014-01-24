@@ -91,8 +91,101 @@
 ;                           keyword set to temporarily turn of Refresh. - MRA
 ;       2013/11/23  -   Added the SetLayout and Overplot methods. - MRA
 ;       2013/12/26  -   Accept multiple targets for overplotting. - MRA
+;       2014/01/24  -   Added the _OverloadImpliedPrint and _OverloadPrint methods. - MRA
 ;-
 ;*****************************************************************************************
+;+
+;   The purpose of this method is to print information about the object's properties
+;   when the PRINT procedure is used.
+;-
+function MrPlot::_OverloadPrint
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, "''"
+    endif
+    
+    undefined = '<undefined>'
+    undefObj = '<NullObject>'
+    default = '<IDL_Default>'
+    joinStr = '   '
+    
+    ;First, get the results from the superclasses
+    atomKeys = self -> MrGrAtom::_OverloadPrint()
+    grKeys = self -> MrGraphicsKeywords::_OverloadPrint()
+    layKeys = self -> MrLayout::_OverloadPrint()
+
+    ;Class Properties
+    dimension = string('Dimension', '=', self.dimension, FORMAT='(a-26, a-2, i0)')
+    nsum      = string('NSum',      '=', self.nsum,      FORMAT='(a-26, a-2, i1)')
+    overplot  = string('OverPlot',  '=', self.overplot,  FORMAT='(a-26, a-2, i1)')
+    polar     = string('Polar',     '=', self.polar,     FORMAT='(a-26, a-2, i1)')
+    xlog      = string('Xlog',      '=', self.xlog,      FORMAT='(a-26, a-2, i1)')
+    ylog      = string('YLog',      '=', self.ylog,      FORMAT='(a-26, a-2, i1)')
+    ynozero   = string('YNoZero',   '=', self.ynozero,   FORMAT='(a-26, a-2, i1)')
+    
+    label     = string('Label', '=', "'" + self.label + "'", FORMAT='(a-26, a-2, a0)')
+    
+    max_value = string('Max_Value', '=', FORMAT='(a-26, a-2)')
+    min_value = string('Min_Value', '=', FORMAT='(a-26, a-2)')
+    symcolor  = string('SymColor',  '=', FORMAT='(a-26, a-2)')
+    target    = string('Target',    '=', FORMAT='(a-26, a-2)')
+    
+    ;Pointers
+    if n_elements(*self.max_value) eq 0 then max_value += default else max_value += string(*self.max_value, FORMAT='(f0)')
+    if n_elements(*self.min_value) eq 0 then min_value += default else min_value += string(*self.min_value, FORMAT='(f0)')
+    if n_elements(*self.symcolor)  eq 0 then symcolor += "''"     else symcolor  += strjoin(string(*self.symcolor, FORMAT='(a0)'), joinStr)
+    if n_elements(*self.target) eq 0 then target += undefObj else target += strjoin(MrObj_Class(*self.target), joinStr)
+    
+    ;Put MrPlot properties together
+    selfStr = obj_class(self) + '  <' + strtrim(obj_valid(self, /GET_HEAP_IDENTIFIER), 2) + '>'
+    plotKeys = [ dimension, $
+                 nsum, $
+                 overplot, $
+                 polar, $
+                 xlog, $
+                 ylog, $
+                 ynozero, $
+                 label, $
+                 max_value, $
+                 min_value, $
+                 symcolor, $
+                 target $
+               ]
+
+    ;Group everything in alphabetical order
+    result = [[atomKeys], [grKeys], [layKeys], [transpose(plotKeys)]]
+    result = [[selfStr], ['  ' + transpose(result[sort(result)])]]
+    
+    return, result
+end
+
+
+;+
+;   The purpose of this method is to print information about the object's properties
+;   when implied print is used.
+;-
+function MrPlot::_OverloadImpliedPrint
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, "''"
+    endif
+    
+    result = self -> _OverloadPrint()
+    
+    return, result
+end
+
+
 ;+
 ;   The purpose of this method is to draw the plot in the draw window.
 ;-
@@ -150,95 +243,97 @@ NOERASE=noerase
     if n_elements(noerase) eq 0 then noerase = *self.noerase
 
     ;Draw the plot.
-    wePlot, *self.indep, *self.dep, $
-            DIMENSION = self.dimension, $
-            OUTPUT    = output, $
-            LABEL     = self.label, $
+    MraPlot, *self.indep, *self.dep, $
+             DIMENSION =  self.dimension, $
+             OUTPUT    =  output, $
+             LABEL     =  self.label, $
             
-            ;cgPlot Keywords
-            SYMCOLOR  = *self.symcolor, $
+             ;cgPlot Keywords
+             SYMCOLOR  = *self.symcolor, $
                    
-            ;MrGraphicsAtom Keywords
-            POSITION  = self.position, $
+             ;MrGraphicsAtom Keywords
+             POSITION  = self.position, $
 
-            ;Graphics Keywords
-            MAX_VALUE = *self.max_value, $
-            MIN_VALUE = *self.min_value, $
-            XLOG      = *self.xlog, $
-            YLOG      = *self.ylog, $
-            YNOZERO   = *self.ynozero, $
+             ;Graphics Keywords
+             MAX_VALUE = *self.max_value, $
+             MIN_VALUE = *self.min_value, $
+             NSUM      =  self.nsum, $
+             POLAR     =  self.polar, $
+             XLOG      =  self.xlog, $
+             YLOG      =  self.ylog, $
+             YNOZERO   =  self.ynozero, $
                
-            ;MrGraphicsKeywords
-            AXISCOLOR     = *self.axiscolor, $
-            BACKGROUND    = *self.background, $
-            CHARSIZE      =  self.charsize, $
-            CHARTHICK     = *self.charthick, $
-            CLIP          = *self.clip, $
-            COLOR         = *self.color, $
-            DATA          =  self.data, $
-            DEVICE        =  self.device, $
-            NORMAL        =  self.normal, $
-            FONT          = *self.font, $
-            NOCLIP        = *self.noclip, $
-            NODATA        = *self.nodata, $
-            NOERASE       =       noerase, $
-            PSYM          = *self.psym, $
-            SUBTITLE      = *self.subtitle, $
-            SYMSIZE       = *self.symsize, $
-            T3D           = *self.t3d, $
-            THICK         = *self.thick, $
-            TICKLEN       = *self.ticklen, $
-            TITLE         = *self.title, $
-            XCHARSIZE     = *self.xcharsize, $
-            XGRIDSTYLE    = *self.xgridstyle, $
-            XMINOR        = *self.xminor, $
-            XRANGE        = *self.xrange, $
-            XSTYLE        = *self.xstyle, $
-            XTHICK        = *self.xthick, $
-            XTICK_GET     = *self.xtick_get, $
-            XTICKFORMAT   = *self.xtickformat, $
-            XTICKINTERVAL = *self.xtickinterval, $
-            XTICKLAYOUT   = *self.xticklayout, $
-            XTICKLEN      = *self.xticklen, $
-            XTICKNAME     = *self.xtickname, $
-            XTICKS        = *self.xticks, $
-            XTICKUNITS    = *self.xtickunits, $
-            XTICKV        = *self.xtickv, $
-            XTITLE        = *self.xtitle, $
-            YCHARSIZE     = *self.ycharsize, $
-            YGRIDSTYLE    = *self.ygridstyle, $
-            YMINOR        = *self.yminor, $
-            YRANGE        = *self.yrange, $
-            YSTYLE        = *self.ystyle, $
-            YTHICK        = *self.ythick, $
-            YTICK_GET     = *self.ytick_get, $
-            YTICKFORMAT   = *self.ytickformat, $
-            YTICKINTERVAL = *self.ytickinterval, $
-            YTICKLAYOUT   = *self.yticklayout, $
-            YTICKLEN      = *self.yticklen, $
-            YTICKNAME     = *self.ytickname, $
-            YTICKS        = *self.yticks, $
-            YTICKUNITS    = *self.ytickunits, $
-            YTICKV        = *self.ytickv, $
-            YTITLE        = *self.ytitle, $
-            ZCHARSIZE     = *self.zcharsize, $
-            ZGRIDSTYLE    = *self.zgridstyle, $
-            ZMARGIN       = *self.zmargin, $
-            ZMINOR        = *self.zminor, $
-            ZRANGE        = *self.zrange, $
-            ZSTYLE        = *self.zstyle, $
-            ZTHICK        = *self.zthick, $
-            ZTICK_GET     = *self.ztick_get, $
-            ZTICKFORMAT   = *self.ztickformat, $
-            ZTICKINTERVAL = *self.ztickinterval, $
-            ZTICKLAYOUT   = *self.zticklayout, $
-            ZTICKLEN      = *self.zticklen, $
-            ZTICKNAME     = *self.ztickname, $
-            ZTICKS        = *self.zticks, $
-            ZTICKUNITS    = *self.ztickunits, $
-            ZTICKV        = *self.ztickv, $
-            ZTITLE        = *self.ztitle, $
-            ZVALUE        = *self.zvalue
+             ;MrGraphicsKeywords
+             AXISCOLOR     = *self.axiscolor, $
+             BACKGROUND    = *self.background, $
+             CHARSIZE      =  self.charsize, $
+             CHARTHICK     = *self.charthick, $
+             CLIP          = *self.clip, $
+             COLOR         = *self.color, $
+             DATA          =  self.data, $
+             DEVICE        =  self.device, $
+             NORMAL        =  self.normal, $
+             FONT          = *self.font, $
+             NOCLIP        = *self.noclip, $
+             NODATA        = *self.nodata, $
+             NOERASE       =       noerase, $
+             PSYM          = *self.psym, $
+             SUBTITLE      = *self.subtitle, $
+             SYMSIZE       = *self.symsize, $
+             T3D           = *self.t3d, $
+             THICK         = *self.thick, $
+             TICKLEN       = *self.ticklen, $
+             TITLE         = *self.title, $
+             XCHARSIZE     = *self.xcharsize, $
+             XGRIDSTYLE    = *self.xgridstyle, $
+             XMINOR        = *self.xminor, $
+             XRANGE        = *self.xrange, $
+             XSTYLE        = *self.xstyle, $
+             XTHICK        = *self.xthick, $
+             XTICK_GET     = *self.xtick_get, $
+             XTICKFORMAT   = *self.xtickformat, $
+             XTICKINTERVAL = *self.xtickinterval, $
+             XTICKLAYOUT   = *self.xticklayout, $
+             XTICKLEN      = *self.xticklen, $
+             XTICKNAME     = *self.xtickname, $
+             XTICKS        = *self.xticks, $
+             XTICKUNITS    = *self.xtickunits, $
+             XTICKV        = *self.xtickv, $
+             XTITLE        = *self.xtitle, $
+             YCHARSIZE     = *self.ycharsize, $
+             YGRIDSTYLE    = *self.ygridstyle, $
+             YMINOR        = *self.yminor, $
+             YRANGE        = *self.yrange, $
+             YSTYLE        = *self.ystyle, $
+             YTHICK        = *self.ythick, $
+             YTICK_GET     = *self.ytick_get, $
+             YTICKFORMAT   = *self.ytickformat, $
+             YTICKINTERVAL = *self.ytickinterval, $
+             YTICKLAYOUT   = *self.yticklayout, $
+             YTICKLEN      = *self.yticklen, $
+             YTICKNAME     = *self.ytickname, $
+             YTICKS        = *self.yticks, $
+             YTICKUNITS    = *self.ytickunits, $
+             YTICKV        = *self.ytickv, $
+             YTITLE        = *self.ytitle, $
+             ZCHARSIZE     = *self.zcharsize, $
+             ZGRIDSTYLE    = *self.zgridstyle, $
+             ZMARGIN       = *self.zmargin, $
+             ZMINOR        = *self.zminor, $
+             ZRANGE        = *self.zrange, $
+             ZSTYLE        = *self.zstyle, $
+             ZTHICK        = *self.zthick, $
+             ZTICK_GET     = *self.ztick_get, $
+             ZTICKFORMAT   = *self.ztickformat, $
+             ZTICKINTERVAL = *self.ztickinterval, $
+             ZTICKLAYOUT   = *self.zticklayout, $
+             ZTICKLEN      = *self.zticklen, $
+             ZTICKNAME     = *self.ztickname, $
+             ZTICKS        = *self.zticks, $
+             ZTICKUNITS    = *self.ztickunits, $
+             ZTICKV        = *self.ztickv, $
+             ZTITLE        = *self.ztitle, $
+             ZVALUE        = *self.zvalue
 end
 
 
@@ -258,25 +353,25 @@ pro MrPlot::doOverplot
     endif
     
     ;Get the dimensions of the independent variable.
-    weOPlot, *self.indep, *self.dep, $
+    MraOPlot, *self.indep, *self.dep, $
 
-             ;weOPlot Keywords
-             CHARSIZE  =  self.charsize, $
-             COLOR     = *self.color, $
-             DIMENSION =  self.dimension, $
-             LINESTYLE = *self.linestyle, $
-             PSYM      = *self.psym, $
-             SYMCOLOR  = *self.symcolor, $
-             SYMSIZE   = *self.symsize, $
-             THICK     = *self.thick, $
+              ;weOPlot Keywords
+              CHARSIZE  =  self.charsize, $
+              COLOR     = *self.color, $
+              DIMENSION =  self.dimension, $
+              LINESTYLE = *self.linestyle, $
+              PSYM      = *self.psym, $
+              SYMCOLOR  = *self.symcolor, $
+              SYMSIZE   = *self.symsize, $
+              THICK     = *self.thick, $
 
-             ;OPlot Keywords
-             NSUM      = *self. nsum, $
-             POLAR     = *self. polar, $
-             CLIP      = *self. clip, $
-             NOCLIP    = *self. noclip, $
-             T3D       = *self. t3d, $
-             ZVALUE    = *self. zvalue
+              ;OPlot Keywords
+              NSUM      = *self. nsum, $
+              POLAR     =  self. polar, $
+              CLIP      = *self. clip, $
+              NOCLIP    = *self. noclip, $
+              T3D       = *self. t3d, $
+              ZVALUE    = *self. zvalue
 END
   
 
@@ -431,11 +526,11 @@ _REF_EXTRA = extra
     ;Graphics Properties
     if arg_present(MAX_VALUE) and n_elements(*self.MAX_VALUE) ne 0 then max_value = *self.max_value
     if arg_present(MIN_VALUE) and n_elements(*self.MIN_VALUE) ne 0 then min_value = *self.min_value
-    if arg_present(nsum)      and n_elements(*self.nsum)      ne 0 then nsum = *self.nsum
-    if arg_present(XLOG)      and n_elements(*self.XLOG)      ne 0 then xlog = *self.xlog
-    if arg_present(YLOG)      and n_elements(*self.YLOG)      ne 0 then ylog = *self.ylog
-    if arg_present(POLAR)     and n_elements(*self.POLAR)     ne 0 then polar = *self.polar
-    if arg_present(YNOZERO)   and n_elements(*self.YNOZERO)   ne 0 then ynozero = *self.ynozero
+    if arg_present(nsum)      and n_elements( self.nsum)      ne 0 then nsum      =  self.nsum
+    if arg_present(XLOG)      and n_elements( self.XLOG)      ne 0 then xlog      =  self.xlog
+    if arg_present(YLOG)      and n_elements( self.YLOG)      ne 0 then ylog      =  self.ylog
+    if arg_present(POLAR)     and n_elements( self.POLAR)     ne 0 then polar     =  self.polar
+    if arg_present(YNOZERO)   and n_elements( self.YNOZERO)   ne 0 then ynozero   = *self.ynozero
 
     ;Get all of the remaining keywords from MrGraphicsKeywords
     if n_elements(EXTRA) gt 0 then begin
@@ -713,13 +808,13 @@ _REF_EXTRA = extra
     ;Graphics Properties
     if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
     if n_elements(MIN_VALUE) ne 0 then *self.min_value = min_value
-    if n_elements(NSUM)      ne 0 then *self.nsum = nsum
-    if n_elements(POLAR)     ne 0 then *self.polar = keyword_set(polar)
-    if n_elements(XLOG)      ne 0 then *self.xlog = keyword_set(xlog)
-    if n_elements(YLOG)      ne 0 then *self.ylog = keyword_set(ylog)
-    if n_elements(YNOZERO)   ne 0 then *self.ynozero = keyword_set(ynozero)
-    if n_elements(xstyle)    ne 0 then *self.xstyle = ~(xstyle and 1) + xstyle
-    if n_elements(ystyle)    ne 0 then *self.ystyle = ~(ystyle and 1) + ystyle
+    if n_elements(NSUM)      ne 0 then  self.nsum      = nsum
+    if n_elements(POLAR)     ne 0 then  self.polar     = keyword_set(polar)
+    if n_elements(XLOG)      ne 0 then  self.xlog      = keyword_set(xlog)
+    if n_elements(YLOG)      ne 0 then  self.ylog      = keyword_set(ylog)
+    if n_elements(YNOZERO)   ne 0 then  self.ynozero   = keyword_set(ynozero)
+    if n_elements(xstyle)    ne 0 then *self.xstyle    = ~(xstyle and 1) + xstyle
+    if n_elements(ystyle)    ne 0 then *self.ystyle    = ~(ystyle and 1) + ystyle
     
     if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
     if n_elements(charsize) gt 0 then self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
@@ -762,10 +857,6 @@ pro MrPlot::cleanup
     ptr_free, self.dep
     ptr_free, self.max_value
     ptr_free, self.min_value
-    ptr_free, self.nsum
-    ptr_free, self.xlog
-    ptr_free, self.ylog
-    ptr_free, self.polar
     ptr_free, self.symcolor
     ptr_free, self.target
     
@@ -868,10 +959,16 @@ _REF_EXTRA = extra
     endif
 
     dims = size(x, /DIMENSIONS)
-    setDefaultValue, dimension, 0
-    setDefaultValue, refresh, 1, /BOOLEAN
     nx = n_elements(x)
     ny = n_elements(y)
+
+    ;Defaults
+    self.xlog = keyword_set(xlog)
+    self.ylog = keyword_set(ylog)
+    self.polar = keyword_set(polar)
+    self.ynozero = keyword_set(ynozero)
+    setDefaultValue, dimension, 0
+    setDefaultValue, nSum,  0
 
 ;---------------------------------------------------------------------
 ;Superclass Properties ///////////////////////////////////////////////
@@ -898,13 +995,8 @@ _REF_EXTRA = extra
     self.dep = ptr_new(/ALLOCATE_HEAP)
     self.min_value = ptr_new(/ALLOCATE_HEAP)
     self.max_value = ptr_new(/ALLOCATE_HEAP)
-    self.nsum = ptr_new(/ALLOCATE_HEAP)
     self.target = ptr_new(/ALLOCATE_HEAP)
-    self.xlog = ptr_new(/ALLOCATE_HEAP)
-    self.ylog = ptr_new(/ALLOCATE_HEAP)
-    self.polar = ptr_new(/ALLOCATE_HEAP)
     self.symcolor = ptr_new(/ALLOCATE_HEAP)
-    self.ynozero = ptr_new(/ALLOCATE_HEAP)
 
     ;If REFRESH=1 three things happen: If the call to MrGrAtom is
     ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
@@ -994,9 +1086,9 @@ _REF_EXTRA = extra
                          NSUM = nsum, $
                          POLAR = polar, $
                          SYMCOLOR = symcolor, $
-                         XLOG = keyword_set(xlog), $
+                         XLOG = xlog, $
                          XRANGE = xrange, $
-                         YLOG = keyword_set(ylog), $
+                         YLOG = ylog, $
                          YNOZERO = ynozero, $
                          YRANGE = yrange
     
@@ -1038,28 +1130,28 @@ pro MrPlot__define, class
     
     class = {MrPlot, $
              ;Data Properties
-             indep: ptr_new(), $               ;independent variable
-             dep: ptr_new(), $                 ;dependent variable
+             indep: ptr_new(), $            ;independent variable
+             dep: ptr_new(), $              ;dependent variable
              
              ;Graphics Properties
-             max_value: ptr_new(), $           ;maximum value displayed in plot
-             min_value: ptr_new(), $           ;minimum value displayed in plot
-             xlog: ptr_new(), $                ;log-scale the x-axis?
-             ylog: ptr_new(), $                ;log-scale the y-axis?
-             polar: ptr_new(), $               ;create a polar plot?
-             ynozero: ptr_new(), $             ;do not make ymin=0
-             nsum: ptr_new(), $                ;*number of points to average when plotting
+             max_value: ptr_new(), $        ;maximum value displayed in plot
+             min_value: ptr_new(), $        ;minimum value displayed in plot
+             xlog: 0B, $                    ;log-scale the x-axis?
+             ylog: 0B, $                    ;log-scale the y-axis?
+             polar: 0B, $                   ;create a polar plot?
+             ynozero: 0B, $                 ;do not make ymin=0
+             nsum: 0L, $                    ;*number of points to average when plotting
              
              ;cgPlot Properties
-             overplot: 0B, $                   ;Overplot?
-             symcolor: ptr_new(), $            ;color of each symbol
-             target: ptr_new(), $              ;Overplot target
-             label: '', $                      ;*
+             overplot: 0B, $                ;Overplot?
+             symcolor: ptr_new(), $         ;color of each symbol
+             target: ptr_new(), $           ;Overplot target
+             label: '', $                   ;*
              
              ;MrPlot Properties
-             dimension: 0, $                   ;The over which plots will be made
-             init_xrange: dblarr(2), $         ;Initial y-range
-             init_yrange: dblarr(2), $         ;Initial x-range
+             dimension: 0, $                ;The over which plots will be made
+             init_xrange: dblarr(2), $      ;Initial y-range
+             init_yrange: dblarr(2), $      ;Initial x-range
              
              ;Inheritances -- At the bottom so that IDL calls MrPlot's methods before
              ;                it calls the superclass methods.

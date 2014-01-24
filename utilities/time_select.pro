@@ -1,1 +1,0 @@
-/Users/argall/Documents/Work/Programs/MyLibraryIDL/data_utils/time_select.pro

@@ -53,13 +53,73 @@
 ;       2013/11/24  -   Forgot to add O[XY]MARGIN keywords to Set/GetProperty. Fixed. - MRA
 ;       2013/11/28  -   LAYOUT property is strictly a 3-element array. - MRA
 ;       2014/01/10  -   Forgot to set the POSITION property within INIT. Fixed. - MRA
+;       2014/01/24  -   Added the _OverloadPrint method. Changed object properties to
+;                           floats so that fractions of a character size can be specified. - MRA
 ;-
 ;*****************************************************************************************
 ;+
 ;   Calculate a position based on the layout properties.
 ;-
+function MrLayout::_OverloadPrint
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, fltarr(4)
+    endif
+    
+    undefined = '<undefined>'
+    
+    ;Create the string
+    charsize = string('CharSize', '=', self.charsize, FORMAT='(a-26, a-2, f0)')
+    layout   = string('Layout',   '=', self.layout,   FORMAT='(a-26, a-2, 3(i0, 2x))')
+    oxmargin = string('OXMargin', '=', self.oxmargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
+    oymargin = string('OYMargin', '=', self.oymargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
+    position = string('Position', '=', self.position, FORMAT='(a-26, a-2, 4(f0, 2x))')
+    xmargin  = string('XMargin',  '=', self.xmargin,  FORMAT='(a-26, a-2, 2(f0, 2x))')
+    xgap     = string('XGap',     '=', self.xgap,     FORMAT='(a-26, a-2, f0)')
+    x_region = string('X_Region', '=', self.x_region, FORMAT='(a-26, a-2, 4(f0, 2x))')
+    x_window = string('X_Window', '=', self.x_window, FORMAT='(a-26, a-2, 4(f0, 2x))')
+    ymargin  = string('YMargin',  '=', self.ymargin,  FORMAT='(a-26, a-2, 2(f0, 2x))')
+    ygap     = string('YGap',     '=', self.ygap,     FORMAT='(a-26, a-2, f0)')
+    y_region = string('Y_Region', '=', self.y_region, FORMAT='(a-26, a-2, 4(f0, 2x))')
+    y_window = string('Y_Window', '=', self.y_window, FORMAT='(a-26, a-2, 4(f0, 2x))')
+    
+    ;Pointers may or may not have a value
+    aspect = string('Aspect', '=', FORMAT='(a-26, a-2)')
+    if n_elements(*self.aspect) eq 0 then aspect += undefined else aspect += string(*self.aspect, FORMAT='(f0)')
+    
+    ;Combine all of the string into an array
+    result = [ aspect, $
+               charsize, $
+               layout, $
+               oxmargin, $
+               oymargin, $
+               position, $
+               xmargin, $
+               xgap, $
+               x_region, $
+               x_window, $
+               ymargin, $
+               ygap, $
+               y_region, $
+               y_window $
+             ]
+    
+    ;Return a column vector so that everything is printed on its own line.
+    return, transpose(result)
+end
+
+
+
+;+
+;   Calculate a position based on the layout properties.
+;-
 function MrLayout::CalcPosition
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -162,7 +222,7 @@ YMARGIN=ymargin, $
 YGAP=ygap, $
 Y_REGION=y_region, $
 Y_WINDOW=y_window
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -247,7 +307,7 @@ XMARGIN=xmargin, $
 XGAP=xgap, $
 YMARGIN=ymargin, $
 YGAP=ygap
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -448,18 +508,18 @@ pro MrLayout__define, class
     compile_opt strictarr
     
     define = { MrLayout, $
-               aspect: ptr_new(), $
+               aspect:   ptr_new(), $
                charsize: 0.0, $
-               layout: intarr(3), $
-               oxmargin: [0,0], $
-               oymargin: [0,0], $
+               layout:   intarr(3), $
+               oxmargin: [0.0,0.0], $
+               oymargin: [0.0,0.0], $
                position: fltarr(4), $
-               xmargin: [0, 0], $
-               xgap: 0, $
+               xmargin:  [0.0, 0.0], $
+               xgap:     0.0, $
                x_region: [0.0, 0.0], $
                x_window: [0.0, 0.0], $
-               ymargin: [0, 0], $
-               ygap: 0, $
+               ymargin:  [0.0, 0.0], $
+               ygap:     0.0, $
                y_region: [0.0, 0.0], $
                y_window: [0.0, 0.0] $
              }

@@ -51,8 +51,38 @@
 ;       2013/11/20  -   Written by Matthew Argall
 ;       2013/11/22  -   Added the WINDOW property, the _SetWindow, Refresh, and Close
 ;                           methods, and the BUFFER, CURRENT, and NOGUI keywords. - MRA
+;       2014/01/24  -   Added the _OverloadPrint method. - MRA
 ;-
 ;*****************************************************************************************
+;+
+;   The purpose of this method is to print information about the object's properties
+;   when the PRINT procedure is used.
+;-
+function MrGrAtom::_OverloadPrint
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, "''"
+    endif
+    
+    ;Class Properties
+    hide = string('Hide', '=', self.hide, FORMAT='(a-26, a-2, i1)')
+    name = string('Name', '=', self.name, FORMAT='(a-26, a-2, a0)')
+    
+    ;Combine the results
+    result = [ hide, $
+               name $
+             ]
+
+    ;Return a column so that each property is printed on a separate line.
+    return, transpose(result)
+end
+
+
 ;+
 ;   Determine if the coordate made by X and Y lies within the object's position.
 ;

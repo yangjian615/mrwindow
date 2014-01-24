@@ -1,1 +1,0 @@
-/Users/argall/Documents/Work/Programs/WileEGraphics/wegraphicskeywords__define.pro

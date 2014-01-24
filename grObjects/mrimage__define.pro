@@ -86,9 +86,127 @@
 ;                           temporarily turn of Refresh. - MRA
 ;       2013/12/30  -   CTIndex takes precedence over PALETTE when both were present. Now,
 ;                           if PALETTE is set, CTINDEX is cleared, and vice versa. - MRA
+;       2014/01/24  -   Added the _OverloadImpliedPrint and _OverloadPrint methods. - MRA
 ;                           
 ;-
 ;*****************************************************************************************
+;+
+;   The purpose of this method is to print information about the object's properties
+;   when the PRINT procedure is used.
+;-
+function MrImage::_OverloadPrint
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, "''"
+    endif
+    
+    ;Useful strings
+    undefined = '<undefined>'
+    joinStr = '   '
+    
+    ;Superclasses
+    grKeys = self -> MrGraphicsKeywords::_OverloadPrint()
+    layKeys = self -> MrLayout::_OverloadPrint()
+    atomKeys = self -> MrGrAtom::_OverloadPrint()
+    
+    ;Object Properties
+    tv       = string('TV',       '=', self.tv,       FORMAT='(a-26, a-2, i1)')
+    idisplay = string('iDisplay', '=', self.idisplay, FORMAT='(a-26, a-2, i0)')
+    center   = string('Center',   '=', self.center,   FORMAT='(a-26, a-2, i1)')
+    paint    = string('Paint',    '=', self.paint,    FORMAT='(a-26, a-2, i1)')
+    xlog     = string('XLog',     '=', self.xlog,     FORMAT='(a-26, a-2, i1)')
+    ylog     = string('YLog',     '=', self.ylog,     FORMAT='(a-26, a-2, i1)')
+    
+    ;Pointers
+    axes          = string('Axes',          '=', FORMAT='(a-26, a-2)')
+    bottom        = string('Bottom',        '=', FORMAT='(a-26, a-2)')
+    ctindex       = string('CTIndex',       '=', FORMAT='(a-26, a-2)')
+    data_pos      = string('Data_Pos',      '=', FORMAT='(a-26, a-2)')
+    missing_value = string('Missing_Value', '=', FORMAT='(a-26, a-2)')
+    missing_color = string('Missing_Color', '=', FORMAT='(a-26, a-2)')
+    nan           = string('NaN',           '=', FORMAT='(a-26, a-2)')
+    palette       = string('Palette',       '=', FORMAT='(a-26, a-2)')
+    range         = string('Range',         '=', FORMAT='(a-26, a-2)')
+    scale         = string('Scale',         '=', FORMAT='(a-26, a-2)')
+    top           = string('Top',           '=', FORMAT='(a-26, a-2)')
+    max_value     = string('Max_Value',     '=', FORMAT='(a-26, a-2)')
+    min_value     = string('Min_Value',     '=', FORMAT='(a-26, a-2)')
+    
+    ;Value or Undefined?
+    if n_elements(*self.axes)          eq 0 then axes          += undefined else axes          += string(*self.axes,          FORMAT='(i1)')
+    if n_elements(*self.bottom)        eq 0 then bottom        += undefined else bottom        += string(*self.bottom,        FORMAT='(i0)')
+    if n_elements(*self.ctindex)       eq 0 then ctindex       += undefined else ctindex       += string(*self.ctindex,       FORMAT='(i0)')
+    if n_elements(*self.data_pos)      eq 0 then data_pos      += undefined else data_pos      += string(*self.data_pos,      FORMAT='(4(f0, 3x))')
+    if n_elements(*self.missing_value) eq 0 then missing_value += undefined else missing_value += string(*self.missing_value, FORMAT='(f0)')
+    if n_elements(*self.missing_color) eq 0 then missing_color += undefined else missing_color += string(*self.missing_color, FORMAT='(a0)')
+    if n_elements(*self.nan)           eq 0 then nan           += undefined else nan           += string(*self.nan,           FORMAT='(i1)')
+    if n_elements(*self.range)         eq 0 then range         += undefined else range         += string(*self.range,         FORMAT='(2(f0, 3x))')
+    if n_elements(*self.scale)         eq 0 then scale         += undefined else scale         += string(*self.scale,         FORMAT='(i1)')
+    if n_elements(*self.top)           eq 0 then top           += undefined else top           += string(*self.top,           FORMAT='(i0)')
+    if n_elements(*self.max_value)     eq 0 then max_value     += undefined else max_value     += string(*self.max_value,     FORMAT='(f0)')
+    if n_elements(*self.min_value)     eq 0 then min_value     += undefined else min_value     += string(*self.min_value,     FORMAT='(f0)')
+
+    ;Get the help string
+    if n_elements(*self.palette) gt 0 then begin
+        help, *self.palette, OUTPUT=tempStr
+        palette += tempStr
+    endif else palette += undefined 
+    
+    selfStr = obj_class(self) + '  <' + strtrim(obj_valid(self, /GET_HEAP_IDENTIFIER), 2) + '>'
+    imKeys = [ tv, $
+               idisplay, $
+               center, $
+               paint, $
+               xlog, $
+               ylog, $
+               axes, $
+               bottom, $
+               ctindex, $
+               data_pos, $
+               missing_value, $
+               missing_color, $
+               nan, $
+               palette, $
+               range, $
+               scale, $
+               top, $
+               max_value, $
+               min_value $
+             ]
+stop
+    result = [[atomKeys], [grKeys], [layKeys], [transpose(imKeys)]]
+    result = [[selfStr], ['  ' + transpose(result[sort(result)])]]
+    
+    return, result
+end
+
+
+;+
+;   The purpose of this method is to print information about the object's properties
+;   when implied print is used.
+;-
+function MrImage::_OverloadImpliedPrint
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, "''"
+    endif
+    
+    result = self -> _OverloadPrint()
+    
+    return, result
+end
+
+
 ;+
 ;   The purpose of this method is to draw the plot in the draw window. The plot is
 ;   first buffered into the pixmap for smoother opteration (by allowing motion events
@@ -96,7 +214,7 @@
 ;-
 pro MrImage::Draw, $
 NOERASE=noerase
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -125,7 +243,7 @@ end
 ;-
 pro MrImage::doImage, $
 NOERASE=noerase
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -251,84 +369,84 @@ NOERASE=noerase
 ;DATA POSITION? //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if self.paint eq 0 then begin
-        maImage, (*self.image)[iData[0]:iData[2], iData[1]:iData[3], self.iDisplay], $
-                 (*self.indep)[iData[0]:iData[2]], (*self.dep)[iData[1]:iData[3]], $
+        MraImage, (*self.image)[iData[0]:iData[2], iData[1]:iData[3], self.iDisplay], $
+                  (*self.indep)[iData[0]:iData[2]], (*self.dep)[iData[1]:iData[3]], $
                 
-                 ;IMAGE_PLOTS Keywords
-                 AXES          = *self.axes, $
-                 BOTTOM        = *self.bottom, $
-                 CTINDEX       = *self.ctindex, $
-                 DPOSITION     = *self.data_pos, $
-                 NAN           = *self.nan, $
-                 SCALE         = *self.scale, $
-                 RANGE         = *self.range, $
-                 MISSING_VALUE = *self.missing_value, $
-                 MISSING_COLOR = *self.missing_color, $
-                 PALETTE       = *self.palette, $
-                 TOP           = *self.top, $
+                  ;IMAGE_PLOTS Keywords
+                  AXES          = *self.axes, $
+                  BOTTOM        = *self.bottom, $
+                  CTINDEX       = *self.ctindex, $
+                  DPOSITION     = *self.data_pos, $
+                  NAN           = *self.nan, $
+                  SCALE         = *self.scale, $
+                  RANGE         = *self.range, $
+                  MISSING_VALUE = *self.missing_value, $
+                  MISSING_COLOR = *self.missing_color, $
+                  PALETTE       = *self.palette, $
+                  TOP           = *self.top, $
                 
-                 ;MrGraphicAtom Keywords
-                 POSITION      =  self.position, $
+                  ;MrGraphicAtom Keywords
+                  POSITION      =  self.position, $
                 
-                 ;Graphics Keywords
-                 MAX_VALUE     = max_value, $
-                 MIN_VALUE     = min_value, $
+                  ;Graphics Keywords
+                  MAX_VALUE     = max_value, $
+                  MIN_VALUE     = min_value, $
                 
-                 ;MrGraphicsKeywords
-;                 AXISCOLOR     = *self.axiscolor, $
-                 BACKGROUND    = *self.background, $
-                 CHARSIZE      =  self.charsize, $
-                 CHARTHICK     = *self.charthick, $
-                 CLIP          = *self.clip, $
-                 COLOR         = *self.color, $
-                 DATA          =  self.data, $
-                 DEVICE        =  self.device, $
-                 NORMAL        =  self.normal, $
-                 FONT          = *self.font, $
-                 NOCLIP        = *self.noclip, $
-                 NODATA        = *self.nodata, $
-                 NOERASE       =       noerase, $
-                 PSYM          = *self.psym, $
-                 SUBTITLE      = *self.subtitle, $
-                 SYMSIZE       = *self.symsize, $
-                 T3D           = *self.t3d, $
-                 THICK         = *self.thick, $
-                 TICKLEN       = *self.ticklen, $
-                 TITLE         = *self.title, $
+                  ;MrGraphicsKeywords
+ ;                 AXISCOLOR     = *self.axiscolor, $
+                  BACKGROUND    = *self.background, $
+                  CHARSIZE      =  self.charsize, $
+                  CHARTHICK     = *self.charthick, $
+                  CLIP          = *self.clip, $
+                  COLOR         = *self.color, $
+                  DATA          =  self.data, $
+                  DEVICE        =  self.device, $
+                  NORMAL        =  self.normal, $
+                  FONT          = *self.font, $
+                  NOCLIP        = *self.noclip, $
+                  NODATA        = *self.nodata, $
+                  NOERASE       =       noerase, $
+                  PSYM          = *self.psym, $
+                  SUBTITLE      = *self.subtitle, $
+                  SYMSIZE       = *self.symsize, $
+                  T3D           = *self.t3d, $
+                  THICK         = *self.thick, $
+                  TICKLEN       = *self.ticklen, $
+                  TITLE         = *self.title, $
                 
-                 XCHARSIZE     = *self.xcharsize, $
-                 XGRIDSTYLE    = *self.xgridstyle, $
-                 XMINOR        = *self.xminor, $
-                 XRANGE        = *self.xrange, $
-                 XSTYLE        = *self.xstyle, $
-                 XTHICK        = *self.xthick, $
-                 XTICK_GET     = *self.xtick_get, $
-                 XTICKFORMAT   = *self.xtickformat, $
-                 XTICKINTERVAL = *self.xtickinterval, $
-                 XTICKLAYOUT   = *self.xticklayout, $
-                 XTICKLEN      = *self.xticklen, $
-                 XTICKNAME     = *self.xtickname, $
-                 XTICKS        = *self.xticks, $
-                 XTICKUNITS    = *self.xtickunits, $
-                 XTICKV        = *self.xtickv, $
-                 XTITLE        = *self.xtitle, $
+                  XCHARSIZE     = *self.xcharsize, $
+                  XGRIDSTYLE    = *self.xgridstyle, $
+                  XMINOR        = *self.xminor, $
+                  XRANGE        = *self.xrange, $
+                  XSTYLE        = *self.xstyle, $
+                  XTHICK        = *self.xthick, $
+                  XTICK_GET     = *self.xtick_get, $
+                  XTICKFORMAT   = *self.xtickformat, $
+                  XTICKINTERVAL = *self.xtickinterval, $
+                  XTICKLAYOUT   = *self.xticklayout, $
+                  XTICKLEN      = *self.xticklen, $
+                  XTICKNAME     = *self.xtickname, $
+                  XTICKS        = *self.xticks, $
+                  XTICKUNITS    = *self.xtickunits, $
+                  XTICKV        = *self.xtickv, $
+                  XTITLE        = *self.xtitle, $
                 
-                 YCHARSIZE     = *self.ycharsize, $
-                 YGRIDSTYLE    = *self.ygridstyle, $
- ;                YMINOR        = *self.yminor, $
-                 YRANGE        = *self.yrange, $
-                 YSTYLE        = *self.ystyle, $
-                 YTHICK        = *self.ythick, $
-                 YTICK_GET     = *self.ytick_get, $
-                 YTICKFORMAT   = *self.ytickformat, $
-                 YTICKINTERVAL = *self.ytickinterval, $
-                 YTICKLAYOUT   = *self.yticklayout, $
-                 YTICKLEN      = *self.yticklen, $
-                 YTICKNAME     = *self.ytickname, $
-                 YTICKS        = *self.yticks, $
-                 YTICKUNITS    = *self.ytickunits, $
-                 YTICKV        = *self.ytickv, $
-                 YTITLE        = *self.ytitle;, $
+                  YCHARSIZE     = *self.ycharsize, $
+                  YGRIDSTYLE    = *self.ygridstyle, $
+  ;                YMINOR        = *self.yminor, $
+                  YRANGE        = *self.yrange, $
+                  YSTYLE        = *self.ystyle, $
+                  YTHICK        = *self.ythick, $
+                  YTICK_GET     = *self.ytick_get, $
+                  YTICKFORMAT   = *self.ytickformat, $
+                  YTICKINTERVAL = *self.ytickinterval, $
+                  YTICKLAYOUT   = *self.yticklayout, $
+                  YTICKLEN      = *self.yticklen, $
+                  YTICKNAME     = *self.ytickname, $
+                  YTICKS        = *self.yticks, $
+                  YTICKUNITS    = *self.ytickunits, $
+                  YTICKV        = *self.ytickv, $
+                  YTITLE        = *self.ytitle;, $
                 
  ;                ZCHARSIZE=*self.zcharsize, $
  ;                ZGRIDSTYLE=*self.zgridstyle, $
@@ -354,85 +472,85 @@ NOERASE=noerase
 ;---------------------------------------------------------------------
     endif else begin
     
-        maImage, *self.image, Xmin, Ymin, Xmax, Ymax, $
+        MraImage, *self.image, Xmin, Ymin, Xmax, Ymax, $
                 
-                 ;IMAGE_PLOTS Keywords
-                 AXES          = *self.axes, $
-                 BOTTOM        = *self.bottom, $
-                 CTINDEX       = *self.ctindex, $
-                 DPOSITION     = *self.data_pos, $
-                 NAN           = *self.nan, $
-                 SCALE         = *self.scale, $
-                 RANGE         = *self.range, $
-                 MISSING_VALUE = *self.missing_value, $
-                 MISSING_COLOR = *self.missing_color, $
-                 PALETTE       = *self.palette, $
-                 TOP           = *self.top, $
+                  ;IMAGE_PLOTS Keywords
+                  AXES          = *self.axes, $
+                  BOTTOM        = *self.bottom, $
+                  CTINDEX       = *self.ctindex, $
+                  DPOSITION     = *self.data_pos, $
+                  NAN           = *self.nan, $
+                  SCALE         = *self.scale, $
+                  RANGE         = *self.range, $
+                  MISSING_VALUE = *self.missing_value, $
+                  MISSING_COLOR = *self.missing_color, $
+                  PALETTE       = *self.palette, $
+                  TOP           = *self.top, $
                 
-                 ;MrGraphicAtom Keywords
-                 POSITION      =  self.position, $
+                  ;MrGraphicAtom Keywords
+                  POSITION      =  self.position, $
                 
-                 ;Graphics Keywords
-                 MAX_VALUE     = max_value, $
-                 MIN_VALUE     = min_value, $
-                 XLOG          = self.xlog, $
-                 YLOG          = self.ylog, $
+                  ;Graphics Keywords
+                  MAX_VALUE     = max_value, $
+                  MIN_VALUE     = min_value, $
+                  XLOG          = self.xlog, $
+                  YLOG          = self.ylog, $
                 
-                 ;MrGraphicsKeywords
-;                 AXISCOLOR     = *self.axiscolor, $
-                 BACKGROUND    = *self.background, $
-                 CHARSIZE      =  self.charsize, $
-                 CHARTHICK     = *self.charthick, $
-                 CLIP          = *self.clip, $
-                 COLOR         = *self.color, $
-                 DATA          =  self.data, $
-                 DEVICE        =  self.device, $
-                 NORMAL        =  self.normal, $
-                 FONT          = *self.font, $
-                 NOCLIP        = *self.noclip, $
-                 NODATA        = *self.nodata, $
-                 NOERASE       =       noerase, $
-                 PSYM          = *self.psym, $
-                 SUBTITLE      = *self.subtitle, $
-                 SYMSIZE       = *self.symsize, $
-                 T3D           = *self.t3d, $
-                 THICK         = *self.thick, $
-                 TICKLEN       = *self.ticklen, $
-                 TITLE         = *self.title, $
+                  ;MrGraphicsKeywords
+ ;                 AXISCOLOR     = *self.axiscolor, $
+                  BACKGROUND    = *self.background, $
+                  CHARSIZE      =  self.charsize, $
+                  CHARTHICK     = *self.charthick, $
+                  CLIP          = *self.clip, $
+                  COLOR         = *self.color, $
+                  DATA          =  self.data, $
+                  DEVICE        =  self.device, $
+                  NORMAL        =  self.normal, $
+                  FONT          = *self.font, $
+                  NOCLIP        = *self.noclip, $
+                  NODATA        = *self.nodata, $
+                  NOERASE       =       noerase, $
+                  PSYM          = *self.psym, $
+                  SUBTITLE      = *self.subtitle, $
+                  SYMSIZE       = *self.symsize, $
+                  T3D           = *self.t3d, $
+                  THICK         = *self.thick, $
+                  TICKLEN       = *self.ticklen, $
+                  TITLE         = *self.title, $
                 
-                 XCHARSIZE     = *self.xcharsize, $
-                 XGRIDSTYLE    = *self.xgridstyle, $
-                 XMINOR        = *self.xminor, $
-                 XRANGE        = *self.xrange, $
-                 XSTYLE        = *self.xstyle, $
-                 XTHICK        = *self.xthick, $
-                 XTICK_GET     = *self.xtick_get, $
-                 XTICKFORMAT   = *self.xtickformat, $
-                 XTICKINTERVAL = *self.xtickinterval, $
-                 XTICKLAYOUT   = *self.xticklayout, $
-                 XTICKLEN      = *self.xticklen, $
-                 XTICKNAME     = *self.xtickname, $
-                 XTICKS        = *self.xticks, $
-                 XTICKUNITS    = *self.xtickunits, $
-                 XTICKV        = *self.xtickv, $
-                 XTITLE        = *self.xtitle, $
+                  XCHARSIZE     = *self.xcharsize, $
+                  XGRIDSTYLE    = *self.xgridstyle, $
+                  XMINOR        = *self.xminor, $
+                  XRANGE        = *self.xrange, $
+                  XSTYLE        = *self.xstyle, $
+                  XTHICK        = *self.xthick, $
+                  XTICK_GET     = *self.xtick_get, $
+                  XTICKFORMAT   = *self.xtickformat, $
+                  XTICKINTERVAL = *self.xtickinterval, $
+                  XTICKLAYOUT   = *self.xticklayout, $
+                  XTICKLEN      = *self.xticklen, $
+                  XTICKNAME     = *self.xtickname, $
+                  XTICKS        = *self.xticks, $
+                  XTICKUNITS    = *self.xtickunits, $
+                  XTICKV        = *self.xtickv, $
+                  XTITLE        = *self.xtitle, $
                 
-                 YCHARSIZE     = *self.ycharsize, $
-                 YGRIDSTYLE    = *self.ygridstyle, $
- ;                YMINOR        = *self.yminor, $
-                 YRANGE        = *self.yrange, $
-                 YSTYLE        = *self.ystyle, $
-                 YTHICK        = *self.ythick, $
-                 YTICK_GET     = *self.ytick_get, $
-                 YTICKFORMAT   = *self.ytickformat, $
-                 YTICKINTERVAL = *self.ytickinterval, $
-                 YTICKLAYOUT   = *self.yticklayout, $
-                 YTICKLEN      = *self.yticklen, $
-                 YTICKNAME     = *self.ytickname, $
-                 YTICKS        = *self.yticks, $
-                 YTICKUNITS    = *self.ytickunits, $
-                 YTICKV        = *self.ytickv, $
-                 YTITLE        = *self.ytitle
+                  YCHARSIZE     = *self.ycharsize, $
+                  YGRIDSTYLE    = *self.ygridstyle, $
+  ;                YMINOR        = *self.yminor, $
+                  YRANGE        = *self.yrange, $
+                  YSTYLE        = *self.ystyle, $
+                  YTHICK        = *self.ythick, $
+                  YTICK_GET     = *self.ytick_get, $
+                  YTICKFORMAT   = *self.ytickformat, $
+                  YTICKINTERVAL = *self.ytickinterval, $
+                  YTICKLAYOUT   = *self.yticklayout, $
+                  YTICKLEN      = *self.yticklen, $
+                  YTICKNAME     = *self.ytickname, $
+                  YTICKS        = *self.yticks, $
+                  YTICKUNITS    = *self.ytickunits, $
+                  YTICKV        = *self.ytickv, $
+                  YTITLE        = *self.ytitle
     endelse
 end
 
@@ -536,7 +654,7 @@ MIN_VALUE = min_value, $
 XLOG = xlog, $
 YLOG = ylog, $
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -619,7 +737,7 @@ end
 ;                           of each pixel.
 ;-
 pro MrImage::GetData, image, x, y, x1, y1
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1022,7 +1140,7 @@ end
 ;   Clean up after the object is destroyed -- destroy pointers and object references.
 ;-
 pro MrImage::cleanup
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1211,7 +1329,7 @@ XRANGE = xrange, $
 YLOG = ylog, $
 YRANGE = yrange, $
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -1460,7 +1578,7 @@ end
 ;   Object class definition
 ;-
 pro MrImage__define
-    compile_opt idl2
+    compile_opt strictarr
     
     define = {MrImage, $
               inherits MrGrAtom, $

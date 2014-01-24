@@ -1,1 +1,0 @@
-/Users/argall/Documents/Work/Programs/WileEGraphics/weplot.pro
