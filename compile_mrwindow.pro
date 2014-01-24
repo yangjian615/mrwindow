@@ -72,12 +72,16 @@
 .comp ./utilities/getmrwindows.pro
 .comp ./utilities/ht_velocity.pro
 .comp ./utilities/ismember.pro
+.comp ./utilities/linspace.pro
 .comp ./utilities/moveplot_gui.pro
 .comp ./utilities/mraimage.pro
 .comp ./utilities/mraoplot.pro
 .comp ./utilities/mraplot.pro
+.comp ./utilities/mrcmpversion.pro
 .comp ./utilities/mrgetwindow.pro
+.comp ./utilities/mrisnull.pro
 .comp ./utilities/mrlayout.pro
+.comp ./utilities/mrnull.pro
 .comp ./utilities/mrpixelcorners.pro
 .comp ./utilities/mrpixeldeltas.pro
 .comp ./utilities/mrpixelpoints.pro
