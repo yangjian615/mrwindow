@@ -471,7 +471,6 @@ NOERASE=noerase
 ;PAINT ///////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     endif else begin
-    
         MraImage, *self.image, Xmin, Ymin, Xmax, Ymax, $
                 
                   ;IMAGE_PLOTS Keywords

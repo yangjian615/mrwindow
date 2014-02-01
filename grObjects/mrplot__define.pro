@@ -366,7 +366,7 @@ pro MrPlot::doOverplot
               THICK     = *self.thick, $
 
               ;OPlot Keywords
-              NSUM      = *self. nsum, $
+              NSUM      =  self. nsum, $
               POLAR     =  self. polar, $
               CLIP      = *self. clip, $
               NOCLIP    = *self. noclip, $

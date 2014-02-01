@@ -112,6 +112,7 @@
 ;       09/25/2013  -   Added MVA_CROSS capabilities. Added the AVERAGE parameter and
 ;                           QUIET keyword to the Average method. - MRA
 ;       2014/01/21  -   Use cgColor to load colors into the color table. - MRA
+;       2014/01/30  -   Put quotes around "copy + paste" output to make valid strings. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -251,7 +252,6 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
     ;Put a check mark by the button
     widget_control, event.id, SET_BUTTON=isSet
 end
-
 
 
 ;+
@@ -939,10 +939,10 @@ pro MrAbstractAnalysis::MVA_Cross, xrange, average
     ;print again in idl format easy copy and paste
     print, '________________________________________________________________'
     print, 'IDL Format for Copy + Paste'
-    print, FORMAT='(%"sTime1    = %s")', ssm_to_hms((*self.intervals).xrange[0])
-    print, FORMAT='(%"eTime1    = %s")', ssm_to_hms((*self.intervals).xrange[1])
-    print, FORMAT='(%"sTime2    = %s")', ssm_to_hms(xrange[0])
-    print, FORMAT='(%"eTime2    = %s")', ssm_to_hms(xrange[1])
+    print, FORMAT='(%"sTime1    = \"%s\"")', ssm_to_hms((*self.intervals).xrange[0])
+    print, FORMAT='(%"eTime1    = \"%s\"")', ssm_to_hms((*self.intervals).xrange[1])
+    print, FORMAT='(%"sTime2    = \"%s\"")', ssm_to_hms(xrange[0])
+    print, FORMAT='(%"eTime2    = \"%s\"")', ssm_to_hms(xrange[1])
     print, FORMAT='(%"B1_dot_B2 = %7.2f")', angle
     print, FORMAT='(3(a0, f7.4), a0)', $
            'eigvecs = [[', eigvecs[0,0], ', ', eigvecs[1,0], ', ', eigvecs[2,0], '], $', $
