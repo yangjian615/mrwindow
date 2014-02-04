@@ -1271,10 +1271,9 @@ ZTITLE = ztitle
 ;---------------------------------------------------------------------
 ;Other Annotation Objects ////////////////////////////////////////////
 ;---------------------------------------------------------------------
-        endif else if IsMember(['WETEXT', 'WECOLORBAR', 'WELEGENDITEM'], oClass) then begin
+        endif else if IsMember(['MRTEXT', 'WECOLORBAR', 'WELEGENDITEM'], oClass) then begin
             allObjs[i] -> SetProperty, CHARSIZE = charsize, $
-                                       CHARTHICK = charthick, $
-                                       THICK = thick
+                                       CHARTHICK = charthick
         endif
     endfor
         
@@ -1418,17 +1417,16 @@ function MrPlotManager::WhatAmI, objRef
     className = typename(objRef)
     case className of
         'MRAXIS':       ImA = 'AXIS'
+        'MRCOLORFILL':  ImA = 'COLORFILL'
+        'MRCONTOUR':    ImA = 'CONTOUR'
+        'MRIMAGE':      ImA = 'IMAGE'
         'MRPLOT':       ImA = 'PLOT'
         'MRPLOTS':      ImA = 'PLOTS'
-        'MRIMAGE':      ImA = 'IMAGE'
-        'MRCONTOUR':    ImA = 'CONTOUR'
-        'MRCOLORFILL':  ImA = 'COLORFILL'
+        'MRTEXT':       ImA = 'TEXT'
         'WECOLORBAR':   ImA = 'COLORBAR'
-        'WETEXT':       ImA = 'TEXT'
         'WEARROW':      ImA = 'ARROW'
         'WEOVERPLOT':   ImA = 'OVERPLOT'
         'WELEGENDITEM': ImA = 'LEGEND'
-        'MRAXIS':       ImA = 'AXIS'
         else:           ImA = ''
     endcase
     
@@ -1462,13 +1460,13 @@ pro MrPlotManager::Config
               axis: ['MRAXIS'], $
               legend: ['WELEGENDITEM'], $
               arrow: ['WEARROW'], $
-              text: ['WETEXT'], $
+              text: ['MRTEXT'], $
               overplot: ['WEOVERPLOT'], $
               plots: ['MRPLOTS'], $
               polyfill: ['MRCOLORFILL'], $
               ImAData: ['PLOT', 'IMAGE', 'CONTOUR'], $     ;TO BE USED WITH ::WHATAMI
               data: ['MRPLOT', 'MRIMAGE', 'MRCONTOUR'], $
-              annotate: ['WECOLORBAR', 'MRAXIS', 'WELEGENDITEM', 'WEARROW', 'WETEXT', 'MRPLOTS', 'WEOVERPLOT', 'MRCOLORFILL'], $
+              annotate: ['WECOLORBAR', 'MRAXIS', 'WELEGENDITEM', 'WEARROW', 'MRTEXT', 'MRPLOTS', 'WEOVERPLOT', 'MRCOLORFILL'], $
               files: ['CDF_PLOT'] $
             }
     

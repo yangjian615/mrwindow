@@ -1470,7 +1470,7 @@ pro MrZoom::Wheel_Zoom_Page, event
     
     ;How many pages are there?
     nPages = size(image, /DIMENSIONS)
-    nPages = nPages[ndims-1]
+    nPages = total(nPages[2:ndims-1])
     
     ;Change pages. Stop at beginning and at the end
     iDisplay += event.clicks

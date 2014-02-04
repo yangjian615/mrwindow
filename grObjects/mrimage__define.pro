@@ -178,7 +178,7 @@ function MrImage::_OverloadPrint
                max_value, $
                min_value $
              ]
-stop
+
     result = [[atomKeys], [grKeys], [layKeys], [transpose(imKeys)]]
     result = [[selfStr], ['  ' + transpose(result[sort(result)])]]
     
@@ -260,8 +260,6 @@ NOERASE=noerase
     endif
 
     if n_elements(noerase) eq 0 then noerase = *self.noerase
-    
-    
 
 ;---------------------------------------------------------------------
 ;PAINT PIXEL-BY-PIXEL? ///////////////////////////////////////////////

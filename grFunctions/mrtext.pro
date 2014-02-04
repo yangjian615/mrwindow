@@ -32,7 +32,7 @@
 ;*****************************************************************************************
 ;
 ;+
-;   Create a weText object.
+;   Create a MrText object.
 ;
 ; :Params:
 ;       XLOC:               in, optional, type=depends
@@ -47,22 +47,12 @@
 ;       CURRENT:            in, optional, type=boolean, default=0
 ;                           If set, the plot will be added to the current MrWindow
 ;                               graphics window.
-;       OUTLOC:             out, optional, type=fltarr(2)
-;                           If `PLACE` is set, then this will return the location at which
-;                               the text was placed in the window.
-;       PLACE:              in, optional, type=boolean, default=0
-;                           Indicate that you want to click on the plot in order to
-;                               determine the location of the text. In this case, `XLOC`
-;                               and `YLOC` are not given.
-;       WIDTH:              out, optional, type=float
-;                           A named variable into which the width of the text, in
-;                               normalized units, will be returned.
 ;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by weText__define.
+;                           Any keyword accepted by MrText__define.
 ;
 ; :Returns:
 ;       THETEXT:            out, required, type=object
-;                           A weText object reference.
+;                           A MrText object reference.
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -78,12 +68,11 @@
 ; :History:
 ;	Modification History::
 ;       2013/11/27  -   Written by Matthew Argall.
+;       2014/02/03  -   Create MrText objects, not weText objects. Removed the PLACE,
+;                           OUTLOC, and WIDTH keywords. - MRA
 ;-
 function MrText, xloc, yloc, text, $
  CURRENT=current, $
- OUTLOC = outloc, $
- PLACE = place, $
- WIDTH = width, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -102,8 +91,7 @@ _REF_EXTRA = extra
     if keyword_set(place) then text = temporary(xloc)
 
     ;Create a cgOverPlot object
-    theText = obj_new('weText', xloc, yloc, text, CURRENT=current, $
-                      PLACE=place, WIDTH=width, OUTLOC=outloc, $
+    theText = obj_new('MrText', xloc, yloc, text, CURRENT=current, $
                       _STRICT_EXTRA=extra)
 
     return, theText
