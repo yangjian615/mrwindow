@@ -174,6 +174,8 @@
 ;                           are now the primary means of identifying plots within the
 ;                           current layout. IsAvailable accepts values outside of the
 ;                           current layout so still uses invariant [col,row] locations. - MRA
+;       2014/02/07  -   Make_Location was returning the wrong plot index in cases where
+;                           an extra row was added to the layout. Fixed. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -1090,8 +1092,13 @@ POSITION = position
             ;   Update the layout?
             if keyword_set(update_layout) then begin
                 self -> ExpandLayout, 0, 1
-                layout = [self.GrLayout, self.GrLayout[1]]
-            endif else layout = [self.GrLayout + [0,1], self.GrLayout[1]+1]
+                pIndex = self -> ConvertLocation([1,self.GrLayout[1]], /COLROW, /TO_PINDEX)
+                layout = [self.GrLayout, pIndex]
+            endif else begin
+                layout = [self.GrLayout + [0,1], 0]
+                pIndex = self -> ConvertLocation([1,layout[1]], layout[0:1], /COLROW, /TO_PINDEX)
+                layout[2] = pIndex
+            endelse
         endelse
         
     ;otherwise, throw an error message
