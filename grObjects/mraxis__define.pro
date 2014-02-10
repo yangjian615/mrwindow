@@ -569,7 +569,7 @@ _REF_EXTRA=extra
             IF Arg_Present(tickname)     GT 0 THEN tickname     = *self.xtickname
             IF Arg_Present(ticks)        GT 0 THEN ticks        = *self.xticks
             IF Arg_Present(tickunits)    GT 0 THEN tickunits    = *self.xtickunits
-            IF Arg_Present(tickvalues)   GT 0 THEN tickvalues   = *self.xtickvalues
+            IF Arg_Present(tickvalues)   GT 0 THEN tickvalues   = *self.xtickv
             IF Arg_Present(title)        GT 0 THEN title        = *self.xtitle
         ENDCASE
         
@@ -587,7 +587,7 @@ _REF_EXTRA=extra
             IF Arg_Present(tickname)     GT 0 THEN tickname     = *self.ytickname
             IF Arg_Present(ticks)        GT 0 THEN ticks        = *self.yticks
             IF Arg_Present(tickunits)    GT 0 THEN tickunits    = *self.ytickunits
-            IF Arg_Present(tickvalues)   GT 0 THEN tickvalues   = *self.ytickvalues
+            IF Arg_Present(tickvalues)   GT 0 THEN tickvalues   = *self.ytickv
             IF Arg_Present(title)        GT 0 THEN title        = *self.ytitle
         ENDCASE
         
@@ -605,7 +605,7 @@ _REF_EXTRA=extra
             IF Arg_Present(tickname)     GT 0 THEN tickname     = *self.ztickname
             IF Arg_Present(ticks)        GT 0 THEN ticks        = *self.zticks
             IF Arg_Present(tickunits)    GT 0 THEN tickunits    = *self.ztickunits
-            IF Arg_Present(tickvalues)   GT 0 THEN tickvalues   = *self.ztickvalues
+            IF Arg_Present(tickvalues)   GT 0 THEN tickvalues   = *self.ztickv
             IF Arg_Present(title)        GT 0 THEN title        = *self.ztitle
         ENDCASE
     ENDCASE
@@ -1027,7 +1027,7 @@ _REF_EXTRA=extra
             IF N_Elements(tickname)     GT 0 THEN *self.xtickname     = tickname
             IF N_Elements(ticks)        GT 0 THEN *self.xticks        = ticks
             IF N_Elements(tickunits)    GT 0 THEN *self.xtickunits    = tickunits
-            IF N_Elements(tickvalues)   GT 0 THEN *self.xtickvalues   = tickvalues
+            IF N_Elements(tickvalues)   GT 0 THEN *self.xtickv        = tickvalues
             IF N_Elements(title)        GT 0 THEN *self.xtitle        = title
         ENDCASE
         
@@ -1045,7 +1045,7 @@ _REF_EXTRA=extra
             IF N_Elements(tickname)     GT 0 THEN *self.ytickname     = tickname
             IF N_Elements(ticks)        GT 0 THEN *self.yticks        = ticks
             IF N_Elements(tickunits)    GT 0 THEN *self.ytickunits    = tickunits
-            IF N_Elements(tickvalues)   GT 0 THEN *self.ytickvalues   = tickvalues
+            IF N_Elements(tickvalues)   GT 0 THEN *self.ytick         = tickvalues
             IF N_Elements(title)        GT 0 THEN *self.ytitle        = title
         ENDCASE
         
@@ -1063,7 +1063,7 @@ _REF_EXTRA=extra
             IF N_Elements(tickname)     GT 0 THEN *self.ztickname     = tickname
             IF N_Elements(ticks)        GT 0 THEN *self.zticks        = ticks
             IF N_Elements(tickunits)    GT 0 THEN *self.ztickunits    = tickunits
-            IF N_Elements(tickvalues)   GT 0 THEN *self.ztickvalues   = tickvalues
+            IF N_Elements(tickvalues)   GT 0 THEN *self.ztickv        = tickvalues
             IF N_Elements(title)        GT 0 THEN *self.ztitle        = title
         ENDCASE
     ENDCASE
