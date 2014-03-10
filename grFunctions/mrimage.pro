@@ -95,7 +95,7 @@
 function MrImage, image, x, y, x0, y0, x1, y1, $
  CURRENT=current, $
 _REF_EXTRA = extra
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error

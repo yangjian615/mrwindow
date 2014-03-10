@@ -271,7 +271,12 @@ END
 
 
 ;+
-; This method draws the axis object.
+;   This method draws the axis object.
+;
+; :Keywords:
+;       NOERASE:        in, optional, type=boolean, default=0
+;                       If set, the device will not be erased before drawing. The default
+;                           is to clear the display before drawing the graphic.
 ;-
 PRO MrText::Draw, $
 NOERASE=noerase

@@ -74,7 +74,12 @@
 ;-
 ;*****************************************************************************************
 ;+
+;   The purpose of this method is to draw the axis on the display window.
 ;
+; :Keywords:
+;       NOERASE:        in, optional, type=boolean, default=0
+;                       If set, the device will not be erased before drawing. The default
+;                           is to clear the display before drawing the graphic.
 ;-
 PRO MrAxis::Draw, $
 NOERASE=noerase
@@ -104,6 +109,11 @@ END
 ;   This method draws the axis object.
 ;
 ; :Private:
+;
+; :Keywords:
+;       NOERASE:        in, optional, type=boolean, default=0
+;                       If set, the device will not be erased before drawing. The default
+;                           is to clear the display before drawing the graphic.
 ;-
 PRO MrAxis::doAxis, $
 NOERASE=noerase
@@ -441,41 +451,121 @@ END
 
 
 ;+
-;   This method obtains the current properties of the object. 
-; 
+;   Initialization method.
+;
+;   Note:
+;       Keywords below are the same as the regular direct graphics keywords, but are
+;       axis-independent (i.e., they do not have X, Y, or Z appended to them). Notable
+;       exceptions include::
+;           AXIS_RANGE  -   replaces [XYZ]RANGE
+;           TICKVALUES  -   replaces [XYZ]TICKV
+;
+;       For more information about any of the keywords, see `IDL's online help page
+;       <http://exelisvis.com/docs/graphkeyw.html>`
+;
+; :Params:
+;       DIRECTION:          out, required, type=string
+;                           The type of axis to be made. Choices are::
+;                               "X" - An x-axis
+;                               "Y" - A y-axis
+;                               "Z" - A z-axis 
+;       
 ; :Keywords:
-;     xloc: out, optional, type=depends
-;         The X location of the axis. 
-;     yloc: out, optional, type=depends
-;         The Y location of the axis. 
-;     zloc: out, optional, type=depends
-;         The Z location of the axis. 
-;     location, out, optional, type=string
-;         The location at which to place the axis.
-;     offset, out, optional, type=integer
-;         The offset, in character units, from the original axis set up by a previous
-;     save: out, optional, type=boolean
-;         Set this keyword to save the scaling parameters set by the axis for subsequent use.
-;     title: out, optional, type=string
-;         The title or annotation that appears on the axis. Equivalent to setting XTITLE
-;         wtih `XAXIS`, the YTITLE with `YAXIS`, or ZTITLE with `ZAXIS`.
-;     xaxis: out, optional, type=integer
-;         If set to 0, the axis is drawn under the plot with the tick marks pointing up; if set 
-;         to 1, the axis is drawn on top of the plot with the tick marks pointing down.
-;     xlog: out, optional, type=boolean
-;         Set this keyword to specify a logarithmic axis type.
-;     yaxis: out, optional, type=integer
-;         If set to 0, the axis is drawn on the left of the plot with the tick marks pointing 
-;         to the right. If set to 1, the axis is drawn on the right of the plot with the tick 
-;         marks pointing to the left.
-;     ylog: out, optional, type=boolean
-;         Set this keyword to specify a logarithmic axis type.
-;     zaxis: out, optional, type=integer
-;         Set to 0-3 to position the Z axis in various locatons. See the AXIS documentation.
-;     zlog: out, optional, type=boolean
-;         Set this keyword to specify a logarithmic axis type.
-;     _ref_extra: out, optional
-;          Any keywords appropriate for the superclass MrGrAtom::GetProperty.
+;       AXIS_RANGE:         out, optional, type=dblarr(2)
+;                           Data range of the axis.
+;       CHARSIZE:           out, optional, type=float
+;                           Scale factor for IDL's default character size.
+;       CURRENT:            out, optional, type=boolean
+;                           If set, the axis will be added to the current MrWindow
+;                               graphics window.
+;       CHARTHICK:          out, optional, type=integer
+;                           Multiple of IDL's default character thickness with which to 
+;                               draw axis labels and titles.
+;       COLOR:              out, optional, type=string
+;                           Color of the axis.
+;       DATA:               out, optional, type=boolean
+;                           If set, the axis will be locked to the data space and will
+;                               move about if the data range of `TARGET` changes. The
+;                               default is to set the axis at a fixed location.
+;       FONT:               out, optional, type=integer
+;                           The type of font desired::
+;                               -1  -   Hershey vector-drawn fonts
+;                                0  -   Device fonts
+;                                1  -   TrueType fonts
+;       GRIDSTYLE:          out, optional, type=integer
+;                           Linestyle used for plot tickmarks and grids (Set `TICKLEN`=1
+;                               to create a grid). Options are::
+;                                   0 - Solid
+;                                   1 - Dotted
+;                                   2 - Dashed
+;                                   3 - Dash-Dot
+;                                   4 - Dash Dot Dot
+;                                   5 - Long Dash
+;       LOCATION:           out, optional, type=string/intarr(2)/intarr(3)
+;                           Location of the axis with respect to its `TARGET`. If a string
+;                               is provided, it must be one of the following::
+;                                   "BOTTOM"    -   For an x-axis, place below target
+;                                   "LEFT"      -   For a  y-axis, place to the left of target
+;                                   "RIGHT"     -   For a  y-axis, place to the right of target
+;                                   "TOP"       -   for an x-axis, place above target.
+;                               If a 2-element vector is given, it specifies the x- and y-
+;                               location of the axis in data coordinates. If a 3-element
+;                               vector is given, the 3rd element specifies the z-coordinate.
+;       LOG:                out, optional, type=boolean
+;                           Log-scale the axis.
+;       MINOR:              out, optional, type=integer
+;                           Number of minor tickmarks to use. The default is determined
+;                               by IDL when the plot is made.
+;       OFFSET:             out, optional, type=float
+;                           Offset from the `TARGET` graphic, in character units.
+;       SUBTITLE:           out, optional, type=string
+;                           A subtitle to be placed beneath the title.
+;       STYLE:              out, optional, type=integer
+;                           Bit-wise axis style options include::
+;                                1 - Force exact axis
+;                                2 - Extend axis range
+;                                4 - Suppress entire axis
+;                                8 - Suppress box style axis (draw axis on only one side of plot)
+;                               16 - Inhibit setting Y-axis minimum to 0 (Y-axis only)
+;       T3D:                out, optional, type=boolean
+;                           If set, output will be transformed into 3D using !P.T
+;       TARGET:             out, optional, type=object
+;                           The graphic with which the axis should be associated. If not
+;                               give, the currently selected graphic will be chosen.
+;       THICK:              out, optional, type=float
+;                           Scale factor controlling the thickness of the axis and its
+;                               tickmarks
+;       TICKDIR:            out, optional, type=byte
+;                           Direction of the tick marks. 0 indicates above or to the right
+;                               of the axis, 1 indicates below or to the left.
+;       TICKFORMAT:         out, optional, type=string/strarr
+;                           Format to be applied to tick labels. See the `online help for
+;                               more details.
+;       TICKINTERVAL:       out, optional, type=integer
+;                           Interval between major tickmarks. The default is determined
+;                               by IDL when the plot is created.
+;       TICKLAYOUT:         out, optional, type=integer
+;                           Tick layout style to be applied to each level of the axis.
+;                               Optional are 0, 1, or 2. See the online help for details.
+;       TICKLEN:            out, optional, type=float
+;                           Length of each tickmark, in normal coordinates.
+;       TICKNAME:           out, optional, type=string/strarr
+;                           Names to be used for each ticklabel.
+;       TICKS:              out, optional, type=integer
+;                           Number of major tick mark intervals. There are TICKS+1 tick
+;                               labels on the axis.
+;       TICKUNITS:          out, optional, type=string/strarr
+;                           Units to be used for axis tick labelling. See the online
+;                               help for details.
+;       TICKVALUES:         out, optional, type=number/numeric array
+;                           Values at which major tickmarks should be drawn. If not
+;                               provided (an neither is `TICKNAME`), then IDL will
+;                               determine them when the plot is created.
+;       TITLE:              out, optional, type=string
+;                           Title to be placed on the axis. See `TICKDIR`.
+;       _REF_EXTRA:         out, optional, type=any
+;                           Any keyword accepted by MrGrLayout superclass is also
+;                               accepted for keyword inheritance.
 ;-
 PRO MrAxis::GetProperty, $
 CHARSIZE=charsize, $
@@ -613,9 +703,21 @@ END
 
 
 ;+
-;   Calculate the axis location
+;   Calculate the axis location.
 ;
 ; :Private:
+;
+; :Params:
+;       LOCATION:       out, optional, type=string/intarr(2)/intarr(3)
+;                       Location of the axis with respect to its `TARGET`. If a string
+;                           is provided, it must be one of the following::
+;                               "BOTTOM"    -   For an x-axis, place below target
+;                               "LEFT"      -   For a  y-axis, place to the left of target
+;                               "RIGHT"     -   For a  y-axis, place to the right of target
+;                               "TOP"       -   for an x-axis, place above target.
+;                           If a 2-element vector is given, it specifies the x- and y-
+;                           location of the axis in data coordinates. If a 3-element
+;                           vector is given, the 3rd element specifies the z-coordinate.
 ;-
 PRO MrAxis::SetLocation, location
     Compile_Opt strictarr
@@ -792,9 +894,26 @@ END
 
 
 ;+
-;   Calculate the Axis position
+;   Set the type of axis to be drawn. This is translated from the DIRECTION and TICKDIR
+;   keywords -- see the SetLocation method. Only one of the keywords can be set at a time.
 ;
 ; :Private:
+;
+; :Keywords:
+;       XAXIS:          in, optional, type=integer, default=0
+;                       Indicates which type of X-axis should be drawn::
+;                           0 - Axis below the target with tickmarks directed up.
+;                           1 - Axis above the target with tickmarks directed down.
+;       YAXIS:          in, optional, type=integer, default=0
+;                       Indicates which type of X-axis should be drawn::
+;                           0 - Axis to the right of the target with tickmarks directed up.
+;                           1 - Axis to the left of the target with tickmarks directed down.
+;       ZAXIS:          in, optional, type=integer, default=0
+;                       Indicates which type of X-axis should be drawn::
+;                           0 - lower (front) right, with tickmarks pointing left
+;                           1 - lower (frint) left,  with tickmarks pointing right
+;                           2 - upper (back)  left,  with tickmarks pointing right
+;                           3 - upper (back)  right, with tickmarks pointing left
 ;-
 PRO MrAxis::SetAxis, $
 XAXIS=xaxis, $
@@ -871,42 +990,121 @@ END
 
 
 ;+
-;   This method sets the properties of the object.
+;   Initialization method.
 ;
+;   Note:
+;       Keywords below are the same as the regular direct graphics keywords, but are
+;       axis-independent (i.e., they do not have X, Y, or Z appended to them). Notable
+;       exceptions include::
+;           AXIS_RANGE  -   replaces [XYZ]RANGE
+;           TICKVALUES  -   replaces [XYZ]TICKV
+;
+;       For more information about any of the keywords, see `IDL's online help page
+;       <http://exelisvis.com/docs/graphkeyw.html>`
+;
+; :Params:
+;       DIRECTION:          in, required, type=string
+;                           The type of axis to be made. Choices are::
+;                               "X" - An x-axis
+;                               "Y" - A y-axis
+;                               "Z" - A z-axis 
+;       
 ; :Keywords:
-;     xloc: in, optional, type=depends
-;         The X location of the axis. 
-;     yloc: in, optional, type=depends
-;         The Y location of the axis. 
-;     zloc: in, optional, type=depends
-;         The Z location of the axis.
-;     location, in, optional, type=string
-;         The location at which to place the axis.
-;     offset, in, optional, type=integer
-;         The offset, in character units, from the original axis set up by a previous
-;         call to the Plot procedure at which to place new axis.
-;     save: in, optional, type=boolean
-;         Set this keyword to save the scaling parameters set by the axis for subsequent use.
-;     title: in, optional, type=string
-;         The title or annotation that appears on the axis. Equivalent to setting XTITLE
-;         wtih `XAXIS`, the YTITLE with `YAXIS`, or ZTITLE with `ZAXIS`.
-;     xaxis: in, optional, type=integer
-;         If set to 0, the axis is drawn under the plot with the tick marks pointing up; if set 
-;         to 1, the axis is drawn on top of the plot with the tick marks pointing down.
-;     xlog: in, optional, type=boolean
-;         Set this keyword to specify a logarithmic axis type.
-;     yaxis: in, optional, type=integer
-;         If set to 0, the axis is drawn on the left of the plot with the tick marks pointing 
-;         to the right. If set to 1, the axis is drawn on the right of the plot with the tick 
-;         marks pointing to the left.
-;     ylog: in, optional, type=boolean
-;         Set this keyword to specify a logarithmic axis type.
-;     zaxis: in, optional, type=integer
-;         Set to 0-3 to position the Z axis in various locatons. See the AXIS documentation.
-;     zlog: in, optional, type=boolean
-;         Set this keyword to specify a logarithmic axis type.
-;     _ref_extra: in, optional
-;          Any keywords appropriate for the MrGrAtom superclass.
+;       AXIS_RANGE:         in, optional, type=dblarr(2)
+;                           Data range of the axis.
+;       CHARSIZE:           in, optional, type=float
+;                           Scale factor for IDL's default character size.
+;       CURRENT:            in, optional, type=boolean
+;                           If set, the axis will be added to the current MrWindow
+;                               graphics window.
+;       CHARTHICK:          in, optional, type=integer
+;                           Multiple of IDL's default character thickness with which to 
+;                               draw axis labels and titles.
+;       COLOR:              in, optional, type=string
+;                           Color of the axis.
+;       DATA:               in, optional, type=boolean
+;                           If set, the axis will be locked to the data space and will
+;                               move about if the data range of `TARGET` changes. The
+;                               default is to set the axis at a fixed location.
+;       FONT:               in, optional, type=integer
+;                           The type of font desired::
+;                               -1  -   Hershey vector-drawn fonts
+;                                0  -   Device fonts
+;                                1  -   TrueType fonts
+;       GRIDSTYLE:          in, optional, type=integer
+;                           Linestyle used for plot tickmarks and grids (Set `TICKLEN`=1
+;                               to create a grid). Options are::
+;                                   0 - Solid
+;                                   1 - Dotted
+;                                   2 - Dashed
+;                                   3 - Dash-Dot
+;                                   4 - Dash Dot Dot
+;                                   5 - Long Dash
+;       LOCATION:           in, optional, type=string/intarr(2)/intarr(3)
+;                           Location of the axis with respect to its `TARGET`. If a string
+;                               is provided, it must be one of the following::
+;                                   "BOTTOM"    -   For an x-axis, place below target
+;                                   "LEFT"      -   For a  y-axis, place to the left of target
+;                                   "RIGHT"     -   For a  y-axis, place to the right of target
+;                                   "TOP"       -   for an x-axis, place above target.
+;                               If a 2-element vector is given, it specifies the x- and y-
+;                               location of the axis in data coordinates. If a 3-element
+;                               vector is given, the 3rd element specifies the z-coordinate.
+;       LOG:                in, optional, type=boolean
+;                           Log-scale the axis.
+;       MINOR:              in, optional, type=integer
+;                           Number of minor tickmarks to use. The default is determined
+;                               by IDL when the plot is made.
+;       OFFSET:             in, optional, type=float
+;                           Offset from the `TARGET` graphic, in character units.
+;       SUBTITLE:           in, optional, type=string
+;                           A subtitle to be placed beneath the title.
+;       STYLE:              in, optional, type=integer
+;                           Bit-wise axis style options include::
+;                                1 - Force exact axis
+;                                2 - Extend axis range
+;                                4 - Suppress entire axis
+;                                8 - Suppress box style axis (draw axis on only one side of plot)
+;                               16 - Inhibit setting Y-axis minimum to 0 (Y-axis only)
+;       T3D:                in, optional, type=boolean
+;                           If set, output will be transformed into 3D using !P.T
+;       TARGET:             in, optional, type=object
+;                           The graphic with which the axis should be associated. If not
+;                               give, the currently selected graphic will be chosen.
+;       THICK:              in, optional, type=float
+;                           Scale factor controlling the thickness of the axis and its
+;                               tickmarks
+;       TICKDIR:            in, optional, type=byte
+;                           Direction of the tick marks. 0 indicates above or to the right
+;                               of the axis, 1 indicates below or to the left.
+;       TICKFORMAT:         in, optional, type=string/strarr
+;                           Format to be applied to tick labels. See the `online help for
+;                               more details.
+;       TICKINTERVAL:       in, optional, type=integer
+;                           Interval between major tickmarks. The default is determined
+;                               by IDL when the plot is created.
+;       TICKLAYOUT:         in, optional, type=integer
+;                           Tick layout style to be applied to each level of the axis.
+;                               Optional are 0, 1, or 2. See the online help for details.
+;       TICKLEN:            in, optional, type=float
+;                           Length of each tickmark, in normal coordinates.
+;       TICKNAME:           in, optional, type=string/strarr
+;                           Names to be used for each ticklabel.
+;       TICKS:              in, optional, type=integer
+;                           Number of major tick mark intervals. There are TICKS+1 tick
+;                               labels on the axis.
+;       TICKUNITS:          in, optional, type=string/strarr
+;                           Units to be used for axis tick labelling. See the online
+;                               help for details.
+;       TICKVALUES:         in, optional, type=number/numeric array
+;                           Values at which major tickmarks should be drawn. If not
+;                               provided (an neither is `TICKNAME`), then IDL will
+;                               determine them when the plot is created.
+;       TITLE:              in, optional, type=string
+;                           Title to be placed on the axis. See `TICKDIR`.
+;       _REF_EXTRA:         in, optional, type=any
+;                           Any keyword accepted by MrGrLayout superclass is also
+;                               accepted for keyword inheritance.
 ;-
 PRO MrAxis::SetProperty, $
 CHARSIZE=charsize, $
@@ -1106,62 +1304,127 @@ END
 
 
 ;+
+;   Initialization method.
+;
+;   Note:
+;       Keywords below are the same as the regular direct graphics keywords, but are
+;       axis-independent (i.e., they do not have X, Y, or Z appended to them). Notable
+;       exceptions include::
+;           AXIS_RANGE  -   replaces [XYZ]RANGE
+;           TICKVALUES  -   replaces [XYZ]TICKV
+;
+;       For more information about any of the keywords, see `IDL's online help page
+;       <http://exelisvis.com/docs/graphkeyw.html>`
+;
 ; :Params:
-;    xloc: in, optional, type=depends
-;       The X location of the axis. 
-;    yloc: in, optional, type=depends
-;       The Y location of the axis. 
-;    zloc: in, optional, type=depends
-;       The Z location of the axis. 
+;       DIRECTION:          in, required, type=string, default='X'
+;                           The type of axis to be made. Choices are::
+;                               "X" - An x-axis
+;                               "Y" - A y-axis
+;                               "Z" - A z-axis 
 ;       
 ; :Keywords:
-;     data: in, optional, type=boolean
-;         Set this keyword to indicate xloc and yloc are in data coordinates. Data coordinates
-;         are the default, unless DEVICE or NORMAL is set.
-;     device: in, optional, type=boolean
-;         Set this keyword to indicate xloc and yloc are in device coordinates.
-;     location, in, optional, type=string, default=''
-;         The location at which to place the axis. Options are::
-;           "BOTTOM"    -   X-axis at the bottom of the plot.
-;           "TOP"       -   X-axis at the top of the plot.
-;           "LEFT"      -   Y-axis at the left of the plot.
-;           "RIGHT"     -   Y-axis at the right of the plot.
-;         Setting this keyword also sets `NORMAL`=1.
-;     normal: in, optional, type=boolean
-;         Set this keyword to indicate xloc and yloc are in normalized coordinates.
-;     offset, in, optional, type=integer, default=0
-;         The offset, in character units, from the original axis set up by a previous
-;         call to the Plot procedure at which to place new axis. Used only with `LOCATION`.
-;         An OFFSET of 0 is equivalent to not specifying XLOC, YLOC, or ZLOC.
-;     save: in, optional, type=boolean
-;         Set this keyword to save the scaling parameters set by the axis for subsequent use.
-;     title: in, optional, type=string, default=""
-;         The title or annotation that appears on the axis. Equivalent to setting XTITLE
-;         wtih `XAXIS`, the YTITLE with `YAXIS`, or ZTITLE with `ZAXIS`.
-;     xaxis: in, optional, type=integer, default=0
-;         If set to 0, the axis is drawn under the plot with the tick marks pointing up; if set 
-;         to 1, the axis is drawn on top of the plot with the tick marks pointing down.
-;     xlog: in, optional, type=boolean, default=0
-;         Set this keyword to specify a logarithmic axis type.
-;     yaxis: in, optional, type=integer, default=0
-;         If set to 0, the axis is drawn on the left of the plot with the tick marks pointing 
-;         to the right. If set to 1, the axis is drawn on the right of the plot with the tick 
-;         marks pointing to the left.
-;     ylog: in, optional, type=boolean, default=0
-;         Set this keyword to specify a logarithmic axis type.
-;     zaxis: in, optional, type=integer, default=0
-;         Set to 0-3 to position the Z axis in various locatons. See the AXIS documentation.
-;     zlog: in, optional, type=boolean, default=0
-;         Set this keyword to specify a logarithmic axis type.
-;     _ref_extra: in, optional
-;          Any keywords appropriate for the AXIS command or MrAxis.
+;       AXIS_RANGE:         in, optional, type=dblarr(2)
+;                           Data range of the axis.
+;       CHARSIZE:           in, optional, type=float, default=1.5
+;                           Scale factor for IDL's default character size.
+;       CURRENT:            in, optional, type=boolean, default=0
+;                           If set, the axis will be added to the current MrWindow
+;                               graphics window.
+;       CHARTHICK:          in, optional, type=integer, default=1
+;                           Multiple of IDL's default character thickness with which to 
+;                               draw axis labels and titles.
+;       COLOR:              in, optional, type=string, default='Black'
+;                           Color of the axis.
+;       DATA:               in, optional, type=boolean, default=0
+;                           If set, the axis will be locked to the data space and will
+;                               move about if the data range of `TARGET` changes. The
+;                               default is to set the axis at a fixed location.
+;       FONT:               in, optional, type=integer, default=-1
+;                           The type of font desired::
+;                               -1  -   Hershey vector-drawn fonts
+;                                0  -   Device fonts
+;                                1  -   TrueType fonts
+;       GRIDSTYLE:          in, optional, type=integer, default=0
+;                           Linestyle used for plot tickmarks and grids (Set `TICKLEN`=1
+;                               to create a grid). Options are::
+;                                   0 - Solid
+;                                   1 - Dotted
+;                                   2 - Dashed
+;                                   3 - Dash-Dot
+;                                   4 - Dash Dot Dot
+;                                   5 - Long Dash
+;       LOCATION:           in, optional, type=string/intarr(2)/intarr(3)
+;                           Location of the axis with respect to its `TARGET`. If a string
+;                               is provided, it must be one of the following::
+;                                   "BOTTOM"    -   For an x-axis, place below target
+;                                   "LEFT"      -   For a  y-axis, place to the left of target
+;                                   "RIGHT"     -   For a  y-axis, place to the right of target
+;                                   "TOP"       -   for an x-axis, place above target.
+;                               If a 2-element vector is given, it specifies the x- and y-
+;                               location of the axis in data coordinates. If a 3-element
+;                               vector is given, the 3rd element specifies the z-coordinate.
+;       LOG:                in, optional, type=boolean, default=0
+;                           Log-scale the axis.
+;       MINOR:              in, optional, type=integer
+;                           Number of minor tickmarks to use. The default is determined
+;                               by IDL when the plot is made.
+;       OFFSET:             in, optional, type=float, default=0
+;                           Offset from the `TARGET` graphic, in character units.
+;       SUBTITLE:           in, optional, type=string, default=""
+;                           A subtitle to be placed beneath the title.
+;       STYLE:              in, optional, type=integer, default=1
+;                           Bit-wise axis style options include::
+;                                1 - Force exact axis
+;                                2 - Extend axis range
+;                                4 - Suppress entire axis
+;                                8 - Suppress box style axis (draw axis on only one side of plot)
+;                               16 - Inhibit setting Y-axis minimum to 0 (Y-axis only)
+;       T3D:                in, optional, type=boolean, default=0
+;                           If set, output will be transformed into 3D using !P.T
+;       TARGET:             in, optional, type=object, default=current graphic
+;                           The graphic with which the axis should be associated. If not
+;                               give, the currently selected graphic will be chosen.
+;       THICK:              in, optional, type=float, default=1.0
+;                           Scale factor controlling the thickness of the axis and its
+;                               tickmarks
+;       TICKDIR:            in, optional, type=byte, default=0
+;                           Direction of the tick marks. 0 indicates above or to the right
+;                               of the axis, 1 indicates below or to the left.
+;       TICKFORMAT:         in, optional, type=string/strarr, default=""
+;                           Format to be applied to tick labels. See the `online help for
+;                               more details.
+;       TICKINTERVAL:       in, optional, type=integer
+;                           Interval between major tickmarks. The default is determined
+;                               by IDL when the plot is created.
+;       TICKLAYOUT:         in, optional, type=integer, default=0
+;                           Tick layout style to be applied to each level of the axis.
+;                               Optional are 0, 1, or 2. See the online help for details.
+;       TICKLEN:            in, optional, type=float, default=0.02
+;                           Length of each tickmark, in normal coordinates.
+;       TICKNAME:           in, optional, type=string/strarr, default=""
+;                           Names to be used for each ticklabel.
+;       TICKS:              in, optional, type=integer
+;                           Number of major tick mark intervals. There are TICKS+1 tick
+;                               labels on the axis.
+;       TICKUNITS:          in, optional, type=string/strarr, default=""
+;                           Units to be used for axis tick labelling. See the online
+;                               help for details.
+;       TICKVALUES:         in, optional, type=number/numeric array
+;                           Values at which major tickmarks should be drawn. If not
+;                               provided (an neither is `TICKNAME`), then IDL will
+;                               determine them when the plot is created.
+;       TITLE:              in, optional, type=string, default=""
+;                           Title to be placed on the axis. See `TICKDIR`.
+;       _REF_EXTRA:         in, optional, type=any
+;                           Any keyword accepted by MrGrLayout superclass is also
+;                               accepted for keyword inheritance.
 ;-
 FUNCTION MrAxis::init, direction, $
 CHARSIZE=charsize, $
 CURRENT=current, $
 LOCATION=location, $
 OFFSET = offset, $
-SAVE=save, $
 TARGET=target, $
 TICKDIR=tickdir, $
 
@@ -1170,13 +1433,10 @@ AXIS_RANGE=axis_range, $
 CHARTHICK=charthick, $
 COLOR=color, $
 DATA=data, $
-DEVICE=device, $
 FONT=font, $
 GRIDSTYLE=gridstyle, $
 LOG=log, $
 MINOR=minor, $
-NODATA=noData, $
-NORMAL=normal, $
 SUBTITLE=subtitle, $
 STYLE=sytle, $
 T3D=t3d, $
@@ -1328,8 +1588,8 @@ END
 ; The class definition module for the object.
 ; 
 ; :Params:
-;     class: out, optional, type=struct
-;        The class definition as a structure variable. Occasionally useful.
+;     CLASS:        out, optional, type=struct
+;                   The class definition as a structure variable. Occasionally useful.
 ;-
 PRO MrAxis__define, class
     

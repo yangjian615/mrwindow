@@ -62,6 +62,9 @@
 ;       2013/11/19  -   Inherit IDL_Object, added the _OverloadBracketsRightSide method. - MRA
 ;       2013/12/10  -   Added the _OverloadForeach method. - MRA
 ;       2014/01/10  -   Added negative indexing to _OverloadBRS for single indices. - MRA
+;       2014/03/04  -   _OverloadBRS now accepts arrays of indices. - MRA
+;       2014/03/06  -   Added the _OverloadPrint method. The WhichObjects method now calls
+;                           the _OverloadPrint method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -97,9 +100,10 @@ function MrIDL_Container::_OverloadBracketsRightSide, isRange, subscript1
         ;If a scalar or array was given, get what was asked for.
         if isRange[0] eq 0 then begin
             ;Negative index?
-            if subscript1 lt 0 then begin
+            iNeg = where(subscript1 lt 0, nNeg)
+            if nNeg gt 0 then begin
                 nObj = self -> Count()
-                subscript1 += nObj
+                subscript1[iNeg] += nObj
             endif
         
             result = self -> Get(POSITION=subscript1)
@@ -163,6 +167,42 @@ function MrIDL_Container::_OverloadForeach, value, key
 end
 
 
+;+
+;   The purpose of this method provide output when the PRINT procedure is called.
+;
+; :Returns:
+;       RESULTS:            A string to be printed by the PRINT procedure.
+;-
+function MrIDL_Container::_OverloadPrint
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg(/QUIET)
+        return, ''
+    endif
+
+    ;Get all of the objects
+    allObjs = self -> Get(/ALL, COUNT=nObjs)
+    if nObjs eq 0 then return, 'Container is empty.'
+    
+    ;Identifiers and types
+    objIDs = obj_valid(allObjs, /GET_HEAP_IDENTIFIER)
+    objClass = MrObj_Class(allObjs)
+
+    ;Header
+    printStr = strarr(1,nObjs+1)
+    printStr[0,0] = string('Index', 'HeapID', 'Class', FORMAT='(1x, a5, 4x, a6, 2x, a5)')
+    for i = 0, nObjs-1 do begin
+        if objIDs[i] eq 0 then objIDstr = '<invalid>' else objIDstr = strtrim(objIDs[i], 2)
+        printStr[0,i+1] = string(i, objIDstr, objClass[i], FORMAT='(i5, 3x, i7, 3x, a0)')
+    endfor
+
+    return, printStr
+end
+
 
 ;+
 ;   The purpose of this method is to add functionality to the IDL_Container::Add method.
@@ -200,15 +240,13 @@ POSITION = Index
         return
     endif
     
-    ;Defaults
-    SetDefaultValue, destroy, 0, /BOOLEAN
-    
     ;Clear all contained items?
     if keyword_set(clear) then self -> Remove, /ALL, DESTROY=destroy
     
     ;Add the objects
     self -> IDL_Container::Add, Objects, POSITION=Index
 end
+
 
 
 ;+
@@ -262,7 +300,7 @@ DESTROY = destroy
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        void = cgErrorMsg(/QUIET)
         return
     endif
     
@@ -273,7 +311,10 @@ DESTROY = destroy
     if szOld eq 11 then begin
         ;Is the object in the container?
         tf_contained = self -> IsContained(old, POSITION=index)
-        if tf_contained eq 0 then message, 'Object "OLD" not found. Cannot replace.'
+        if tf_contained eq 0 then begin
+            message, 'Object "' + obj_class(old) + '" not found. Cannot replace.', /INFORMATIONAL
+            return
+        endif
         
         ;Remove the old object and add the new one.
         self -> Remove, old, DESTROY=destroy
@@ -329,8 +370,8 @@ TYPE = type
     endif
     
     ;Defaults
-    SetDefaultValue, destroy, 0, /BOOLEAN
-    SetDefaultValue, all, 0, /BOOLEAN
+    all     = keyword_set(all)
+    destroy = keyword_set(destroy)
         
 ;---------------------------------------------------------------------
 ;Remove All? /////////////////////////////////////////////////////////
@@ -339,7 +380,7 @@ TYPE = type
     if keyword_set(all) then begin
         if destroy then allObj = self -> Get(/ALL, COUNT=nObj)
         self -> IDL_Container::Remove, /ALL
-        if destroy then for i = 0, nObj-1 do obj_destroy, allObj[i]
+        if destroy eq 1 && nObj gt 0 then obj_destroy, allObj
         return
     endif
         
@@ -347,7 +388,8 @@ TYPE = type
 ;Remove An Index? ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    ;Remove Indices first.
+    ;Necessary to remove Indices first. Otherwise indices will change
+    ;as specific objects are removed.
     if n_elements(index) ne 0 then begin
         if destroy then RemoveThese = self -> Get(POSITION=index)
         self -> IDL_Container::Remove, POSITION=index
@@ -399,16 +441,8 @@ pro MrIDL_Container::WhichObjects
         return
     endif
 
-    ;Get each of the objects.
-    oContained = self -> Get(/ALL, COUNT=count)
-
-    ;Print a header.
-    print, '-Index-', '--Class--', FORMAT='(a7, 3x, a9)'
-    
-    ;Print the index and class name of each object.
-    for i = 0, count - 1 do $
-        print, i, typename(oContained[i]), FORMAT='(2x, i3, 6x, a0)'
-
+    result = self -> _OverloadPrint()
+    print, result
 end
 
 
@@ -445,6 +479,7 @@ function MrIDL_Container::init
         return, 0
     endif
 
+    ;Superclass
     if self -> IDL_Container::INIT() eq 0 then return, 0
     
     return, 1

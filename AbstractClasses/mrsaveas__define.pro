@@ -75,6 +75,8 @@
 ;                           then do not use WSet to make the window current. This prevents
 ;                           a new, blank window from being created. - MRA
 ;       09/26/2013  -   Renamed from MrAbstractSaveAs to MrSaveAs. - MRA
+;       2014/03/08  -   Button UValues were causing ImageMagick plots to be created in
+;                           the wrong format. Fixed. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -174,7 +176,7 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
 
     IF N_Elements(filetype) EQ 0 then filetype = 'PNG'
     IF N_Elements(filename) EQ 0 THEN filename = 'cgwindow.' + StrLowCase(filetype)
-    IF StrUpCase(filetype) EQ 'PDF' THEN rastertype = -1 ELSE rastertype = 0 ;rastertype = {0 | self.im_raster}
+    IF StrUpCase(filetype) EQ 'PDF' THEN rastertype = -1 ELSE rastertype = self.im_raster
     
     ; Strip the extension off the filename.
     outname = cgRootName(filename, DIRECTORY=dirName)
@@ -330,10 +332,10 @@ pro MrSaveAs::Create_SaveAs_Menu, parent
     IF cgHasImageMagick() EQ 1 THEN BEGIN
         imraster = Widget_Button(cgSaveID, Value='Raster Image File via ImageMagick', /MENU)
         button = Widget_Button(imraster, Value='BMP', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imraster, Value='GIF', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imraster, Value='JPEG', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imraster, Value='PNG', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imraster, Value='TIFF', UNAME='IMAGEMAGICK_BMP', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(imraster, Value='GIF', UNAME='IMAGEMAGICK_GIF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(imraster, Value='JPEG', UNAME='IMAGEMAGICK_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(imraster, Value='PNG', UNAME='IMAGEMAGICK_PNG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(imraster, Value='TIFF', UNAME='IMAGEMAGICK_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
     ENDIF
 
 end
@@ -553,7 +555,7 @@ PRO MrSaveAs::Output, filename
     
     ; Need a filename?
     IF N_Elements(filename) EQ 0 THEN filename = 'idl.ps'
-stop
+
     ; The type of file is determined by the filename extension.
     rootname = cgRootName(filename, DIRECTORY=dir, EXTENSION=ext)
     CASE StrUpCase(ext) OF
@@ -728,7 +730,7 @@ PRO MrSaveAs::SaveAsRaster, event
            
            ; Draw the graphics.
            self -> Draw
-           
+
            ; Close the file and convert to proper file type.
            CASE filetype OF
                 'BMP':  cgPS_Close, /BMP, DELETE_PS=self.ps_delete, $
@@ -833,7 +835,7 @@ DIRECTORY=directory
         
         ;Get the file extension so we know how to save. If the extension was given, do
         ;not append another to the file name.
-        void = cgRooName(filename, EXTENSION=ext)
+        void = cgRootName(filename, EXTENSION=ext)
 	    if ext ne file_type and file_type ne '' then filename += '.' + strlowcase(file_type)
     endelse
     

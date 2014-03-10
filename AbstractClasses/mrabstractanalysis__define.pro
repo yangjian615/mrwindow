@@ -113,6 +113,7 @@
 ;                           QUIET keyword to the Average method. - MRA
 ;       2014/01/21  -   Use cgColor to load colors into the color table. - MRA
 ;       2014/01/30  -   Put quotes around "copy + paste" output to make valid strings. - MRA
+;       2014/03/03  -   Added TAIL keyword for performing MVAB in the magnetotail. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -665,6 +666,49 @@ end
 
 
 ;+
+;   Retrieve the coordinates of the mouse click and find the nearest data point.
+;
+; :Params:
+;       EVENT:              in, required, type=structure
+;                           An event structure returned by the windows manager.
+;-
+pro MrAbstractAnalysis::Get_Data_Point, event
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Only care about button presses
+    if event.type ne 0 then return
+
+    ;Convert the clicked point to data coordinates and print the location
+    coords = convert_coord(event.x, event.y, /DEVICE, /TO_DATA)
+        
+    ;Only care about button presses
+    xy_data = self -> Data_Range([coords[0], coords[0]])
+    
+    n = n_elements(xy_data[0,*])
+
+    ;Make strings of the results
+    x_pt = string(xy_data[0,0], FORMAT='(f0.4)')
+    
+    ;Bracket data if there is more than one component
+    if n eq 1 $
+        then y_pt = string(xy_data[1,*], FORMAT='(f0.4)') $
+        else y_pt = '[' + strjoin(string(xy_data[1,*], FORMAT='(f0.4)'), ', ') + ']'
+
+    ;Print the results
+    print, FORMAT='(%"x = %s   y = %s")', x_pt, y_pt
+end
+
+
+;+
 ;   Print the endpoints of interval within the data set.
 ;
 ; :Params:
@@ -712,49 +756,6 @@ end
 
 
 ;+
-;   Retrieve the coordinates of the mouse click and find the nearest data point.
-;
-; :Params:
-;       EVENT:              in, required, type=structure
-;                           An event structure returned by the windows manager.
-;-
-pro MrAbstractAnalysis::Get_Data_Point, event
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        self -> Error_Handler
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Only care about button presses
-    if event.type ne 0 then return
-
-    ;Convert the clicked point to data coordinates and print the location
-    coords = convert_coord(event.x, event.y, /DEVICE, /TO_DATA)
-        
-    ;Only care about button presses
-    xy_data = self -> Data_Range([coords[0], coords[0]])
-    
-    n = n_elements(xy_data[0,*])
-
-    ;Make strings of the results
-    x_pt = string(xy_data[0,0], FORMAT='(f0.4)')
-    
-    ;Bracket data if there is more than one component
-    if n eq 1 $
-        then y_pt = string(xy_data[1,*], FORMAT='(f0.4)') $
-        else y_pt = '[' + strjoin(string(xy_data[1,*], FORMAT='(f0.4)'), ', ') + ']'
-
-    ;Print the results
-    print, FORMAT='(%"x = %s   y = %s")', x_pt, y_pt
-end
-
-
-;+
 ;   The average value in a given interval.
 ;
 ; :Params:
@@ -772,9 +773,13 @@ end
 ;                                   the plot. The upper-left-most plot has a plot index of
 ;                                   1, and the plot index increases as you go down the
 ;                                   column, then across the row.
+;       TAIL:               in, optional, type=boolean, default=0
+;                           If set, output will be configured to the magnetotail, where
+;                               the normal component is mostly along Z-GSE.
 ;-
 pro MrAbstractAnalysis::MVAB, xrange, location, $
-PLOT_INDEX=plot_index
+PLOT_INDEX=plot_index, $
+TAIL=tail
     compile_opt strictarr
     
     ;Error handling
@@ -791,6 +796,7 @@ PLOT_INDEX=plot_index
 ;---------------------------------------------------------------------
 
     ;Defaults
+    tail       = keyword_set(tail)
     plot_index = keyword_set(plot_index)
 
     ;Use the selected plot
@@ -821,6 +827,12 @@ PLOT_INDEX=plot_index
         2: eigvecs = mva(indep[iRange[0]:iRange[1]], dep[*,iRange[0]:iRange[1]], EIGVALS=eigvals)
         else: message, 'Data must be a 3xN or Nx3 array.'
     endcase
+    
+    ;Interchange the N and L eigenvectors if we are in the magnetotail
+    if tail eq 1 then begin
+        eigvals = eigvals[[2,1,0]]
+        eigvecs = eigvecs[*,[2,1,0]]
+    endif
     
 ;---------------------------------------------------------------------
 ;Print the Results ///////////////////////////////////////////////////
@@ -1324,7 +1336,7 @@ pro MrAbstractAnalysis::vHT, xrange, yrange
 
         self.amode[2] += 1
         velObj = self -> GetSelect()
-        self.intervals = ptr_new({index: vIndex, object:velObj})
+        self.intervals = ptr_new({tRange: xrange, index: vIndex, object:velObj})
         return
     endif
     
@@ -1343,7 +1355,7 @@ pro MrAbstractAnalysis::vHT, xrange, yrange
     magObj -> GetProperty, DIMENSION=B_dim
     
     ;Get the index range for magnetic field data.
-    iRange = (*self.intervals).vIndex
+    iRange = (*self.intervals).index
     xrange = t_v[iRange]
     xy_data = self -> Data_Range(xrange, IRANGE=bIndex)
 
@@ -1394,6 +1406,9 @@ pro MrAbstractAnalysis::vHT, xrange, yrange
     
     ;Calculate the deHoffmann-Teller velocity.
     v_ht = ht_velocity(v_interp, B_interp)
+    
+    ;Print the time interval
+    print, '[t0, t1] = [' + strjoin(ssm_to_hms([(*self.intervals).tRange]), ', ') + ']'
     
     ;print the results to the command window for easy Copy + Paste
     print, 'x', 'y', 'z', format='(13x, 2(a1, 11x), a1)'

@@ -133,6 +133,8 @@
 ;       2013/12/10  -   Added the SetGlobal method. CHARSIZE affects the layout of the
 ;                           plotting grid, but is no longer applied to the individual
 ;                           graphics. - MRA
+;       2014/03/09  -   Added the FindByPIndex and FindByColRow methods and removed
+;                           the Get method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -156,17 +158,17 @@ pro MrPlotManager::AdjustLayout_Property, event
     new_layout = plotpositions_gui(self.tlb, $
                                    LAYOUT  = self.GrLayout, $
                                    XGAP    = self.xgap, $
-                                   XMARGIN = self.xmargin, $
+                                   XMARGIN = self.oxmargin, $
                                    YGAP    = self.ygap, $
-                                   YMARGIN = self.ymargin)
+                                   YMARGIN = self.oymargin)
     if ptr_valid(new_layout) eq 0 then return
     
     ;Update the layout
-    self -> SetProperty, LAYOUT  = (*new_layout).layout, $
-                         XGAP    = (*new_layout).xgap, $
-                         XMARGIN = (*new_layout).xmargin, $
-                         YGAP    = (*new_layout).ygap, $
-                         YMARGIN = (*new_layout).ymargin
+    self -> SetProperty, LAYOUT   = (*new_layout).layout, $
+                         XGAP     = (*new_layout).xgap, $
+                         OXMARGIN = (*new_layout).xmargin, $
+                         YGAP     = (*new_layout).ygap, $
+                         OYMARGIN = (*new_layout).ymargin
     
     ;Redraw
     self -> Draw
@@ -431,8 +433,8 @@ QUIET = quiet
         theObjects[i] -> SetLayout, LAYOUT=loc, POSITION=pos, $
                                     ASPECT=*self.aspect, $
                                     OXMARGIN=self.oxmargin, OYMARGIN=self.oymargin, $
-                                    XMARGIN=self.xmargin, XGAP=self.xgap, $
-                                    YMARGIN=self.ymargin, YGAP=self.ygap, $
+                                    IXMARGIN=self.ixmargin, XGAP=self.xgap, $
+                                    IYMARGIN=self.iymargin, YGAP=self.ygap, $
                                     UPDATE_LAYOUT=0
 
         ;Store the location and position if they were created.
@@ -502,8 +504,8 @@ pro MrPlotManager::ApplyPositions
         dataObjs[i] -> SetLayout, LAYOUT=layout, POSITION=position, UPDATE_LAYOUT=0, $
                                   ASPECT=*self.aspect, $
                                   OXMARGIN=self.oxmargin, OYMARGIN=self.oymargin, $
-                                  XMARGIN=self.xmargin, XGAP=self.xgap, $
-                                  YMARGIN=self.ymargin, YGAP=self.ygap
+                                  IXMARGIN=self.ixmargin, XGAP=self.xgap, $
+                                  IYMARGIN=self.iymargin, YGAP=self.ygap
     endfor
 end
 
@@ -583,81 +585,11 @@ end
 
 
 ;+
-;   This method gets objects from the container. It provides additional functionality
-;   to the MrIDL_Container::Get method::
-;       - Filter objects based on their location in the 2D plotting grid.
 ;
-;   :Keywords:
-;       ALL:            in, optional, type=boolean, default=0
-;                       If set, all objects within the container will be returned.
-;       FIXED:          in, optional, type=boolean, default=0
-;                       If set, indicate `LOCATION` is a fixed location.
-;       ISA:            in, optional, type=string/strarr
-;                       Names of the object classes to be retrieved. Use in conjunction
-;                           with `ALL` to retrieve all objects specified classes.
-;       LOCATION:       in, optional, type=intarr
-;                       Return the object at this [col,row] location.
-;       PINDEX:         in, optional, type=boolean, default=0
-;                       If set, specifies that `LOCATION` is a plot index.
-;       COUNT:          out, optional, type=integer
-;                       A named variable that will store the number of returned objects.
-;       ANNOTATE:       in, optional, type=boolean, default=0
-;                       If set, return all annotate objects.
-;                       A named variable that will store the number of returned objects.
-;       ARROW:          in, optional, type=boolean, default=0
-;                       If set, return all arrow objects.
-;                       A named variable that will store the number of returned objects.
-;       AXIS:           in, optional, type=boolean, default=0
-;                       If set, return all axis objects.
-;                       A named variable that will store the number of returned objects.
-;       COLORBAR:       in, optional, type=boolean, default=0
-;                       If set, return all colorbar objects.
-;                       A named variable that will store the number of returned objects.
-;       CONTOUR:        in, optional, type=boolean, default=0
-;                       If set, return all contour objects.
-;                       A named variable that will store the number of returned objects.
-;       DATA:           in, optional, type=boolean, default=0
-;                       If set, return all data objects.
-;                       A named variable that will store the number of returned objects.
-;       IMAGE:          in, optional, type=boolean, default=0
-;                       If set, return all image objects.
-;                       A named variable that will store the number of returned objects.
-;       LEGEND:         in, optional, type=boolean, default=0
-;                       If set, return all legend objects.
-;                       A named variable that will store the number of returned objects.
-;       OVERPLOT:       in, optional, type=boolean, default=0
-;                       If set, return all overplot objects.
-;                       A named variable that will store the number of returned objects.
-;       PLOT:           in, optional, type=boolean, default=0
-;                       If set, return all plot objects.
-;                       A named variable that will store the number of returned objects.
-;       TEXT:           in, optional, type=boolean, default=0
-;                       If set, return all text objects.
-;
-; :Returns:
-;       RESULT:         An object array containing the desired objects.
 ;-
-function MrPlotManager::Get, $
-ALL = All, $
-FIXED = fixed, $
-ISA = IsA, $
-LOCATION = location, $
-PINDEX = pIndex, $
-POSITION = index, $
-COUNT = count, $
-;TYPE
-ANNOTATE = annotate, $
-ARROW = arrow, $
-AXIS = axis, $
-COLORBAR = colorbar, $
-CONTOUR = contour, $
-DATA = data, $
-IMAGE = image, $
-LEGEND = legend, $
-OVERPLOT = overplot, $
-PLOT = plot, $
-TEXT = text
-    compile_opt idl2
+function MrPlotManager::FindByColRow, colrow, $
+COUNT=count
+    compile_opt strictarr
 
     ;Error handling
     catch, the_error
@@ -667,143 +599,51 @@ TEXT = text
         Count = 0
         return, obj_new()
     endif
+
+    ;Convert COLROW to a plot index
+    pIndex = self -> ConvertIndex(ColRow, /COLROW, /TO_PINDEX)
     
-    ;Defaults
-    fixed = keyword_set(fixed)
-    pIndex = keyword_set(pIndex)
-
-    ;Make sure at most one of these keywords is set.
-    if fixed + pIndex gt 1 then message, 'FIXED and PLOT_INDEX are mutually exclusive.'
-
-;---------------------------------------------------------------------
-;Find by Fixed Location //////////////////////////////////////////////
-;---------------------------------------------------------------------
-    if n_elements(location) gt 0 && location[0] lt 0 then begin
-        AllObj = self -> MrIDL_Container::Get(/ALL, ISA=(*self.gTypes).data, COUNT=nObj)
-        i = 0
-        success = 0
-        while success eq 0 and i lt nObj do begin
-            AllObj[i] -> GetProperty, LAYOUT=oLayout
-            if n_elements(oLayout) eq 4 then success = array_equal(location, oLayout[2:3])
-            i++
-        endwhile
-
-        if success $
-            then result = AllObj[i-1] $
-            else result = obj_new()
-    
-;---------------------------------------------------------------------
-;Find by Location ////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    endif else if n_elements(location) gt 0 then begin
-        if min(location[0,*] lt 0) then $
-            message, 'Invalid LOCATION. Use /FIXED with 4-elements position.'
-        
-        ;Determine what LOCATION means.
-        if keyword_set(pIndex) then begin
-            PIndex_in = location
-            nIn = n_elements(PIndex_in)
-        endif else if keyword_set(fixed) then begin
-            pos_in = location
-            nIn = n_elements(pos_in[0,*])
-        endif else begin
-            PIndex_in = self -> ConvertLocation(location, /COLROW, /TO_PINDEX)
-            nIn = n_elements(PIndex_in)
-        endelse
-
-        ;Get all of the data objects
-        AllObj = self -> MrIDL_Container::Get(/ALL, ISA=(*self.gTypes).data, COUNT=nObj)
-        Result = objarr(nObj)
-        count = 0
-
-    ;---------------------------------------------------------------------
-    ;Loop through All Objects in Container ///////////////////////////////
-    ;---------------------------------------------------------------------
-        for i = 0, nObj - 1 do begin
-            skip = 0
-        
-            ;Get the layout and position
-            AllObj[i] -> GetProperty, LAYOUT=oLayout, POSITION=oPosition
-
-        ;---------------------------------------------------------------------
-        ;Find a Objects at Fixed Positions ///////////////////////////////////
-        ;---------------------------------------------------------------------
-            
-            if fixed eq 1 then begin
-                ;See if the current graphic matches any of the positions given
-                delta = min(abs(mean(pos_in - rebin(oPosition, 4, nIn), DIMENSION=1)))
-
-                ;If it does, return the graphic. If not, continue to the next one.
-                if delta lt 1e-5 $
-                    then Result[count] = allObj[i] $
-                    else continue
-
-                ;If we get to here, a graphic was stored. Increase the count and
-                ;continue to the next graphic object.
-                count += 1
-                continue
-            endif
-
-        ;---------------------------------------------------------------------
-        ;Find a Objects in Layout Positions //////////////////////////////////
-        ;---------------------------------------------------------------------
-            
-            ;Find the plot index of the object
-            nLayout = n_elements(oLayout)
-            if nLayout eq 0 then begin
-                if n_elements(oPosition) eq 0 $
-                    then skip = 1 $
-                    else location = self -> FindLocation(oPosition, /FIXED)
-            endif else oPIndex = oLayout[2]
-            
-            ;If no valid layout or position was provided, then go to the next object.
-            if skip eq 1 then continue
-
-            ;Return this object? If the plot-index of the current graphic matches any
-            ;of the inputs plot-indices, then yes.
-            tf_get = isMember(pIndex_in, oPIndex, N_MATCHES=nGet)
-            if nGet eq 0 || tf_get eq 0 $
-                then continue $
-                else Result[count] = AllObj[i]
-            
-            ;If we get to here, increase the object count
-            count += 1
-        endfor
-
-    ;---------------------------------------------------------------------
-    ;Trim Results ////////////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-        case count of
-            0: return, MrNull('OBJREF')
-            1: Result = Result[0]
-            else: Result = Result[0:count-1]
-        endcase
-
-;---------------------------------------------------------------------
-;Normal Get //////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    endif else begin
-        ;Get specific object types?
-        if keyword_set(annotate) then if n_elements(isa) eq 0 then isa = (*self.gTypes).annotate else isa = [isa, (*self.gTypes).annotate]
-        if keyword_set(arrow)    then if n_elements(isa) eq 0 then isa = (*self.gTypes).arrow    else isa = [isa, (*self.gTypes).arrow]
-        if keyword_set(axis)     then if n_elements(isa) eq 0 then isa = (*self.gTypes).axis     else isa = [isa, (*self.gTypes).axis]
-        if keyword_set(colorbar) then if n_elements(isa) eq 0 then isa = (*self.gTypes).colorbar else isa = [isa, (*self.gTypes).colorbar]
-        if keyword_set(contour)  then if n_elements(isa) eq 0 then isa = (*self.gTypes).contour  else isa = [isa, (*self.gTypes).contour]
-        if keyword_set(data)     then if n_elements(isa) eq 0 then isa = (*self.gTypes).data     else isa = [isa, (*self.gTypes).data]
-        if keyword_set(image)    then if n_elements(isa) eq 0 then isa = (*self.gTypes).image    else isa = [isa, (*self.gTypes).image]
-        if keyword_set(legend)   then if n_elements(isa) eq 0 then isa = (*self.gTypes).legend   else isa = [isa, (*self.gTypes).legend]
-        if keyword_set(overplot) then if n_elements(isa) eq 0 then isa = (*self.gTypes).overplot else isa = [isa, (*self.gTypes).overplot]
-        if keyword_set(plot)     then if n_elements(isa) eq 0 then isa = (*self.gTypes).plot     else isa = [isa, (*self.gTypes).plot]
-        if keyword_set(text)     then if n_elements(isa) eq 0 then isa = (*self.gTypes).text     else isa = [isa, (*self.gTypes).text]
-        
-        ;Make sure All is used with IsA
-        if n_elements(IsA) gt 0 then All = 1
-        
-        Result = self -> MrIDL_Container::Get(ALL=All, ISA=IsA, POSITION=index, COUNT=count)
-    endelse
-    
-    return, Result
+    ;Call FindByPIndex
+    object = self -> FindByPIndex(pIndex, COUNT=count)
 end
+
+
+;+
+;
+;-
+function MrPlotManager::FindByPIndex, pIndex, $
+COUNT=count
+    compile_opt strictarr
+
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        Count = 0
+        return, obj_new()
+    endif
+
+    ;Get all of the objects in the container
+    allObjs = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=count)
+    if count eq 0 then return, obj_new()
+    
+    ;Get all of the plot indices
+    objPIndex = intarr(count)
+    for i = 0, count - 1 do begin
+        allObjs[i] -> GetProperty, LAYOUT=objLayout
+        objPIndex[i] = objLayout[2]
+    endfor
+    
+    ;Find a match
+    iMatch = where(objPIndex eq pIndex, count)
+    if count eq 0 then return, obj_new()
+    if count eq 1 then iMatch = iMatch[0]
+    
+    ;Return the matching objects
+    return, allObjs[iMatch]
+end
+
 
 
 ;+
@@ -1007,7 +847,8 @@ TOFIXED = toFixed
     endcase
     
     ;Get the object
-    theObj = self -> Get(LOCATION=oldPIndex, /PINDEX)
+    theObj = self -> FindByPIndex(oldPIndex, COUNT=count)
+    if count eq 0 then message, 'Could not find a graphic at given location.'
 
     ;If toFixed is set, then the actual position will not change. The plot will simply
     ;be removed from the layout and put into a fixed location.

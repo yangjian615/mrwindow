@@ -18,7 +18,7 @@
 .comp ./cdf-reader/cdf_read__define.pro
 .comp ./cdf-reader/cdf_read.pro
 .comp ./cdf-reader/cdf_varselect__define.pro
-.comp ./cdf-reader/utilities/cdf_epoch_type.pro
+.comp ./cdf-reader/utilities/mrcdf_epoch_type.pro
 .comp ./cdf-reader/utilities/convert_time.pro
 .comp ./cdf-reader/utilities/datetime_to_epoch.pro
 .comp ./cdf-reader/utilities/dissectdate.pro

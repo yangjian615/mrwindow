@@ -82,7 +82,8 @@ NOERASE=noerase
     if n_elements(*self.zcoords) gt 0 then nparams += 1
     
     ;Are multiple colorfills being performed?
-    if nparas gt 1 and size(*self.xcoords, /N_DIMENSIONS) gt 1 then doMulti = 1 else doMulti = 0
+;    if nparas gt 1 and size(*self.xcoords, /N_DIMENSIONS) gt 1 then doMulti = 1 else doMulti = 0
+    doMulti = 0
     
     ;Color fill
     if doMulti $
@@ -628,7 +629,7 @@ pro MrColorFill::cleanup
     ptr_free, self.zcoords
     ptr_free, self.color
     ptr_free, self.image_coord
-    ptr_free, self.linestlye
+    ptr_free, self.linestyle
     ptr_free, self.orientation
     ptr_free, self.pattern
     ptr_free, self.position

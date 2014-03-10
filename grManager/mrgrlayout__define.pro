@@ -305,22 +305,19 @@ pro MrGrLayout::CalcPositions
 
     ;Calculate positions
     *self.layout_positions = MrLayout(self.GrLayout, $
-                                      ASPECT   = *self.aspect, $
-                                      CHARSIZE =  self.charsize, $
-                                      OXMARGIN =  self.oxmargin, $
-                                      OYMARGIN =  self.oymargin, $
-                                      P_REGION =       p_region, $
-                                      P_WINDOW =       p_window, $
-                                      XGAP     =  self.xgap, $
-                                      XMARGIN  =  self.xmargin, $
-                                      YGAP     =  self.ygap, $
-                                      YMARGIN  =  self.ymargin)
+                                      ASPECT    = *self.aspect, $
+                                      CHARSIZE  =  self.charsize, $
+                                      OXMARGIN  =  self.oxmargin, $
+                                      OYMARGIN  =  self.oymargin, $
+                                      P_REGION  =       p_region, $
+                                      XGAP      =  self.xgap, $
+                                      IXMARGIN  =  self.ixmargin, $
+                                      YGAP      =  self.ygap, $
+                                      IYMARGIN  =  self.iymargin)
     
     ;Save the window and region
     self.x_region = p_region[[0,2]]
-    self.x_window = P_window[[0,2]]
     self.y_region = p_region[[1,3]]
-    self.y_window = p_window[[1,3]]
 end
 
 
@@ -1114,8 +1111,8 @@ POSITION = position
             position = (*self.layout_positions)[*, aIndex]
         endif else begin
             position = MrLayout(layout, ASPECT=*self.aspect, CHARSIZE=self.charsize, $
-                                OXMARGIN=self.oxmargin, XMARGIN=self.xmargin, XGAP=self.xgap, $
-                                OYMARGIN=self.oymargin, YMARGIN=self.ymargin, YGAP=self.ygap)
+                                OXMARGIN=self.oxmargin, IXMARGIN=self.ixmargin, XGAP=self.xgap, $
+                                OYMARGIN=self.oymargin, IYMARGIN=self.iymargin, YGAP=self.ygap)
         endelse
     endif
 end
@@ -1633,8 +1630,8 @@ pro MrGrLayout::whichLayout
     if n_elements(*self.aspect) ne 0 then print, FORMAT='(%"  Aspect:     %f")', *self.aspect
     print, FORMAT='(%"  OXMARGIN:  [%i, %i]")', self.oxmargin
     print, FORMAT='(%"  OYMARGIN:  [%i, %i]")', self.oymargin
-    print, FORMAT='(%"  XMargin:   [%i, %i]")', self.xmargin
-    print, FORMAT='(%"  YMargin:   [%i, %i]")', self.ymargin
+    print, FORMAT='(%"  IXMargin:  [%i, %i]")', self.ixmargin
+    print, FORMAT='(%"  IYMargin:  [%i, %i]")', self.iymargin
     print, FORMAT='(%"  XGap:      %i")', self.xgap
     print, FORMAT='(%"  YGap:      %i")', self.ygap
 

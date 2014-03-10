@@ -173,7 +173,6 @@ PATH_XY=path_xy
     ; PATH_INFO and PATH_XY both suppress output. If neither are desired, call
     ; cgContour without them.
     ;
-
     if tf_getpath eq 0 then begin
         cgContour, *self.c_data, *self.xcoords, *self.ycoords, $
                 

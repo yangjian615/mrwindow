@@ -214,6 +214,7 @@
 ;                           now destroys the window when the native OS (x)=close button
 ;                           is pressed. "File | Close" now destroys the widget as well.
 ;                           "File | Destroy" was removed. Removed unused keywords. - MRA
+;       2014/02/12  -   Resize created a window when graphics was buffered. Fixed. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -1228,7 +1229,7 @@ pro MrWindow::ResizeDrawWidget, xsize, ysize
     endif else if winIsAvailable then begin
         wDelete, self.winID
         
-        if self.buffer then pixmap = 0 else pixmap = 1
+        if self.buffer then pixmap = 1 else pixmap = 0
         self.winID = MrGetWindow(TITLE='MrWindow', XSIZE=xsize, YSIZE=ysize, /FREE, PIXMAP=pixmap)
     endif
     

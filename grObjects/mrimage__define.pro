@@ -87,6 +87,7 @@
 ;       2013/12/30  -   CTIndex takes precedence over PALETTE when both were present. Now,
 ;                           if PALETTE is set, CTINDEX is cleared, and vice versa. - MRA
 ;       2014/01/24  -   Added the _OverloadImpliedPrint and _OverloadPrint methods. - MRA
+;       2014/02/28  -   Find ranges using MIN() and MAX(). - MRA
 ;                           
 ;-
 ;*****************************************************************************************
@@ -924,7 +925,7 @@ _REF_EXTRA=extra
             then self.window -> Refresh, DISABLE=~init_refresh
         return
     endif
-    
+
     ;Default to updating the layout
     SetDefaultValue, update_layout, 1, /BOOLEAN
     
@@ -1327,7 +1328,7 @@ YLOG = ylog, $
 YRANGE = yrange, $
 _REF_EXTRA = extra
     compile_opt strictarr
-    
+
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
@@ -1335,7 +1336,7 @@ _REF_EXTRA = extra
         void = cgErrorMsg()
         return, 0
     endif
-    
+
     ;Check the image
     imDims = size(image, /DIMENSIONS)
     nDims = size(image, /N_DIMENSIONS)
@@ -1479,7 +1480,7 @@ _REF_EXTRA = extra
             else setDefaultValue, indep, linspace(xrange[0], xrange[1], imDims[0])
 
     ;Otherwise, make the xrange span all of DEP
-    endif else if n_elements(xrange) eq 0 then xrange = [indep[0], indep[imDims[0]-1]]
+    endif else if n_elements(xrange) eq 0 then xrange = [min(indep, MAX=xmax, /NAN), xmax]
 
     ;----------------------
     ;INDEPENDENT VARIABLE |
@@ -1496,7 +1497,7 @@ _REF_EXTRA = extra
             else setDefaultValue, dep, linspace(yrange[0], yrange[1], imDims[1])
             
     ;Otherwise, make the yrange span all of INDEP
-    endif else if n_elements(yrange) eq 0 then yrange = [dep[0], dep[imDims[1]-1]]
+    endif else if n_elements(yrange) eq 0 then yrange = [min(dep, MAX=ymax, /NAN), ymax]
         
 ;---------------------------------------------------------------------
 ;Check/Set Keywords //////////////////////////////////////////////////

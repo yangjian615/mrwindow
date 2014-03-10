@@ -90,7 +90,7 @@ _REF_EXTRA = extra
     current = keyword_set(current)
 
     ;Create the plot
-    theColorFill = obj_new('MrPlotS', x, y, z, CURRENT=current, _STRICT_EXTRA=extra)
+    theColorFill = obj_new('MrColorFill', x, y, z, CURRENT=current, _STRICT_EXTRA=extra)
     
     return, theColorFill
 end

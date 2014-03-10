@@ -55,6 +55,8 @@
 ;       2014/01/10  -   Forgot to set the POSITION property within INIT. Fixed. - MRA
 ;       2014/01/24  -   Added the _OverloadPrint method. Changed object properties to
 ;                           floats so that fractions of a character size can be specified. - MRA
+;       2014/02/12  -   [XY]MARGIN renamed to O[XY]MARGIN. [IO][XY]MARGIN now have the
+;                           same meaning as their direct graphics keywords. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -79,11 +81,11 @@ function MrLayout::_OverloadPrint
     oxmargin = string('OXMargin', '=', self.oxmargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
     oymargin = string('OYMargin', '=', self.oymargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
     position = string('Position', '=', self.position, FORMAT='(a-26, a-2, 4(f0, 2x))')
-    xmargin  = string('XMargin',  '=', self.xmargin,  FORMAT='(a-26, a-2, 2(f0, 2x))')
+    xmargin  = string('IXMargin', '=', self.ixmargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
     xgap     = string('XGap',     '=', self.xgap,     FORMAT='(a-26, a-2, f0)')
     x_region = string('X_Region', '=', self.x_region, FORMAT='(a-26, a-2, 4(f0, 2x))')
     x_window = string('X_Window', '=', self.x_window, FORMAT='(a-26, a-2, 4(f0, 2x))')
-    ymargin  = string('YMargin',  '=', self.ymargin,  FORMAT='(a-26, a-2, 2(f0, 2x))')
+    ymargin  = string('IYMargin', '=', self.iymargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
     ygap     = string('YGap',     '=', self.ygap,     FORMAT='(a-26, a-2, f0)')
     y_region = string('Y_Region', '=', self.y_region, FORMAT='(a-26, a-2, 4(f0, 2x))')
     y_window = string('Y_Window', '=', self.y_window, FORMAT='(a-26, a-2, 4(f0, 2x))')
@@ -303,9 +305,9 @@ OXMARGIN=oxmargin, $
 OYMARGIN=oymargin, $
 POSITION=position, $
 UPDATE_LAYOUT=update_layout, $
-XMARGIN=xmargin, $
+IXMARGIN=ixmargin, $
 XGAP=xgap, $
-YMARGIN=ymargin, $
+IYMARGIN=iymargin, $
 YGAP=ygap
     compile_opt strictarr
     
@@ -326,12 +328,12 @@ YGAP=ygap
     case n_elements(margin) of
         0: ;Do nothing
         1: begin
-            xmargin = [margin, margin]
-            ymargin = [margin, margin]
+            oxmargin = [margin, margin]
+            oymargin = [margin, margin]
         endcase
         4: begin
-            xmargin = margin[[0,2]]
-            ymargin = margin[[1,3]]
+            oxmargin = margin[[0,2]]
+            oymargin = margin[[1,3]]
         endcase
         else: message, 'MARGIN must be a scalar or 4-element vector.'
     endcase
@@ -339,12 +341,12 @@ YGAP=ygap
     ;Set Properties. Make sure layout elements are always >= 0.
     if n_elements(aspect)   ne 0 then *self.aspect   = aspect
     if n_elements(charsize) gt 0 then  self.charsize = charsize
+    if n_elements(iymargin) ne 0 then  self.iymargin = iymargin
+    if n_elements(ixmargin) ne 0 then  self.ixmargin = ixmargin
     if n_elements(layout)   ne 0 then  self.layout   = layout
     if n_elements(oxmargin) gt 0 then  self.oxmargin = oxmargin
     if n_elements(oymargin) gt 0 then  self.oymargin = oymargin
-    if n_elements(xmargin)  ne 0 then  self.xmargin  = xmargin
     if n_elements(xgap)     ne 0 then  self.xgap     = xgap
-    if n_elements(ymargin)  ne 0 then  self.ymargin  = ymargin
     if n_elements(ygap)     ne 0 then  self.ygap     = ygap
     
     ;Update the position to fit the new layout?
@@ -414,14 +416,14 @@ end
 function MrLayout::init, $
 ASPECT=aspect, $
 CHARSIZE=charsize, $
+IXMARGIN=ixmargin, $
+IYMARGIN=iymargin, $
 LAYOUT=layout, $
 MARGIN=margin, $
 OXMARGIN=oxmargin, $
 OYMARGIN=oymargin, $
 POSITION=position, $
-XMARGIN=xmargin, $
 XGAP=xgap, $
-YMARGIN=ymargin, $
 YGAP=ygap
     compile_opt strictarr
     
@@ -437,23 +439,23 @@ YGAP=ygap
     case n_elements(margin) of
         0: ;Do nothing
         1: begin
-            xmargin = [margin, margin]
-            ymargin = [margin, margin]
+            oxmargin = [margin, margin]
+            oymargin = [margin, margin]
         endcase
         4: begin
-            xmargin = margin[[0,2]]
-            ymargin = margin[[1,3]]
+            oxmargin = margin[[0,2]]
+            oymargin = margin[[1,3]]
         endcase
         else: message, 'MARGIN must be a scalar or 4-element vector.'
     endcase
     
     ;Defualt Values
     if n_elements(charsize) gt 0 then self.charsize = charsize else self.charsize = 1.5
-    if n_elements(oxmargin) gt 0 then self.oxmargin = oxmargin else self.oxmargin = [0, 0]
-    if n_elements(oymargin) gt 0 then self.oymargin = oymargin else self.oymargin = [0, 0]
-    if n_elements(xmargin)  gt 0 then self.xmargin  = xmargin  else self.xmargin  = [10, 3]
+    if n_elements(iymargin) gt 0 then self.iymargin = iymargin else self.iymargin = [0,0]
+    if n_elements(ixmargin) gt 0 then self.ixmargin = ixmargin else self.ixmargin = [0,0]
+    if n_elements(oxmargin) gt 0 then self.oxmargin = oxmargin else self.oxmargin = [10, 3]
+    if n_elements(oymargin) gt 0 then self.oymargin = oymargin else self.oymargin = [4,2]
     if n_elements(xgap)     gt 0 then self.xgap     = xgap     else self.xgap     = 14
-    if n_elements(ymargin)  gt 0 then self.ymargin  = ymargin  else self.ymargin  = [4,2]
     if n_elements(ygap)     gt 0 then self.ygap     = ygap     else self.ygap     = 6
     
     ;Default pointers
@@ -510,15 +512,15 @@ pro MrLayout__define, class
     define = { MrLayout, $
                aspect:   ptr_new(), $
                charsize: 0.0, $
+               ixmargin: [0.0, 0.0], $
+               iymargin: [0.0, 0.0], $
                layout:   intarr(3), $
                oxmargin: [0.0,0.0], $
                oymargin: [0.0,0.0], $
                position: fltarr(4), $
-               xmargin:  [0.0, 0.0], $
                xgap:     0.0, $
                x_region: [0.0, 0.0], $
                x_window: [0.0, 0.0], $
-               ymargin:  [0.0, 0.0], $
                ygap:     0.0, $
                y_region: [0.0, 0.0], $
                y_window: [0.0, 0.0] $
