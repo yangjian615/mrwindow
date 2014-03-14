@@ -41,7 +41,42 @@
 ;  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                            ;
 ;******************************************************************************************;
 ;+
+; Provides an object interface to handle IDL direct graphics plotting keywords. Basically,
+; any graphics keyword that is common to IDL plotting routines (e.g. Plot, Contour, 
+; Surface, etc.) is supported here. See the IDL documentation for "Graphics Keywords for
+; a complete list.
+; 
+; The program requires the `Coyote Library <http://www.idlcoyote.com/documents/programs.php>`
+; to be installed on your machine.
 ;
+; :Categories:
+;    Graphics
+;           
+; :Author:
+;       FANNING SOFTWARE CONSULTING::
+;           David W. Fanning 
+;           1645 Sheely Drive
+;           Fort Collins, CO 80526 USA
+;           Phone: 970-221-0438
+;           E-mail: david@idlcoyote.com
+;           Coyote's Guide to IDL Programming: http://www.idlcoyote.com
+;
+; :History:
+;     Change History::
+;        Written, 16 May 2012, by David W. Fanning.
+;        Added missing LINESTYLE keyword. 22 May 2012. DWF.
+;        BIG problem in the way I was handling the PSYM keyword solved! 18 July 2012. DWF.
+;        04/26/2013 -   Removed XMARGIN and YMARGIN keywords because they were conflicting
+;                           causing duplicate definitions in a class of mine. - Matthew R Argall
+;        09/27/2013 -   Removed the POSITION keyword. - MRA
+;        2013/11/23 -   Removed the CHARSIZE keyword. - MRA
+;        2014/01/21 -   DATA, NORMAL, and DEVICE are no longer pointers. - MRA
+;
+; :Copyright:
+;     Copyright (c) 2012, Fanning Software Consulting, Inc.
+;-
+;+
+;   Provide output with the PRINT procedure is used.
 ;-
 FUNCTION MrGraphicsKeywords::_OverloadPrint
     compile_opt strictarr
@@ -275,42 +310,6 @@ FUNCTION MrGraphicsKeywords::_OverloadPrint
     return, transpose(outStr)
 END
 
-
-;+
-; Provides an object interface to handle IDL direct graphics plotting keywords. Basically,
-; any graphics keyword that is common to IDL plotting routines (e.g. Plot, Contour, 
-; Surface, etc.) is supported here. See the IDL documentation for "Graphics Keywords for
-; a complete list.
-; 
-; The program requires the `Coyote Library <http://www.idlcoyote.com/documents/programs.php>`
-; to be installed on your machine.
-;
-; :Categories:
-;    Graphics
-;           
-; :Author:
-;       FANNING SOFTWARE CONSULTING::
-;           David W. Fanning 
-;           1645 Sheely Drive
-;           Fort Collins, CO 80526 USA
-;           Phone: 970-221-0438
-;           E-mail: david@idlcoyote.com
-;           Coyote's Guide to IDL Programming: http://www.idlcoyote.com
-;
-; :History:
-;     Change History::
-;        Written, 16 May 2012, by David W. Fanning.
-;        Added missing LINESTYLE keyword. 22 May 2012. DWF.
-;        BIG problem in the way I was handling the PSYM keyword solved! 18 July 2012. DWF.
-;        04/26/2013 -   Removed XMARGIN and YMARGIN keywords because they were conflicting
-;                           causing duplicate definitions in a class of mine. - Matthew R Argall
-;        09/27/2013 -   Removed the POSITION keyword. - MRA
-;        2013/11/23 -   Removed the CHARSIZE keyword. - MRA
-;        2014/01/21 -   DATA, NORMAL, and DEVICE are no longer pointers. - MRA
-;
-; :Copyright:
-;     Copyright (c) 2012, Fanning Software Consulting, Inc.
-;-
 
 ;+
 ; This method initializes the object. Any "graphics keyword" that falls under

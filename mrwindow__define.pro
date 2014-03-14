@@ -215,6 +215,13 @@
 ;                           is pressed. "File | Close" now destroys the widget as well.
 ;                           "File | Destroy" was removed. Removed unused keywords. - MRA
 ;       2014/02/12  -   Resize created a window when graphics was buffered. Fixed. - MRA
+;       2014/03/09  -   Added the GetSelect, _SetSelect, IsSelected, HitTest, and Focus2
+;                           methods. Added the _Selection property. - MRA
+;       2014/03/10  -   Added the Show and SetCurrent methods. - MRA
+;       2014/03/12  -   Removed the old Focus method and renamed Focus2 to Focus. Also
+;                           removed the old GetSelect and SetSelect methods. - MRA
+;       2014/03/13  -   Disinherit the MrSaveAs class, but keep it around as an object
+;                           property. Added the GetRefresh method for convenience. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -251,6 +258,67 @@ end
 
 
 ;+
+;   Determine if objects
+;-
+pro MrWindow::_SetSelect, object, $
+ADD=add, $
+ALL=all, $
+CLEAR=clear, $
+TOGGLE=toggle, $
+UNSELECT=unselect
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Add the object to the selection?
+    if keyword_set(add) then begin
+        self._selection -> Add, object
+        return
+    endif
+    
+    ;Add all objects to the selection?
+    if keyword_set(all) then begin
+        allObjs = self -> Get(/ALL)
+        self._selection -> Remove, /ALL
+        self._selection -> Add, allObjs
+        return
+    endif
+    
+    ;Clear all selections?
+    if keyword_set(clear) then begin
+        self._selection -> Remove, /ALL
+        return
+    endif
+    
+    ;Toggle the object?
+    if keyword_set(toggle) then begin
+        tf_contained = self._selection -> IsContained(object)
+        if tf_contained eq 1 $
+            then self._selection -> Remove, object $
+            else self._selection -> Add, object
+        return
+    endif
+    
+    ;Unselect the object?
+    if keyword_set(unselect) then begin
+        self._selection -> Remove, object
+        return
+    endif
+    
+    ;Clear the selection and add the object?
+    self._selection -> Remove, /ALL
+    self._selection -> Add, object
+end
+
+
+;+
 ;   Build the GUI. This is separate from the realization method so that custom GUI
 ;   configurations can be used. Also, so that the GUI can be build in the background
 ;   without being realized right away.
@@ -283,7 +351,7 @@ YSIZE = ysize
     self.ysize = ysize
     
     ;Make a top-level base with a menu bar
-    self.tlb = widget_base(title='MrWindow', /COLUMN, /TLB_SIZE_EVENTS, $
+    self.tlb = widget_base(TITLE=self.title, /COLUMN, /TLB_SIZE_EVENTS, $
                            UVALUE={object: self, method: 'TLB_Events'}, $
                            MBAR=menuID, XOFFSET=100, YOFFSET=0, UNAME='tlb', $
                            /TLB_KILL_REQUEST_EVENTS)
@@ -295,7 +363,7 @@ YSIZE = ysize
     button = widget_button(fileID, VALUE='Close', UVALUE={object: self, method: 'Destroy'}, /SEPARATOR)
 
     ;Create a "Save As" menu for the menu bar.
-    self -> Create_SaveAs_Menu, menuID
+    self._SaveAs -> Create_SaveAs_Menu, menuID, /MENU
 
     ;Make the edit menu in the menu bar
     editID = widget_button(menuID, VALUE='Edit', /MENU)
@@ -471,7 +539,6 @@ pro MrWindow::Draw_Events, event
     ;If a button press happened, we need to focus first. If anything else happened,
     ;we need to know if the object of focus is zoomable right away.
     if event.type ne 0 then tf_zoomable = self -> isZoomable()
-
 ;---------------------------------------------------------------------
 ;Button Press Events /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -498,7 +565,7 @@ pro MrWindow::Draw_Events, event
         if self.textmode[0] eq 2 then self -> Adjust_Text, event    ;Move text
         if self.textmode[0] eq 4 then self -> Adjust_Text, event    ;Rotate text
         if self.textmode[0] eq 8 then self -> Remove_Text, event    ;Remove text
-        
+
         ;Zoom Events
         if tf_zoomable eq 1 then self -> MrZoom::Draw_Events, event
     endif
@@ -593,84 +660,11 @@ end
 ;       EVENT:              in, optional, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrWindow::destroy, event
+pro MrWindow::Destroy, event
     compile_opt strictarr
     
     ;Destroy the object and the widget, if it still exists
     obj_destroy, self
-end
-
-
-;+
-;   Event handler for Focus events. Find the closest plot to the clicked point.
-;
-; :Private:
-;
-; :Params:
-;   EVENT:              in, optional, type=structure/int
-;                       The event returned by the windows manager. If not given, the
-;                           plot indicated by SELF.FOCUS will become the object of focus.
-;                           If EVENT is an integer, then it is the index value of the
-;                           object within the container on which to focus.
-;-
-pro MrWindow::Focus, event
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        self -> Error_Handler
-        void = cgErrorMsg()
-        return
-    endif
-
-;---------------------------------------------------------------------
-;Event? //////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    event_type = size(event, /TYPE)
-    if event_type eq 8 then begin
-
-        ;Only listen to button presses.
-        if event.type ne 0 then return
-    
-    ;---------------------------------------------------------------------
-    ;Find the Objects that Were Clicked //////////////////////////////////
-    ;---------------------------------------------------------------------
-        ;Get all of the objects that are selectable
-        dataObj = self -> Get(/PLOT, /IMAGE, /COLORBAR, /CONTOUR, COUNT=nObj)
-        if nObj eq 0 then return
-
-        tf_clicked = bytarr(nObj)
-        delta = fltarr(nObj)
-        for i = 0, nObj - 1 do begin
-            if obj_class(dataObj[i]) eq 'MRPLOT' && dataObj[i] -> GetOverplot() then continue
-            tf_clicked[i] = dataObj[i] -> IsInside(event.x, event.y, DELTA=del)
-            delta[i] = del
-        endfor
-    
-    ;---------------------------------------------------------------------
-    ;Pick the Focus //////////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-        
-        iClicked = where(tf_clicked eq 1, nClicked)
-        if nClicked eq 0 $
-            then self.focus = obj_new() $
-            else self.focus = dataObj[iClicked[0]]
-
-;---------------------------------------------------------------------
-;Container Index Given? //////////////////////////////////////////////
-;---------------------------------------------------------------------
-    endif else if event_type ne 0 then begin
-        self.focus = self -> Get(POSITION=event)
-    endif
-
-;---------------------------------------------------------------------
-;Set Focus ///////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    ;Set the system variables and synchronize.
-    if isMember((*self.gTypes).data, typename(self.focus)) then self.focus -> RestoreCoords
 end
 
 
@@ -760,6 +754,75 @@ end
 
 
 ;+
+;   Event handler for Focus events. Find the closest plot to the clicked point.
+;
+; :Private:
+;
+; :Params:
+;       EVENT:          in, optional, type=structure/int
+;                       The event returned by the windows manager. If not given, the
+;                           currently selected graphic will become the object of focus.
+;                           If EVENT is an integer, then it is the index value of the
+;                           object within the container on which to focus.
+;-
+pro MrWindow::Focus, event
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = cgErrorMsg()
+        return
+    endif
+
+;---------------------------------------------------------------------
+;Event? //////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    event_type = size(event, /TNAME)
+    if event_type eq 'STRUCT' then begin
+
+        ;Only listen to button presses.
+        if event.type ne 0 then return
+    
+    ;---------------------------------------------------------------------
+    ;Find the Objects that Were Clicked //////////////////////////////////
+    ;---------------------------------------------------------------------
+        ;Get all of the objects that are selectable
+        newSelect = self -> HitTest(event.x, event.y, COUNT=nHits, $
+                                    ISA=['MRPLOT', 'MRIMAGE', 'MRCOLORBAR', 'MRCONTOUR'])
+        if nHits eq 0 then return
+
+        ;Remove all selected items
+        self._selection -> Remove, /ALL
+        
+        ;Add the selected items
+        self._selection -> Add, newSelect
+;---------------------------------------------------------------------
+;Container Index Given? //////////////////////////////////////////////
+;---------------------------------------------------------------------
+    endif else if event_type ne 'UNDEFINED' then begin
+        ;Remove other selections
+        self._selection -> Remove, /ALL
+        
+        ;Get the new selection
+        newSelect = self -> Get(POSITION=index)
+        self._selection, Add, newSelect
+        
+    endif else begin
+        newSelect = self -> GetSelect()
+    endelse
+
+;---------------------------------------------------------------------
+;Set Focus ///////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Set the coordinate system
+    if n_elements(newSelect) eq 1 && obj_valid(newSelect) then newSelect -> RestoreCoords
+end
+
+
+;+
 ;   A simple way of obtaining the window's name.
 ;
 ;   :Returns:
@@ -798,6 +861,9 @@ end
 ;                           If set, the display will be refreshed after the window is
 ;                               created. This will cause the widget to be realized and
 ;                               the contents to be drawn.
+;       SAVEAS:             out, optional, type=object
+;                           MrSaveAs object reference with postscript and ImageMagick
+;                               settings.
 ;       SAVEDIR:            out, optional, type=string
 ;                           The directory in which plots will be saved.
 ;       THEOBJ:             out, optional, type=boolean, default=0
@@ -809,7 +875,7 @@ end
 ;       _REF_EXTRA:         out, optional, type=any
 ;                           If `INDEX` is present, then any keyword accepted by the
 ;                               indicated object's GetProperty method. If not present,
-;                               then any keyword accepted by the MrZoom, MrSaveAs, 
+;                               then any keyword accepted by the MrZoom, 
 ;                               MrCursor, or MrPlotLayout classes.
 ;                           
 ;-
@@ -817,6 +883,7 @@ pro MrWindow::GetProperty, index, $
 NAME = name, $
 REFRESH = refresh, $
 SAVEDIR = save_dir, $
+SAVEAS = saveas, $
 THEOBJ = theObj, $
 XSIZE = xsize, $
 YSIZE = ysize, $
@@ -847,12 +914,13 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     
     ;Get Properties
-    if arg_present(cmode)   then cmode = self.cmode
-    if arg_present(name)    then name = self.name
+    if arg_present(cmode)   then cmode   = self.cmode
+    if arg_present(name)    then name    = self.name
     if arg_present(refresh) then refresh = self._refresh
     if arg_present(savedir) then savedir = self.savedir
-    if arg_present(xsize)   then xsize = self.xsize
-    if arg_present(ysize)   then ysize = self.ysize
+    if arg_present(saveas)  then saveas  = self._SaveAs
+    if arg_present(xsize)   then xsize   = self.xsize
+    if arg_present(ysize)   then ysize   = self.ysize
 
     nExtra = n_elements(extra)
     
@@ -865,21 +933,6 @@ _REF_EXTRA = extra
                         N_NONMEMBERS=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrCursor::GetProperty, _STRICT_EXTRA=extra[iCursor]
-        if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
-    endif
-
-;---------------------------------------------------------------------
-;SAVEAS PROPERTIES ///////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    if nExtra gt 0 then begin
-        void = isMember(['ADJUSTSIZE', 'IM_DENSITY', 'IM_OPTIONS', 'IM_RASTER', 'IM_RESIZE', $
-                         'IM_TRANSPARENT', 'IM_WIDTH', 'PDF_UNIX_CONVERT_CMD', 'PDF_PATH', $
-                         'PS_CHARSIZE', 'PS_DECOMPOSED', 'PS_DELETE', 'PS_ENCAPSULATED', $
-                         'PS_FONT', 'PS_METRIC', 'PS_QUIET', 'PS_SCALE_FACTOR', 'PS_TT_FONT'], $
-                         extra, iSaveAs, N_MATCHES=nmatches, NONMEMBER_INDS=iExtra, $
-                         N_NONMEMBERS=nExtra, /FOLD_CASE)
-        
-        if nmatches gt 0 then self -> MrSaveAs::GetProperty, _STRICT_EXTRA=extra[iSaveAs]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
     endif
     
@@ -905,36 +958,95 @@ end
 
 
 ;+
-;   Determines if the object indicated by self.focus is zoomable or not.
+;   A simple way of obtaining the window's refresh state.
 ;
 ;   :Returns:
-;       theSelected:            The currently selected graphic.
+;       REFRESH:            The refresh state of the window.
 ;-
-function MrWindow::GetSelect
+function MrWindow::GetRefresh
+    return, self._refresh
+end
+
+
+;+
+;
+;-
+function MrWindow::GetSelect, $
+COUNT=count
+    return, self._selection -> Get(/ALL, COUNT=count)
+end
+
+
+;+
+;   Determine if objects
+;-
+function MrWindow::HitTest, x, y, $
+DIMENSIONS=dimensions, $
+ISA=isa, $
+COUNT=count
     compile_opt strictarr
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Error_Handler
         void = cgErrorMsg()
         return, obj_new()
     endif
     
-    ;Return the selected graphic, if valid.
-    if obj_valid(self.focus) $
-        then return, self.focus $
-        else return, obj_new()
+    ;Get all of the objects
+    allObjs = self -> Get(/ALL, ISA=isa, COUNT=nObjs)
+    
+    ;Figure out which ones were it
+    hitObjs = objarr(nObjs)
+    count = 0
+    for i = 0, nObjs - 1 do begin
+        tf_hit = allObjs[i] -> HitTest(x, y, DIMENSIONS=dimensions)
+        if tf_hit eq 1 then begin
+            hitObjs[count] = allObjs[i]
+            count += 1
+        endif
+    endfor
+    
+    ;Did we hit something?
+    if count eq 0 then return, obj_new()
+    
+    ;Trim the results and return
+    hitObjs = hitObjs[0:count-1]
+    return, hitObjs
 end
 
 
 ;+
-;   Determines if the object indicated by self.focus is zoomable or not.
+;   Determine if objects
+;-
+function MrWindow::IsSelected, object
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = cgErrorMsg()
+        return, obj_new()
+    endif
+    
+    ;Check of the given object is selected
+    tf_selected = self._selection -> IsContained(object)
+    
+    return, tf_selected
+end
+
+
+;+
+;   Determines if the currently selected object is zoomable.
 ;
 ; :Private:
 ;
 ;   :Returns:
-;       TF_ZOOMABLE:            Returns true (1) if the object indicated by self.Focus
+;       TF_ZOOMABLE:            Returns true (1) if the currently selected graphic
 ;                                   is able to be zoomed, false (0) if not.
 ;-
 function MrWindow::IsZoomable
@@ -949,12 +1061,14 @@ function MrWindow::IsZoomable
     endif
     
     ;Get the object and determine if it is zoomable or not.
-    oType = typename(self.focus)
+    oGraphic = self -> GetSelect(COUNT=count)
+    if count ne 1 then return, 0
+    
+    oType = typename(oGraphic)
     tf_zoomable = IsMember([(*self.gTypes).data, (*self.gTypes).colorbar], oType)
     
     return, tf_zoomable
 end
-
 
 
 ;+
@@ -963,7 +1077,7 @@ end
 ;
 ; :Private:
 ;-
-pro MrWindow::Notify_Realize
+pro MrWindow::Notify_Realize, id
     compile_opt strictarr
     
     ;Error handling
@@ -980,6 +1094,9 @@ pro MrWindow::Notify_Realize
     ;Get the window ID of the draw widget
     widget_control, self.drawID, GET_VALUE=winID
     self.winID = winID
+    
+    ;Read image data from this window.
+    self._SaveAs -> SetProperty, WINID=id
     
     ;Indicate that the widget has been realized. This must come before calling Draw
     self._realized = 1B
@@ -1247,7 +1364,32 @@ end
 
 
 ;+
-;   The purpose of this method is to make this window the current window.
+;   Save the display to a file.
+;
+; :Params:
+;       FILENAME:           in, optional, type=string, default='MrWindow.ps'
+;                           Name of the file to which graphics output will be saved. The
+;                               type of image file created is determined by the extension
+;                               given. Options include "BMP", "EPS", "GIF", "JPEG", "JPG",
+;                               "PDF", "PNG", "PS", "TIF", and "TIFF".
+;-
+pro MrWindow::Save, filename
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    self._SaveAs -> Output, filename
+end
+
+
+;+
+;   Set this window as the current window.
 ;-
 pro MrWindow::SetCurrent
     compile_opt strictarr
@@ -1259,12 +1401,14 @@ pro MrWindow::SetCurrent
         void = cgErrorMsg()
         return
     endif
-
-    ;Find SELF in the array.
-    iCurrent = where(*!MrWindow_Array eq self)
     
-    ;Shift it to the front.
-    !MrWindow_Array = shift(!MrWindow_Array, -iCurrent)
+    ;Check if the window is listed
+    tf_contained = !MR_WINDOW -> IsContained(self, POSITION=source)
+    
+    ;Make it first
+    if tf_contained $
+        then !MR_WINDOW -> Move, self, source, 0 $
+        else message, 'Window is not listed. Cannot make current.'
 end
 
 
@@ -1301,7 +1445,7 @@ end
 ;       _REF_EXTRA:         out, optional, type=any
 ;                           If `INDEX` is present, then any keyword accepted by the
 ;                               indicated object's GetProperty method. If not present,
-;                               then any keyword accepted by MrZoom, MrSaveAs,
+;                               then any keyword accepted by MrZoom,
 ;                               MrCursor, or MrPlotLayout.
 ;-
 pro MrWindow::SetProperty, index, $
@@ -1395,21 +1539,6 @@ _REF_EXTRA = extra
         if nMatches gt 0 then self -> MrCursor::SetProperty, _STRICT_EXTRA=extra[iCursor]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
     endif
-
-;---------------------------------------------------------------------
-;SAVEAS PROPERTIES ///////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    if nExtra gt 0 then begin
-        void = isMember(['ADJUSTSIZE', 'IM_DENSITY', 'IM_OPTIONS', 'IM_RASTER', 'IM_RESIZE', $
-                         'IM_TRANSPARENT', 'IM_WIDTH', 'PDF_UNIX_CONVERT_CMD', 'PDF_PATH', $
-                         'PS_CHARSIZE', 'PS_DECOMPOSED', 'PS_DELETE', 'PS_ENCAPSULATED', $
-                         'PS_FONT', 'PS_METRIC', 'PS_QUIET', 'PS_SCALE_FACTOR', 'PS_TT_FONT'], $
-                         extra, iSaveAs, N_MATCHES=nmatches, NONMEMBER_INDS=iExtra, $
-                         N_NONMEMBERS=nExtra, /FOLD_CASE)
-        
-        if nmatches gt 0 then self -> MrSaveAs::SetProperty, _STRICT_EXTRA=extra[iSaveAs]
-        if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
-    endif
     
 ;---------------------------------------------------------------------
 ;ZOOM PROPERTIES /////////////////////////////////////////////////////
@@ -1438,6 +1567,37 @@ end
 
 
 ;+
+;   Expose or hide the graphics window
+;
+; :Params:
+;       DOSHOW:         in, optional, type=boolean, default=1
+;                       Set to 0 to hide the window or 1 to expose it.
+;
+; :Keywords:
+;       ICONIFY:        in, optional, type=boolean
+;                       Set to 1 to iconify the window. Set to 0 to de-iconify the window.
+;-
+pro MrWindow::Show, doShow, $
+ICONIFY=iconify
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;To show, or not to show?
+    show = n_elements(show) eq 0 ? 1 : keyword_set(show)
+    
+    ;Show the window
+    wshow, self.winID, doShow, ICONIC=iconify
+end
+
+
+;+
 ;   The purpose of this method is to add a MrWindow object to the !MrWindow_Array system
 ;   variable. If the system variable does not exist, it will be created.
 ;
@@ -1454,16 +1614,16 @@ pro MrWindow::SysVAdd, object
         return
     endif
     
+    ;Was a MrWindow object given?
     if obj_class(object) ne 'MRWINDOW' then $
-        message, 'Only MrWindow objects can be added to !MrWindow_Array.'
+        message, 'Only MrWindow objects can be added to !MR_WINDOWS.'
 
-    ;If the system variable exists does, add the window to the beginning of the list of
-    ;windows. If not, create the system variable.
-    if self -> SysVExists() $
-        then if n_elements(*!MrWindow_Array) gt 0 $
-            then *!MrWindow_Array = [object, *!MrWindow_Array] $
-            else *!MrWindow_Array = [object] $
-        else defsysv, '!MrWindow_Array', ptr_new([object])
+    ;Does the system variable exist?
+    if self -> SysVExists() eq 0 $
+        then defsysv, '!MR_WINDOWS', obj_new('MrWindow_Container')
+    
+    ;Add the window to the beginning of the container
+    !MR_WINDOWS -> Add, self, POSITION=0
 end
 
 
@@ -1487,7 +1647,7 @@ function MrWindow::SysVExists
     endif
     
     ;Check if it exists.
-    defsysv, '!MrWindow_Array', EXISTS=exists
+    defsysv, '!MR_WINDOWS', EXISTS=exists
     return, exists
 end
 
@@ -1511,21 +1671,13 @@ pro MrWindow::SysVRemove, object
     
     ;Make sure MrWindow object was given
     if obj_class(object) ne 'MRWINDOW' then $
-        message, 'Only MrWindow objects can be removed from !MrWindow_Array.'
+        message, 'Only MrWindow objects can be removed from !MR_WINDOWS.'
         
     ;Check if the system variable exists
     if self -> SysVExists() eq 0 then return
     
-    ;Pick out the objects that will be kept
-    void = IsMember(*!MrWindow_Array, object, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
-    
-    ;Throw away the rest.
-    if nKeep gt 0 then begin
-        *!MrWindow_Array = (*!MrWindow_Array)[iKeep]
-    endif else begin
-        ptr_free, !MrWindow_Array
-        !MrWindow_Array = ptr_new(/ALLOCATE_HEAP)
-    endelse
+    ;Remove the window
+    !MR_WINDOWS -> Remove, self
 end
 
 
@@ -1652,7 +1804,8 @@ pro MrWindow::Wheel_Zoom, event
     if event.type ne 7 || self.wmode eq 0 then return
     
     ;Figure out which type of object has the focus.
-    oType = self -> WhatAmI(self.focus)
+    oGraphic = self -> GetSelect()
+    oType = self -> WhatAmI(oGraphic)
 
     ;Choose the zoom type
     case oType of
@@ -1676,7 +1829,7 @@ end
 ;
 ; :Private:
 ;-
-pro MrWindow::whichDataObjects, text
+pro MrWindow::whichDataObjects, outText
     compile_opt strictarr
     
     ;Error handling
@@ -1713,7 +1866,7 @@ pro MrWindow::whichDataObjects, text
                                            FORMAT='(a9, 4x, a' + typeLen + ', 4x, a10, 4x, a8)')
                               
         ;Get the object's position and layout
-        dataObj[i] -> GetProperty, LAYOUT=layout
+        dataObj[i] -> GetLayout, LAYOUT=layout
         colrow = self -> ConvertLocation(layout[2], /PINDEX, /TO_COLROW)
 
         ;Print the type-name, location, and position
@@ -1723,13 +1876,12 @@ pro MrWindow::whichDataObjects, text
 
         outText[i+1] = string(FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0, 5x, a0)', $
                               sIndex, obj_class(dataObj[i]), sLocation, sName)
-    
     endfor
     
     ;Output the text
     case n_params() of
         0: print, transpose(outText)
-        1: text = transpose(temporary(outText))
+        1: outText = transpose(temporary(outText))
         else: message, 'Incorrect number of parameters.'
     endcase
 end
@@ -1853,7 +2005,9 @@ pro MrWindow_Notify_Realize, id
     
     ;Call the Notify_Realize method
     widget_control, id, GET_UVALUE=uvalue
-    call_method, 'Notify_Realize', uvalue.object
+    
+    ;Call the Notify_Realize method
+    call_method, 'Notify_Realize', uvalue.object, id
     
 end
 
@@ -1887,9 +2041,12 @@ pro MrWindow::cleanup
 ;    self -> MrAbstractArrow::Cleanup
     self -> MrCursor::Cleanup
 ;    self -> MrAbstractText::Cleanup
-    self -> MrSaveAs::Cleanup
+;    self -> MrSaveAs::Cleanup
     self -> MrZoom::Cleanup
     self -> MrPlotManager::Cleanup
+    
+    ;Destroy objects
+    obj_destroy, self._saveas
     
     ;Delete the windows.
     if windowavailable(self.winID) then wDelete, self.winID
@@ -1946,6 +2103,8 @@ end
 ;                           The width of the draw window in pixels
 ;       YSIZE:              in, optional, type=long, default=512
 ;                           The height of the draw window in pixels
+;       WINDOW_TITLE:       in, optional, type=string, default='MrWindow'
+;                           Title to be placed graphic window's title bar.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by the superclasses is also accepted for
 ;                               keyword inheritance.
@@ -1966,9 +2125,10 @@ DRAW = draw, $
 NAME = name, $
 NOGUI = noGUI, $
 REFRESH = refresh, $
-SAVEDIR = savedir, $
+;SAVEDIR = savedir, $
 XSIZE = xsize, $
 YSIZE = ysize, $
+WINDOW_TITLE=window_title, $
 _REF_EXTRA = extra
     compile_opt strictarr
 
@@ -1982,22 +2142,22 @@ _REF_EXTRA = extra
     
     ;Superclasses
     if self -> MrPlotManager::Init()   eq 0 then return, 0
-    if self -> MrSaveAs::Init()        eq 0 then return, 0
     if self -> MrZoom::Init()          eq 0 then return, 0
     if self -> MrCursor::Init(CMODE=8) eq 0 then return, 0
 
 ;---------------------------------------------------------------------
 ;Keywords ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    cd, CURRENT=current
+;    cd, CURRENT=current
     
     ;Default window size
     setDefaultValue, amode, 0, /BOOLEAN
     setDefaultValue, buffer, 0, /BOOLEAN
     setDefaultValue, refresh, 1, /BOOLEAN
     setDefaultValue, name, 'MrWindow'
+    setDefaultValue, window_title, 'MrWindow'
     setDefaultValue, noGUI, 0, /BOOLEAN
-    setDefaultValue, savedir, current
+;    setDefaultValue, savedir, current
     setDefaultvalue, xsize, 600
     setDefaultValue, ysize, 340
 
@@ -2005,9 +2165,12 @@ _REF_EXTRA = extra
     self.amode = amode
     self.buffer = buffer
     self.name = name
-    self.savedir = savedir
+;    self.savedir = savedir
+    self.title = window_title
     self.xsize = xsize
     self.ysize = ysize
+    self._selection = obj_new('MrIDL_Container')
+    self._saveas    = obj_new('MrSaveAs', void, self)
 
     self -> SetProperty, _EXTRA=extra
     
@@ -2042,7 +2205,7 @@ _REF_EXTRA = extra
 	        ;Create a normal window. Make it a pixmap if DISPLAY=0
 	        if display eq 1 then pixmap = 0 else pixmap = 1
             self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, /PIXMAP)
-            self.winID = MrGetWindow(TITLE='MrWindow', XSIZE=xsize, YSIZE=ysize, $
+            self.winID = MrGetWindow(TITLE=window_title, XSIZE=xsize, YSIZE=ysize, $
                                      /FREE, PIXMAP=pixmap)
 
     ;---------------------------------------------------------------------
@@ -2059,7 +2222,8 @@ _REF_EXTRA = extra
         
             ;Refresh? -- If we are not refreshing, we must create a temporary window.
             if refresh eq 0 $
-                then self.winID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
+                then self.winID = MrGetWindow(TITLE=window_title, XSIZE=xsize, YSIZE=ysize, $
+                                              /PIXMAP, /FREE)
 	    endelse
 
     ;---------------------------------------------------------------------
@@ -2119,7 +2283,6 @@ pro MrWindow__define, class
     class = { MrWindow, $
               ;In order of importance.
               inherits MrPlotManager, $         ;Manage plot layout
-              inherits MrSaveAs, $              ;SaveAs menu
               inherits MrZoom, $                ;Zoom events and menu
               inherits MrCursor, $              ;Cursor events and menu
               inherits MrManipulate, $          ;Manipulation events and menu
@@ -2130,13 +2293,16 @@ pro MrWindow__define, class
               tlb: 0, $                         ;Widget ID of the top level base
               buffer: 0, $                      ;Buffer the graphics?
               drawID: 0, $                      ;Widget ID of the draw widget
+              _selection: obj_new(), $          ;Container of selected objects
               focus: obj_new(), $               ;Object of focus
               pixID: 0, $                       ;Window ID of the pixmap
               menuID: 0, $                      ;Widget ID of the menu bar
               name: '', $                       ;Name of the window
               _realized: 0B, $                  ;Has the widget been realized?
               _refresh: 0B, $                   ;Refresh the window?
+              _SaveAs: obj_new(), $             ;Object for saving image output.
               statusID: 0, $                    ;Widget ID of the status bar
+              title: '', $                      ;Title placed on the title bar
               winID: 0, $                       ;Window ID of the draw window
               x0: 0, $                          ;First clicked x-coordinate, for zooming
               y0: 0, $                          ;First clicked y-coordinate, for zooming

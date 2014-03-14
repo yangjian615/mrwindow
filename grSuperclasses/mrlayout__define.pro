@@ -57,6 +57,7 @@
 ;                           floats so that fractions of a character size can be specified. - MRA
 ;       2014/02/12  -   [XY]MARGIN renamed to O[XY]MARGIN. [IO][XY]MARGIN now have the
 ;                           same meaning as their direct graphics keywords. - MRA
+;       2014/03/10  -   Added the GetPosition and GetLayout methods. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -165,6 +166,32 @@ function MrLayout::CalcPosition
     self.y_window = p_window[[1,3]]
 
     return, position    
+end
+
+
+;+
+;   Get the position.
+;
+; :Returns:
+;       POSITION:       out, optional, type=intarr(4)
+;                       The normalized position of the graphic on the display.
+;-
+function MrLayout::GetPosition
+    return, self.position
+end
+
+
+;+
+;   Get the layout.
+;
+; :Returns:
+;       LAYOUT:         [nCols, nRows, index]. [nCols,nRows] is the number of columns and
+;                           rows in the display. "index" is the plot index at which to
+;                           place the plot, beginning with 1,1], 1 in the upper-left
+;                           corner and incrementing first right then down.
+;-
+function MrLayout::GetLayout
+    return, self.layout
 end
 
 

@@ -49,6 +49,7 @@
 ; :History:
 ;	Modification History::
 ;       04/22/2013  -   Written by Matthew Argall
+;       05/04/2013  -   Do not allow zooming outside of the data range. - MRA
 ;       05/10/2013  -   Inherit MrAbstractColorBar. - MRA
 ;       05/12/2013  -   Inherit MrAbstractAxes. Repurposed AXES keyword for adding
 ;                           MrAbstractAxes objects. Added IMAXES to draw a set of axes
@@ -88,6 +89,9 @@
 ;                           if PALETTE is set, CTINDEX is cleared, and vice versa. - MRA
 ;       2014/01/24  -   Added the _OverloadImpliedPrint and _OverloadPrint methods. - MRA
 ;       2014/02/28  -   Find ranges using MIN() and MAX(). - MRA
+;       2014/03/10  -   Disinherit MrLayout, but keep it as an object property. Added
+;                           the GetLayout method. Picking an initial window is no longer
+;                           an obscure process. - MRA
 ;                           
 ;-
 ;*****************************************************************************************
@@ -237,10 +241,6 @@ end
 ;   The purpose of this method is to do the actual plotting.
 ;
 ; :Private:
-;
-; :History:
-;   Modification History::
-;       05/04/2013  -   Do not allow zooming outside of the data range. - MRA
 ;-
 pro MrImage::doImage, $
 NOERASE=noerase
@@ -364,6 +364,9 @@ NOERASE=noerase
         *self.data_pos = data_pos
     endelse
 
+    ;Get layout properties.
+    self.layout -> GetProperty, POSITION=position, CHARSIZE=charsize
+
 ;---------------------------------------------------------------------
 ;DATA POSITION? //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -384,17 +387,17 @@ NOERASE=noerase
                   PALETTE       = *self.palette, $
                   TOP           = *self.top, $
                 
-                  ;MrGraphicAtom Keywords
-                  POSITION      =  self.position, $
+                  ;MrLayout Keywords
+                  POSITION      =       position, $
+                  CHARSIZE      =       charchize, $
                 
                   ;Graphics Keywords
-                  MAX_VALUE     = max_value, $
-                  MIN_VALUE     = min_value, $
+                  MAX_VALUE     =       max_value, $
+                  MIN_VALUE     =       min_value, $
                 
                   ;MrGraphicsKeywords
  ;                 AXISCOLOR     = *self.axiscolor, $
                   BACKGROUND    = *self.background, $
-                  CHARSIZE      =  self.charsize, $
                   CHARTHICK     = *self.charthick, $
                   CLIP          = *self.clip, $
                   COLOR         = *self.color, $
@@ -486,7 +489,8 @@ NOERASE=noerase
                   TOP           = *self.top, $
                 
                   ;MrGraphicAtom Keywords
-                  POSITION      =  self.position, $
+                  POSITION      =       position, $
+                  CHARSIZE      =       charsize, $
                 
                   ;Graphics Keywords
                   MAX_VALUE     = max_value, $
@@ -497,7 +501,6 @@ NOERASE=noerase
                   ;MrGraphicsKeywords
  ;                 AXISCOLOR     = *self.axiscolor, $
                   BACKGROUND    = *self.background, $
-                  CHARSIZE      =  self.charsize, $
                   CHARTHICK     = *self.charthick, $
                   CLIP          = *self.clip, $
                   COLOR         = *self.color, $
@@ -550,6 +553,90 @@ NOERASE=noerase
                   YTICKV        = *self.ytickv, $
                   YTITLE        = *self.ytitle
     endelse
+end
+
+
+;+
+;   The purpose of this method is to retrieve object properties
+;
+; :Keywords:
+;       _REF_EXTRA:         out, optional, type=any
+;                           Any keyword accepted by the MrLayout__Define class is
+;                               also accepted via keyword inheritance.
+;-
+pro MrImage::GetLayout, $
+_REF_EXTRA = extra
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Layout Properties
+    self.layout -> GetProperty, _STRICT_EXTRA=extra
+end
+
+
+;+
+;   The purpose of this method is to retrieve data
+;
+; :Calling Sequence:
+;       myPlot -> GetData, image
+;       myPlot -> GetData, image, x, y
+;       myPlot -> GetData, image, x, y, x1, y1
+;
+; :Params:
+;       IMAGE:          out, required, type=numeric array
+;                       A named variable into which the image data will be returned.
+;       X:              out, optional, type=numeric array
+;                       A named variable into which the independent variable data will
+;                           be returned. `Y` must also be provided.
+;       Y:              out, optional, type=numeric array
+;                       A named variable into which the dependent variable data will
+;                           be returned. `Y` must also be provided.
+;       X1:             out, optional, type=numeric array
+;                       A named variable into which the x-corrdinate of the upper-right
+;                           corner of each pixel in `IMAGE` will be returned. If present,
+;                           then `X` represents the x-coordinate of the lower-right corner
+;                           of each pixel. Must be used in conjunction with `Y1`.
+;       Y1:             out, optional, type=numeric array
+;                       A named variable into which the y-corrdinate of the upper-right
+;                           corner of each pixel in `IMAGE` will be returned. If present,
+;                           then `Y` represents the y-coordinate of the lower-right corner
+;                           of each pixel.
+;-
+pro MrImage::GetData, image, x, y, x1, y1
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Retrieve the data
+    case n_params() of
+        1: image = *self.image
+        3: begin
+            image = *self.image
+            x = *self.indep
+            y = *self.dep
+        endcase
+        5: begin
+            image = *self.image
+            x = *self.Xmin
+            y = *self.Ymin
+            x1 = *self.Xmax
+            y1 = *self.Ymax
+        endcase
+        else: message, 'Incorrect number of parameters.'
+    endcase
 end
 
 
@@ -625,6 +712,8 @@ Y_POS = y_pos, $
 IDISPLAY = iDisplay, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
+LAYOUT = layout, $
+POSITION = position, $
 TV = tv, $
 XMIN = xmin, $
 XMAX = xmax, $
@@ -670,6 +759,8 @@ _REF_EXTRA = extra
     if arg_present(iDisplay)    then iDisplay    =  self.iDisplay
     if arg_present(INIT_XRANGE) then init_xrange =  self.init_xrange
     if arg_present(INIT_YRANGE) then init_yrange =  self.init_yrange
+    if arg_present(layout)      then layout      =  self.layout -> GetLayout()
+    if arg_present(position)    then position    =  self.layout -> GetPosition()
     if arg_present(xmin) then if n_elements(*self.Xmin) gt 0 then xmin = *self.Xmin
     if arg_present(xmax) then if n_elements(*self.Xmax) gt 0 then xmax = *self.Xmax
     if arg_present(ymin) then if n_elements(*self.Ymin) gt 0 then ymin = *self.Ymin
@@ -703,65 +794,6 @@ _REF_EXTRA = extra
         self -> MrGrAtom::GetProperty, _EXTRA=extra
         self -> MrGraphicsKeywords::GetProperty, _EXTRA=extra
     endif
-end
-
-
-;+
-;   The purpose of this method is to retrieve data
-;
-; :Calling Sequence:
-;       myPlot -> GetData, image
-;       myPlot -> GetData, image, x, y
-;       myPlot -> GetData, image, x, y, x1, y1
-;
-; :Params:
-;       IMAGE:          out, required, type=numeric array
-;                       A named variable into which the image data will be returned.
-;       X:              out, optional, type=numeric array
-;                       A named variable into which the independent variable data will
-;                           be returned. `Y` must also be provided.
-;       Y:              out, optional, type=numeric array
-;                       A named variable into which the dependent variable data will
-;                           be returned. `Y` must also be provided.
-;       X1:             out, optional, type=numeric array
-;                       A named variable into which the x-corrdinate of the upper-right
-;                           corner of each pixel in `IMAGE` will be returned. If present,
-;                           then `X` represents the x-coordinate of the lower-right corner
-;                           of each pixel. Must be used in conjunction with `Y1`.
-;       Y1:             out, optional, type=numeric array
-;                       A named variable into which the y-corrdinate of the upper-right
-;                           corner of each pixel in `IMAGE` will be returned. If present,
-;                           then `Y` represents the y-coordinate of the lower-right corner
-;                           of each pixel.
-;-
-pro MrImage::GetData, image, x, y, x1, y1
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Retrieve the data
-    case n_params() of
-        1: image = *self.image
-        3: begin
-            image = *self.image
-            x = *self.indep
-            y = *self.dep
-        endcase
-        5: begin
-            image = *self.image
-            x = *self.Xmin
-            y = *self.Ymin
-            x1 = *self.Xmax
-            y1 = *self.Ymax
-        endcase
-        else: message, 'Incorrect number of parameters.'
-    endcase
 end
 
 
@@ -944,8 +976,8 @@ _REF_EXTRA=extra
     
     ;If we are not updating the layout...
     endif else begin
-        self -> MrLayout::SetProperty, LAYOUT=layout, POSITION=position, UPDATE_LAYOUT=0, $
-                                      _STRICT_EXTRA=extra
+        self.layout -> SetProperty, LAYOUT=layout, POSITION=position, UPDATE_LAYOUT=0, $
+                                    _STRICT_EXTRA=extra
     endelse
     
     ;Reset the refresh state.
@@ -1175,7 +1207,6 @@ pro MrImage::cleanup
     ;Superclasses
     self -> MrGraphicsKeywords::CleanUp
     self -> MrGrAtom::CleanUp
-    self -> MrLayout::CleanUp
 end
 
 
@@ -1302,6 +1333,8 @@ function MrImage::init, image, x, y, x0, y0, x1, y1, $
 CURRENT = current, $
 IDISPLAY = idisplay, $
 KEEP_ASPECT = keep_aspect, $
+LAYOUT = layout, $
+POSITION = position, $
 TV = tv, $
       
 ;IMAGE_PLOTS Keywords
@@ -1367,10 +1400,6 @@ _REF_EXTRA = extra
     if self -> MrGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrGraphicsKeywords.'
         
-    ;MrLayout
-    if self -> MrLayout::INIT(_EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrLayout.'
-        
 ;---------------------------------------------------------------------
 ;Allocate Heap to Pointers ///////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1397,25 +1426,19 @@ _REF_EXTRA = extra
     self.Ymax          = ptr_new(/ALLOCATE_HEAP)
     self.Ymin          = ptr_new(/ALLOCATE_HEAP)
 
-    ;If REFRESH=1 three things happen: If the call to MrGrAtom is
-    ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
-    ;      cause errors.
-    ;   2. here, then when MrGrAtom calls the SetProperty
-    ;      method, none of the data will be loaded into the object.
-    ;   3. after the call to SetProperty so that all of the data is loaded, the initial
-    ;      call to SetProperty will not have a valid self.window property
-    ;
-    ;To fix problem 1 and 3, put the call to MrGrAtom here. To fix problem 2,
-    ;turn Refresh off.
-    if keyword_set(current) then begin
-        theWin = GetMrWindows(/CURRENT)
-        theWin -> GetProperty, REFRESH=init_refresh
-        theWin -> Refresh, /DISABLE
-    endif
-
-    ;Graphic Atom
-    if self -> MrGrAtom::INIT(CURRENT=current, _EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGrAtom.'
+;---------------------------------------------------------------------
+;Window and Layout ///////////////////////////////////////////////////
+;---------------------------------------------------------------------    
+    ;Layout -- Must be done before initializing MrGrLayout
+    self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
+    
+    ;Superclass
+    if self -> MrGrAtom::INIT(CURRENT=current) eq 0 then $
+        message, 'Unable to initialize MrGrAtom'
+        
+    ;Turn refresh off
+    self.window -> GetProperty, REFRESH=refreshIn
+    if refreshIn then self -> Refresh, /DISABLE
 
 ;---------------------------------------------------------------------
 ;Input Parameters ////////////////////////////////////////////////////
@@ -1564,9 +1587,9 @@ _REF_EXTRA = extra
     self.init_range = imRange
     
     ;Refresh the graphics?
-    if keyword_set(current) $
-        then theWin -> Refresh, DISABLE=~init_refresh $
-        else self -> Refresh
+    if keyword_set(current) eq 0 $
+        then self -> Refresh $
+        else if refreshIn then self -> Refresh
 
     return, 1
 end
@@ -1580,7 +1603,6 @@ pro MrImage__define
     
     define = {MrImage, $
               inherits MrGrAtom, $
-              inherits MrLayout, $
               inherits MrGraphicsKeywords, $
               
               ;Data
@@ -1592,12 +1614,13 @@ pro MrImage__define
               tv: 0B, $                         ;indicate that a TV position was given
               
               ;MrImage Properties
-              idisplay: 0L, $                   ;Index to display (>3D images)
-              init_range: dblarr(2), $          ;Initial image range
+              idisplay:    0L, $                ;Index to display (>3D images)
+              init_range:  dblarr(2), $         ;Initial image range
               init_xrange: dblarr(2), $         ;Initial x-range
               init_yrange: dblarr(2), $         ;Initial y-range
+              layout:      obj_new(), $         ;Window layout
               
-              ;MrImage.pro Keywords
+              ;mraImage Keywords
               axes: ptr_new(), $                ;Draw axes around the image?
               bottom: ptr_new(), $              ;If scaled, minimum scaled value
               center: 0B, $                     ;Center of pixel locations was given?

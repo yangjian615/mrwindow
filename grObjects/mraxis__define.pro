@@ -71,6 +71,8 @@
 ;                           parameters have changed and MrAxis now behaves more like the
 ;                           Axis function graphic. - MRA
 ;       2014/01/21  -   OFFSET is now a float, not an integer. - MRA
+;       2014/03/10  -   If TARGET is not give, the currently selected graphic is used.
+;                           This models the behavior of function graphics. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -1384,7 +1386,10 @@ END
 ;                           If set, output will be transformed into 3D using !P.T
 ;       TARGET:             in, optional, type=object, default=current graphic
 ;                           The graphic with which the axis should be associated. If not
-;                               give, the currently selected graphic will be chosen.
+;                               give, the currently selected graphic will be chosen. If
+;                               no graphics are selected, the graphic with the highest
+;                               ordering will be chosen. If no graphics are found, no
+;                               axis will be made.
 ;       THICK:              in, optional, type=float, default=1.0
 ;                           Scale factor controlling the thickness of the axis and its
 ;                               tickmarks
@@ -1417,12 +1422,11 @@ END
 ;       TITLE:              in, optional, type=string, default=""
 ;                           Title to be placed on the axis. See `TICKDIR`.
 ;       _REF_EXTRA:         in, optional, type=any
-;                           Any keyword accepted by MrGrLayout superclass is also
-;                               accepted for keyword inheritance.
+;                           Any keyword accepted by MrGrLayout::SetProperty superclass
+;                               method is also accepted for keyword inheritance.
 ;-
 FUNCTION MrAxis::init, direction, $
 CHARSIZE=charsize, $
-CURRENT=current, $
 LOCATION=location, $
 OFFSET = offset, $
 TARGET=target, $
@@ -1467,10 +1471,32 @@ _REF_EXTRA=extra
         void = cgErrorMsg()
         RETURN, 0
     ENDIF
+    
+
+;-----------------------------------------------------
+;Target, Window, & Superclasses \\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
+    ;Find a single target.
+    if n_elements(target) eq 0 then begin
+        target = self -> _GetTarget(/ANY, COUNT=nTargets)
+        if nTargets eq 0 then message, 'Insert MrAxis failed. No targets available.'
+        if nTargets gt 1 then begin
+            message, 'More than one target available. Choosing first target.', /INFORMATIONAL
+            target = target[0]
+        endif
+    endif
 
     ;cgGraphicsKeywords
-    IF self -> MrGraphicsKeywords::init(_EXTRA=extra) EQ 0 THEN $
+    IF self -> MrGraphicsKeywords::init() EQ 0 THEN $
         Message, 'Unable to initialize cgGraphicsKeywords.'
+        
+    ;Superclass
+    if self -> MrGrAtom::INIT(TARGET=target) eq 0 then $
+        message, 'Unable to initialize MrGrAtom'
+    
+    ;Refresh the window?
+    self.window -> GetProperty, REFRESH=refreshIn
+    if refreshIn then self.window -> Refresh, /DISABLE
 
 ;---------------------------------------------------------------------
 ;Defaults and Allocate Heap to Pointers //////////////////////////////
@@ -1503,35 +1529,6 @@ _REF_EXTRA=extra
     self.ymargin  = Ptr_New(/ALLOCATE_HEAP)
     self.zaxis    = Ptr_New(/ALLOCATE_HEAP)
     self.zmargin  = Ptr_New(/ALLOCATE_HEAP)
-    
-    ;Objects
-    self.target = Obj_New()
-
-;---------------------------------------------------------------------
-;Window //////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    ;If REFRESH=1 three things happen: If the call to MrGrAtom is
-    ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
-    ;      cause errors.
-    ;   2. here, then when MrGrAtom calls the SetProperty
-    ;      method, none of the data will be loaded into the object.
-    ;   3. after the call to SetProperty so that all of the data is loaded, the initial
-    ;      call to SetProperty will not have a valid self.window property
-    ;
-    ;To fix problem 1 and 3, put the call to MrGrAtom here. To fix problem 2,
-    ;turn Refresh off.
-
-    refresh_in = 1
-    if keyword_set(current) then begin
-        theWin = GetMrWindows(/CURRENT)
-        theWin -> GetProperty, REFRESH=refresh_in
-        theWin -> Refresh, /DISABLE
-    endif
-
-    ;Graphic Atom
-    if self -> MrGrAtom::INIT(CURRENT=current, _EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGrAtom.'
 
 ;---------------------------------------------------------------------
 ;Set Properties //////////////////////////////////////////////////////
@@ -1578,7 +1575,7 @@ _REF_EXTRA=extra
                         _EXTRA=extra
     
     ;Refersh the graphics window
-    self.window -> Refresh, DISABLE=~refresh_in
+    if refreshIn then self -> Refresh
                          
     Return, 1
 END

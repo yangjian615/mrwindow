@@ -146,6 +146,8 @@
 ;                           method. Eliminate a lot of effort by first creating a new set
 ;                           of bindings, then by consolidating bindings. Removed the BindEm
 ;                           method. - MRA
+;       2014/03/10  -   Use the window's GetSelect method to determine which object
+;                           will be zoomed.
 ;-
 ;*****************************************************************************************
 ;+
@@ -514,7 +516,8 @@ pro MrZoom::Box_Zoom, event
             y = [self.y0 < event.y, self.y0 > event.y]
 
             ;Get the object of focus. Convert data coordinates
-            xy = self.focus -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
+            oGraphic = self.GetSelect()
+            xy = oGraphic -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
             xrange = reform(xy[0,*])
             yrange = reform(xy[1,*])
             
@@ -524,8 +527,8 @@ pro MrZoom::Box_Zoom, event
             
             ;Set the new range and apply any bindings
             self -> Refresh, /DISABLE
-            self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
-            self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS
+            oGraphic -> SetProperty, XRANGE=xrange, YRANGE=yrange
+            self -> Apply_Bindings, oGraphic, /XAXIS, /YAXIS
             self -> Refresh
             
             ;reset initial click
@@ -1158,11 +1161,13 @@ pro MrZoom::Pan, event
 
             ;Hide the plot being panned. Setting the property will casue the
             ;graphic window to be refreshed with the FOCUS graphic hidden.
-            self.focus -> SetProperty, HIDE=1   ;;;;;;;;;;;;;
+            oGraphic = self -> GetSelect()
+            oGraphic -> SetProperty, HIDE=1   ;;;;;;;;;;;;;
             
             ;Disable refreshing then turn hide off
             self -> Refresh, /DISABLE
-            self.focus -> SetProperty, HIDE=0
+            oGraphic = self -> GetSelect()
+            oGraphic -> SetProperty, HIDE=0
         
             ;Turn on motion events
             self -> On_Off_Motion_Events, /ON
@@ -1170,12 +1175,13 @@ pro MrZoom::Pan, event
         
         2: begin    ;motion event
             ;Get the object of focus
-            self.focus -> GetProperty, XRANGE=xrange, YRANGE=yrange
+            oGraphic = self -> GetSelect()
+            oGraphic -> GetProperty, XRANGE=xrange, YRANGE=yrange
 
             ;Convert to data coordinates.
             x = [self.x0, event.x]
             y = [self.y0, event.y]
-            xy = self.focus -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
+            xy = oGraphic -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
             
             ;How much did the mouse move?
             delta_x = xy[0,1] - xy[0,0]
@@ -1187,10 +1193,10 @@ pro MrZoom::Pan, event
             yrange = yrange - delta_y
 
             ;Set the new ranges
-;            self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
-            self.focus -> SetProperty, HIDE=0, XRANGE=xrange, YRANGE=yrange
+;            oGraphic -> SetProperty, XRANGE=xrange, YRANGE=yrange
+            oGraphic -> SetProperty, HIDE=0, XRANGE=xrange, YRANGE=yrange
             self -> CopyPixmap
-            self.focus -> Draw, /NOERASE
+            oGraphic -> Draw, /NOERASE
             
             self.x0 = event.x
             self.y0 = event.y
@@ -1206,7 +1212,8 @@ pro MrZoom::Pan, event
             self.y0 = -1
             
             ;Apply bindings. Need a Draw to update the bindings.
-            self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS, /CAXIS
+            oGraphic = self -> GetSelect()
+            self -> Apply_Bindings, oGraphic, /XAXIS, /YAXIS, /CAXIS
             self -> Refresh
         endcase
     endcase
@@ -1269,11 +1276,12 @@ pro MrZoom::UnZoom, event
     endif
     
     ;Set the x- and y-range
-    self.focus -> getProperty, INIT_XRANGE=init_xrange, INIT_YRANGE=init_yrange
-    self.focus -> setProperty, XRANGE=init_xrange, YRANGE=init_yrange
+    oGraphic = self -> GetSelect()
+    oGraphic -> getProperty, INIT_XRANGE=init_xrange, INIT_YRANGE=init_yrange
+    oGraphic -> setProperty, XRANGE=init_xrange, YRANGE=init_yrange
     
     ;Update Bindings
-    self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS
+    self -> Apply_Bindings, oGraphic, /XAXIS, /YAXIS
     
     ;Redraw
     self -> Draw
@@ -1374,7 +1382,8 @@ pro MrZoom::Wheel_Zoom_XY, event
     endif
 
     ;Get the current x- and y-range
-    self.focus -> getProperty, XRANGE=xrange, YRANGE=yrange
+    oGraphic = self.GetSelect()
+    oGraphic -> getProperty, XRANGE=xrange, YRANGE=yrange
 
     ;Zooming in and out is determined by the sign of events.clicks.
     ;   events.clicks < 0 if the scroll wheel is moved forward -- zoom in
@@ -1393,8 +1402,8 @@ pro MrZoom::Wheel_Zoom_XY, event
     
     ;Set the zoomed x- and y-range
     self -> Refresh, /DISABLE
-    self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
-    self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS
+    oGraphic -> SetProperty, XRANGE=xrange, YRANGE=yrange
+    self -> Apply_Bindings, oGraphic, /XAXIS, /YAXIS
     self -> Refresh
 end
 
@@ -1420,7 +1429,8 @@ pro MrZoom::Wheel_Zoom_Color, event
     endif
 
     ;Get the current x- and y-range
-    self.focus -> getProperty, RANGE=range
+    oGraphic = self.GetSelect()
+    oGraphic -> getProperty, RANGE=range
 
     ;Zooming in and out is determined by the sign of events.clicks.
     ;   events.clicks < 0 if the scroll wheel is moved forward -- zoom in
@@ -1432,8 +1442,8 @@ pro MrZoom::Wheel_Zoom_Color, event
     if range[0] gt range[1] then range[0] = range[1] - delta
     
     ;Set the zoomed x- and y-range
-    self.focus -> SetProperty, RANGE=range
-    self -> Apply_Bindings, self.focus, /CAXIS
+    oGraphic -> SetProperty, RANGE=range
+    self -> Apply_Bindings, oGraphic, /CAXIS
 
     ;Redraw
     self -> draw
@@ -1461,15 +1471,16 @@ pro MrZoom::Wheel_Zoom_Page, event
     endif
 
     ;Get the current x- and y-range
-    self.focus -> GetData, image
-    self.focus -> GetProperty, IDISPLAY=iDisplay
+    oGraphic = self -> GetSelect()
+    oGraphic -> GetData, theImage
+    oGraphic -> GetProperty, IDISPLAY=iDisplay
 
     ;Make sure the image has more than 2 dimensions
-    ndims = size(image, /N_DIMENSIONS)
+    ndims = size(theImage, /N_DIMENSIONS)
     if ndims lt 3 then return
     
     ;How many pages are there?
-    nPages = size(image, /DIMENSIONS)
+    nPages = size(theImage, /DIMENSIONS)
     nPages = total(nPages[2:ndims-1])
     
     ;Change pages. Stop at beginning and at the end
@@ -1478,8 +1489,8 @@ pro MrZoom::Wheel_Zoom_Page, event
     if iDisplay ge nPages then iDisplay = nPages - 1
     
     ;Set the page being displayed
-    self.focus -> SetProperty, IDISPLAY=iDisplay
-    self -> Apply_Bindings, self.focus, /CAXIS
+    oGraphic -> SetProperty, IDISPLAY=iDisplay
+    self -> Apply_Bindings, oGraphic, /CAXIS
 
     ;Redraw
     self -> draw
@@ -1533,7 +1544,8 @@ pro MrZoom::XY_Zoom, event
     y = [self.y0 < event.y, self.y0 > event.y]
 
     ;Convert from device to data coordinates
-    xy = self.focus -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
+    oGraphic = self -> GetSelect()
+    xy = oGraphic -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
     xrange = reform(xy[0,*])
     yrange = reform(xy[1,*])
     
@@ -1542,15 +1554,15 @@ pro MrZoom::XY_Zoom, event
     case self.zmode of
         1: begin
             if self.x0 ne event.x then begin
-                self.focus -> SetProperty, XRANGE=xrange
-                self -> Apply_Bindings, self.focus, /XAXIS
+                oGraphic -> SetProperty, XRANGE=xrange
+                self -> Apply_Bindings, oGraphic, /XAXIS
             endif
         endcase
         
         2: begin
             if self.y0 ne event.y then begin
-                self.focus -> SetProperty, YRANGE=yrange
-                self -> Apply_Bindings, self.focus, /YAXIS
+                oGraphic -> SetProperty, YRANGE=yrange
+                self -> Apply_Bindings, oGraphic, /YAXIS
             endif
         endcase
         

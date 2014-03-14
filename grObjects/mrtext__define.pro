@@ -415,8 +415,8 @@ END
 ;       Z:              out, optional, type=number
 ;                       A Z-coordinate. Used if `T3D` is set.
 ;       _REF_EXTRA:     out, optional, type=any
-;                       Any keywords appropriate for the superclass Init method is also
-;                           accepted by keyword inheritance
+;                       Any keywords appropriate for the MrGrAtom::GetProperty method is
+;                           also accepted by keyword inheritance
 ;-
 PRO MrText::GetProperty, $
 XLOC=xloc, $
@@ -586,8 +586,8 @@ END
 ;       Z:              in, optional, type=number
 ;                       A Z-coordinate. Used if `T3D` is set.
 ;       _REF_EXTRA:     in, optional, type=any
-;                       Any keywords appropriate for the superclass Init method is also
-;                           accepted by keyword inheritance
+;                       Any keywords appropriate for the MrGrAtom::SetProperty method is
+;                           also accepted by keyword inheritance
 ;-
 PRO MrText::SetProperty, $
 XLOC=xloc, $
@@ -772,9 +772,9 @@ END
 ;       TARGET:         in, optional, type=object, default=obj_new()
 ;                       If `DATA` is set, then the graphics object whose data coordinates
 ;                           are to be used in converting to and from data coordinates. The
-;                           graphics object must have a ConvertCoord method. Note that the
-;                           graphics object will not be destroyed when the text object is
-;                           destroyed.
+;                           graphics object must have a ConvertCoord method. If no target
+;                           is provided, the text will be placed in the current window. If
+;                           no window is available, one will be created.
 ;       TEXT_AXES:      in, optional, type=int, default=0
 ;                       Plane of vector drawn text when 3D plotting is enabled::
 ;                           0   -   XY-Plane
@@ -788,8 +788,8 @@ END
 ;       Z:              in, optional, type=number
 ;                       A Z-coordinate. Used if `T3D` is set.
 ;       _REF_EXTRA:     in, optional, type=any
-;                       Any keywords appropriate for the superclass Init method is also
-;                           accepted by keyword inheritance
+;                       Any keywords appropriate for the MrGrAtom::SetProperty method is
+;                           also accepted by keyword inheritance
 ;-
 FUNCTION MrText::init, xloc, yloc, text, $
 ALIGNMENT=alignment, $
@@ -820,7 +820,21 @@ _REF_EXTRA=extra
         void = cgErrorMsg()
         RETURN, 0
     ENDIF
+
+;---------------------------------------------------------------------
+;Superclass & Window /////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Window is obtained by MrGrAtom
+    if self -> MrGrAtom::INIT(TARGET=target, /CURRENT) eq 0 then $
+        message, 'Unable to initialize MrGrAtom'
     
+    ;Refresh the window?
+    self.window -> GetProperty, REFRESH=refreshIn
+    if refreshIn then self.window -> Refresh, /DISABLE
+
+;---------------------------------------------------------------------
+;Location ////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     ;If PLACE is set, then TEXT is the first parameter.
     IF Keyword_Set(place) THEN BEGIN
         textStr = xloc
@@ -838,7 +852,10 @@ _REF_EXTRA=extra
             textStr = text
         ENDELSE
     ENDELSE
-    
+
+;---------------------------------------------------------------------
+;Object Properties ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
     ;Set defaults
     place  = keyword_set(place)
     data   = keyword_set(data)
@@ -866,29 +883,6 @@ _REF_EXTRA=extra
     ;Objects
     self.target     = Obj_New()
     self.map_object = Obj_New()
-
-    ;If REFRESH=1 three things happen: If the call to MrGrAtom is
-    ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
-    ;      cause "Invalid pointer" errors.
-    ;   2. here, then, when MrGrAtom::_SetWindow creates a window, MrPlotManager will call
-    ;      the SetProperty method, which in turn calls the self.window -> Draw method.
-    ;      Since the data properties have not yet been set, an error will occur when trying
-    ;      to display it.
-    ;   3. after the call to SetProperty so that all of the data is loaded, the initial
-    ;      call to SetProperty will not have a valid self.window property. This is a
-    ;      problem because at the end of SetProperty, self.window -> Draw is called.
-    ;
-    ;To fix problem 1 and 3, put the call to MrGrAtom here. To fix problem 2,
-    ;turn Refresh off.
-    if keyword_set(current) then begin
-        theWin = GetMrWindows(/CURRENT)
-        theWin -> GetProperty, REFRESH=init_refresh
-        theWin -> Refresh, /DISABLE
-    endif
-
-    ;Graphic Atom
-    if self -> MrGrAtom::INIT(CURRENT=current, _EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGrAtom.'
     
     ;Set object properties
     self -> SetProperty, XLOC=x, $
@@ -911,12 +905,13 @@ _REF_EXTRA=extra
                          TARGET=target, $
                          TEXT_AXES=text_axes, $
                          TT_FONT=tt_font, $
-                         Z=z
+                         Z=z, $
+                         _EXTRA=extra
 
     ;Refresh the graphics?
-    if keyword_set(current) $
-        then theWin -> Refresh, DISABLE=~init_refresh $
-        else self -> Refresh
+    if n_elements(target) eq 0 $
+        then self -> Refresh
+        else if refreshIn then self -> Refresh
                          
     Return, 1
 END

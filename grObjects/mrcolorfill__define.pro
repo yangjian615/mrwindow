@@ -52,6 +52,8 @@
 ;       2014/01/11  -   Written by Matthew Argall
 ;       2014/01/12  -   Added the doColorFillMulti method. Required changing some object
 ;                           properties to pointers. - MRA
+;       2014/03/12  -   Automatically pick a TARGET if one has not been given. Superclass
+;                           properties can now be set/get. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -363,6 +365,9 @@ END
 ;       ZVALUE:         out, optional, type=float
 ;                       Provides the Z coordinate if a Z parameter is not present in the
 ;                           call. This is of use only if `T3D` is set.
+;       _REF_EXTRA:     out, optional, type=any
+;                       Any keyword accepted by MrGrAtom::GetProperty is also accepted
+;                           via keyword inheritance.
 ;-
 PRO MrColorFill::GetProperty, $ 
 XCOORDS=xcoords, $
@@ -386,7 +391,8 @@ T3D=t3d, $
 TARGET=target, $
 THICK=thick, $
 TRANSPARENT=transparent, $
-Z=zValue
+Z=zValue, $
+_REF_EXTRA=extra
     Compile_Opt strictarr
     
     ; Catch the error.
@@ -420,10 +426,13 @@ Z=zValue
     IF arg_present(transparent)  GT 0 THEN transparent  =  self.transparent
     IF arg_present(zValue)       GT 0 THEN zValue       = *self.z
 
+    ;Target
     IF Arg_Present(target) GT 0 THEN IF Obj_Valid(self.target) GT 0 $
         THEN target = self.target $
         ELSE target = Obj_New()
-        
+    
+    ;Superclass
+    IF Arg_Present(extra) GT 0 THEN self -> MrGrAtom::GetProperty, _STRICT_EXTRA=extra
 END
 
 
@@ -508,6 +517,9 @@ END
 ;       ZVALUE:         in, optional, type=float
 ;                       Provides the Z coordinate if a Z parameter is not present in the
 ;                           call. This is of use only if `T3D` is set.
+;       _REF_EXTRA:     in, optional, type=any
+;                       Any keyword accepted by MrGrAtom::SetProperty is also accepted
+;                           via keyword inheritance.
 ;-
 PRO MrColorFill::SetProperty, $ 
 XCOORDS=xcoords, $
@@ -531,7 +543,8 @@ T3D=t3d, $
 TARGET=target, $
 THICK=thick, $
 TRANSPARENT=transparent, $
-ZVALUE=zValue
+ZVALUE=zValue, $
+_REF_EXTRA=extra
     Compile_Opt strictarr
     
     ; Catch the error.
@@ -565,6 +578,8 @@ ZVALUE=zValue
     IF N_Elements(target) GT 0 THEN IF Obj_Valid(target) $
         THEN self.target = target $
         ELSE self.target = Obj_New()
+    
+    IF N_Elements(extra) GT 0 THEN self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra
 
 ;-----------------------------------------------------
 ;Data, Device, Normal \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -711,7 +726,9 @@ end
 ;                           fill polygons.
 ;       TARGET:         in, optional, type=object
 ;                       If coordinates are given in data units, set this to the graphic
-;                           object that defines the data space.
+;                           object that defines the data space. If no target is given, the
+;                           first selected object is used. If not objects are selected,
+;                           the highest ordered graphic is used.
 ;       T3D:            in, optional, type=boolean, default=0
 ;                       If set, the generalized transformation matrix in !P.T will be used.
 ;       THICK:          in, optional, type=float, default=1.0
@@ -723,6 +740,9 @@ end
 ;       ZVALUE:         in, optional, type=float
 ;                       Provides the Z coordinate if a Z parameter is not present in the
 ;                           call. This is of use only if `T3D` is set.
+;       _REF_EXTRA:     in, optional, type=any
+;                       Any keyword accepted by MrGrAtom::SetProperty is also accepted
+;                           via keyword inheritance.
 ;-
 FUNCTION MrColorFill::init, xcoords, ycoords, zcoords, $
 CURRENT=current, $
@@ -755,6 +775,30 @@ _REF_EXTRA=extra
         void = cgErrorMsg()
         RETURN, 0
     ENDIF
+    
+;-----------------------------------------------------
+;Target \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
+    ;Find a single target.
+    if n_elements(target) eq 0 then begin
+        target = self -> _GetTarget(/ANY, COUNT=nTargets)
+        if nTargets eq 0 then message, 'Insert MrColorFill failed. No targets available.'
+        if nTargets gt 1 then begin
+            message, 'More than one target available. Choosing first target.', /INFORMATIONAL
+            target = target[0]
+        endif
+    endif
+
+;---------------------------------------------------------------------
+;Superclass & Window /////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Window is obtained by MrGrAtom
+    if self -> MrGrAtom::INIT(TARGET=target) eq 0 then $
+        message, 'Unable to initialize MrGrAtom'
+    
+    ;Refresh the window?
+    self.window -> GetProperty, REFRESH=refreshIn
+    if refreshIn then self.window -> Refresh, /DISABLE
 
 ;---------------------------------------------------------------------
 ;Defaults and Allocate Heap to Pointers //////////////////////////////
@@ -777,33 +821,6 @@ _REF_EXTRA=extra
     self.spacing     = Ptr_New(/ALLOCATE_HEAP)
     self.thick       = Ptr_New(/ALLOCATE_HEAP)
     self.z           = Ptr_New(/ALLOCATE_HEAP)
-    
-    ;Objects
-    self.target = Obj_New()
-
-    ;If REFRESH=1 three things happen: If the call to MrGrAtom is
-    ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
-    ;      cause "Invalid pointer" errors.
-    ;   2. here, then, when MrGrAtom::_SetWindow creates a window, MrPlotManager will call
-    ;      the SetProperty method, which in turn calls the self.window -> Draw method.
-    ;      Since the data properties have not yet been set, an error will occur when trying
-    ;      to display it.
-    ;   3. after the call to SetProperty so that all of the data is loaded, the initial
-    ;      call to SetProperty will not have a valid self.window property. This is a
-    ;      problem because at the end of SetProperty, self.window -> Draw is called.
-    ;
-    ;To fix problem 1 and 3, put the call to MrGrAtom here. To fix problem 2,
-    ;turn Refresh off.
-    refresh_in = 1
-    if keyword_set(current) then begin
-        theWin = GetMrWindows(/CURRENT)
-        theWin -> GetProperty, REFRESH=refresh_in
-        theWin -> Refresh, /DISABLE
-    endif
-
-    ;Graphic Atom
-    if self -> MrGrAtom::INIT(CURRENT=current, _STRICT_EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGrAtom.'
 
 ;---------------------------------------------------------------------
 ;Set Properties //////////////////////////////////////////////////////
@@ -829,10 +846,11 @@ _REF_EXTRA=extra
                          TARGET=target, $
                          THICK=thick, $
                          TRANSPARENT=transparent, $
-                         ZVALUE=zValue
+                         ZVALUE=zValue, $
+                         _EXTRA=extra
     
     ;Refersh the graphics window
-    self.window -> Refresh, DISABLE=~refresh_in
+    if refreshIn then self.window -> Refresh
                          
     Return, 1
 END

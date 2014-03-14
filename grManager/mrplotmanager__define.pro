@@ -383,7 +383,7 @@ QUIET = quiet
     ;---------------------------------------------------------------------
         
         ;Get the position and layout of the object.
-        theObjects[i] -> GetProperty, POSITION=pos, LAYOUT=layout
+        theObjects[i] -> GetLayout, POSITION=pos, LAYOUT=layout
         
         ;Record the initial position for comparison.
         if n_elements(pos) eq 0 then pos_init = pos
@@ -484,7 +484,7 @@ pro MrPlotManager::ApplyPositions
     for i = 0, nData - 1 do begin
     
         ;Check to see that it has a LAYOUT specified
-        dataObjs[i] -> GetProperty, LAYOUT=layout
+        dataObjs[i] -> GetLayout, LAYOUT=layout
         if layout[2] le 0 then continue
         
         ;If GrLayout[0:1] does not match LAYOUT[0:1], then LAYOUT[2] might not be in
@@ -554,7 +554,7 @@ DRAW=draw
 
     ;Start shifting them
     for i = 0, nObj - 1 do begin
-        theseObj[i] -> GetProperty, LAYOUT=layout
+        theseObj[i] -> GetLayout, LAYOUT=layout
         if layout[2] le 0 then continue
 
         ;If the plot is before the hole, then skip it.
@@ -631,7 +631,7 @@ COUNT=count
     ;Get all of the plot indices
     objPIndex = intarr(count)
     for i = 0, count - 1 do begin
-        allObjs[i] -> GetProperty, LAYOUT=objLayout
+        allObjs[i] -> GetLayout, LAYOUT=objLayout
         objPIndex[i] = objLayout[2]
     endfor
     
@@ -754,7 +754,7 @@ TYPE = type
             ;Is it a data object?
             if (tf_data[i] eq 1) then begin
                 ;Get their position and layout.
-                Child_Object[i] -> GetProperty, LAYOUT=layout, POSITION=position
+                Child_Object[i] -> GetLayout, LAYOUT=layout, POSITION=position
             
                 ;Remove from the layout
                 self -> RemoveFromLayout, layout[2]
@@ -852,7 +852,7 @@ TOFIXED = toFixed
 
     ;If toFixed is set, then the actual position will not change. The plot will simply
     ;be removed from the layout and put into a fixed location.
-    if toFixed eq 1 then theObj -> GetProperty, POSITION=newLocation
+    if toFixed eq 1 then theObj -> GetLayout, POSITION=newLocation
 
     case n_elements(newLocation) of
         2: begin
@@ -1182,7 +1182,7 @@ pro MrPlotManager::ShiftPlots, pIndex
     
     ;Start shifting them
     for i = 0, nObj - 1 do begin
-        theseObj[i] -> GetProperty, LAYOUT=objLayout
+        theseObj[i] -> GetLayout, LAYOUT=objLayout
         
         ;THESEOBJ are in no particular order. Must check them all.
         if objLayout[2] lt pStartShift || objLayout[2] ge pStopShift then continue

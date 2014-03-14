@@ -100,6 +100,9 @@
 ;                           object reference. Fixed by changing the class property from
 ;                           an object to a pointer. - MRA
 ;       2013/12/02  -   Added the GetPath method. - MRA
+;       2014/03/12  -   Overplot and Current are now applied in a more straigh-forward
+;                           manner. Disinherited MrLayout, but kept it as a object
+;                           property. Added the Getlayout method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -165,6 +168,8 @@ PATH_XY=path_xy
     
 
     if n_elements(noerase) eq 0 then noerase = *self.noerase
+    
+    self.layout -> GetProperty, POSITION=position, CHARSIZE=charsize
 
 ;-----------------------------------------------------
 ;Draw the Contour Plot \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -218,13 +223,13 @@ PATH_XY=path_xy
                    XLOG             = *self.xlog, $
                    YLOG             = *self.ylog, $
                    
-                   ;MrGraphicsAtom Keywords
-                   POSITION      = self.position, $
+                   ;MrLayout Keywords
+                   CHARSIZE      =       charsize, $
+                   POSITION      =       position, $
               
                    ;MrGraphicsKeywords
                    AXISCOLOR     = *self.axiscolor, $
                    BACKGROUND    = *self.background, $
-                   CHARSIZE      =  self.charsize, $
                    CHARTHICK     = *self.charthick, $
                    CLIP          = *self.clip, $
                    COLOR         = *self.color, $
@@ -350,11 +355,14 @@ PATH_XY=path_xy
                TRIANGULATION    = *self.triangulation, $
                XLOG             = *self.xlog, $
                YLOG             = *self.ylog, $
+                   
+               ;MrLayout Keywords
+               CHARSIZE      =       charsize, $
+               POSITION      =       position, $
           
                ;MrGraphicsKeywords
                AXISCOLOR     = *self.axiscolor, $
                BACKGROUND    = *self.background, $
-               CHARSIZE      =  self.charsize, $
                CHARTHICK     = *self.charthick, $
                CLIP          = *self.clip, $
                COLOR         = *self.color, $
@@ -365,7 +373,6 @@ PATH_XY=path_xy
                NOCLIP        = *self.noclip, $
                NODATA        = *self.nodata, $
                NOERASE       = *self.noerase, $
-               POSITION      =  self.position, $
 ;               PSYM          = *self.psym, $
                SUBTITLE      = *self.subtitle, $
 ;               SYMSIZE       = *self.symsize, $
@@ -470,6 +477,31 @@ pro MrContour::GetData, z, x, y
         endcase
         else: message, 'Incorrect number of parameters.'
     endcase
+end
+
+
+;+
+;   The purpose of this method is to retrieve object properties
+;
+; :Keywords:
+;       _REF_EXTRA:         out, optional, type=any
+;                           Any keyword accepted by the MrLayout__Define class is
+;                               also accepted via keyword inheritance.
+;-
+pro MrContour::GetLayout, $
+_REF_EXTRA = extra
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Layout Properties
+    self.layout -> GetProperty, _STRICT_EXTRA=extra
 end
 
 
@@ -714,6 +746,8 @@ end
 ;-
 pro MrContour::GetProperty, $
 ;MrContour Properties
+LAYOUT=layout, $
+POSITION=position, $
 TARGET=target, $
 
 ;cgContour Properties
@@ -778,6 +812,7 @@ _REF_EXTRA=extra
     if arg_present(axescolor)     ne 0 then axescolor     = *self.axiscolor
     if arg_present(background)    ne 0 then background    = *self.background
     if arg_present(label)         ne 0 then label         =  self.label
+    if arg_present(layout)        ne 0 then layout        =  self.layout -> GetLayout()
     if arg_present(olevels)       ne 0 then olevels       = *self.olevels
     if arg_present(onimage)       ne 0 then onimage       =  self.onimage
     if arg_present(outcolor)      ne 0 then outcolor      = *self.outcolor
@@ -785,6 +820,7 @@ _REF_EXTRA=extra
     if arg_present(outline)       ne 0 then outline       =  self.outline
     if arg_present(output)        ne 0 then output        =  self.output
     if arg_present(palette)       ne 0 then palette       = *self.palette
+    if arg_present(position)      ne 0 then position      =  self.position -> GetPosition()
     if arg_present(traditional)   ne 0 then traditional   =  self.traditional
     
     ;Contour Properties
@@ -826,7 +862,6 @@ _REF_EXTRA=extra
     
     ;Superclass properties
     if n_elements(extra) ne 0 then begin
-        self -> MrLayout::GetProperty, _EXTRA=extra
         self -> MrGrAtom::GetProperty, _EXTRA=extra
         self -> MrGraphicsKeywords::GetProperty, _EXTRA=extra
     endif
@@ -1540,7 +1575,9 @@ end
 FUNCTION MrContour::Init, data, x, y, $
 ;MrContour Keywords
 CURRENT = current, $
+LAYOUT=layout, $
 OVERPLOT=target, $
+POSITION=position, $
 
 ;CONTOUR KEYWORDS
 C_ANNOTATION=c_annotation, $
@@ -1618,10 +1655,6 @@ _REF_EXTRA=extra
     if self -> MrGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
         message, 'Unable to initialize MrGraphicsKeywords.'
         
-    ;MrLayout
-    if self -> MrLayout::INIT(_EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrLayout.'
-        
 ;---------------------------------------------------------------------
 ;ALLOCATE HEAP ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1675,29 +1708,24 @@ _REF_EXTRA=extra
     ;Initialize Objects
     self.target           = Obj_New()
     self.map_object       = Ptr_New(/ALLOCATE_HEAP)
-    
-    ;If REFRESH=1 three things happen: If the call to MrGrAtom is
-    ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
-    ;      cause "Invalid pointer" errors.
-    ;   2. here, then when MrGrAtom::_SetWindow creates a window, MrPlotManager will call
-    ;      the SetProperty method, which in turn calls the self.window -> Draw method.
-    ;      Since the data properties have not yet been set, an error will occur when trying
-    ;      to display it.
-    ;   3. after the call to SetProperty so that all of the data is loaded, the initial
-    ;      call to SetProperty will not have a valid self.window property. This is a
-    ;      problem because at the end of SetProperty, self.window -> Draw is called.
-    ;
-    ;To fix problem 1 and 3, put the call to MrGrAtom here. To fix problem 2,
-    ;turn Refresh off.
-    if keyword_set(current) then begin
-        theWin = GetMrWindows(/CURRENT)
-        theWin -> GetProperty, REFRESH=init_refresh
-        theWin -> Refresh, /DISABLE
-    endif
 
-    ;Graphic Atom
-    if self -> MrGrAtom::INIT(CURRENT=current, _EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGrAtom.'
+;---------------------------------------------------------------------
+;Window and Layout ///////////////////////////////////////////////////
+;---------------------------------------------------------------------    
+    ;Layout -- Must be done before initializing MrGrAtom
+    self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
+    
+    ;Was the /OVERPLOT keyword set, instead of giving a target
+    if MrIsA(target, /SCALAR, /INTEGER) $
+        then if keyword_set(target) then target = self -> _GetTarget()
+    
+    ;Superclass
+    if self -> MrGrAtom::INIT(CURRENT=current, TARGET=target, WINDOW_TITLE=window_title) eq 0 then $
+        message, 'Unable to initialize MrGrAtom'
+    
+    ;Turn off refresh while various properties are set
+    self.window -> GetProperty, REFRESH=refreshIn
+    if refreshIn eq 1 then theWindow -> Refresh, /DISABLE
 
 ;---------------------------------------------------------------------
 ;Defaults ////////////////////////////////////////////////////////////
@@ -1867,9 +1895,9 @@ _REF_EXTRA=extra
                               PATH_FILENAME=path_filename
 
     ;Refresh the graphics?
-    if keyword_set(current) $
-        then theWin -> Refresh, DISABLE=~init_refresh $
-        else self -> Refresh
+    if keyword_set(current) eq 0 && n_elements(target) eq 0 $
+        then self -> Refresh $
+        else if refreshIn then self -> Refresh
 
     return, 1
 end
@@ -1887,62 +1915,62 @@ pro MrContour__define, class
     on_error, 2
     
     class = { MrContour, $
-              inherits MrLayout, $
               inherits MrGrAtom, $
               inherits MrGraphicsKeywords, $
               
               ;Data properties
-              c_data: Ptr_New(), $
+              c_data:  Ptr_New(), $
               xcoords: Ptr_New(), $
               ycoords: Ptr_New(), $
               
               ;MrContour Properties
-              target: obj_new(), $
-              init_xrange: fltarr(2), $
-              init_yrange: fltarr(2), $
+              target:        obj_new(), $
+              init_xrange:   fltarr(2), $
+              init_yrange:   fltarr(2), $
+              layout:        obj_new(), $
               ;cgContour Properties
-              label: 0, $
-              map_object: Ptr_New(), $      ;cgContour throws an error for invalid objects
-              missingvalue: Ptr_New(), $
-              olevels: Ptr_New(), $
-              onImage: 0B, $
-              outcolor: Ptr_New(), $
-              outfilename: '', $
-              outline: 0B, $
-              output: '', $
-              palette: Ptr_New(), $
-              traditional: 0B, $
+              label:         0, $
+              map_object:    Ptr_New(), $      ;cgContour throws an error for invalid objects
+              missingvalue:  Ptr_New(), $
+              olevels:       Ptr_New(), $
+              onImage:       0B, $
+              outcolor:      Ptr_New(), $
+              outfilename:   '', $
+              outline:       0B, $
+              output:        '', $
+              palette:       Ptr_New(), $
+              traditional:   0B, $
               
               ;Contour Properties
-              c_annotation: Ptr_New(), $
-              c_charsize: Ptr_New(), $
-              c_charthick: Ptr_New(), $
-              c_colors: Ptr_New(), $
-              c_labels: Ptr_New(), $
-              c_linestyle: Ptr_New(), $
+              c_annotation:  Ptr_New(), $
+              c_charsize:    Ptr_New(), $
+              c_charthick:   Ptr_New(), $
+              c_colors:      Ptr_New(), $
+              c_labels:      Ptr_New(), $
+              c_linestyle:   Ptr_New(), $
               c_orientation: Ptr_New(), $
-              c_spacing: Ptr_New(), $
-              c_thick: Ptr_New(), $
-              cell_fill: Ptr_New(), $
-              closed: Ptr_New(), $
-              downhill: Ptr_New(), $
-              fill: Ptr_New(), $
-              follow: Ptr_New(), $
-              irregular: Ptr_New(), $
-              isotropic: Ptr_New(), $
-              levels: Ptr_New(), $
-              nlevels: Ptr_New(), $
-              max_value: Ptr_New(), $
-              min_value: Ptr_New(), $
-              overplot: 0B, $
+              c_spacing:     Ptr_New(), $
+              c_thick:       Ptr_New(), $
+              cell_fill:     Ptr_New(), $
+              closed:        Ptr_New(), $
+              downhill:      Ptr_New(), $
+              fill:          Ptr_New(), $
+              follow:        Ptr_New(), $
+              irregular:     Ptr_New(), $
+              isotropic:     Ptr_New(), $
+              levels:        Ptr_New(), $
+              nlevels:       Ptr_New(), $
+              max_value:     Ptr_New(), $
+              min_value:     Ptr_New(), $
+              overplot:      0B, $
               path_data_coords: Ptr_New(), $
-              path_double: Ptr_New(), $
+              path_double:   Ptr_New(), $
               path_filename: Ptr_New(), $
-              path_info: Ptr_New(), $
-              path_xy: Ptr_New(), $
-              resolution: Ptr_New(), $
+              path_info:     Ptr_New(), $
+              path_xy:       Ptr_New(), $
+              resolution:    Ptr_New(), $
               triangulation: Ptr_New(), $
-              xlog: Ptr_New(), $
-              ylog: Ptr_New() $
+              xlog:          Ptr_New(), $
+              ylog:          Ptr_New() $
             }
 end

@@ -36,6 +36,19 @@
 ;   The purpose of this program is to return available MrWindow objects.
 ;
 ; :Params:
+;       NAME:           in, optional, type=string
+;                       Name of the window to be retrieved. The first window by this
+;                           name will be returned.
+;
+; :Keywords:
+;       CURRENT:        in, optional, type=boolean, default=0
+;                       If set, only the current window will be returned. The default
+;                           is to return all windows.
+;       NAMES:          out, optional, type=string/strarr
+;                       Names of all windows returned.
+;       PRINT:          in, optional, type=boolean, defualt=0
+;                       If set, information about each open window will be printed.
+;                           All other keywords are ignored.
 ;
 ; :Author:
 ;       Matthew Argall::
@@ -48,50 +61,53 @@
 ; :History:
 ;   Modification History::
 ;       2013/11/22  -   Written by Matthew Argall
+;       2014/02/10  -   !MR_WINDOWS was turned into a container. Updated program. Added
+;                           the PRINT keyword. - MRA
 ;-
 function GetMrWindows, name, $
 CURRENT=current, $
-NAMES=names
+NAMES=names, $
+PRINT=print
     compile_opt strictarr
     on_error, 2
 
     ;Make sure the array of windows exists
-    defsysv, '!MrWindow_Array', EXISTS=exists
+    defsysv, '!MR_WINDOWS', EXISTS=exists
     if exists eq 0 then return, obj_new()
     
     ;How many windows are there?
-    nWin = n_elements(*!MrWindow_Array)
-    if nWin eq 0 then return, obj_new()
+    nWin = !MR_WINDOWS -> Count()
+    if nWin eq 0 then begin
+        if keyword_set(print) then print, 'No windows are currently open.'
+        return, obj_new()
+    endif
+
+;-----------------------------------------------------
+;Print \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
+    if keyword_set(print) then begin
+        !MR_WINDOWS -> PrintInfo
+        result = obj_new()
 
 ;-----------------------------------------------------
 ;Current Window \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
-    if keyword_set(current) then begin
-        result = (*!MrWindow_Array)[0]
+    endif else if keyword_set(current) then begin
+        result = !MR_WINDOWS -> Get()
         names = result -> GetName()
 
 ;-----------------------------------------------------
 ;By Name \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
     endif else if arg_present(name) then begin
-        names = ''
-        i = 0
-        while temp_name eq '' and i lt nWin do begin
-            if (*!MrWindow_Array)[i] -> GetName() eq name then begin
-                result = (*!MrWindow_Array)[i]
-                names = name
-            endif
-            i++
-        endwhile
-        
-        ;If no match was found, then return a null object
-        if names eq '' then result = obj_new()
+        result = !MR_WINDOWS -> FindByName(name, COUNT=count)
+        if count gt 1 then result = result[0]
         
 ;-----------------------------------------------------
 ;All Windows \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
     endif else begin
-        result = *!MrWindow_Array
+        result = !MR_WINDOWS -> Get(/ALL)
         if arg_present(names) then begin
             names = strarr(nWin)
             for i = 0, nWin - 1 do names[i] = result[i] -> GetName()

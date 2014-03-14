@@ -42,9 +42,6 @@
 ;                               'Z' - z-axis
 ;
 ; :Keywords:
-;       CURRENT:            in, optional, type=boolean, default=0
-;                           If set, the plot will be added to the current MrWindow
-;                               graphics window.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by weAxis__define.
 ;
@@ -69,7 +66,6 @@
 ;       2014/01/20  -   Inputs to MrAxis__Define changed. Updated. - MRA
 ;-
 function MrAxis, direction, $
- CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -85,7 +81,7 @@ _REF_EXTRA = extra
     current = keyword_set(current)
 
     ;Create a cgOverPlot object
-    theAxis = obj_new('MrAxis', direction, CURRENT=current, _STRICT_EXTRA=extra)
+    theAxis = obj_new('MrAxis', direction, _STRICT_EXTRA=extra)
 
     return, theAxis
 end

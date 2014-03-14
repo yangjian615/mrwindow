@@ -77,6 +77,8 @@
 ;       09/27/2013  -   Use N_Elements instead of N_Params in case `Y` is present but 
 ;                           undefined. Position and layout properties are now handled
 ;                           by MrGraphicAtom. Renamed from MrPlotSObject to MrPlotS. - MRA
+;       2014/03/12  -   If no target is given use the currently selected graphic. Can
+;                           now set/get superclass properties. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -380,6 +382,9 @@ end
 ;       ZVALUE:         in, optional, type=float
 ;                       Provides the Z coordinate if a Z parameter is not present in the
 ;                           call. This is of use only if `T3D` is set.
+;       _REF_EXTRA:     in, optional, type=any
+;                       Any keyword accepted by MrGrAtom::SetProperty is also accepted
+;                           via keyword inheritance.
 ;-
 pro MrPlotS::SetProperty, $
 XCOORDS=xcoords, $
@@ -403,7 +408,8 @@ LINESTYLE=linestyle, $
 NOCLIP=noclip, $
 T3D=t3d, $
 THICK=thick, $
-ZVALUE=zvalue
+ZVALUE=zvalue, $
+_REF_EXTRA=extra
     compile_opt idl2
     
     ;Error handling
@@ -433,9 +439,13 @@ ZVALUE=zvalue
     if n_elements(thick)     ne 0 then  self.thick = thick
     if n_elements(zvalue)    ne 0 then  self.zvalue = zvalue
 
+    ;Target
     IF N_Elements(target) GT 0 THEN IF Obj_Valid(target) $
         THEN self.target = target $
         ELSE self.target = Obj_New()
+
+    ;Superclass
+    IF N_Elements(extra) GT 0 THEN self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra
 
 ;-----------------------------------------------------
 ;Data, Device, Normal \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -444,6 +454,8 @@ ZVALUE=zvalue
     if n_elements(data) gt 0 then begin
         data = keyword_set(data)
         if data then begin
+            if obj_valid(target) eq 0 then $
+                message, 'TARGET invalid. Cannot use DATA coordinates.'
             self.normal = 0B
             self.device = 0B
         endif
@@ -471,7 +483,7 @@ ZVALUE=zvalue
         self.normal = normal
     endif
     
-    if self.data + self.device + self.normal eq 0 then self.data = 1B
+    if self.data + self.device + self.normal eq 0 then self.normal = 1B
 
 ;-----------------------------------------------------
 ;Map Object \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -577,7 +589,9 @@ end
 ;                           vector of the same length as X.
 ;       TARGET:         in, optional, type=object
 ;                       If coordinates are given in data units, set this to the graphic
-;                           object that defines the data space.
+;                           object that defines the data space. If no target is given,
+;                           the graphic will be placed in the current window. If no window
+;                           is available, one will be opened.
 ;       T3D:            in, optional, type=boolean, default=0
 ;                       If set, the generalized transformation matrix in !P.T will be used.
 ;       THICK:          in, optional, type=float, default=1.0
@@ -585,9 +599,11 @@ end
 ;       ZVALUE:         in, optional, type=float
 ;                       Provides the Z coordinate if a Z parameter is not present in the
 ;                           call. This is of use only if `T3D` is set.
+;       _REF_EXTRA:     in, optional, type=any
+;                       Any keyword accepted by MrGrAtom::SetProperty is also accepted
+;                           via keyword inheritance.
 ;-
 function MrPlotS::init, xcoords, ycoords, zcoords, $
-CURRENT=current, $
 TARGET=target, $
 
 ;cgPlotS Properties
@@ -606,7 +622,8 @@ NOCLIP=noclip, $
 NORMAL=normal, $
 T3D=t3d, $
 THICK=thick, $
-ZVALUE=zvalue
+ZVALUE=zvalue, $
+_REF_EXTRA=extra
     compile_opt strictarr
 
     ;Error handling
@@ -616,6 +633,17 @@ ZVALUE=zvalue
         void = cgErrorMsg()
         return, 0
     endif
+
+;---------------------------------------------------------------------
+;Superclass & Window /////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Window is obtained by MrGrAtom
+    if self -> MrGrAtom::INIT(TARGET=target, /CURRENT) eq 0 then $
+        message, 'Unable to initialize MrGrAtom'
+    
+    ;Refresh the window?
+    self.window -> GetProperty, REFRESH=refreshIn
+    if refreshIn then self.window -> Refresh, /DISABLE
 
 ;---------------------------------------------------------------------
 ;Keywords ////////////////////////////////////////////////////////////
@@ -638,31 +666,6 @@ ZVALUE=zvalue
     
     ;Objects
     self.map_object = obj_new()
-    self.target = obj_new()
-
-    ;If REFRESH=1 three things happen: If the call to MrGrAtom is
-    ;   1. before here, none of the pointers are valid and calls to SetProperty by MrGrAtom
-    ;      cause "Invalid pointer" errors.
-    ;   2. here, then, when MrGrAtom::_SetWindow creates a window, MrPlotManager will call
-    ;      the SetProperty method, which in turn calls the self.window -> Draw method.
-    ;      Since the data properties have not yet been set, an error will occur when trying
-    ;      to display it.
-    ;   3. after the call to SetProperty so that all of the data is loaded, the initial
-    ;      call to SetProperty will not have a valid self.window property. This is a
-    ;      problem because at the end of SetProperty, self.window -> Draw is called.
-    ;
-    ;To fix problem 1 and 3, put the call to MrGrAtom here. To fix problem 2,
-    ;turn Refresh off.
-    refresh_in = 1
-    if keyword_set(current) then begin
-        theWin = GetMrWindows(/CURRENT)
-        theWin -> GetProperty, REFRESH=refresh_in
-        theWin -> Refresh, /DISABLE
-    endif
-
-    ;Graphic Atom
-    if self -> MrGrAtom::INIT(CURRENT=current, _STRICT_EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGrAtom.'
 
 ;---------------------------------------------------------------------
 ;Set Object Properties ///////////////////////////////////////////////
@@ -688,10 +691,13 @@ ZVALUE=zvalue
                          T3D=t3d, $
                          TARGET=target, $
                          THICK=thick, $
-                         ZVALUE=zvalue
+                         ZVALUE=zvalue, $
+                         _EXTRA=extra
 
     ;Draw?
-    self.window -> draw
+    if n_elements(target) eq 0 $
+        then self -> Refresh $
+        else if refreshIn then self -> Refresh
 
     return, 1
 end

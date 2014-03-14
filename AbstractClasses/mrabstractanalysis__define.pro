@@ -265,7 +265,7 @@ end
 ;       LOCATION:           in, optional, type=intarr(2)
 ;                           The [col, row] location of the plot whose data is to be averaged.
 ;                               If not provided, the currently selected plot will be
-;                               rotated (i.e. the one stored in self.focus).
+;                               rotated.
 ;       AVERAGE:            out, optional, type=float
 ;                           The average of the dependent variable over the interval given
 ;                               by `XRANGE`.
@@ -444,7 +444,7 @@ end
 ;       INDEX:              in, optional, type=int
 ;                           The index into the IDL container of the plot for which the
 ;                               data range is to be determined. If not provided, the
-;                               current object will be used (self.focus).
+;                               currently selected object will be used.
 ;
 ; :Keywords:
 ;       IRANGE:             out, optional, type=int
@@ -765,7 +765,7 @@ end
 ;       LOCATION:           in, optional, type=intarr(2)
 ;                           The [col, row] location of the plot whose data is to be averaged.
 ;                               If not provided, the currently selected plot will be
-;                               rotated (i.e. self.focus).
+;                               rotated.
 ;
 ; :Keywords:
 ;       PLOT_INDEX:             in, optional, type=int, default=0
@@ -801,7 +801,7 @@ TAIL=tail
 
     ;Use the selected plot
     if n_elements(location) eq 0 $
-        then theObj = self.focus $
+        then theObj = self -> GetSelect() $
         else theObj = self -> Get(LOCATION=location, PLOT_INDEX=plot_index)
     
 ;---------------------------------------------------------------------
@@ -1082,7 +1082,7 @@ end
 ;       LOCATION:           in, optional, type=intarr(2)
 ;                           The [col, row] location of the plot whose data is to be rotated.
 ;                               If not provided, the currently selected plot will be
-;                               rotated (i.e. self.focus).
+;                               rotated.
 ;
 ; :Keywords:
 ;       PLOT_INDEX:         in, optional, type=int, default=0
@@ -1251,12 +1251,13 @@ pro MrAbstractAnalysis::VerticalCut, xrange, yrange
         
         2: begin    ;motion event
             ;Get the object of focus
-            self.focus -> GetProperty, XRANGE=xrange, YRANGE=yrange
+            oGraphic = self -> GetSelect()
+            oGraphic -> GetProperty, XRANGE=xrange, YRANGE=yrange
             
             ;Convert to data coordinates.
             x = [self.x0, event.x]
             y = [self.y0, event.y]
-            xy = self.focus -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
+            xy = oGraphic -> ConvertCoord(x, y, /DEVICE, /TO_DATA)
             
             ;How much did the mouse move?
             delta_x = xy[0,1] - xy[0,0]
@@ -1268,7 +1269,7 @@ pro MrAbstractAnalysis::VerticalCut, xrange, yrange
             yrange = yrange - delta_y
             
             ;Set the new ranges
-            self.focus -> SetProperty, XRANGE=xrange, YRANGE=yrange
+            oGraphic -> SetProperty, XRANGE=xrange, YRANGE=yrange
             
             self.x0 = event.x
             self.y0 = event.y
@@ -1284,7 +1285,8 @@ pro MrAbstractAnalysis::VerticalCut, xrange, yrange
             self.y0 = -1
             
             ;Apply bindings. Need a Draw to update the bindings.
-            self -> Apply_Bindings, self.focus, /XAXIS, /YAXIS
+            oGraphic = self.GetSelect()
+            self -> Apply_Bindings, oGraphic, /XAXIS, /YAXIS
 
             self -> Draw
         endcase

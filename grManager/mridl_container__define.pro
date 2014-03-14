@@ -65,6 +65,7 @@
 ;       2014/03/04  -   _OverloadBRS now accepts arrays of indices. - MRA
 ;       2014/03/06  -   Added the _OverloadPrint method. The WhichObjects method now calls
 ;                           the _OverloadPrint method. - MRA
+;       2014/03/10  -   Renamed the WhichObjects method to PrintInfo. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -184,6 +185,11 @@ function MrIDL_Container::_OverloadPrint
         return, ''
     endif
 
+    ;Print information about the container class
+    class  = obj_class(self)
+    heapID = obj_valid(self, /GET_HEAP_IDENTIFIER)
+    selfStr = string(FORMAT='(a0, 3x, "<", i0, ">")', class, heapID)
+
     ;Get all of the objects
     allObjs = self -> Get(/ALL, COUNT=nObjs)
     if nObjs eq 0 then return, 'Container is empty.'
@@ -193,11 +199,14 @@ function MrIDL_Container::_OverloadPrint
     objClass = MrObj_Class(allObjs)
 
     ;Header
-    printStr = strarr(1,nObjs+1)
-    printStr[0,0] = string('Index', 'HeapID', 'Class', FORMAT='(1x, a5, 4x, a6, 2x, a5)')
+    printStr      = strarr(1,nObjs+2)
+    printStr[0,0] = string(selfStr)
+    printStr[0,1] = string('Index', 'HeapID', 'Class', FORMAT='(1x, a5, 4x, a6, 2x, a5)')
+    
+    ;Print object information
     for i = 0, nObjs-1 do begin
         if objIDs[i] eq 0 then objIDstr = '<invalid>' else objIDstr = strtrim(objIDs[i], 2)
-        printStr[0,i+1] = string(i, objIDstr, objClass[i], FORMAT='(i5, 3x, i7, 3x, a0)')
+        printStr[0,i+2] = string(i, objIDstr, objClass[i], FORMAT='(i5, 3x, i7, 3x, a0)')
     endfor
 
     return, printStr
@@ -275,6 +284,27 @@ function MrIDL_Container::GetIndex, Objects
     tf_contained = self -> IDL_Container::IsContained(Objects, POSITION=Index)
     return, index
 end
+
+
+;+
+;   The purpose of this method is to print a list of contained objects and the index
+;   at which they can be found.
+;-
+pro MrIDL_Container::PrintInfo
+    compile_opt idl2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+
+    result = self -> _OverloadPrint()
+    print, result
+end
+
 
 
 ;+
@@ -424,27 +454,6 @@ TYPE = type
         if destroy then obj_destroy, theObj
     endif
 end
-
-
-;+
-;   The purpose of this method is to print a list of contained objects and the index
-;   at which they can be found.
-;-
-pro MrIDL_Container::WhichObjects
-    compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-
-    result = self -> _OverloadPrint()
-    print, result
-end
-
 
 ;+
 ;   Clean up after the object is destroyed -- destroy pointers and object references.

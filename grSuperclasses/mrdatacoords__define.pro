@@ -51,8 +51,83 @@
 ;       2013/11/20  -   Written by Matthew Argall
 ;       2013/11/21  -   Added the _P_CLIP, _P_T, _P_T3D, _[XYZ]_WINDOW, and _[XYZ]_REGION
 ;                           properties so that overplotting and 3D transforms work. - MRA
+;       2014/01/26  -   Added the ApplyCoords method and now set up the data coordinate
+;                           system in the INIT method. - MRA
 ;-
 ;*****************************************************************************************
+;+
+;   The purpose of the method is to set-up and save the data coordinate system. To
+;   do so, an invisible plotting region is created so that the ![PDXY] system variables
+;   update to the proper data space.
+;
+; :Keywords:
+;       CLIP:           in, optional, type=fltarr(4)
+;                       The coordinate rectangle at which data will be clipped.
+;       POSITION:       in, optional, type=fltarr(4)
+;                       Position of the plot in normal coordinates.
+;       XRANGE:         in, optional, type=numeric(2)
+;                       Min and Max of the data range for the x-axis
+;       XLOG:           in, optional, type=boolean
+;                       If set, the x-axis will have a log scale.
+;       YRANGE:         in, optional, type=numeric(2)
+;                       Min and Max of the data range for the y-axis
+;       YLOG:           in, optional, type=boolean
+;                       If set, the y-axis will have a log scale.
+;       ZRANGE:         in, optional, type=numeric(2)
+;                       Min and Max of the data range for the z-axis
+;       ZLOG:           in, optional, type=boolean
+;                       If set, the z-axis will have a log scale.
+;-
+pro MrDataCoords::ApplyCoords, $
+CLIP = clip, $
+POSITION = position, $
+T3D = t3d, $
+XRANGE = xrange, $
+XLOG = xlog, $
+YRANGE = yrange, $
+YLOG = ylog, $
+ZRANGE = zrange, $
+ZLOG = zlog
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        if n_elements(newWin) gt 0 then wdelete, newWin
+        void = cgErrorMsg()
+        return
+    endif
+
+    ;Defaults
+    if n_elements(clip)     eq 0 then clip     = self._p_clip[0:3]
+    if n_elements(position) eq 0 then position = [self._x_region[0], self._y_region[0], $
+                                                  self._x_region[1], self._y_region[1]]
+    if n_elements(t3d)      eq 0 then t3d      = self._p_t3d
+    if n_elements(xrange)   eq 0 then xrange   = self._x_crange
+    if n_elements(xlog)     eq 0 then xlog     = self._x_type
+    if n_elements(yrange)   eq 0 then yrange   = self._y_crange
+    if n_elements(ylog)     eq 0 then ylog     = self._y_type
+    if n_elements(zrange)   eq 0 then zrange   = self._z_crange
+    if n_elements(zlog)     eq 0 then zlog     = self._z_type
+    
+    ;Create a window if one is not already open
+    if !d.window eq -1 and ((!d.flags and 256) gt 0) $
+        then newWin = MrGetWindow(/FREE, /PIXMAP)
+    
+    ;Create an invisible plot to set up the system variables
+    plot, xrange, yrange, CLIP=clip, POSITION=position, T3D=t3d, /NODATA, /NOERASE, $
+          XLOG=xlog, XSTYLE=5, $
+          YLOG=ylog, YSTYLE=21
+    
+    ;Save the system variables
+    self -> SaveCoords
+    
+    ;Destroy the window if it was created here
+    if n_elements(newWin) gt 0 then wdelete, newWin
+end
+
+
 ;+
 ;   Convert between data, normal, and device coordinates.
 ;
@@ -160,7 +235,7 @@ end
 ;   Save the current system variables necessary for conveting between coordinate sytems.
 ;-
 pro MrDataCoords::SaveCoords
-    compile_opt idl2
+    compile_opt strictarr
     
     ;Error handling
     catch, the_error
@@ -207,8 +282,61 @@ end
 
 ;+
 ;   The initialization method.
+;
+; :Keywords:
+;       CLIP:           in, optional, type=fltarr(4)
+;                       The coordinate rectangle at which data will be clipped.
+;       POSITION:       in, optional, type=fltarr(4), default="[0,0,1,1]"
+;                       Position of the plot in normal coordinates.
+;       XRANGE:         in, optional, type=numeric(2), default="[0,1]"
+;                       Min and Max of the data range for the x-axis
+;       XLOG:           in, optional, type=boolean
+;                       If set, the x-axis will have a log scale.
+;       YRANGE:         in, optional, type=numeric(2), default="[0,1]"
+;                       Min and Max of the data range for the y-axis
+;       YLOG:           in, optional, type=boolean
+;                       If set, the y-axis will have a log scale.
+;       ZRANGE:         in, optional, type=numeric(2)
+;                       Min and Max of the data range for the z-axis
+;       ZLOG:           in, optional, type=boolean
+;                       If set, the z-axis will have a log scale.
 ;-
-function MrDataCoords::init
+function MrDataCoords::init, $
+CLIP = clip, $
+POSITION = position, $
+T3D = t3d, $
+XRANGE = xrange, $
+XLOG = xlog, $
+YRANGE = yrange, $
+YLOG = ylog, $
+ZRANGE = zrange, $
+ZLOG = zlog
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, 0
+    endif
+    
+    ;Defaults
+    if n_elements(position) eq 0 then position = [0,0,1,1]
+    if n_elements(xrange)   eq 0 then xrange = [0, 1]
+    if n_elements(yrange)   eq 0 then yrange = [0, 1]
+
+    ;Set up the data coordinates.
+    self -> ApplyCoords, POSITION=position, $
+                         CLIP=clip, $
+                         T3D=t3d, $
+                         XRANGE=xrange, $
+                         XLOG=xlog, $
+                         YRANGE=yrange, $
+                         YLOG=ylog, $
+                         ZRANGE=zrange, $
+                         ZLOG=zlog
+
     ;Does not need to be initialized
     return, 1
 end
@@ -239,7 +367,7 @@ end
 ;       _Y_TYPE:        The !Y.Type system variable
 ;       _Y_WINDOW:      The !Y.Window system variable
 ;       _Z_CRANGE:      The !Z.CRange sytem variable
-;       _Z_CRANGE:      The !Z.CRange system variable
+;       _Z_REGION:      The !Z.Region system variable
 ;       _Z_S:           The !Z.S sytem variable
 ;       _Z_TYPE:        The !Z.Type system variable
 ;       _Z_WINDOW:      The !Z.Window system variable
