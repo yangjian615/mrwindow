@@ -1,1 +1,1 @@
-/Users/argall/Documents/Work/Programs/cdf-reader/cdf_plot__define.pro
+/Users/argall/Documents/Work/Programs//cdf-reader/cdf_plot__define.pro

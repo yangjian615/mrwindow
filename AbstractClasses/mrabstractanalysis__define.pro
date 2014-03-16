@@ -1119,7 +1119,7 @@ INVERSE = inverse
     ;Get the graphic object
     if n_elements(location) eq 0 $
         then theObj = self -> GetSelect() $
-        else theObj = self -> Get(LOCATION=location, PINDEX=plot_index)
+        else theObj = self -> FindByColRow(location)
 
     ;Get the rotation matrix
     if n_elements(rotmat) ne 9 then begin
@@ -1410,7 +1410,7 @@ pro MrAbstractAnalysis::vHT, xrange, yrange
     v_ht = ht_velocity(v_interp, B_interp)
     
     ;Print the time interval
-    print, '[t0, t1] = [' + strjoin(ssm_to_hms([(*self.intervals).tRange]), ', ') + ']'
+    print, "'[t0, t1] = ['" + strjoin(ssm_to_hms([(*self.intervals).tRange]), "', '") + "']"
     
     ;print the results to the command window for easy Copy + Paste
     print, 'x', 'y', 'z', format='(13x, 2(a1, 11x), a1)'

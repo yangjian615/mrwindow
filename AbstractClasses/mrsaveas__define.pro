@@ -55,7 +55,7 @@
 ;       supply the window ID via the INIT method or the SetProperty method.
 ;
 ;   INCORPORATING INTO WIDGET PROGRAMS
-;       To incorporate into a widget program, use the Notify_Realize event handler to
+;       To incorporate into a widget program, use the Notify_Realize event handler
 ;       for the Widget_Draw object. In the callback procedure, pass the draw widget's
 ;       widget ID to the SaveAs object via the SetProperty method.
 ;       

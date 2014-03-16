@@ -336,7 +336,7 @@ end
 ;+
 ;   Serve as a general error handler for event handling routines.
 ;-
-pro MrZoom::Error_Handler
+pro MrCursor::Error_Handler
     compile_opt idl2
     
     ;Error handling

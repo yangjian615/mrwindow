@@ -135,6 +135,7 @@
 ;                           graphics. - MRA
 ;       2014/03/09  -   Added the FindByPIndex and FindByColRow methods and removed
 ;                           the Get method. - MRA
+;       2014/03/15  -   SetGlobal can now segregate object classes. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -585,7 +586,14 @@ end
 
 
 ;+
+;   Find a graphic by its [col,row] location.
 ;
+; :Params:
+;       COLROW:         in, required, type=intarr(2)
+;                       The [column, row] in which the desired graphic is located.
+;
+; :Returns:
+;       OBJECT:         The graphics located at `COLROW`.
 ;-
 function MrPlotManager::FindByColRow, colrow, $
 COUNT=count
@@ -601,15 +609,25 @@ COUNT=count
     endif
 
     ;Convert COLROW to a plot index
-    pIndex = self -> ConvertIndex(ColRow, /COLROW, /TO_PINDEX)
-    
+    pIndex = self -> ConvertLocation(ColRow, /COLROW, /TO_PINDEX)
+
     ;Call FindByPIndex
     object = self -> FindByPIndex(pIndex, COUNT=count)
+
+    return, object
 end
 
 
 ;+
+;   Find a graphic by its [col,row] location.
 ;
+; :Params:
+;       PINDEX:         in, required, type=intarr(2)
+;                       The plot index, starting with 1 and increasing left to right then
+;                           top to bottom,  in which the desired graphic is located.
+;
+; :Returns:
+;       OBJECT:         The graphics located at `PINDEX`.
 ;-
 function MrPlotManager::FindByPIndex, pIndex, $
 COUNT=count
@@ -902,6 +920,7 @@ end
 ;   globally, like setting the ![PXYZ] system variables.
 ;-
 pro MrPlotManager::SetGlobal, $
+ISA=isa, $
 CHARSIZE = charsize, $
 CHARTHICK = charthick, $
 FONT = font, $
@@ -969,7 +988,8 @@ ZTITLE = ztitle
     if n_elements(charsize) gt 0 then self -> SetProperty, CHARSIZE=charsize
 
     ;Get all of the objects
-    allObjs = self -> Get(/ALL, COUNT=nObjs)
+    allObjs = self -> Get(/ALL, ISA=isa, COUNT=nObjs)
+    if nObjs eq 0 then return
     
     ;Step through each object and set the pertinent values
     for i = 0, nObjs - 1 do begin
