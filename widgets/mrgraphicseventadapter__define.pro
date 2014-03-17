@@ -26,20 +26,14 @@
 ;                       Number of button clicks that occurred::
 ;                           1 - Single Click
 ;                           2 - Double Click
+;
+; :Returns:
+;       RESULT:         Returns::
+;                           1 - Event handling will continue to the function callback
+;                           0 - Event handling will stop after MouseDown completes.
 ;-
-pro MrDraw_Event_Handler::MouseDown, Window, X, Y, Button, KeyMods, Clicks
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Click + Drag has begun.
-    self._drag = 1
+function MrGraphicsEventAdapter::MouseDown, Window, X, Y, Button, KeyMods, Clicks
+    return, 1
 end
 
 
@@ -60,9 +54,14 @@ end
 ;                           2 - Control
 ;                           4 - Caps Lock
 ;                           8 - Alt
+;
+; :Returns:
+;       RESULT:         Returns::
+;                           1 - Event handling will continue to the function callback
+;                           0 - Event handling will stop after MouseMotion completes.
 ;-
-pro MrDraw_Event_Handler::MouseMotion, Window, X, Y, KeyMods
-    ;Nothing to do
+function MrGraphicsEventAdapter::MouseMotion, Window, X, Y, KeyMods
+    return, 1
 end
 
 
@@ -82,20 +81,14 @@ end
 ;                           1 - Right
 ;                           2 - Left
 ;                           4 - Center
+;
+; :Returns:
+;       RESULT:         Returns::
+;                           1 - Event handling will continue to the function callback
+;                           0 - Event handling will stop after MouseUp completes.
 ;-
-pro MrDraw_Event_Handler::MouseUp, Window, X, Y, Button
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Click + Drag has ended.
-    self.drag = 0
+function MrGraphicsEventAdapter::MouseUp, Window, X, Y, Button
+    return, 1
 end
 
 
@@ -118,9 +111,14 @@ end
 ;                           2 - Control
 ;                           4 - Caps Lock
 ;                           8 - Alt
+;
+; :Returns:
+;       RESULT:         Returns::
+;                           1 - Event handling will continue to the function callback
+;                           0 - Event handling will stop after MouseWheel completes.
 ;-
-pro MrDraw_Event_Handler::MouseWheel, Window, X, Y, Delta, KeyMods
-    ;Nothing to do...
+function MrGraphicsEventAdapter::MouseWheel, Window, X, Y, Delta, KeyMods
+    return, 1
 end
 
 
@@ -128,7 +126,7 @@ end
 ;   The purpose of this method is to clean up object properties
 ;   after the object is destroyed.
 ;-
-pro MrDraw_Event_Handler::cleanup
+pro MrGraphicsEventAdapter::cleanup
     ;Nothing to clean up
 end
 
@@ -140,7 +138,7 @@ end
 ;       CLASS:          out, optional, type=structure
 ;                       The class definition structure.
 ;-
-function MrDraw_Event_Handler::Init
+function MrGraphicsEventAdapter::Init
     ;Nothing to do
     return, 1
 end
@@ -152,11 +150,14 @@ end
 ; :Params:
 ;       CLASS:          out, optional, type=structure
 ;                       The class definition structure.
+;
+; :Fields:
+;       _MRGRAPHICSEVENTADAPTER:    Objects must have at least one property.
 ;-
-pro MrDraw_Event_Handler__Define, class
+pro MrGraphicsEventAdapter__Define, class
     compile_opt strictarr
     
-    class = { MrDraw_Event_Handler, $
-              drag: 0B $
+    class = { MrGraphicsEventAdapter, $
+              _MrGraphicsEventAdatapter: 0B $
             }
 end
