@@ -1,1 +1,0 @@
-/Users/argall/Documents/Work/Programs/MyLibraryIDL/time_utils/cdf_epoch_type.pro

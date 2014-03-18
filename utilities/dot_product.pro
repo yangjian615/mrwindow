@@ -1,1 +1,1 @@
-/Users/argall/Documents/Work/Programs//MyLibraryIDL/math_utils/dot_product.pro
+/Users/argall/Documents/Work/Programs/MyLibraryIDL/math_utils/dot_product.pro

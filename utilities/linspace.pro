@@ -1,1 +1,1 @@
-/Users/argall/Documents/Work/Programs//MyLibraryIDL/array_utils/linspace.pro
+/Users/argall/Documents/Work/Programs/MyLibraryIDL/array_utils/linspace.pro

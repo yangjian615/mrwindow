@@ -612,7 +612,7 @@ end
 pro MrWidgetBase__define, class
     compile_opt strictarr
 
-    class =  { MrWidgetBase, $          ; The MrWidgetBase object class name.
+    class =  { MrWidgetBase, $
                inherits MrWidgetAtom, $
 
                ;Event Handling Methods

@@ -508,6 +508,7 @@ end
 ;-
 pro MrWidgetAtom::GetProperty, $
  FUNC_HANDLERS=func_handlers, $
+ ID=id, $
  
  ;Widget_Info Options
  ACTIVE=active, $

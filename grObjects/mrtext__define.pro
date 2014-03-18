@@ -910,7 +910,7 @@ _REF_EXTRA=extra
 
     ;Refresh the graphics?
     if n_elements(target) eq 0 $
-        then self -> Refresh
+        then self -> Refresh $
         else if refreshIn then self -> Refresh
                          
     Return, 1

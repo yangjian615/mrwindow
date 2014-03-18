@@ -54,6 +54,9 @@
 ;       raster output, make sure the window you want read is the current window, or
 ;       supply the window ID via the INIT method or the SetProperty method.
 ;
+;       Dialog boxes are created to help the user pick where she wants to save the file.
+;       The GROUP_LEADER property allows the dialog boxes to be associated with a widget.
+;
 ;   INCORPORATING INTO WIDGET PROGRAMS
 ;       To incorporate into a widget program, use the Notify_Realize event handler
 ;       for the Widget_Draw object. In the callback procedure, pass the draw widget's
@@ -82,6 +85,7 @@
 ;                           and _SaveWindow properties so that the class does not have
 ;                           to be inherited. Added the Draw and SetDisplayWindow methods.
 ;                           Added more control to how buttons are made in Create_SaveAs_Menu.- MRA
+;       2014/03/18  -   Added the _Group_Leader property. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -151,7 +155,7 @@ PRO MrSaveAs::AutoPostScriptFile, filename
                DECOMPOSED=self.ps_decomposed, $
                EUROPEAN=self.ps_metric, $
                ENCAPSULATED=self.ps_encapsulated, $
-               GROUP_LEADER=self.tlb, $
+               GROUP_LEADER=*self._group_leader, $
                SCALE_FACTOR=self.ps_scale_factor, $
                CHARSIZE=self.ps_charsize, $
                FONT=self.ps_font, $
@@ -226,7 +230,7 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
            cgPS_Open, $
                 DECOMPOSED=self.ps_decomposed, $
                 FILENAME=thisname, $
-                GROUP_LEADER=self.tlb, $
+                GROUP_LEADER=*self._group_leader, $
                 METRIC=self.ps_metric, $
                 KEYWORDS=keywords, $ ; Returned cgPS_Config keywords.
                 SCALE_FACTOR=self.ps_scale_factor, $
@@ -264,7 +268,7 @@ PRO MrSaveAs::AutoRasterFile, filetype, filename
            cgPS_Open, $
                 DECOMPOSED=self.ps_decomposed, $
                 FILENAME=thisname, $
-                GROUP_LEADER=self.tlb, $
+                GROUP_LEADER=*self._group_leader, $
                 METRIC=self.ps_metric, $
                 KEYWORDS=keywords, $ ; Returned cgPS_Config keywords.
                 SCALE_FACTOR=self.ps_scale_factor, $
@@ -469,6 +473,77 @@ end
 
 
 ;+
+; Sends the window commands to a PostScript file.
+;
+; :Params:
+;     event: in, required, type=structure
+;         An event structure.
+;-
+PRO MrSaveAs::CreatePostScriptFile, event
+    Compile_Opt idl2
+    
+    ; Error handling during postscript output.
+    Catch, PS_Error
+    IF PS_Error NE 0 THEN BEGIN
+        Catch, /CANCEL
+        void = cgErrorMsg()
+        
+        ; Close the PostScript file.
+        cgPS_Close, /NoFix     
+
+        ; Set the window index number back.
+        IF N_Elements(currentWindow) NE 0 THEN BEGIN
+            IF WindowAvailable(currentWindow) THEN WSet, currentWindow ELSE WSet, -1
+        ENDIF
+        RETURN
+    ENDIF
+    
+    ; Make this window the current graphics windows.
+    self -> SetDisplayWindow, currentWindow
+    IF currentWindow EQ -1 THEN RETURN
+    
+    ; Construct a file name, if you have one.
+    ext = self.ps_encapsulated ? '.eps' : '.ps'
+    IF self.saveFile NE "" THEN BEGIN
+        filename = Filepath(ROOT_DIR=self.saveDir, self.saveFile + ext)
+    ENDIF ELSE BEGIN
+         CD, CURRENT=thisDir
+         filename = Filepath(ROOT_DIR=thisDir, 'MrDrawWindow' + ext)
+    ENDELSE
+
+    ; Allow the user to configure the PostScript file.
+    cgPS_Open, /GUI, $
+               CANCEL=cancelled, $
+               CHARSIZE=self.ps_charsize, $
+               DECOMPOSED=self.ps_decomposed, $
+               EUROPEAN=self.ps_metric, $
+               ENCAPSULATED=self.ps_encapsulated, $
+               FILENAME=filename, $
+               FONT=self.ps_font, $
+               GROUP_LEADER=*self._group_leader, $
+               KEYWORDS=keywords, $
+               SCALE_FACTOR=self.ps_scale_factor, $
+               QUIET=self.ps_quiet, $
+               TT_FONT=self.ps_tt_font
+    IF cancelled THEN RETURN
+    
+    ; Save the name of the last output file.
+    self.saveDir = File_DirName(keywords.filename)
+    self.saveFile = cgRootName(keywords.filename)
+    
+    ; Execute the graphics commands.
+    self -> Draw
+    
+    ; Clean up.
+    cgPS_Close
+    
+    ; Set the window index number back.
+    IF WindowAvailable(currentWindow) THEN WSet, currentWindow ELSE WSet, -1
+
+END
+
+
+;+
 ;   Some methods of saving simply reqd the image from the display window. Others, such
 ;   as the postscript device, require the graphics to be re-drawn. In those cases, this
 ;   method determines how that drawing should be undertaken.
@@ -479,7 +554,7 @@ pro MrSaveAs::Draw
     ;If the class has been inherited, there is no reason to supply a window. Interal
     ;calls to the draw method will be directed to the superclass's draw method. If
     ;it has not been inherited, we need to call the window's Draw method.
-    self.window -> Draw
+    self._SaveWindow -> Draw
 end
 
 
@@ -607,79 +682,6 @@ WINDOW=theWindow
     IF Arg_Present(im_options)      THEN im_options     = self.im_options
     IF Arg_Present(im_resize)       THEN im_resize      = self.im_resize
     IF Arg_Present(im_raster)       THEN im_raster      = self.im_raster
-END
-
-
-;+
-; Sends the window commands to a PostScript file.
-;
-; :Params:
-;     event: in, required, type=structure
-;         An event structure.
-;-
-PRO MrSaveAs::CreatePostScriptFile, event
-
-    Compile_Opt idl2
-    
-    ; Error handling.
-    Catch, theError
-    IF theError NE 0 THEN BEGIN
-        Catch, /CANCEL
-        void = cgErrorMsg()
-        
-        ; Close the PostScript file.
-        cgPS_Close, /NoFix     
-
-        ; Set the window index number back.
-        IF N_Elements(currentWindow) NE 0 THEN BEGIN
-            IF WindowAvailable(currentWindow) THEN WSet, currentWindow ELSE WSet, -1
-        ENDIF
-        
-        RETURN
-    ENDIF
-    
-    ; Make this window the current graphics windows
-    self -> SetDisplayWindow, currentWindow
-    if currentWindow eq -1 then return
-    
-    ; Construct a file name, if you have one.
-    ext = self.ps_encapsulated ? '.eps' : '.ps'
-    IF self.saveFile NE "" THEN BEGIN
-        filename = Filepath(ROOT_DIR=self.saveDir, self.saveFile + ext)
-    ENDIF ELSE BEGIN
-         CD, CURRENT=thisDir
-         filename = Filepath(ROOT_DIR=thisDir, 'MrDrawWindow' + ext)
-    ENDELSE
-
-    ; Allow the user to configure the PostScript file.
-    cgPS_Open, /GUI, $
-        CANCEL=cancelled, $
-        CHARSIZE=self.ps_charsize, $
-        DECOMPOSED=self.ps_decomposed, $
-        EUROPEAN=self.ps_metric, $
-        ENCAPSULATED=self.ps_encapsulated, $
-        FILENAME=filename, $
-        FONT=self.ps_font, $
-        GROUP_LEADER=self.tlb, $
-        KEYWORDS=keywords, $
-        SCALE_FACTOR=self.ps_scale_factor, $
-        QUIET=self.ps_quiet, $
-        TT_FONT=self.ps_tt_font
-    IF cancelled THEN RETURN
-    
-    ; Save the name of the last output file.
-    self.saveDir = File_DirName(keywords.filename)
-    self.saveFile = cgRootName(keywords.filename)
-    
-    ; Execute the graphics commands.
-    self -> Draw
-    
-    ; Clean up.
-    cgPS_Close
-    
-    ; Set the window index number back.
-    IF WindowAvailable(currentWindow) THEN WSet, currentWindow ELSE WSet, -1
-
 END
 
 
@@ -825,7 +827,7 @@ PRO MrSaveAs::SaveAsRaster, event
            cgPS_Open, $
                 DECOMPOSED=self.ps_decomposed, $
                 FILENAME=thisname, $
-                GROUP_LEADER=self.tlb, $
+                GROUP_LEADER=*self._group_leader, $
                 METRIC=self.ps_metric, $
                 KEYWORDS=keywords, $ ; Returned PSConfig keywords.
                 SCALE_FACTOR=self.ps_scale_factor, $
@@ -862,7 +864,7 @@ PRO MrSaveAs::SaveAsRaster, event
            cgPS_Open, $
                 DECOMPOSED=self.ps_decomposed, $
                 FILENAME=thisname, $
-                GROUP_LEADER=self.tlb, $
+                GROUP_LEADER=*self._group_leader, $
                 METRIC=self.ps_metric, $
                 KEYWORDS=keywords, $ ; Returned PSConfig keywords.
                 SCALE_FACTOR=self.ps_scale_factor, $
@@ -975,7 +977,7 @@ DIRECTORY=directory
             else file = self.saveFile
         
         ;Ask for a file name
-        filename = dialog_pickfile(DIALOG_PARENT=self.tlb, $
+        filename = dialog_pickfile(DIALOG_PARENT=*self._group_leader, $
                                    FILE=file, PATH=directory, GET_PATH=saveDir, $
                                    TITLE='Save Image As:', /WRITE)
         
@@ -1062,6 +1064,9 @@ end
 ;     ADJUSTSIZE:               in, optional, type=boolean
 ;                               Set this keyword to adjust default character size to the
 ;                                   display window size.
+;     GROUP_LEADER:             in, optional, type=long
+;                               ID of a widget that will serve as a group leader for
+;                                   any dialog pickfile boxes that appear.
 ;     IM_DENSITY:               in, optional, type=integer, default=300
 ;                               Set this keyword to the sampling density when ImageMagick
 ;                                   creates raster image file from PostScript outout.
@@ -1120,12 +1125,13 @@ end
 ;                               ID of the display window that will be read when raster
 ;                                   output is generated. If not given, the window indicated
 ;                                   by !D.Window will be read.
-;     THEWINDOW:                in, optional, type=object
+;     WINDOW:                   in, optional, type=object
 ;                               A display window with a Draw method. Required for
 ;                                   post-script output.
 ;-
 PRO MrSaveAs::SetProperty, $
 ADJUSTSIZE=adjustsize, $       ; Adjust the default charsize to match display size.
+GROUP_LEADER=group_leader, $                  ; ID of a widget to serve as the group leader
 IM_DENSITY=im_density, $                      ; Sets the density parameter on ImageMagick convert command.
 IM_OPTIONS=im_options, $                      ; Sets extra ImageMagick options on the ImageMagick convert command.
 IM_RASTER=im_raster, $                        ; Sets whether to use ImageMagick to create raster files.
@@ -1155,28 +1161,29 @@ WINDOW=theWindow
         RETURN
     ENDIF
     
-    IF N_Elements(winID)                NE 0 THEN self._saveWinID  = winID
-    IF N_Elements(theWindow)            NE 0 THEN self._saveWindow = theWindow
+    IF N_Elements(winID)                GT 0 THEN  self._saveWinID    = winID
+    IF N_Elements(theWindow)            GT 0 THEN  self._saveWindow   = theWindow
+    IF N_Elements(group_leader)         GT 0 THEN *self._group_leader = group_leader
     
-    IF N_Elements(adjustsize)           NE 0 THEN self.adjustsize = Keyword_Set(adjustsize)
+    IF N_Elements(adjustsize)           GT 0 THEN self.adjustsize = Keyword_Set(adjustsize)
 
-    IF N_Elements(im_transparent)       NE 0 THEN self.im_transparent       = im_transparent
-    IF N_Elements(im_density)           NE 0 THEN self.im_density           = im_density
-    IF N_Elements(im_resize)            NE 0 THEN self.im_resize            = im_resize
-    IF N_Elements(im_options)           NE 0 THEN self.im_options           = im_options
-    IF N_Elements(im_raster)            NE 0 then self.im_raster            = im_raster
-    IF N_Elements(im_width)             NE 0 then self.im_width             = im_width
-    IF N_Elements(pdf_unix_convert_cmd) NE 0 THEN self.pdf_unix_convert_cmd = pdf_unix_convert_cmd
-    IF N_Elements(pdf_path)             NE 0 THEN self.pdf_path             = pdf_path
-    IF N_Elements(ps_decomposed)        NE 0 THEN self.ps_decomposed        = ps_decomposed
-    IF N_Elements(ps_delete)            NE 0 THEN self.ps_delete            = ps_delete
-    IF N_Elements(ps_metric)            NE 0 THEN self.ps_metric            = ps_metric
-    IF N_Elements(ps_encapsulated)      NE 0 THEN self.ps_encapsulated      = ps_encapsulated
-    IF N_Elements(ps_charsize)          NE 0 THEN self.ps_charsize          = ps_charsize
-    IF N_Elements(ps_font)              NE 0 THEN self.ps_font              = ps_font
-    IF N_Elements(ps_quiet)             NE 0 THEN self.ps_quiet             = ps_quiet
-    IF N_Elements(ps_scale_factor)      NE 0 THEN self.ps_scale_factor      = ps_scale_factor
-    IF N_Elements(ps_tt_font)           NE 0 THEN self.ps_tt_font           = ps_tt_font    
+    IF N_Elements(im_transparent)       GT 0 THEN self.im_transparent       = im_transparent
+    IF N_Elements(im_density)           GT 0 THEN self.im_density           = im_density
+    IF N_Elements(im_resize)            GT 0 THEN self.im_resize            = im_resize
+    IF N_Elements(im_options)           GT 0 THEN self.im_options           = im_options
+    IF N_Elements(im_raster)            GT 0 then self.im_raster            = im_raster
+    IF N_Elements(im_width)             GT 0 then self.im_width             = im_width
+    IF N_Elements(pdf_unix_convert_cmd) GT 0 THEN self.pdf_unix_convert_cmd = pdf_unix_convert_cmd
+    IF N_Elements(pdf_path)             GT 0 THEN self.pdf_path             = pdf_path
+    IF N_Elements(ps_decomposed)        GT 0 THEN self.ps_decomposed        = ps_decomposed
+    IF N_Elements(ps_delete)            GT 0 THEN self.ps_delete            = ps_delete
+    IF N_Elements(ps_metric)            GT 0 THEN self.ps_metric            = ps_metric
+    IF N_Elements(ps_encapsulated)      GT 0 THEN self.ps_encapsulated      = ps_encapsulated
+    IF N_Elements(ps_charsize)          GT 0 THEN self.ps_charsize          = ps_charsize
+    IF N_Elements(ps_font)              GT 0 THEN self.ps_font              = ps_font
+    IF N_Elements(ps_quiet)             GT 0 THEN self.ps_quiet             = ps_quiet
+    IF N_Elements(ps_scale_factor)      GT 0 THEN self.ps_scale_factor      = ps_scale_factor
+    IF N_Elements(ps_tt_font)           GT 0 THEN self.ps_tt_font           = ps_tt_font    
 END
 
 
@@ -1204,6 +1211,9 @@ end
 ;     ADJUSTSIZE:               in, optional, type=boolean
 ;                               Set this keyword to adjust default character size to the
 ;                                   display window size.
+;     GROUP_LEADER:             in, optional, type=long
+;                               ID of a widget that will serve as a group leader for
+;                                   any dialog pickfile boxes that appear.
 ;     IM_DENSITY:               in, optional, type=integer, default=300
 ;                               Set this keyword to the sampling density when ImageMagick
 ;                                   creates raster image file from PostScript outout.
@@ -1260,7 +1270,8 @@ end
 ;                                   creating PostScript output.
 ;-
 function MrSaveAs::init, winID, theWindow, $
-ADJUSTSIZE=adjustsize, $       ; Adjust the default charsize to match display size.
+ADJUSTSIZE=adjustsize, $                      ; Adjust the default charsize to match display size.
+GROUP_LEADER=group_leader, $                  ; ID of a widget to serve as the group leader
 IM_DENSITY=im_density, $                      ; Sets the density parameter on ImageMagick convert command.
 IM_OPTIONS=im_options, $                      ; Sets extra ImageMagick options on the ImageMagick convert command.
 IM_RASTER=im_raster, $                        ; Sets whether to use ImageMagick to create raster files.
@@ -1325,6 +1336,10 @@ PS_TT_FONT=ps_tt_font                         ; Select the true-type font to use
 ;---------------------------------------------------------------------
     if n_elements(winID)     gt 0 then self._saveWinID  = winID
     if n_elements(theWindow) gt 0 then self._saveWindow = theWindow
+    
+    ;Heap Variables
+    self._group_leader = ptr_new(/ALLOCATE_HEAP)
+    if n_elements(group_leader) gt 0 then *self._group_leader = group_leader
 
 ;    self.adjustsize = d_adjustsize
     self.im_transparent = n_elements(im_transparent) gt 0 ? im_transparent : d_im_transparent
@@ -1364,8 +1379,9 @@ pro MrSaveAs__define, class
     class = {MrSaveAs, $
     
              ;Display window
-             _SaveWindow: obj_new(), $     ; Window in which graphics are displayed.
-             _SaveWinID:  0L, $            ; ID of the window from which the image will be read.
+             _SaveWindow:   obj_new(), $   ; Window in which graphics are displayed.
+             _SaveWinID:    0L, $          ; ID of the window from which the image will be read.
+             _group_leader: ptr_new(), $   ; ID of a widget to serve as a group leader.
               
              ; PostScript options.
              ps_decomposed: 0L, $          ; Sets the PostScript color mode.

@@ -1,1 +1,1 @@
-/Users/argall/Documents/Work/Programs//WileEGraphics/wecolorbar__define.pro
+/Users/argall/Documents/Work/Programs/WileEGraphics/wecolorbar__define.pro

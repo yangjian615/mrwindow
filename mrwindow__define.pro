@@ -363,6 +363,7 @@ YSIZE = ysize
     button = widget_button(fileID, VALUE='Close', UVALUE={object: self, method: 'Destroy'}, /SEPARATOR)
 
     ;Create a "Save As" menu for the menu bar.
+    self._SaveAs -> SetProperty, GROUP_LEADER=self.tlb
     self._SaveAs -> Create_SaveAs_Menu, menuID, /MENU
 
     ;Make the edit menu in the menu bar
@@ -1347,7 +1348,7 @@ pro MrWindow::ResizeDrawWidget, xsize, ysize
         wDelete, self.winID
         
         if self.buffer then pixmap = 1 else pixmap = 0
-        self.winID = MrGetWindow(TITLE='MrWindow', XSIZE=xsize, YSIZE=ysize, /FREE, PIXMAP=pixmap)
+        self.winID = MrGetWindow(TITLE='MrWindow', XSIZE=xsize, YSIZE=ysize, /FREE, /PIXMAP)
     endif
     
     ;Update the object properties

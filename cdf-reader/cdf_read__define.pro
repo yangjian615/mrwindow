@@ -1,1 +1,1 @@
-/Users/argall/Documents/Work/Programs//cdf-reader/cdf_read__define.pro
+/Users/argall/Documents/Work/Programs/Projects/cdf-reader/cdf_read__define.pro

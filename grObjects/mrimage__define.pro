@@ -389,7 +389,7 @@ NOERASE=noerase
                 
                   ;MrLayout Keywords
                   POSITION      =       position, $
-                  CHARSIZE      =       charchize, $
+                  CHARSIZE      =       charsize, $
                 
                   ;Graphics Keywords
                   MAX_VALUE     =       max_value, $
@@ -709,6 +709,7 @@ X_POS = x_pos, $
 Y_POS = y_pos, $
 
 ;MrImage Keywords
+CHARSIZE = charsize, $
 IDISPLAY = iDisplay, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
@@ -756,6 +757,7 @@ _REF_EXTRA = extra
     if arg_present(Y_POS) and n_elements(*self.Y_POS) ne 0 then y_pos = *self.y_pos
 
     ;MrImage Properties
+    if arg_present(charsize)    then self.layout -> GetProperty, CHARSIZE=charsize
     if arg_present(iDisplay)    then iDisplay    =  self.iDisplay
     if arg_present(INIT_XRANGE) then init_xrange =  self.init_xrange
     if arg_present(INIT_YRANGE) then init_yrange =  self.init_yrange
@@ -790,7 +792,6 @@ _REF_EXTRA = extra
     
     ;MrGraphicsKeywords Properties
     if n_elements(EXTRA) ne 0 then begin
-        self -> MrLayout::GetProperty, _EXTRA=extra
         self -> MrGrAtom::GetProperty, _EXTRA=extra
         self -> MrGraphicsKeywords::GetProperty, _EXTRA=extra
     endif
@@ -1331,9 +1332,11 @@ end
 function MrImage::init, image, x, y, x0, y0, x1, y1, $
 ;MrImage Keywords
 CURRENT = current, $
+HIDE = hide, $
 IDISPLAY = idisplay, $
 KEEP_ASPECT = keep_aspect, $
 LAYOUT = layout, $
+NAME = name, $
 POSITION = position, $
 TV = tv, $
       
@@ -1432,13 +1435,10 @@ _REF_EXTRA = extra
     ;Layout -- Must be done before initializing MrGrLayout
     self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
     
-    ;Superclass
-    if self -> MrGrAtom::INIT(CURRENT=current) eq 0 then $
-        message, 'Unable to initialize MrGrAtom'
-        
-    ;Turn refresh off
-    self.window -> GetProperty, REFRESH=refreshIn
-    if refreshIn then self -> Refresh, /DISABLE
+    ;Superclass.
+    if self -> MrGrAtom::INIT(CURRENT=current, NAME=name, HIDE=hide, TARGET=target, $
+                              WINREFRESH=winRefresh, WINDOW_TITLE=window_title) eq 0 $
+       then message, 'Unable to initialize MrGrAtom'
 
 ;---------------------------------------------------------------------
 ;Input Parameters ////////////////////////////////////////////////////
@@ -1585,11 +1585,11 @@ _REF_EXTRA = extra
     self.init_xrange = xrange
     self.init_yrange = yrange
     self.init_range = imRange
-    
+
     ;Refresh the graphics?
     if keyword_set(current) eq 0 $
         then self -> Refresh $
-        else if refreshIn then self -> Refresh
+        else if winRefresh then self -> Refresh
 
     return, 1
 end

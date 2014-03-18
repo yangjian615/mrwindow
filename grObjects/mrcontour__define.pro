@@ -127,7 +127,14 @@ NOERASE=noerase
     
     ;Overplot?
     if self.overplot then begin
+        ;Restore target's coordinate system. Make sure that the overplot
+        ;is positioned correctly.
         self.target -> RestoreCoords
+        position = [!x.window[0], !y.window[0], $
+                    !x.window[1], !y.window[1]]
+        self.layout -> SetProperty, POSITION=position, UPDATE_LAYOUT=0
+        
+        ;Overplot
         self -> doContour, NOERASE=noerase, $
                            OLEVELS=oLevels
         self -> SaveCoords
@@ -1716,16 +1723,13 @@ _REF_EXTRA=extra
     self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
     
     ;Was the /OVERPLOT keyword set, instead of giving a target
-    if MrIsA(target, /SCALAR, /INTEGER) $
+    if MrIsA(target, /SCALAR, 'INT') $
         then if keyword_set(target) then target = self -> _GetTarget()
-    
-    ;Superclass
-    if self -> MrGrAtom::INIT(CURRENT=current, TARGET=target, WINDOW_TITLE=window_title) eq 0 then $
-        message, 'Unable to initialize MrGrAtom'
-    
-    ;Turn off refresh while various properties are set
-    self.window -> GetProperty, REFRESH=refreshIn
-    if refreshIn eq 1 then theWindow -> Refresh, /DISABLE
+
+    ;Superclass.
+    if self -> MrGrAtom::INIT(CURRENT=current, NAME=name, HIDE=hide, TARGET=target, $
+                              WINREFRESH=winRefresh, WINDOW_TITLE=window_title) eq 0 $
+       then message, 'Unable to initialize MrGrAtom'
 
 ;---------------------------------------------------------------------
 ;Defaults ////////////////////////////////////////////////////////////
@@ -1897,7 +1901,7 @@ _REF_EXTRA=extra
     ;Refresh the graphics?
     if keyword_set(current) eq 0 && n_elements(target) eq 0 $
         then self -> Refresh $
-        else if refreshIn then self -> Refresh
+        else if winRefresh then self -> Refresh
 
     return, 1
 end

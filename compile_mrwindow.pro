@@ -30,16 +30,16 @@
 .comp ./cdf-reader/utilities/type_to_format_code.pro
 
 ;Graphic Functions
-.comp ./mrarrow.pro
-.comp ./mraxis.pro
-.comp ./mrcolorbar.pro
-.comp ./mrcolorfill.pro
-.comp ./mrcontour.pro
-.comp ./mrimage.pro
-.comp ./mrlegend.pro
-.comp ./mrplot.pro
-.comp ./mrplots.pro
-.comp ./mrtext.pro
+.comp ./grFunctions/mrarrow.pro
+.comp ./grFunctions/mraxis.pro
+.comp ./grFunctions/mrcolorbar.pro
+.comp ./grFunctions/mrcolorfill.pro
+.comp ./grFunctions/mrcontour.pro
+.comp ./grFunctions/mrimage.pro
+.comp ./grFunctions/mrlegend.pro
+.comp ./grFunctions/mrplot.pro
+.comp ./grFunctions/mrplots.pro
+.comp ./grFunctions/mrtext.pro
 
 ;Graphic Manager
 .comp ./grManager/mrgrlayout__define.pro
@@ -64,6 +64,14 @@
 .comp ./grSuperclasses/mrgraphicskeywords__define.pro
 .comp ./grSuperclasses/mrgratom__define.pro
 .comp ./grSuperclasses/mrlayout__define.pro
+
+;Widgets
+.comp ./widgets/mrdrawwidget__define.pro
+.comp ./widgets/mreventhandler__define.pro
+.comp ./widgets/mrgraphicseventadapter__define.pro
+.comp ./widgets/mrtoplevelbase__define.pro
+.comp ./widgets/mrwidgetatom__define.pro
+.comp ./widgets/mrwidgetbase__define.pro
 
 ;Utilities
 .comp ./utilities/dot_product.pro
