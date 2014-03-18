@@ -727,12 +727,7 @@ end
 ;                           to be called when events are generated. If a structure
 ;                           is provided, its only fields must be "object" and "method",
 ;                           describing the procedure method to be used as an event
-;                           handler::
-;                               {object: oRef, $
-;                               method: 'callback_method'}
-;                           For function event handling, set the `FUNCTION_CALLBACK`
-;                           keyword. If set, all of the *_HANDLER keywords will be
-;                           ignored.
+;                           handler
 ;       DROP_EVENTS:    out, optional, type=boolean
 ;                       If set, drop events will be enabled.
 ;       DROP_HANDLER:   out, optional, type=string/structure
@@ -909,12 +904,7 @@ end
 ;                           to be called when events are generated. If a structure
 ;                           is provided, its only fields must be "object" and "method",
 ;                           describing the procedure method to be used as an event
-;                           handler::
-;                               {object: oRef, $
-;                               method: 'callback_method'}
-;                           For function event handling, set the `FUNCTION_CALLBACK`
-;                           keyword. If set, all of the *_HANDLER keywords will be
-;                           ignored.
+;                           handler
 ;       DROP_EVENTS:    in, optional, type=boolean
 ;                       If set, drop events will be enabled.
 ;       DROP_HANDLER:   in, optional, type=string/structure
@@ -1242,7 +1232,7 @@ end
 ;                           handler::
 ;                               {object: oRef, $
 ;                               method: 'callback_method'}
-;                           For function event handling, set the `FUNCTION_CALLBACK`
+;                           For function event handling, set the `FUNC_HANDLERS`
 ;                           keyword. If set, all of the *_HANDLER keywords will be
 ;                           ignored.
 ;       DROP_EVENTS:    in, optional, type=boolean, default=0
@@ -1258,10 +1248,11 @@ end
 ;       EXPOSE_HANDLER: in, optional, type=string/structure
 ;                       Either the name of the procedure or a structure defining an object
 ;                           method to be called when expose events are generated.
-;   FUNCTION_CALLBACKS: in, optional, type=boolean, default=0
+;       FUNC_HANDLERS:  in, optional, type=boolean, default=0
 ;                       If set, function callbacks will be used, not procedures. This
-;                           switches `EVENT_HANDLER` from EVENT_PRO to EVENT_FUNC.
-;
+;                           switches `EVENT_HANDLER` from EVENT_PRO to EVENT_FUNC. All
+;                           events handled by `EVENT_HANDLER`, then, must have functions
+;                           for event handlers, not procdures.
 ;       FRAME:          in, optional, type=integer, default=0
 ;                       Create a frame this many pixels wide around the widget.
 ;       GROUP_LEADER:   in, optional, type=integer
@@ -1362,7 +1353,7 @@ end
 function MrDrawWidget::init, parent,   $
 ;MrDrawWidget Keywords
  BACKGROUND=background, $
- FUNCTION_CALLBACK=function_callback, $
+ FUNC_HANDLERS=func_handlers, $
  NOERASE=noerase, $
  REFRESH=refresh, $
  WINDOW_TITLE=window_title, $
@@ -1423,10 +1414,9 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
 ;Defaults ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-;    self._nodraw = keyword_set(nodraw)
-    function_callbacks = keyword_set(function_callbacks)
-    noerase            = keyword_set(noerase)
-    refresh            = keyword_set(refresh)
+    func_handlers = keyword_set(func_handlers)
+    noerase       = keyword_set(noerase)
+    refresh       = keyword_set(refresh)
     if n_elements(background_color) eq 0 then background_color = 'White'
     if n_elements(retain)           eq 0 then retain=(!version.os_family eq 'windows') ? 1 : 2
     if n_elements(xsize)            eq 0 then xsize = 300
@@ -1512,7 +1502,7 @@ _REF_EXTRA=extra
                                          _STRICT_EXTRA=extra)
     if success eq 0 then message, 'MrWidgetAtom could not be initialized.'
     
-    self -> SetProperty, FUNCTION_CALLBACKS=function_callbacks, $
+    self -> SetProperty, FUNC_HANDLERS=func_handlers, $
                          DRAG_NOTIFY=drag_notify, $
                          DROP_HANDLER=drop_handler, $
                          EXPOSE_HANDLER=expose_handler, $
