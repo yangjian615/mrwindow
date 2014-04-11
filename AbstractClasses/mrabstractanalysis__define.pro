@@ -89,11 +89,14 @@
 ;       4+2     -   Average
 ;       8+2     -   MVAB
 ;       16+2    -   vHT
+;       32+2    -   MVAB Cross
+;       64+2    -   aHT
 ;
 ; Uses::
 ;   Uses the following external programs::
+;       cgErrorMsg.pro
+;       MrHTAnalysis.pro
 ;       windowavailable.pro (Coyote Graphics)
-;       error_message.pro (Coyote Graphics)
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -114,6 +117,11 @@
 ;       2014/01/21  -   Use cgColor to load colors into the color table. - MRA
 ;       2014/01/30  -   Put quotes around "copy + paste" output to make valid strings. - MRA
 ;       2014/03/03  -   Added TAIL keyword for performing MVAB in the magnetotail. - MRA
+;       2014/04/02  -   INVERSE keyword now leaves input rotation matrix to the Rotate
+;                           method unchanged. Average method works with new version of
+;                           MrWindow. - MRA
+;       2014/05/04  -   Added ability to perform an HT analysis for a boundary moving
+;                           with a constant acceleration. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -223,9 +231,21 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
             endelse
         endcase
         
+        ;GET_INTERVAL will be used
+        'AHT': begin
+            if isSet then begin
+                self.amode = [64 + 2, 0, 0]
+                self -> On_Off_Button_Events, /ON
+            endif else begin
+                self.amode = [0, 0, 0]
+                if ptr_valid(self.intervals) then ptr_free, self.intervals
+                self -> On_Off_Button_Events, /OFF
+            endelse
+        endcase
+        
         'VERTICAL_CUT': begin
             if isSet then begin
-                self.amode = [64, 1, 0]
+                self.amode = [128, 1, 0]
                 self -> On_Off_Button_Events, /ON
                 self -> On_Off_Motion_Events, /ON
             endif else begin
@@ -237,7 +257,7 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
         
         'HORIZONTAL_CUT': begin
             if isSet then begin
-                self.amode = [128, 1, 0]
+                self.amode = [256, 1, 0]
                 self -> On_Off_Button_Events, /ON
                 self -> On_Off_Motion_Events, /ON
             endif else begin
@@ -302,9 +322,13 @@ QUIET = quiet
     quiet = keyword_set(quiet)
 
     ;Get the object whose data is being analyzed
-    if n_elements(location) eq 0 $
-        then theObj = self -> GetSelect() $
-        else theObj = self -> Get(LOCATION=location, PINDEX=plot_index)
+    if n_elements(location) eq 0 then begin
+        theObj = self -> GetSelect()
+    endif else begin
+        if plot_index $
+            then theObj = self -> FindByPIndex(location) $
+            else theObj = self -> FindByColRow(location)
+    endelse
     
 ;---------------------------------------------------------------------
 ;Get Data and Compute Average ////////////////////////////////////////
@@ -377,7 +401,8 @@ MVAB = mvab, $
 MVA_CROSS = mva_cross, $
 NONE = none, $
 VERTICAL_CUT = vertical_cut, $
-VHT = vHT
+VHT = vHT, $
+AHT = aHT
     compile_opt strictarr
     
     ;Error handling
@@ -389,20 +414,21 @@ VHT = vHT
     endif
     
     ;Set Defaults
-    setDefaultValue, average,        0, /BOOLEAN
-    setDefaultValue, get_data_value, 0, /BOOLEAN
-    setDefaultValue, get_interval,   0, /BOOLEAN
-    setDefaultValue, horizontal_cut, 0, /BOOLEAN
-    setDefaultValue, menu,           0, /BOOLEAN
-    setDefaultValue, mvab,           0, /BOOLEAN
-    setDefaultValue, mva_cross,      0, /BOOLEAN
-    setDefaultValue, none,           0, /BOOLEAN
-    setDefaultValue, vertical_cut,   0, /BOOLEAN
-    setDefaultValue, vHT,            0, /BOOLEAN
+    average        = keyword_set(average)
+    get_data_value = keyword_set(get_data_value)
+    get_interval   = keyword_set(get_interval)
+    horizontal_cut = keyword_set(horizontal_cut)
+    menu           = keyword_set(menu)
+    mvab           = keyword_set(mvab)
+    mva_cross      = keyword_set(mva_cross)
+    none           = keyword_set(none)
+    vertical_cut   = keyword_set(vertical_cut)
+    vHT            = keyword_set(vHT)
+    aHT            = keyword_set(aHT)
     
     ;If no buttons were selected, select them all.
     if (get_data_value + vertical_cut + horizontal_cut + get_interval + average + $
-        mvab + mva_cross + vHT eq 0) $
+        mvab + mva_cross + vHT + aHT eq 0) $
     then begin
         average        = 1
         get_data_value = 1
@@ -414,6 +440,7 @@ VHT = vHT
         none           = 1
         vertical_cut   = 1
         vHT            = 1
+        aHT            = 1
     endif
     
     ;Create the Menu
@@ -430,6 +457,7 @@ VHT = vHT
     if keyword_set(mvab)           then button = widget_button(cursorID, VALUE='MVAB',           UNAME='MVAB',           /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(mva_cross)      then button = widget_button(cursorID, VALUE='MVA_CROSS',      UNAME='MVAB',           /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(vHT)            then button = widget_button(cursorID, VALUE='vHT',            UNAME='VHT',            /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
+    if keyword_set(aHT)            then button = widget_button(cursorID, VALUE='aHT',            UNAME='AHT',            /CHECKED_MENU, UVALUE={object: self, method: 'Analysis_Menu_Events'})
     if keyword_set(none)           then button = widget_button(cursorID, VALUE='None',           UNAME='ANONE',                         UVALUE={object: self, method: 'Analysis_Menu_Events'})
 end
 
@@ -656,6 +684,7 @@ pro MrAbstractAnalysis::Get_Interval, event
                 self -> Average, xrange, location, avg, /QUIET
                 self -> MVA_Cross, xrange, avg
             endif
+            if ((self.amode[0] and 64) gt 0) then self -> vHT, xrange, yrange, /ACCELERATED
             
             ;reset initial click
             self.x0 = -1
@@ -1074,7 +1103,7 @@ end
 
 
 ;+
-;   Transform 3-component time series data from one coordinate system to anoteh.
+;   Transform 3-component time series data from one coordinate system to another.
 ;
 ; :Params:
 ;       ROTMAT:             in, required, type=fltarr(3\,3)
@@ -1129,7 +1158,9 @@ INVERSE = inverse
     endif
 
     ;Inverse transformation
-    if keyword_set(inverse) then rotmat = transpose(rotmat)
+    if keyword_set(inverse) $
+        then rotOut = transpose(rotmat) $
+        else rotOut = rotmat
     
 ;---------------------------------------------------------------------
 ;Rotate the Data /////////////////////////////////////////////////////
@@ -1137,7 +1168,7 @@ INVERSE = inverse
     
     theObj -> GetData, dep
     
-    dep = rotate_vector(rotmat, dep)
+    dep = rotate_vector(rotOut, dep)
     dMin = min(dep, max=dMax)
     
     self -> Refresh, /DISABLE
@@ -1315,8 +1346,14 @@ end
 ;       YRANGE:             in, required, type=numeric
 ;                           A range of coordinate on the ordinate for which the minimum
 ;                               variance coordinate system is to be found.
+;
+; :Keywords:
+;       ACCELERATED:        in, optional, type=boolean, default=0
+;                           If set, the HT frame will be calculated assuming a constant
+;                               acceleration of the 1D boundary.
 ;-
-pro MrAbstractAnalysis::vHT, xrange, yrange
+pro MrAbstractAnalysis::vHT, xrange, yrange, $
+ACCELERATED=accelerated
     compile_opt strictarr
     
     ;Error handling
@@ -1404,19 +1441,25 @@ pro MrAbstractAnalysis::vHT, xrange, yrange
 ;---------------------------------------------------------------------
 
     ;Interpolate the data.
-    MrInterp_TS, B, v, t_B, t_v, B_interp, v_interp, /NO_COPY
+    MrInterp_TS, B, v, t_B, t_v, B_interp, v_interp, t_out, /NO_COPY
     
-    ;Calculate the deHoffmann-Teller velocity.
-    v_ht = ht_velocity(v_interp, B_interp)
+    ;Accelerated HT Frame
+    if keyword_set(accelerated) then begin
+        vHT = MrHTVelocity(v_interp, B_interp, t_out-t_out[0], AHT=aHT)
     
-    ;Print the time interval
-    print, "'[t0, t1] = ['" + strjoin(ssm_to_hms([(*self.intervals).tRange]), "', '") + "']"
+        ;Print the HT velocity and data interval
+        print, FORMAT='(%"[t0, t1] = [\"%s\", \"%s\"]")', ssm_to_hms([(*self.intervals).tRange])
+        print, FORMAT='(%"vHT      = [%10.4f, %10.4f, %10.4f]")', vHT
+        print, FORMAT='(%"aHT      = [%10.4f, %10.4f, %10.4f]")', aHT
     
-    ;print the results to the command window for easy Copy + Paste
-    print, 'x', 'y', 'z', format='(13x, 2(a1, 11x), a1)'
-    print, 'v_ht =', transpose(v_ht), format='(a6, 3(2x, f10.4))'
-    print, format='(a0, 3(f10.4, a0))', $
-           'v_ht = [', v_ht[0], ', ', v_ht[1], ', ', v_ht[2], ']'
+    ;deHoffmann-Teller Velocity.
+    endif else begin
+        vHT = MrHTVelocity(v_interp, B_interp)
+    
+        ;Print the HT velocity and data interval
+        print, FORMAT='(%"[t0, t1] = [\"%s\", \"%s\"]")', ssm_to_hms([(*self.intervals).tRange])
+        print, FORMAT='(%"vHT      = [%10.4f, %10.4f, %10.4f]")', vHT
+    endelse
     
     ;Reset
     self.amode[2] = 0

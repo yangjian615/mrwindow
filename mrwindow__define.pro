@@ -222,6 +222,8 @@
 ;                           removed the old GetSelect and SetSelect methods. - MRA
 ;       2014/03/13  -   Disinherit the MrSaveAs class, but keep it around as an object
 ;                           property. Added the GetRefresh method for convenience. - MRA
+;       2014/03/26  -   Set the current display when the graphics window is made current. - MRA
+;       2014/04/01  -   Check if CDF cancel buttons were pressed to prevent errors. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -734,14 +736,17 @@ pro MrWindow::File_Menu_Events, event
             
             ;Create the plot from the data
             cdf_obj = obj_new('CDF_PLOT')
+            if obj_valid(cdf_obj) eq 0 then return
+            
             thePlot = cdf_obj -> Plot(GROUP_LEADER=self.tlb, $
                                       DISPLAY_TYPE=display_type, $
                                       /CURRENT)
+            if obj_valid(thePlot) eq 0 then return
             
             ;Add Spectrograms
             if display_type eq '3D_SPECTROGRAM' || display_type eq 'SPECTROGRAM' then begin
                 ;Make sure there is enough room for a colorbar.
-                if self.xmargin[1] lt 15 then self -> SetProperty, XMARGIN=[self.xmargin[0],15]
+                if self.oxmargin[1] lt 15 then self -> SetProperty, OXMARGIN=[self.xmargin[0],15]
             endif
             
             ;Draw and destroy the object
@@ -1404,12 +1409,15 @@ pro MrWindow::SetCurrent
     endif
     
     ;Check if the window is listed
-    tf_contained = !MR_WINDOW -> IsContained(self, POSITION=source)
+    tf_contained = !MR_WINDOWS -> IsContained(self, POSITION=source)
     
     ;Make it first
     if tf_contained $
-        then !MR_WINDOW -> Move, self, source, 0 $
+        then !MR_WINDOWS -> Move, source, 0 $
         else message, 'Window is not listed. Cannot make current.'
+    
+    ;Set the display window
+    wset, self.winID
 end
 
 

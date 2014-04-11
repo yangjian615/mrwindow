@@ -108,6 +108,7 @@ _REF_EXTRA = extra
     ;Create the color bar
     case n_params() of
         1: theImage = obj_new('MrImage', image, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
+        2: theImage = obj_new('MrImage', image, x, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
         3: theImage = obj_new('MrImage', image, x, y, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
         5: theImage = obj_new('MrImage', image, x, y, x0, y0, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
         7: theImage = obj_new('MrImage', image, x, y, x0, y0, x1, y1, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)

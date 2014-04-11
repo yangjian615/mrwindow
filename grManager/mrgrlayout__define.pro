@@ -176,6 +176,8 @@
 ;                           current layout so still uses invariant [col,row] locations. - MRA
 ;       2014/02/07  -   Make_Location was returning the wrong plot index in cases where
 ;                           an extra row was added to the layout. Fixed. - MRA
+;       2014/04/03  -   Return scalars when converting locations, if possible. - MRA
+;       2014/04/04  -   Trim layout was finding the max [col,row] incorrectly. Fixed. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -459,6 +461,9 @@ TO_COLROW=to_colrow
         then return, MrNull(-1) $
         else message, 'Location does not exist within layout. Cannot convert.'
 
+    ;How many locations were given?
+    nLocations = n_elements(location)
+    if colrow then nLocations = nLocations / 2
 ;---------------------------------------------------------------------
 ;Convert Fixed Location //////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -521,7 +526,9 @@ TO_COLROW=to_colrow
             colrow: result = layout[0]*(location[1,*]-1) + location[0,*] - 1
         endcase
     endif
-    
+
+    ;Return a scalar? -- Only for AINDEX and PINDEX
+    if nLocations eq 1 then if to_colrow eq 0 then result = result[0]
     return, result
 end
 
@@ -1593,8 +1600,8 @@ pro MrGrLayout::TrimLayout
     
     ;Find the maximum taken column and row
     ColRow = self -> ConvertLocation(pTaken, /PINDEX, /TO_COLROW)
-    maxCol = max(ColRow[0,pTaken])
-    maxRow = max(ColRow[1,pTaken])
+    maxCol = max(ColRow[0,*])
+    maxRow = max(ColRow[1,*])
 
     ;Trim the layout and recalculate the layout positions.
     if maxCol lt self.GrLayout[0] || maxRow lt self.GrLayout[1] $

@@ -1,10 +1,10 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;       MrPlot
+;       MrVector
 ;
 ;*****************************************************************************************
-;   Copyright (c) 2013, Matthew Argall                                                   ;
+;   Copyright (c) 2014, Matthew Argall                                                   ;
 ;   All rights reserved.                                                                 ;
 ;                                                                                        ;
 ;   Redistribution and use in source and binary forms, with or without modification,     ;
@@ -32,30 +32,30 @@
 ;*****************************************************************************************
 ;
 ;+
-;   Create a MrPlot object.
+;   Create a MrVector object.
 ;
 ; :Params:
-;       X:                  in, required, type=any
-;                           If Y is given, a vector representing the independent variable
-;                               to be plotted. If Y is not given, a vector or array of
-;                               representing the dependent variable to be plotted. Each
-;                               column of X will then be overplotted as individual vectors
-;                               in the same set of axes.
-;       Y:                  in, optional, type=any
-;                           A vector or array of representing the dependent variable to be
-;                               plotted. Each column of Y will then be overplotted
-;                               as individual vectors in the same set of axes.
+;       VELX:           in, required, type=integer/float
+;                       An array containing the X component of the particle velocity vector.
+;       VELY:           in, required, type=integer/float
+;                       An array containing the Y component of the particle velocity vector.
+;       POSX:           in, optional, type=integer/float
+;                       An array containing the X posiiton of the particle velocity vector. The
+;                           shaft end of the arrow vector is positioned here.
+;       POSY:           in, optional, type=integer/float
+;                       An array containing the Y posiiton of the particle velocity vector. The
+;                           shaft end of the arrow vector is positioned here.
 ;
 ; :Keywords:
 ;       CURRENT:            in, optional, type=boolean, default=0
 ;                           If set, the plot will be added to the current MrWindow
 ;                               graphics window.
 ;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by MrPlot__define.
+;                           Any keyword accepted by MrVector__define.
 ;
 ; :Returns:
-;       THEPLOT:            out, required, type=object
-;                           A MrPlot object reference.
+;       THEVECTOR:          out, required, type=object
+;                           A MrVector object reference.
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -65,15 +65,12 @@
 ;       Durham, NH, 03824
 ;       matthew.argall@wildcats.unh.edu
 ;
-; :Copyright:
-;       Matthew Argall 2013
-;
 ; :History:
 ;	Modification History::
-;       2013/11/27  -   Written by Matthew Argall.
+;       2014/03/27  -   Written by Matthew Argall.
 ;-
-function MrPlot, x, y, $
- CURRENT=current, $
+function MrVector, velx, vely, posx, posy, $
+CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -88,12 +85,9 @@ _REF_EXTRA = extra
     ;Add to the current window?
     current = keyword_set(current)
 
-    ;Create the plot
-    case n_params() of
-        1: thePlot = obj_new('MrPlot', x, CURRENT=current, _STRICT_EXTRA=extra)
-        2: thePlot = obj_new('MrPlot', x, y, CURRENT=current, _STRICT_EXTRA=extra)
-        else: message, 'Incorrect number of parameters.'
-    endcase
+    ;Create the color bar
+    theVector = obj_new('MrVector', velx, vely, posx, posy, $
+                        CURRENT=current, _STRICT_EXTRA=extra)
     
-    return, thePlot
+    return, theVector
 end

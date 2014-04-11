@@ -103,6 +103,7 @@
 ;       2014/03/12  -   Overplot and Current are now applied in a more straigh-forward
 ;                           manner. Disinherited MrLayout, but kept it as a object
 ;                           property. Added the Getlayout method. - MRA
+;       2014/03/26  -   Inherit MrGrDataAtom and remove duplicate keywords/methods. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -192,7 +193,7 @@ PATH_XY=path_xy
 ;                   ASPECT           = *self.aspect, $
                    LABEL            =  self.label, $
 ;                   LAYOUT           = *self.layout, $
-                   MAP_OBJECT       =  *self.map_object, $
+                   MAP_OBJECT       = *self.map_object, $
                    OLEVELS          =       oLevels, $
                    ONIMAGE          =  self.onImage, $
                    OUTCOLOR         = *self.outcolor, $
@@ -227,8 +228,8 @@ PATH_XY=path_xy
                    MISSINGVALUE     = *self.missingvalue, $
                    RESOLUTION       = *self.resolution, $
                    TRIANGULATION    = *self.triangulation, $
-                   XLOG             = *self.xlog, $
-                   YLOG             = *self.ylog, $
+                   XLOG             =  self.xlog, $
+                   YLOG             =  self.ylog, $
                    
                    ;MrLayout Keywords
                    CHARSIZE      =       charsize, $
@@ -360,8 +361,8 @@ PATH_XY=path_xy
                PATH_XY          =       path_xy, $
                RESOLUTION       = *self.resolution, $
                TRIANGULATION    = *self.triangulation, $
-               XLOG             = *self.xlog, $
-               YLOG             = *self.ylog, $
+               XLOG             =  self.xlog, $
+               YLOG             =  self.ylog, $
                    
                ;MrLayout Keywords
                CHARSIZE      =       charsize, $
@@ -484,60 +485,6 @@ pro MrContour::GetData, z, x, y
         endcase
         else: message, 'Incorrect number of parameters.'
     endcase
-end
-
-
-;+
-;   The purpose of this method is to retrieve object properties
-;
-; :Keywords:
-;       _REF_EXTRA:         out, optional, type=any
-;                           Any keyword accepted by the MrLayout__Define class is
-;                               also accepted via keyword inheritance.
-;-
-pro MrContour::GetLayout, $
-_REF_EXTRA = extra
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Layout Properties
-    self.layout -> GetProperty, _STRICT_EXTRA=extra
-end
-
-
-;+
-;   The purpose of this method is to determine if overplotting is being done.
-;
-; :Params:
-;       TARGET:             out, optional, type=object
-;                           If `TF_OVERPLOT`=1, then the overplot target will be returned.
-;
-; :Returns:
-;       TF_OVERPLOT:        True (1) if overplotting, false (0) if not.
-;-
-function MrContour::GetOverplot, target
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return, 0B
-    endif
-    
-    ;Get the overplot state and the target.
-    tf_overplot = self.overplot
-    if tf_overplot then if arg_present(target) then target = self.target
-    
-    return, tf_overplot
 end
 
 
@@ -672,10 +619,6 @@ end
 ;                           before the contour is displayed. Note, you MUST pass the `x` and `y` grid parameters 
 ;                           to cgContour if you are overplotting on a map projection. There is no checking to
 ;                           be sure these parameters are in the correct longitude and latitude range, respectively.
-;       MAX_VALUE:      out, optional, type=any
-;                       Data points with values above this value are ignored.
-;       MIN_VALUE:      out, optional, type=any
-;                       Data points with values below this value are ignored.
 ;       MISSINGVALUE:   out, optional, type=any
 ;                       Use this keyword to identify any missing data in the input data values.
 ;       NLEVELS:        out, optional, type=integer
@@ -752,11 +695,6 @@ end
 ;                           keyword inheritance.
 ;-
 pro MrContour::GetProperty, $
-;MrContour Properties
-LAYOUT=layout, $
-POSITION=position, $
-TARGET=target, $
-
 ;cgContour Properties
 AXISCOLOR=axiscolor, $
 AXESCOLOR=axescolor, $
@@ -792,8 +730,6 @@ IRREGULAR=irregular, $
 ISOTROPIC=isotropic, $
 LEVELS=levels, $
 NLEVELS=nlevels, $
-MAX_VALUE=max_value, $
-MIN_VALUE=min_value, $
 PATH_DATA_COORDS=path_data_coords, $
 PATH_DOUBLE=path_double, $
 PATH_FILENAME=path_filename, $
@@ -801,8 +737,6 @@ PATH_INFO=path_info, $
 PATH_XY=path_xy, $
 RESOLUTION=resolution, $
 TRIANGULATION=triangulation, $
-XLOG=xlog, $
-YLOG=ylog, $
 _REF_EXTRA=extra
     compile_opt strictarr
     
@@ -848,8 +782,6 @@ _REF_EXTRA=extra
     if arg_present(irregular)     ne 0 then irregular     = *self.irregular
     if arg_present(isotropic)     ne 0 then isotropic     = *self.isotropic
     if arg_present(levels)        ne 0 then levels        = *self.levels
-    if arg_present(max_value)     ne 0 then max_value     = *self.max_value
-    if arg_present(min_value)     ne 0 then min_value     = *self.min_value
     if arg_present(missingvalue)  ne 0 then missingvalue  = *self.missingvalue
     if arg_present(nlevels)       ne 0 then nlevels       = *self.nlevels
     if arg_present(path_filename) ne 0 then path_filename = *self.path_filename
@@ -858,8 +790,6 @@ _REF_EXTRA=extra
     if arg_present(triangulation) ne 0 then triangulation = *self.triangulation
     if arg_present(path_double)   ne 0 then path_double   = *self.path_double
     if arg_present(resolution)    ne 0 then resolution    = *self.resolution
-    if arg_present(xlog)          ne 0 then xlog          =  self.xlog
-    if arg_present(ylog)          ne 0 then ylog          =  self.ylog
     if arg_present(path_data_coords)   ne 0 then path_data_coords = *self.path_data_coords
 
     ;Objects
@@ -868,154 +798,7 @@ _REF_EXTRA=extra
         else map_object = obj_new()
     
     ;Superclass properties
-    if n_elements(extra) ne 0 then begin
-        self -> MrGrAtom::GetProperty, _EXTRA=extra
-        self -> MrGraphicsKeywords::GetProperty, _EXTRA=extra
-    endif
-end
-
-
-;+
-;   The purpose of this method is to change the plot from a normal plot to an overplot
-;   and vice versa.
-;
-; :Params:
-;       TARGET:             in, optional, type=objref
-;                           An MrGraphicObject onto which this Plot will be overplotted.
-;                               If not present, the currently selected graphic will be
-;                               used.
-;
-; :Keywords:
-;       DISABLE:            in, optional, type=boolean, default=0
-;                           Convert an overplot to a plot. If set, then `TARGET` may be
-;                               a 4-element vector of the form [x0, y0, x1, y1] that
-;                               specifies the lower-right and upper-left corners of the
-;                               plot. If `TARGET` is not provided, the plot will be placed
-;                               at the next available layout location.
-;-
-pro MrContour::Overplot, target, $
-DISABLE=disable
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        if n_elements(init_refresh) gt 0 then self.window -> Refresh, DISABLE=~init_refresh
-        return
-    endif
-    
-    ;Disable refreshing
-    self.window -> GetProperty, REFRESH=init_refresh
-    self.window -> Refresh, /DISABLE
-    
-    ;Disable overplotting
-    if keyword_set(disable) then begin
-        self.window -> Make_Location, location
-        self.window -> SetPosition, self.layout[2:*], location
-        self.overplot = 0B
-        self.target = obj_new()
-
-    ;Enable overplotting        
-    endif else begin
-        ;If not TARGET was specified, get the currently selected graphic
-        if n_elements(target) eq 0 then target = self.window -> GetSelect()
-
-        ;Make we can overplot on top of the target graphic
-        oplottable = ['MrPlot', 'MrImage', 'MrContour']
-        if IsMember(oplottable, obj_class(target), /FOLD_CASE) eq 0 || obj_valid(target) eq 0 $
-            then message, 'TARGET must be valid and of class ' + strjoin(oplottable, ', ')
-
-        ;Get the position
-        target -> GetProperty, POSITION=position
-        
-        ;Remove SELF from layout.
-        self.window -> SetPosition, self.layout[2], position
-        self.overplot = 1B
-        self.target = target
-        
-        ;Fill and trim holes
-        self.window -> FillHoles, /TRIMLAYOUT
-    endelse
-    
-    ;Re-enable refreshing
-    self.window -> Refresh, DISABLE=~init_refresh
-end
-
-
-;+
-;   The purpose of this method is to set the layout of a plot while maintaining the
-;   automatically updating grid.
-;
-; :Params:
-;       LAYOUT:             in, required, type=intarr(3)/intarr(4)
-;                           A vector of the form [nCols, nRos, index] or
-;                               [nCols, nRows, col, row], indicating the number of columns
-;                               and rows in the overall layout (nCols, nRows), the index
-;                               where the plot is to be placed ("index", starting with 1
-;                               and increasing left->right then top->bottom). Alternatively,
-;                               "col" and "row" are the column and row in which the plot
-;                               is to be placed. Ignored if `POSITION` is present.
-;
-; :Keywords:
-;       POSITION:           in, optional, type=fltarr(4)
-;                           A vector of the form [x0, y0, x1, y1] specifying the lower-left
-;                               and upper-right corners of the plot, in normal coordinates.
-;                               If this keyword is given, `LAYOUT` is ignored. This keyword
-;                               should not be used. Instead use the SetProperty method
-;                               (or dot-referencing in IDL 8.0+). This is only meant
-;                               for use by MrPlotManager__Define for synchronizing layout
-;                               properties with the window.
-;       UPDATE_LAYOUT:      in, optional, type=boolean, default=1
-;                           Indicate that the layout is to be updated. All graphics within
-;                               the graphics window will be adjusted. This keyword is
-;                               used by MrPlotManager__Define when applying the layout
-;                               grid to each plot. It is not meant to be used elsewhere.
-;       _REF_EXTRA:         in, optional, type=any
-;                           Any keyword accepted by MrLayout::SetProperty is also accepted
-;                               for keyword inheritance.
-;-
-pro MrContour::SetLayout, layout, $
-POSITION=position, $
-UPDATE_LAYOUT=update_layout, $
-_REF_EXTRA=extra
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        if n_elements(init_refresh) gt 0 $
-            then self.window -> Refresh, DISABLE=~init_refresh
-        return
-    endif
-    
-    ;Default to updating the layout
-    SetDefaultValue, update_layout, 1, /BOOLEAN
-    
-    ;Turn refresh off.
-    self.window -> GetProperty, REFRESH=init_refresh
-    self.window -> Refresh, /DISABLE
-    
-    ;If we are updating the layout, let the window take care of things.
-    if update_layout then begin
-        if n_elements(position) gt 0 $
-            then self.window -> SetPosition, self.layout[2], position $
-            else self.window -> SetPosition, self.layout[2], layout
-        
-        ;Adjust other aspects of the layout.
-        if n_elements(extra) gt 0 then self.window -> SetProperty, _EXTRA=extra
-    
-    ;If we are not updating the layout...
-    endif else begin
-        self -> MrLayout::SetProperty, LAYOUT=layout, POSITION=position, UPDATE_LAYOUT=0, $
-                                      _STRICT_EXTRA=extra
-    endelse
-    
-    ;Reset the refresh state.
-    self.window -> Refresh, DISABLE=~init_refresh
+    if n_elements(extra) ne 0 then self -> MrGrDataAtom::GetProperty, _EXTRA=extra
 end
 
 
@@ -1048,9 +831,20 @@ pro MrContour::SetData, z, x, y
         return
     endif
     
+;
+; The goal is to create an contour class that is zoomable. As such, [XY]RANGE must
+; be defined so that data coordinate system is establishable (even if the coordinates
+; simply span the image size). Independent and Dependent variables must be defined
+; so that a map exists between the data coordinates and the image's pixel/index
+; locations.
+;
+    
     ;Retrieve the data
     case n_params() of
-        1: *self.c_data = z
+        1: begin
+            *self.c_data = z
+            if self.nparams eq 0 then self.nparams = 1
+        endcase
         3: begin
             *self.c_data = z
             *self.xcoords = x
@@ -1058,6 +852,29 @@ pro MrContour::SetData, z, x, y
         endcase
         else: message, 'Incorrect number of parameters.'
     endcase
+            
+    ;Set the ranges -- If no data is defined, use the dimensions of the contour. Make
+    ;                  sure not to have the minimum equal to zero if we are log-scaling
+    cDims = size(z, /DIMENSIONS)
+    self.range  = [min(z, /NAN, MAX=zMax), zMax]
+    if n_elements(*self.xcoords) eq 0 $
+        then *self.xrange = [self.xlog, cDims[0]-1] $
+        else *self.xrange = [min(*self.xcoords, /NAN, MAX=xMax), xMax]
+    if n_elements(*self.ycoords) eq 0 $
+        then *self.yrange = [self.ylog, cDims[0]-1] $
+        else *self.yrange = [min(*self.ycoords, /NAN, MAX=yMax), yMax]
+    
+    ;Set the 
+    if n_elements(*self.xcoords) eq 0 then begin
+        if self.xlog $
+            then *self.xcoords = logspace(alog10((*self.xrange)[0]), alog10((*self.xrange)[1]), cDims[0]) $
+            else *self.xcoords = linspace((*self.xrange)[0], (*self.xrange)[1], cDims[0])
+    endif
+    if n_elements(*self.ycoords) eq 0 then begin
+        if self.ylog $
+            then *self.ycoords = logspace(alog10((*self.yrange)[0]), alog10((*self.yrange)[1]), cDims[1]) $
+            else *self.ycoords = linspace((*self.yrange)[0], (*self.yrange)[1], cDims[1])
+    endif
     
     self.window -> draw
 end
@@ -1135,10 +952,6 @@ end
 ;                           before the contour is displayed. Note, you MUST pass the `x` and `y` grid parameters 
 ;                           to cgContour if you are overplotting on a map projection. There is no checking to
 ;                           be sure these parameters are in the correct longitude and latitude range, respectively.
-;       MAX_VALUE:      in, optional, type=any
-;                       Data points with values above this value are ignored.
-;       MIN_VALUE:      in, optional, type=any
-;                       Data points with values below this value are ignored.
 ;       MISSINGVALUE:   in, optional, type=any
 ;                       Use this keyword to identify any missing data in the input data values.
 ;       NLEVELS:        in, optional, type=integer
@@ -1242,8 +1055,6 @@ IRREGULAR=irregular, $
 ISOTROPIC=isotropic, $
 LEVELS=levels, $
 NLEVELS=nlevels, $
-MAX_VALUE=max_value, $
-MIN_VALUE=min_value, $
 PATH_DATA_COORDS=path_data_coords, $
 PATH_DOUBLE=path_double, $
 PATH_FILENAME=path_filename, $
@@ -1302,8 +1113,6 @@ _REF_EXTRA=extra
     if n_elements(irregular)     ne 0 then *self.irregular     = irregular
     if n_elements(isotropic)     ne 0 then *self.isotropic     = isotropic
     if n_elements(levels)        ne 0 then *self.levels        = levels
-    if n_elements(max_value)     ne 0 then *self.max_value     = max_value
-    if n_elements(min_value)     ne 0 then *self.min_value     = min_value
     if n_elements(nlevels)       ne 0 then *self.nlevels       = nlevels
     if n_elements(nlevels)       ne 0 then *self.nlevels       = nlevels
     if n_elements(path_filename) ne 0 then *self.path_filename = path_filename
@@ -1314,9 +1123,6 @@ _REF_EXTRA=extra
     if n_elements(ylog)          ne 0 then  self.ylog          = ylog
     if n_elements(path_data_coords)   ne 0 then *self.path_data_coords = path_data_coords
 
-    if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
-    if n_elements(charsize) gt 0 then self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
-
     ;Map Object
     if n_elements(map_object) gt 0 and obj_valid(map_object) then begin
         if n_elements(*self.map_object) gt 0 then begin
@@ -1326,16 +1132,7 @@ _REF_EXTRA=extra
     endif
     
     ;Superclass properties
-    nExtra = n_elements(extra)
-    if nExtra gt 0 then begin
-        ;MrGrAtom -- Pick out the keywords here to use _STRICT_EXTRA instead of _EXTRA
-        atom_kwds = ['HIDE', 'NAME']
-        void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
-        if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
-    
-        ;MrGraphicsKeywords Properties
-        if nExtra gt 0 then self -> MrGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
-    endif
+    if n_elements(extra) gt 0 then self -> MrGrDataAtom::SetProperty, _EXTRA=extra
     
     if n_elements(xstyle) ne 0 then *self.xstyle = ~(xstyle and 1) + xstyle
     if n_elements(ystyle) ne 0 then *self.ystyle = ~(ystyle and 1) + ystyle
@@ -1382,8 +1179,6 @@ pro MrContour::cleanup
     ptr_free, self.isotropic
     ptr_free, self.levels
     ptr_free, self.nlevels
-    ptr_free, self.max_value
-    ptr_free, self.min_value
     ptr_free, self.missingvalue
     ptr_free, self.olevels
     ptr_free, self.palette
@@ -1394,17 +1189,12 @@ pro MrContour::cleanup
     ptr_free, self.path_xy
     ptr_free, self.resolution
     ptr_free, self.triangulation
-    ptr_free, self.xlog
-    ptr_free, self.ylog
     
     ;Destroy objects
     undefine, self.map_object
 
-    ;Cleanup the remaining keywords by calling the superclass. This must be done because
-    ;the superclasses method has been over-ridden here.
-    self -> MrGraphicsKeywords::CleanUp
-    self -> MrGrAtom::CleanUp
-    self -> MrLayout::CleanUp
+    ;Superclass cleanup
+    self -> MrGrDataAtom::CleanUp
 end
 
 
@@ -1581,9 +1371,11 @@ end
 ;-
 FUNCTION MrContour::Init, data, x, y, $
 ;MrContour Keywords
-CURRENT = current, $
+CURRENT=current, $
+HIDE=hide, $
 LAYOUT=layout, $
-OVERPLOT=target, $
+NAME=name, $
+OVERPLOT=overplot, $
 POSITION=position, $
 
 ;CONTOUR KEYWORDS
@@ -1650,18 +1442,16 @@ _REF_EXTRA=extra
     endif
 
 ;---------------------------------------------------------------------
-;Superclass Properties ///////////////////////////////////////////////
+; Superclasses ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    ;
-    ;If values appear in the call to the superclass's INIT method,
-    ;they will be over-ridden by like value if it appears in the
-    ;EXTRA structure
-    ;
 
-    ;MrGraphicsKeywords
-    if self -> MrGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGraphicsKeywords.'
-        
+    ;Sets up window -- Must be done before calling any method that subsequently
+    ;                  calls the draw method.
+    success = self -> MrGrDataAtom::Init(CURRENT=current, HIDE=hide, LAYOUT=layout, $
+                      NAME=name, OVERPLOT=overplot, POSITION=position, REFRESH=refresh, $
+                      WINDOW_TITLE=window_title, _EXTRA=extra)
+    if success eq 0 then message, 'Unable to initialize superclass MrGrDataAtom.'
+
 ;---------------------------------------------------------------------
 ;ALLOCATE HEAP ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1676,8 +1466,6 @@ _REF_EXTRA=extra
     self.c_data           = Ptr_New(/ALLOCATE_HEAP)
     self.xcoords          = Ptr_New(/ALLOCATE_HEAP)
     self.ycoords          = Ptr_New(/ALLOCATE_HEAP)
-    self.axiscolor        = Ptr_New(/ALLOCATE_HEAP)
-    self.background       = Ptr_New(/ALLOCATE_HEAP)
     self.c_annotation     = Ptr_New(/ALLOCATE_HEAP)
     self.c_charsize       = Ptr_New(/ALLOCATE_HEAP)
     self.c_charthick      = Ptr_New(/ALLOCATE_HEAP)
@@ -1696,8 +1484,6 @@ _REF_EXTRA=extra
     self.isotropic        = Ptr_New(/ALLOCATE_HEAP)
     self.levels           = Ptr_New(/ALLOCATE_HEAP)
     self.nlevels          = Ptr_New(/ALLOCATE_HEAP)
-    self.max_value        = Ptr_New(/ALLOCATE_HEAP)
-    self.min_value        = Ptr_New(/ALLOCATE_HEAP)
     self.missingvalue     = Ptr_New(/ALLOCATE_HEAP)
     self.olevels          = Ptr_New(/ALLOCATE_HEAP)
     self.outcolor         = Ptr_New(/ALLOCATE_HEAP)
@@ -1709,28 +1495,10 @@ _REF_EXTRA=extra
     self.path_xy          = Ptr_New(/ALLOCATE_HEAP)
     self.resolution       = Ptr_New(/ALLOCATE_HEAP)
     self.triangulation    = Ptr_New(/ALLOCATE_HEAP)
-    self.xlog             = Ptr_New(/ALLOCATE_HEAP)
-    self.ylog             = Ptr_New(/ALLOCATE_HEAP)
     
     ;Initialize Objects
-    self.target           = Obj_New()
     self.map_object       = Ptr_New(/ALLOCATE_HEAP)
-
-;---------------------------------------------------------------------
-;Window and Layout ///////////////////////////////////////////////////
-;---------------------------------------------------------------------    
-    ;Layout -- Must be done before initializing MrGrAtom
-    self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
     
-    ;Was the /OVERPLOT keyword set, instead of giving a target
-    if MrIsA(target, /SCALAR, 'INT') $
-        then if keyword_set(target) then target = self -> _GetTarget()
-
-    ;Superclass.
-    if self -> MrGrAtom::INIT(CURRENT=current, NAME=name, HIDE=hide, TARGET=target, $
-                              WINREFRESH=winRefresh, WINDOW_TITLE=window_title) eq 0 $
-       then message, 'Unable to initialize MrGrAtom'
-
 ;---------------------------------------------------------------------
 ;Defaults ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1749,70 +1517,13 @@ _REF_EXTRA=extra
     SetDefaultValue, outline, 0B, /BOOLEAN
     SetDefaultValue, output, ''
     SetDefaultValue, traditional, 0B, /BOOLEAN
-
-;---------------------------------------------------------------------
-;Input Parameters ////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    
-    ;Assign dependent and independent variables.
-    nx = n_elements(x)
-    ny = n_elements(y)
-    if nx gt 0 and ny gt 0 then begin
-        xcoods = x
-        ycoords = y
-    endif
-
-;---------------------------------------------------------------------
-;Set Dependent Variable and XRANGE ///////////////////////////////////
-;---------------------------------------------------------------------
-    ;
-    ; The goal is to create an contour class that is zoomable. As such, [XY]RANGE must
-    ; be defined so that data coordinate system is establishable (even if the coordinates
-    ; simply span the image size). Independent and Dependent variables must be defined
-    ; so that a map exists between the data coordinates and the image's pixel/index
-    ; locations.
-    ;
-
-    cdims = size(data, /DIMENSIONS)
-
-    ;---------------
-    ;X-COORDINATES |
-    ;---------------
-    if n_elements(xcoords) eq 0 then begin
-        ;Make sure XRANGE is defined.
-        if n_elements(xrange) eq 0 then $
-            if keyword_set(xlog) then xrange = [1, cdims[0]-1] $
-                                 else xrange = [0, cdims[0]-1]
-    
-        ;Create DEP such that it is the size of IMAGE[*,i] and spans XRANGE
-        if keyword_set(xlog) $
-            then setDefaultValue, xcoords, logspace(alog10(xrange[0]), alog10(xrange[1]), imDims[0]) $
-            else setDefaultValue, xcoords, linspace(xrange[0], xrange[1], cdims[0])
-
-    ;Otherwise, make the xrange span all of DEP
-    endif else if n_elements(xrange) eq 0 then xrange = [xcoords[0], xcoords[cdims[0]-1]]
-
-    ;---------------
-    ;Y-COORDINATES |
-    ;---------------
-    if n_elements(ycoords) eq 0 then begin
-        ;Make sure YRANGE is defined.
-        if n_elements(yrange) eq 0 then $
-            if keyword_set(ylog) then yrange = [1, cdims[1]-1] $
-                                 else yrange = [0, cdims[1]-1]
-                                 
-        ;Create INDEP such that it is the size of IMAGE[i,*] and spans YRANGE
-        if keyword_set(ylog) $
-            then setDefaultValue, ycoords, logspace(alog10(yrange[0]), alog10(yrange[1]), imDims[1]) $
-            else setDefaultValue, ycoords, linspace(yrange[0], yrange[1], cdims[1])
-            
-    ;Otherwise, make the yrange span all of INDEP
-    endif else if n_elements(yrange) eq 0 then yrange = [ycoords[0], ycoords[cdims[1]-1]]
     
 ;---------------------------------------------------------------------
 ;Set Object Properties ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    self -> SetData, data, xcoords, ycoords
+    if n_elements(x) gt 0 $
+        then self -> SetData, data, x, y $
+        else self -> SetData, data
 
     ;Set the object properties
     self -> SetProperty, $
@@ -1860,14 +1571,6 @@ _REF_EXTRA=extra
                          TRIANGULATION=triangulation, $
                          XLOG=xlog, $
                          YLOG=ylog
-    
-    ;Overplot?
-    if n_elements(target) gt 0 then begin
-        if size(target, /TNAME) eq 'OBJREF' $
-            then self -> Overplot, target $
-            else if keyword_set(target) then self -> Overplot
-    endif
-            
 
 ;---------------------------------------------------------------------
 ;Set Ranges and Styles ///////////////////////////////////////////////
@@ -1883,8 +1586,6 @@ _REF_EXTRA=extra
         else *self.ystyle += ~(*self.ystyle and 1)
 
     ;Make sure the [XY]RANGE is set.
-    if n_elements(*self.xrange) eq 0 then *self.xrange = [min(xcoords, max=XMax), XMax]
-    if n_elements(*self.yrange) eq 0 then *self.yrange = [min(ycoords, max=YMax), YMax]
     self.init_xrange = *self.xrange
     self.init_yrange = *self.yrange
 
@@ -1899,9 +1600,7 @@ _REF_EXTRA=extra
                               PATH_FILENAME=path_filename
 
     ;Refresh the graphics?
-    if keyword_set(current) eq 0 && n_elements(target) eq 0 $
-        then self -> Refresh $
-        else if winRefresh then self -> Refresh
+    if refresh then self -> Refresh
 
     return, 1
 end
@@ -1919,8 +1618,7 @@ pro MrContour__define, class
     on_error, 2
     
     class = { MrContour, $
-              inherits MrGrAtom, $
-              inherits MrGraphicsKeywords, $
+              inherits MrGrDataAtom, $
               
               ;Data properties
               c_data:  Ptr_New(), $
@@ -1928,10 +1626,8 @@ pro MrContour__define, class
               ycoords: Ptr_New(), $
               
               ;MrContour Properties
-              target:        obj_new(), $
               init_xrange:   fltarr(2), $
               init_yrange:   fltarr(2), $
-              layout:        obj_new(), $
               ;cgContour Properties
               label:         0, $
               map_object:    Ptr_New(), $      ;cgContour throws an error for invalid objects
@@ -1943,6 +1639,7 @@ pro MrContour__define, class
               outline:       0B, $
               output:        '', $
               palette:       Ptr_New(), $
+              range:         DblArr(2), $
               traditional:   0B, $
               
               ;Contour Properties
@@ -1964,17 +1661,12 @@ pro MrContour__define, class
               isotropic:     Ptr_New(), $
               levels:        Ptr_New(), $
               nlevels:       Ptr_New(), $
-              max_value:     Ptr_New(), $
-              min_value:     Ptr_New(), $
-              overplot:      0B, $
               path_data_coords: Ptr_New(), $
               path_double:   Ptr_New(), $
               path_filename: Ptr_New(), $
               path_info:     Ptr_New(), $
               path_xy:       Ptr_New(), $
               resolution:    Ptr_New(), $
-              triangulation: Ptr_New(), $
-              xlog:          Ptr_New(), $
-              ylog:          Ptr_New() $
+              triangulation: Ptr_New()  $
             }
 end

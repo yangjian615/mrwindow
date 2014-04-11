@@ -825,12 +825,8 @@ _REF_EXTRA=extra
 ;Superclass & Window /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;Window is obtained by MrGrAtom
-    if self -> MrGrAtom::INIT(TARGET=target, /CURRENT) eq 0 then $
+    if self -> MrGrAtom::INIT(TARGET=target, /CURRENT, WINREFRESH=winRefresh) eq 0 then $
         message, 'Unable to initialize MrGrAtom'
-    
-    ;Refresh the window?
-    self.window -> GetProperty, REFRESH=refreshIn
-    if refreshIn then self.window -> Refresh, /DISABLE
 
 ;---------------------------------------------------------------------
 ;Location ////////////////////////////////////////////////////////////
@@ -906,12 +902,10 @@ _REF_EXTRA=extra
                          TEXT_AXES=text_axes, $
                          TT_FONT=tt_font, $
                          Z=z, $
-                         _EXTRA=extra
+                        _EXTRA=extra
 
     ;Refresh the graphics?
-    if n_elements(target) eq 0 $
-        then self -> Refresh $
-        else if refreshIn then self -> Refresh
+    if winRefresh then self -> Refresh
                          
     Return, 1
 END

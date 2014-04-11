@@ -391,7 +391,7 @@ end
 ;                           If set, the graphic will be dropped to the back of the viewing
 ;                               order, placing it below all others.
 ;-
-function MrGrAtom::Order, $
+pro MrGrAtom::Order, $
 BRING_FORWARD=bring_forward, $
 BRING_TO_FRONT=bring_to_front, $
 SEND_BACKWARD=send_backward, $
@@ -403,12 +403,12 @@ SEND_TO_BACK=send_to_back
     if the_error ne 0 then begin
         catch, /cancel
         void = cgErrorMsg()
-        return, 0
+        return
     endif
 
     ;Get the number of graphics and the index location of the graphic
     nGraphics = self.window -> Count()
-    tf_contained = self.window -> IsContained(POSITION=oldOrder)
+    tf_contained = self.window -> IsContained(self, POSITION=oldOrder)
     
     ;BRING FORWARD
     if keyword_set(bring_forward) then begin
@@ -419,7 +419,7 @@ SEND_TO_BACK=send_to_back
     endif else if keyword_set(bring_to_front) then begin
         if oldOrder ne nGraphics-1 then self.window -> Move, oldOrder, nGraphics-1
         
-    ;send BACKWARD
+    ;SEND BACKWARD
     endif else if keyword_set(send_backward) then begin
         newOrder = oldOrder - 1
         if oldOrder ne 0 then self.window -> Move, oldOrder, newOrder

@@ -136,6 +136,7 @@
 ;       2014/03/09  -   Added the FindByPIndex and FindByColRow methods and removed
 ;                           the Get method. - MRA
 ;       2014/03/15  -   SetGlobal can now segregate object classes. - MRA
+;       2014/03/26  -   Added MrVector to the list of known graphics. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -652,7 +653,7 @@ COUNT=count
         allObjs[i] -> GetLayout, LAYOUT=objLayout
         objPIndex[i] = objLayout[2]
     endfor
-    
+
     ;Find a match
     iMatch = where(objPIndex eq pIndex, count)
     if count eq 0 then return, obj_new()
@@ -1284,6 +1285,7 @@ function MrPlotManager::WhatAmI, objRef
         'MRPLOT':       ImA = 'PLOT'
         'MRPLOTS':      ImA = 'PLOTS'
         'MRTEXT':       ImA = 'TEXT'
+        'MRVECTOR':     ImA = 'VECTOR'
         'WECOLORBAR':   ImA = 'COLORBAR'
         'WEARROW':      ImA = 'ARROW'
         'WEOVERPLOT':   ImA = 'OVERPLOT'
@@ -1314,19 +1316,21 @@ pro MrPlotManager::Config
     endif
     
     ;Class names of the supported graphics types
-    types = { plot: ['MRPLOT'], $
-              image: ['MRIMAGE'], $
-              contour: ['MRCONTOUR'], $
-              colorbar: ['WECOLORBAR'], $
-              axis: ['MRAXIS'], $
-              legend: ['WELEGENDITEM'], $
+    types = { $
               arrow: ['WEARROW'], $
-              text: ['MRTEXT'], $
+              axis: ['MRAXIS'], $
+              colorbar: ['WECOLORBAR'], $
+              contour: ['MRCONTOUR'], $
+              image: ['MRIMAGE'], $
+              legend: ['WELEGENDITEM'], $
               overplot: ['WEOVERPLOT'], $
+              plot: ['MRPLOT'], $
               plots: ['MRPLOTS'], $
               polyfill: ['MRCOLORFILL'], $
-              ImAData: ['PLOT', 'IMAGE', 'CONTOUR'], $     ;TO BE USED WITH ::WHATAMI
-              data: ['MRPLOT', 'MRIMAGE', 'MRCONTOUR'], $
+              text: ['MRTEXT'], $
+              vector: ['MRVECTOR'], $
+              ImAData: ['PLOT', 'IMAGE', 'CONTOUR', 'VECTOR'], $     ;TO BE USED WITH ::WHATAMI
+              data: ['MRPLOT', 'MRIMAGE', 'MRCONTOUR', 'MRVECTOR'], $
               annotate: ['WECOLORBAR', 'MRAXIS', 'WELEGENDITEM', 'WEARROW', 'MRTEXT', 'MRPLOTS', 'WEOVERPLOT', 'MRCOLORFILL'], $
               files: ['CDF_PLOT'] $
             }

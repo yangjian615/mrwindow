@@ -35,6 +35,14 @@
 ;   The purpose of this method is to create an image object with set, get, and draw
 ;   methods.
 ;
+; :Uses:
+;   Uses the following external programs::
+;       setDefaultValue.pro (Coyote Graphics)
+;       cgErrorMsg.pro (Coyote Graphics)
+;       MrGrDataAtom__define.pro
+;       linspace.pro
+;       logspace.pro
+;
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
@@ -42,9 +50,6 @@
 ;       8 College Rd.
 ;       Durham, NH, 03824
 ;       matthew.argall@wildcats.unh.edu
-;
-; :Copyright:
-;       Matthew Argall 2012
 ;
 ; :History:
 ;	Modification History::
@@ -92,6 +97,12 @@
 ;       2014/03/10  -   Disinherit MrLayout, but keep it as an object property. Added
 ;                           the GetLayout method. Picking an initial window is no longer
 ;                           an obscure process. - MRA
+;       2014/03/26  -   Rewrote the SetData method to deal with the different number
+;                           of parameters. Remove all determination of ranges and
+;                           in/dependent variable data from the INIT method. PAINT is
+;                           now an internal property only. [XY]LOG successfully update
+;                           the pixel locations when 3 parameters are given. Inherit
+;                           MrGrDataAtom and removed duplicate properties and methods. - MRA
 ;                           
 ;-
 ;*****************************************************************************************
@@ -115,17 +126,13 @@ function MrImage::_OverloadPrint
     joinStr = '   '
     
     ;Superclasses
-    grKeys = self -> MrGraphicsKeywords::_OverloadPrint()
-    layKeys = self -> MrLayout::_OverloadPrint()
-    atomKeys = self -> MrGrAtom::_OverloadPrint()
+    grKeys = self -> MrGrDataAtom::_OverloadPrint()
     
     ;Object Properties
     tv       = string('TV',       '=', self.tv,       FORMAT='(a-26, a-2, i1)')
     idisplay = string('iDisplay', '=', self.idisplay, FORMAT='(a-26, a-2, i0)')
     center   = string('Center',   '=', self.center,   FORMAT='(a-26, a-2, i1)')
     paint    = string('Paint',    '=', self.paint,    FORMAT='(a-26, a-2, i1)')
-    xlog     = string('XLog',     '=', self.xlog,     FORMAT='(a-26, a-2, i1)')
-    ylog     = string('YLog',     '=', self.ylog,     FORMAT='(a-26, a-2, i1)')
     
     ;Pointers
     axes          = string('Axes',          '=', FORMAT='(a-26, a-2)')
@@ -139,8 +146,6 @@ function MrImage::_OverloadPrint
     range         = string('Range',         '=', FORMAT='(a-26, a-2)')
     scale         = string('Scale',         '=', FORMAT='(a-26, a-2)')
     top           = string('Top',           '=', FORMAT='(a-26, a-2)')
-    max_value     = string('Max_Value',     '=', FORMAT='(a-26, a-2)')
-    min_value     = string('Min_Value',     '=', FORMAT='(a-26, a-2)')
     
     ;Value or Undefined?
     if n_elements(*self.axes)          eq 0 then axes          += undefined else axes          += string(*self.axes,          FORMAT='(i1)')
@@ -167,8 +172,6 @@ function MrImage::_OverloadPrint
                idisplay, $
                center, $
                paint, $
-               xlog, $
-               ylog, $
                axes, $
                bottom, $
                ctindex, $
@@ -179,13 +182,11 @@ function MrImage::_OverloadPrint
                palette, $
                range, $
                scale, $
-               top, $
-               max_value, $
-               min_value $
+               top $
              ]
 
-    result = [[atomKeys], [grKeys], [layKeys], [transpose(imKeys)]]
-    result = [[selfStr], ['  ' + transpose(result[sort(result)])]]
+    result = [[grKeys], [transpose(imKeys)]]
+    result = [[selfStr], ['  ' + result[sort(result)]]]
     
     return, result
 end
@@ -209,6 +210,115 @@ function MrImage::_OverloadImpliedPrint
     result = self -> _OverloadPrint()
     
     return, result
+end
+
+
+;+
+;   Clear data from interal storage
+;-
+pro MrImage::ClearData, $
+CENTERS=centers, $
+CORNERS=corners, $
+DELTAS=deltas, $
+INDEP=indep, $
+DEP=dep, $
+XDELTA_PLUS=xdelta_plus, $
+XDELTA_MINUS=xdelta_minus, $
+XMAX=xmax, $
+XMIN=xmin, $
+YDELTA_PLUS=ydelta_plus, $
+YDELTA_MINUS=ydelta_minus, $
+YMAX=ymax, $
+YMIN=ymin
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Individual quantities
+    indep        = keyword_set(indep)
+    dep          = keyword_set(dep)
+    xdelta_plus  = keyword_set(xdelta_plus)
+    xdelta_minus = keyword_set(xdelta_minus)
+    xmax         = keyword_set(xmax)
+    xmin         = keyword_set(xmin)
+    ydelta_plus  = keyword_set(ydelta_plus)
+    ydelta_minus = keyword_set(ydelta_minus)
+    ymax         = keyword_set(ymax)
+    ymin         = keyword_set(ymin)
+    
+    ;Centers?
+    if keyword_set(centers) then begin
+        indep = 1
+        dep   = 1
+    endif
+    
+    ;Deltas?
+    if keyword_set(deltas) then begin
+        xdelta_plus  = 1
+        xdelta_minus = 1
+        ydelta_plus  = 1
+        ydelta_minus = 1
+    endif
+    
+    ;Corners?
+    if keyword_set(corners) then begin
+        xmax = 1
+        xmin = 1
+        ymax = 1
+        ymin = 1
+    endif
+            
+    ;Pixel Centers.
+    if dep then if n_elements(*self.dep) gt 0 then begin
+        ptr_free, self.dep
+        self.dep = ptr_new(/ALLOCATE_HEAP)
+    endif
+    if indep then if n_elements(*self.indep) gt 0 then begin
+        ptr_free, self.indep
+        self.indep = ptr_new(/ALLOCATE_HEAP)
+    endif
+    
+    ;Pixel Corners
+    if xmin then if n_elements(*self.xmin) gt 0 then begin
+        ptr_free, self.xmin
+        self.xmin = ptr_new(/ALLOCATE_HEAP)
+    endif
+    if xmax then if n_elements(*self.xmax) gt 0 then begin
+        ptr_free, self.xmax
+        self.xmax = ptr_new(/ALLOCATE_HEAP)
+    endif
+    if ymin then if n_elements(*self.ymin) gt 0 then begin
+        ptr_free, self.ymin
+        self.ymin = ptr_new(/ALLOCATE_HEAP)
+    endif
+    if ymax then if n_elements(*self.ymax) gt 0 then begin
+        ptr_free, self.ymax
+        self.ymax = ptr_new(/ALLOCATE_HEAP)
+    endif
+    
+    ;Pixel Deltas
+    if xdelta_minus then if n_elements(*self.xdelta_minus) gt 0 then begin
+        ptr_free, self.xdelta_minus
+        self.xdelta_minus = ptr_new(/ALLOCATE_HEAP)
+    endif
+    if xdelta_plus then if n_elements(*self.xdelta_plus) gt 0 then begin
+        ptr_free, self.xdelta_plus
+        self.xdelta_plus = ptr_new(/ALLOCATE_HEAP)
+    endif
+    if ydelta_minus then if n_elements(*self.ydelta_minus) gt 0 then begin
+        ptr_free, self.ydelta_minus
+        self.ydelta_minus = ptr_new(/ALLOCATE_HEAP)
+    endif
+    if ydelta_plus then if n_elements(*self.ydelta_plus) gt 0 then begin
+        ptr_free, self.ydelta_plus
+        self.ydelta_plus = ptr_new(/ALLOCATE_HEAP)
+    endif
 end
 
 
@@ -256,7 +366,12 @@ NOERASE=noerase
 
     ;Plot TV-style
     if self.tv then begin
-        image_plots, *self.image, *self.x_pos, *self.y_pos
+        case self.nparams of
+            1: mraImage, *self.image, /TV, NOERASE=noerase
+            2: mraImage, *self.image, *self.indep, /TV, NOERASE=noerase
+            3: mraImage, *self.image, *self.indep, *self.dep, /TV, NOERASE=noerase
+            else: message, 'Incorrect number of parameters for the TV command.'
+        endcase
         return
     endif
 
@@ -557,31 +672,6 @@ end
 
 
 ;+
-;   The purpose of this method is to retrieve object properties
-;
-; :Keywords:
-;       _REF_EXTRA:         out, optional, type=any
-;                           Any keyword accepted by the MrLayout__Define class is
-;                               also accepted via keyword inheritance.
-;-
-pro MrImage::GetLayout, $
-_REF_EXTRA = extra
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Layout Properties
-    self.layout -> GetProperty, _STRICT_EXTRA=extra
-end
-
-
-;+
 ;   The purpose of this method is to retrieve data
 ;
 ; :Calling Sequence:
@@ -609,7 +699,7 @@ end
 ;                           then `Y` represents the y-coordinate of the lower-right corner
 ;                           of each pixel.
 ;-
-pro MrImage::GetData, image, x, y, x1, y1
+pro MrImage::GetData, image, x, y, x0, y0, x1, y1
     compile_opt strictarr
     
     ;Error handling
@@ -632,8 +722,17 @@ pro MrImage::GetData, image, x, y, x1, y1
             image = *self.image
             x = *self.Xmin
             y = *self.Ymin
-            x1 = *self.Xmax
-            y1 = *self.Ymax
+            x0 = *self.Xmax
+            y0 = *self.Ymax
+        endcase
+        7: begin
+            image = *self.image
+            x = *self.Xmin
+            y = *self.Ymin
+            x0 = *self.xdelta_minus
+            x1 = *self.xdelta_plus
+            y0 = *self.ydelta_minus
+            y1 = *self.ydelta_plus
         endcase
         else: message, 'Incorrect number of parameters.'
     endcase
@@ -704,10 +803,6 @@ end
 ;                               keyword inheritance.
 ;-
 pro MrImage::GetProperty, $
-;Data keywords
-X_POS = x_pos, $
-Y_POS = y_pos, $
-
 ;MrImage Keywords
 CHARSIZE = charsize, $
 IDISPLAY = iDisplay, $
@@ -751,10 +846,6 @@ _REF_EXTRA = extra
         void = cgErrorMsg()
         return
     endif
-
-    ;Data Properties
-    if arg_present(X_POS) and n_elements(*self.X_POS) ne 0 then x_pos = *self.x_pos
-    if arg_present(Y_POS) and n_elements(*self.Y_POS) ne 0 then y_pos = *self.y_pos
 
     ;MrImage Properties
     if arg_present(charsize)    then self.layout -> GetProperty, CHARSIZE=charsize
@@ -802,10 +893,25 @@ end
 ;   The purpose of this method is to calculate pixel locations.
 ;
 ; :Private:
+;
+; :Keywords:
+;       CENTER:         in, optional, type=boolean, default=0
+;                       If set, `X` and `Y` are the data locations of the center of each
+;                           pixel to be painted on the display. The default is to use
+;                           `X` and `Y` as the location of the bottom-left corner of each
+;                           pixel. Ignored if more than 3 parameters are given.
+;       DIMENSIONS:     in, optional, type=boolean, default=0
+;                       If set, `IMAGE` represents the dimensions of and image, not
+;                           an actual image.
+;       XLOG:           in, optional, type=boolean, default=0
+;                       If set, the X-axis will be log-scaled. Ignored if more than
+;                           3 parameters are given.
+;       YLOG:           in, optional, type=boolean, default=0
+;                       If set, the Y-axis will be log-scaled. Ignored if more than
+;                           3 parameters are given.
 ;-
 pro MrImage::SetPixelLocations, x, y, x0, y0, x1, y1, $
 CENTER=center, $
-DRAW=draw, $
 XLOG=xlog, $
 YLOG=ylog
     compile_opt strictarr
@@ -840,7 +946,7 @@ YLOG=ylog
     dims = dims[0:1]
     
     case n_params() of
-        2: MrPixelPoints,  dims, x, y, Xmin, Ymin, Xmax, Ymax, CENTER=self.center, /DIMENSIONS, XLOG=self.xlog, YLOG=self.ylog
+        2: MrPixelPoints,  dims, x, y, Xmin, Ymin, Xmax, Ymax, CENTER=self.center, /DIMENSIONS, XLOG=xlog, YLOG=ylog
         4: MrPixelCorners, dims, x, y, x0, y0, Xmin, Ymin, Xmax, Ymax, /DIMENSIONS
         6: MrPixelDeltas,  dims, x, y, x0, y0, x1, y1, Xmin, Ymin, Xmax, Ymax, /DIMENSIONS
         else: message, 'Incorrect number of parameters.'
@@ -850,8 +956,13 @@ YLOG=ylog
     *self.Xmax = Xmax
     *self.Ymin = Ymin
     *self.Ymax = Ymax
+    if n_params() eq 2 then begin
+        if xlog + ylog gt 0 $
+            then self.paint = 1 $
+            else self.paint = 0
+    endif
     
-    if keyword_set(draw) then self -> Draw
+    self.window -> Draw
 end
 
 
@@ -861,11 +972,12 @@ end
 ; Calling Sequence::
 ;       myGraphic -> GetData, image
 ;       myGraphic -> GetData, image, x, y
-;       myGraphic -> GetData, image, x, y, x1, y1
+;       myGraphic -> GetData, image, x, y, x0, y0
+;       myGraphic -> GetData, image, x, y, x0, y0, x1, y1
 ;
 ; :Params:
-;       IMAGE:          in, required, type=numeric array
-;                       Image data will be returned.
+;       THEIMAGE:       in, required, type=numeric array
+;                       Image data.
 ;       X:              in, optional, type=numeric array
 ;                       Independent variable data. `Y` must also be provided.
 ;       Y:              in, optional, type=numeric array
@@ -878,8 +990,10 @@ end
 ;                       Y-corrdinate of the upper-right corner of each pixel in `IMAGE`.
 ;                           If present, then `Y` represents the y-coordinate of the lower-
 ;                           right corner of each pixel.
+; :Keywords:
 ;-
-pro MrImage::SetData, image, x, y, x1, y1
+pro MrImage::SetData, theImage, x, y, x0, y0, x1, y1, $
+TV=tv
     compile_opt strictarr
     
     ;Error handling
@@ -890,99 +1004,123 @@ pro MrImage::SetData, image, x, y, x1, y1
         return
     endif
     
+    ;Image dimensions
+    imDims = size(theImage, /DIMENSIONS)
+    nDims  = size(theImage, /N_DIMENSIONS)
+    if n_elements(tv) gt 0 then self.tv = keyword_set(tv)
+
     ;Retrieve the data
     case n_params() of
-        1: *self.image = image
+    ;---------------------------------------------------------------------
+    ; Change the Image ///////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        1: begin
+            *self.image = theImage
+            if self.nparams eq 0 then self.nparams = 1B
+        endcase
+    
+    ;---------------------------------------------------------------------
+    ; TV Positioning /////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        2: begin
+            if self.tv eq 0 then message, 'Must set TV=1 or provide the Y location.'
+            if n_elements(x) ne 1 then message, 'X must be a scalar.'
+            
+            ;Clear the data
+            self -> ClearData, /DELTAS, /CORNERS
+            
+            ;Set the data
+            *self.indep = x
+            *self.image = theImage
+            self.nparams = 2B
+        endcase
+    
+    ;---------------------------------------------------------------------
+    ; Pixel Centers //////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
         3: begin
-            *self.image = image
+            if self.tv then begin
+                if n_elements(x) ne 1 then message, 'X must be a scalar when TV=1.'
+                if n_elements(y) ne 1 then message, 'Y must be a scalar when TV=1.'
+            endif
+            
+            ;Clear data
+            self -> ClearData, /DELTAS, /CORNERS
+            
+            ;Store the data
+            *self.image = theImage
             *self.indep = x
             *self.dep = y
+            
+            ;Find the pixel locations
+            if self.tv eq 0 then self -> SetPixelLocations, x, y
+            self.nparams = 3B
         endcase
+        
+    ;---------------------------------------------------------------------
+    ; Pixel Corners //////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
         5: begin
-            *self.Xmin = x
-            *self.Ymin = y
-            *self.Xmax = x1
-            *self.Ymax = y1
+            ;Clear data
+            self -> ClearData, /DELTAS, /CENTERS
+        
+            ;Set the data
+            *self.image = theImage
+            self -> SetPixelLocations, x, y, x0, y0
+            
+            ;Paint each pixel
+            self.paint = 1B
+            self.nparams = 5B
+        endcase
+        
+    ;---------------------------------------------------------------------
+    ; Pixel Deltas ///////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        7: begin
+            ;Clear data
+            self -> ClearData, /DELTAS
+            
+            ;Store the data
+            *self.image = theImage
+            *self.indep = x
+            *self.dep   = y
+            *self.xdelta_minus = x0
+            *self.xdelta_plus  = x1
+            *self.ydelta_minus = y0
+            *self.ydelta_plus  = y1
+            self -> SetPixelLocations, x, y, x0, y0, x1, y1
+            
+            ;Paint the pixels
+            self.paint = 1B
+            self.nparams = 7B
         endcase
         else: message, 'Incorrect number of parameters.'
     endcase
+            
+    ;Get the new ranges
+    *self.range = [min(theImage, /NAN, MAX=imMax), imMax]
+    if n_elements(*self.xmin) eq 0 $
+        then *self.xrange = [self.xlog, imDims[0]-1] $
+        else *self.xrange = [min(*self.xmin), max(*self.xmax)]
+    if n_elements(*self.ymin) eq 0 $
+        then *self.yrange = [self.ylog, imDims[1]-1] $
+        else *self.yrange = [min(*self.ymin), max(*self.ymax)]
+
+    ;To make the image zoomable, we need to know the data location of each pixel.
+    ;These are the pixel centers. If no pixel centers were given, then create them
+    if n_elements(*self.indep) eq 0 then begin
+        if self.xlog $
+            then *self.indep = logspace(alog10((*self.xrange)[0]), alog10((*self.xrange)[1]), imDims[0]) $
+            else *self.indep = linspace((*self.xrange)[0], (*self.xrange)[1], imDims[0])
+    endif
+    
+    if n_elements(*self.dep) eq 0 then begin
+        if self.ylog $
+            then *self.dep = logspace(alog10((*self.yrange)[0]), alog10((*self.yrange)[1]), imDims[1]) $
+            else *self.dep = linspace((*self.yrange)[0], (*self.yrange)[1], imDims[1])
+    endif
     
     self.window -> draw
-end
-
-
-;+
-;   The purpose of this method is to set the layout of a plot while maintaining the
-;   automatically updating grid.
-;
-; :Params:
-;       LAYOUT:             in, required, type=intarr(3)/intarr(4)
-;                           A vector of the form [nCols, nRos, index] or
-;                               [nCols, nRows, col, row], indicating the number of columns
-;                               and rows in the overall layout (nCols, nRows), the index
-;                               where the plot is to be placed ("index", starting with 1
-;                               and increasing left->right then top->bottom). Alternatively,
-;                               "col" and "row" are the column and row in which the plot
-;                               is to be placed. Ignored if `POSITION` is present.
-;
-; :Keywords:
-;       POSITION:           in, optional, type=fltarr(4)
-;                           A vector of the form [x0, y0, x1, y1] specifying the lower-left
-;                               and upper-right corners of the plot, in normal coordinates.
-;                               If this keyword is given, `LAYOUT` is ignored. This keyword
-;                               should not be used. Instead use the SetProperty method
-;                               (or dot-referencing in IDL 8.0+). This is only meant
-;                               for use by MrPlotManager__Define for synchronizing layout
-;                               properties with the window.
-;       UPDATE_LAYOUT:      in, optional, type=boolean, default=1
-;                           Indicate that the layout is to be updated. All graphics within
-;                               the graphics window will be adjusted. This keyword is
-;                               used by MrPlotManager__Define when applying the layout
-;                               grid to each plot. It is not meant to be used elsewhere.
-;       _REF_EXTRA:         in, optional, type=any
-;                           Any keyword accepted by MrLayout::SetProperty is also accepted
-;                               for keyword inheritance.
-;-
-pro MrImage::SetLayout, layout, $
-POSITION=position, $
-UPDATE_LAYOUT=update_layout, $
-_REF_EXTRA=extra
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        if n_elements(init_refresh) gt 0 $
-            then self.window -> Refresh, DISABLE=~init_refresh
-        return
-    endif
-
-    ;Default to updating the layout
-    SetDefaultValue, update_layout, 1, /BOOLEAN
-    
-    ;Turn refresh off.
-    self.window -> GetProperty, REFRESH=init_refresh
-    self.window -> Refresh, /DISABLE
-    
-    ;If we are updating the layout, let the window take care of things.
-    if update_layout then begin
-        if n_elements(position) gt 0 $
-            then self.window -> SetPosition, self.layout[2], position $
-            else self.window -> SetPosition, self.layout[2], layout
-        
-        ;Adjust other aspects of the layout.
-        if n_elements(extra) gt 0 then self.window -> SetProperty, _EXTRA=extra
-    
-    ;If we are not updating the layout...
-    endif else begin
-        self.layout -> SetProperty, LAYOUT=layout, POSITION=position, UPDATE_LAYOUT=0, $
-                                    _STRICT_EXTRA=extra
-    endelse
-    
-    ;Reset the refresh state.
-    self.window -> Refresh, DISABLE=~init_refresh
 end
 
 
@@ -1028,14 +1166,8 @@ end
 ;       TV:                 in, optional, type=Boolean, default=0
 ;                           If set the image position will be determined by IDL's TV
 ;                               procedure.
-;       X_POS:              in, optional, type=int
-;                           If the `TV` keyword is in use, then this specifies the x-
-;                               position of the image as specified by the IDL's TV command.
 ;       XLOG:               in, optional, type=boolean
 ;                           Indicates that a log scale is used on the x-axis
-;       Y_POS:              in, optional, type=int
-;                           If the `TV` keyword is in use, then this specifies the y-
-;                               position of the image as specified by the IDL's TV command.
 ;       YLOG:               in, optional, type=boolean
 ;                           Indicates that a log scale is used on the y-axis
 ;       _REF_EXTRA:         in, optional, type=any
@@ -1043,15 +1175,8 @@ end
 ;                               keyword inheritance.
 ;-
 pro MrImage::SetProperty, $
-;Data keywords
-X_POS = x_pos, $
-Y_POS = y_pos, $
-
 ;MrImage Keywords
-CHARSIZE = charsize, $
-HIDE = hide, $
 IDISPLAY = iDisplay, $
-NAME = name, $
 TV = tv, $
       
 ;IMAGE_PLOTS Keywords
@@ -1062,16 +1187,12 @@ DATA_POS = data_pos, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
 NAN = nan, $
-PAINT = paint, $
 PALETTE = palette, $
 RANGE = range, $
 SCALE = scale, $
 TOP = top, $
 
 ;Graphics Keywords
-MAX_VALUE = max_value, $
-MIN_VALUE = min_value, $
-POSITION = position, $
 XLOG = xlog, $
 YLOG = ylog, $
 _REF_EXTRA = extra
@@ -1085,14 +1206,8 @@ _REF_EXTRA = extra
         return
     endif
 
-    ;Data
-    if n_elements(x_pos) ne 0 then *self.x_pos = x_pos
-    if n_elements(y_pos) ne 0 then *self.y_pos = y_pos
-
     ;MrImage Keywords
-    if n_elements(hide)        gt 0 then self.hide = keyword_set(hide)
     if n_elements(iDisplay)    ne 0 then self.iDisplay = iDisplay
-    if n_elements(name)        gt 0 then self.name = name
     if n_elements(TV)          ne 0 then self.tv = keyword_set(tv)
 
     ;IMAGE_PLOTS.PRO Properties
@@ -1114,56 +1229,22 @@ _REF_EXTRA = extra
         self.ctIndex = ptr_new(/ALLOCATE_HEAP)
     endif
     
-    ;Graphics Properties
-    if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
-    if n_elements(MIN_VALUE) ne 0 then *self.min_value = min_value
-    if n_elements(XLOG)      ne 0 then  self.xlog = keyword_set(xlog)
-    if n_elements(YLOG)      ne 0 then  self.ylog = keyword_set(ylog)
-    
-    if n_elements(position)  gt 0 then  self -> SetLayout, POSITION=position
-    if n_elements(charsize)  gt 0 then  self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
-    
-    ;Check PAINT after XLOG and YLOG have been set
-    if n_elements(paint) gt 0 then self.paint = keyword_set(paint)
+    ;Log-scale the axes?
+    if n_elements(xlog) gt 0 || n_elements(ylog) gt 0 then begin
+        self.xlog = keyword_set(xlog)
+        self.ylog = keyword_set(ylog)
+        
+        ;If only the pixel centers were given, calculate the new sizes of each pixel.
+        if self.nparams eq 3 && self.tv eq 0 $
+            then self -> SetPixelLocations, *self.indep, *self.dep
+    endif
     
     ;Superclass properties
-    nExtra = n_elements(extra)
-    if nExtra gt 0 then begin
-        ;MrGrAtom -- Pick out the keywords here to use _STRICT_EXTRA instead of _EXTRA
-        atom_kwds = ['HIDE', 'NAME']
-        void = IsMember(atom_kwds, extra, iAtom, N_MATCHES=nAtom, NONMEMBER_INDS=iExtra, N_NONMEMBER=nExtra)
-        if nAtom gt 0 then self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra[iAtom]
+    if n_elements(extra) gt 0 $
+        then self -> MrGrDataAtom::SetProperty, _EXTRA=extra
     
-        ;MrGraphicsKeywords Properties
-        if nExtra gt 0 then self -> MrGraphicsKeywords::SetProperty, _STRICT_EXTRA=extra[iExtra]
-    endif
-        
     ;Refresh the window
     self.window -> Draw
-end
-
-
-;+
-;   The purpose of this method is to determine if an image is to be painted or not.
-;
-; :Private:
-;-
-function MrImage::_TF_Paint
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return, 0
-    endif
-    
-    if *self.xlog + *self.ylog gt 0 || *self.paint eq 1 || $
-       n_elements(*self.Xmin) gt 0  || n_elements(*self.Xmax) gt 0 || $
-       n_elements(*self.Ymin) gt 0  || n_elements(*self.Ymax) gt 0 $
-        then return, 1 $
-        else return, 0
 end
 
 
@@ -1185,14 +1266,10 @@ pro MrImage::cleanup
     ptr_free, self.image
     ptr_free, self.dep
     ptr_free, self.indep
-    ptr_free, self.x_pos
-    ptr_free, self.y_pos
     ptr_free, self.axes
     ptr_free, self.bottom
     ptr_free, self.ctindex
     ptr_free, self.data_pos
-    ptr_free, self.max_value
-    ptr_free, self.min_value
     ptr_free, self.missing_color
     ptr_free, self.missing_value
     ptr_free, self.nan
@@ -1200,14 +1277,17 @@ pro MrImage::cleanup
     ptr_free, self.range
     ptr_free, self.scale
     ptr_free, self.top
+    ptr_free, self.xdelta_minus
+    ptr_free, self.xdelta_plus
     ptr_free, self.Xmin
     ptr_free, self.Xmax
+    ptr_free, self.ydelta_minus
+    ptr_free, self.ydelta_plus
     ptr_free, self.Ymin
     ptr_free, self.Ymax
     
     ;Superclasses
-    self -> MrGraphicsKeywords::CleanUp
-    self -> MrGrAtom::CleanUp
+    self -> MrGrDataAtom::cleanup
 end
 
 
@@ -1227,12 +1307,12 @@ end
 ;                           the data coordinates of each pixel. See also, `PAINT`.
 ;       X0:             in, optional, type=1D vector/2D array
 ;                       The x-coordinate, in data coordinates, of the upper-right corner
-;                           if each pixel in `IMAGE`. If supplied, then `X` markes the
+;                           of each pixel in `IMAGE`. If supplied, then `X` markes the
 ;                           x-coordinate of the lower-left corner of each pixel in `IMAGE`.
 ;                           Must be used with `Y0`. If given, `PAINT` will be set to 1.
 ;       Y0:             in, optional, type=1D vector/2D array
 ;                       The y-coordinate, in data coordinates, of the upper-right corner
-;                           if each pixel in `IMAGE`. If supplied, then `Y` markes the
+;                           of each pixel in `IMAGE`. If supplied, then `Y` markes the
 ;                           y-coordinate of the lower-left corner of each pixel in `IMAGE`.
 ;                           Must be used with `X0`. If given, `PAINT` will be set to 1.
 ;       X1:             in, optional, type=scalar/1D vector/2D array
@@ -1299,37 +1379,8 @@ end
 ;       _REF_EXTRA:         in, optional, type=any
 ;                           Keyword accepted by the superclasses are also accepted for
 ;                               keyword inheritance.
-;
-; :Uses:
-;   Uses the following external programs::
-;       setDefaultValue.pro (Coyote Graphics)
-;       error_message.pro (Coyote Graphics)
-;       MrGraphicsKeywords__define.pro
-;       MrGetWindow.pro
-;       linspace.pro
-;       logspace.pro
-;
-; :History:
-;   Modification History::
-;       05/04/2013  -   DEP, INDEP, XRANGE, and YRANGE are now defined and consistent.
-;                           This is necessary for zooming purposes. For images, the zoom
-;                           is not over data coordinates, but over pixels, which uses a
-;                           combination of device coordinates and index values within
-;                           IMAGE. The index values that pick a subregion of the image are
-;                           then used to select the proper range within DEP and INDEP, 
-;                           which in turn set XRANGE and YRANGE.
-;       05/04/2013  -   ::Draw is now only called if GUI=0. ::Notify_Realize will call
-;                           call ::Draw when GUI=1
-;       05/04/2013  -   Added DRAW, WINID and PIXID keywords. - MRA
-;       05/04/2013  -   Added DRAW, WINID and PIXID keywords. - MRA
-;       05/06/2013  -   Initialize MrDrawWindow properties at the beginning without
-;                           building or realizing the GUI. This allows the defaults to
-;                           be in effect if the image is displayed in an existing
-;                           MrDrawWindow (i.e. when WINID and PIXID are both given). - MRA
-;       05/09/2013  -   Use N_Elements instead of N_Params so that undefined x and y
-;                           can be provided. - MRA
 ;-
-function MrImage::init, image, x, y, x0, y0, x1, y1, $
+function MrImage::init, theImage, x, y, x0, y0, x1, y1, $
 ;MrImage Keywords
 CURRENT = current, $
 HIDE = hide, $
@@ -1373,9 +1424,22 @@ _REF_EXTRA = extra
         return, 0
     endif
 
-    ;Check the image
-    imDims = size(image, /DIMENSIONS)
-    nDims = size(image, /N_DIMENSIONS)
+;---------------------------------------------------------------------
+; Superclasses ///////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Sets up window -- Must be done before calling any method that subsequently
+    ;                  calls the draw method.
+    success = self -> MrGrDataAtom::Init(CURRENT=current, HIDE=hide, LAYOUT=layout, $
+                      NAME=name, OVERPLOT=overplot, POSITION=position, REFRESH=refresh, $
+                      WINDOW_TITLE=window_title, _EXTRA=extra)
+    if success eq 0 then message, 'Unable to initialize superclass MrGrDataAtom.'
+
+;---------------------------------------------------------------------
+; Defaults ///////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    imDims = size(theImage, /DIMENSIONS)
+    nDims = size(theImage, /N_DIMENSIONS)
     if nDims ne 2 and nDims ne 3 then message, 'IMAGE must be a 2D or 3D array.'
     
     ;Defaults
@@ -1388,20 +1452,6 @@ _REF_EXTRA = extra
     setDefaultValue, center, 0, /BOOLEAN
     setDefaultValue, ysize, 340
     setDefaultValue, paint, 0, /BOOLEAN
-    if xlog + ylog gt 0 || n_params() gt 3 then paint = 1
-
-;---------------------------------------------------------------------
-;Superclass Properties ///////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;
-    ;If values appear in the call to the superclass's INIT method,
-    ;they will be over-ridden by like value if it appears in the
-    ;EXTRA structure
-    ;
-
-    ;MrGraphicsKeywords
-    if self -> MrGraphicsKeywords::INIT(AXISCOLOR='black', _EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGraphicsKeywords.'
         
 ;---------------------------------------------------------------------
 ;Allocate Heap to Pointers ///////////////////////////////////////////
@@ -1409,8 +1459,6 @@ _REF_EXTRA = extra
     self.image         = ptr_new(/ALLOCATE_HEAP)
     self.indep         = ptr_new(/ALLOCATE_HEAP)
     self.dep           = ptr_new(/ALLOCATE_HEAP)
-    self.x_pos         = ptr_new(/ALLOCATE_HEAP)
-    self.y_pos         = ptr_new(/ALLOCATE_HEAP)
     self.axes          = ptr_new(/ALLOCATE_HEAP)
     self.bottom        = ptr_new(/ALLOCATE_HEAP)
     self.ctindex       = ptr_new(/ALLOCATE_HEAP)
@@ -1424,115 +1472,36 @@ _REF_EXTRA = extra
     self.range         = ptr_new(/ALLOCATE_HEAP)
     self.scale         = ptr_new(/ALLOCATE_HEAP)
     self.top           = ptr_new(/ALLOCATE_HEAP)
+    self.xdelta_minus  = ptr_new(/ALLOCATE_HEAP)
+    self.xdelta_plus   = ptr_new(/ALLOCATE_HEAP)
+    self.ydelta_minus  = ptr_new(/ALLOCATE_HEAP)
+    self.ydelta_plus   = ptr_new(/ALLOCATE_HEAP)
     self.Xmax          = ptr_new(/ALLOCATE_HEAP)
     self.Xmin          = ptr_new(/ALLOCATE_HEAP)
     self.Ymax          = ptr_new(/ALLOCATE_HEAP)
     self.Ymin          = ptr_new(/ALLOCATE_HEAP)
 
 ;---------------------------------------------------------------------
-;Window and Layout ///////////////////////////////////////////////////
-;---------------------------------------------------------------------    
-    ;Layout -- Must be done before initializing MrGrLayout
-    self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
-    
-    ;Superclass.
-    if self -> MrGrAtom::INIT(CURRENT=current, NAME=name, HIDE=hide, TARGET=target, $
-                              WINREFRESH=winRefresh, WINDOW_TITLE=window_title) eq 0 $
-       then message, 'Unable to initialize MrGrAtom'
-
-;---------------------------------------------------------------------
-;Input Parameters ////////////////////////////////////////////////////
+; Set Data ///////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    ;Assign dependent and independent variables.
-    nx = n_elements(x)
-    ny = n_elements(y)
-    if ny gt 0 then begin
-        indep = x
-        dep = y
-    endif else if nx gt 0 then begin
-        dep = x
-        indep = lindgen(imDims[0])
-    endif
-
-;---------------------------------------------------------------------
-;TV Positioning? /////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    nDep = n_elements(dep)
-    nIndep = n_elements(indep)
-    self.x_pos = ptr_new(/ALLOCATE_HEAP)
-    self.y_pos = ptr_new(/ALLOCATE_HEAP)
-
-    ;Is TV positioning to be used? -- Leave DEP and INDEP undefined afterwards.
-    if keyword_set(tv) then begin
-        case nDep of 
-            1: *self.x_pos = temporary(dep)
-            else: message, 'X must be scalar if TV is set.'
-        endcase
-            
-        case nIndep of
-            0: ;Do nothing
-            1: *self.y_pos = temporary(indep)
-            else: message, 'Y must be a scalar or undefined if TV is set.'
-        endcase
-    endif
-
-;---------------------------------------------------------------------
-;Set Dependent Variable and XRANGE ///////////////////////////////////
-;---------------------------------------------------------------------
-    ;
-    ; The goal is to create an image class that is zoomable. As such, [XY]RANGE must
-    ; be defined so that data coordinate system is establishable (even if the coordinates
-    ; simply span the image size). Independent and Dependent variables must be defined
-    ; so that a map exists between the data coordinates and the image's pixel/index
-    ; locations.
-    ;
-
-    ;--------------------
-    ;DEPENDENT VARIABLE |
-    ;--------------------
-    if n_elements(indep) eq 0 then begin
-        ;Make sure XRANGE is defined.
-        if n_elements(xrange) eq 0 then $
-            if keyword_set(xlog) then xrange = [1, imdims[0]-1] $
-                                 else xrange = [0, imDims[0]-1]
+    self.tv = keyword_set(tv)
     
-        ;Create DEP such that it is the size of IMAGE[*,i] and spans XRANGE
-        if keyword_set(xlog) $
-            then setDefaultValue, indep, logspace(alog10(xrange[0]), alog10(xrange[1]), imDims[0]) $
-            else setDefaultValue, indep, linspace(xrange[0], xrange[1], imDims[0])
-
-    ;Otherwise, make the xrange span all of DEP
-    endif else if n_elements(xrange) eq 0 then xrange = [min(indep, MAX=xmax, /NAN), xmax]
-
-    ;----------------------
-    ;INDEPENDENT VARIABLE |
-    ;----------------------
-    if n_elements(dep) eq 0 then begin
-        ;Make sure YRANGE is defined.
-        if n_elements(yrange) eq 0 then $
-            if keyword_set(ylog) then yrange = [1, imDims[1]-1] $
-                                 else yrange = [0, imDims[1]-1]
-                                 
-        ;Create INDEP such that it is the size of IMAGE[i,*] and spans YRANGE
-        if keyword_set(ylog) $
-            then setDefaultValue, dep, logspace(alog10(yrange[0]), alog10(yrange[1]), imDims[1]) $
-            else setDefaultValue, dep, linspace(yrange[0], yrange[1], imDims[1])
-            
-    ;Otherwise, make the yrange span all of INDEP
-    endif else if n_elements(yrange) eq 0 then yrange = [min(dep, MAX=ymax, /NAN), ymax]
+    ;Must set TV first.
+    ;   Setting the data will also set the ranges. Take care of user-supplied
+    ;   ranges below.
+    case n_params() of
+        1: self -> SetData, theImage
+        2: self -> SetData, theImage, x
+        3: self -> SetData, theImage, x, y
+        5: self -> SetData, theImage, x, y, x0, y0
+        7: self -> SetData, theImage, x, y, x0, y0, x1, y1
+        else: message, 'Incorrect number of elements.'
+    endcase
         
 ;---------------------------------------------------------------------
 ;Check/Set Keywords //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    
-    ;Image range
-    if n_elements(range) eq 0 $
-        then imRange = [min(image, NAN=nan, max=imMax), imMax] $
-        else imRange = range
-
-    ;Set the data
-    self -> SetData, image, indep, dep
 
     ;Set the object properties
     self -> SetProperty, AXES = axes, $
@@ -1545,7 +1514,6 @@ _REF_EXTRA = extra
                          MISSING_VALUE = missing_value, $
                          MISSING_COLOR = missing_color, $
                          NAN = nan, $
-                         PAINT = paint, $
                          PALETTE = palette, $
                          RANGE = imRange, $
                          SCALE = scale, $
@@ -1555,17 +1523,6 @@ _REF_EXTRA = extra
                          XRANGE = xrange, $
                          YLOG = ylog, $
                          YRANGE = yrange
-        
-;---------------------------------------------------------------------
-;Pixel Locations /////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    case n_params() of
-        1: ;Do nothing
-        3: if xlog + ylog + center gt 0 $
-            then self -> SetPixelLocations, indep, dep, CENTER=center, XLOG=xlog, YLOG=ylog
-        5: self -> SetPixelLocations, indep, dep, x0, y0
-        7: self -> SetPixelLocations, indep, dep, x0, y0, x1, y1
-    endcase
     
 ;---------------------------------------------------------------------
 ;Styles and Ranges ///////////////////////////////////////////////////
@@ -1582,14 +1539,12 @@ _REF_EXTRA = extra
         else *self.ystyle += ~(*self.ystyle and 1)
         
     ;Set the initial x- and y-range
-    self.init_xrange = xrange
-    self.init_yrange = yrange
-    self.init_range = imRange
+    self.init_xrange = *self.xrange
+    self.init_yrange = *self.yrange
+    self.init_range  = *self.range
 
     ;Refresh the graphics?
-    if keyword_set(current) eq 0 $
-        then self -> Refresh $
-        else if winRefresh then self -> Refresh
+    if refresh then self -> Refresh
 
     return, 1
 end
@@ -1601,47 +1556,45 @@ end
 pro MrImage__define
     compile_opt strictarr
     
-    define = {MrImage, $
-              inherits MrGrAtom, $
-              inherits MrGraphicsKeywords, $
+    define = { MrImage, $
+               inherits MrGrDataAtom, $
               
-              ;Data
-              x_pos: ptr_new(), $               ;the x-position (see TV)
-              y_pos: ptr_new(), $               ;the y-position (see TV)
-              indep: ptr_new(), $               ;independent variable
-              dep:   ptr_new(), $               ;dependent variable
-              image: ptr_new(), $               ;image to be displayed
-              tv: 0B, $                         ;indicate that a TV position was given
+               ;Data
+               indep: ptr_new(), $               ;independent variable
+               dep:   ptr_new(), $               ;dependent variable
+               image: ptr_new(), $               ;image to be displayed
+               tv: 0B, $                         ;indicate that a TV position was given
+               
+               ;Type of data given
+               nparams: 0B, $
               
-              ;MrImage Properties
-              idisplay:    0L, $                ;Index to display (>3D images)
-              init_range:  dblarr(2), $         ;Initial image range
-              init_xrange: dblarr(2), $         ;Initial x-range
-              init_yrange: dblarr(2), $         ;Initial y-range
-              layout:      obj_new(), $         ;Window layout
+               ;MrImage Properties
+               idisplay:    0L, $                ;Index to display (>3D images)
+               init_range:  dblarr(2), $         ;Initial image range
+               init_xrange: dblarr(2), $         ;Initial x-range
+               init_yrange: dblarr(2), $         ;Initial y-range
               
-              ;mraImage Keywords
-              axes: ptr_new(), $                ;Draw axes around the image?
-              bottom: ptr_new(), $              ;If scaled, minimum scaled value
-              center: 0B, $                     ;Center of pixel locations was given?
-              ctindex: ptr_new(), $             ;Color index to load
-              data_pos: ptr_new(), $            ;A data position for the image
-              missing_value: ptr_new(), $       ;Value to be treated as missing
-              missing_color: ptr_new(), $       ;Color of missing value
-              nan: ptr_new(), $                 ;Search for NaN's when scaling?
-              paint: 0B, $                      ;Paint the image pixel-by-pixel?
-              palette: ptr_new(), $             ;Color table to be loaded
-              range: ptr_new(), $               ;Range at which the color table saturates
-              scale: ptr_new(), $               ;Byte-scale the image
-              top: ptr_new(), $                 ;If scaled, maximum scaled value
-              Xmin: ptr_new(), $                ;X-location of bottom-left corner of pixels
-              Xmax: ptr_new(), $                ;X-location of upper-right corner of pixels
-              Ymin: ptr_new(), $                ;Y-location of bottom-left corner of pixels
-              Ymax: ptr_new(), $                ;Y-location of upper-right corner of pixels
-              
-              ;Plotting Keywords
-              max_value: ptr_new(), $           ;maximum value displayed in plot
-              min_value: ptr_new(), $           ;minimum value displayed in plot
-              xlog: 0B, $                       ;log-scale the x-axis?
-              ylog: 0B}                         ;log-scale the y-axis?
+               ;mraImage Keywords
+               axes: ptr_new(), $                ;Draw axes around the image?
+               bottom: ptr_new(), $              ;If scaled, minimum scaled value
+               center: 0B, $                     ;Center of pixel locations was given?
+               ctindex: ptr_new(), $             ;Color index to load
+               data_pos: ptr_new(), $            ;A data position for the image
+               missing_value: ptr_new(), $       ;Value to be treated as missing
+               missing_color: ptr_new(), $       ;Color of missing value
+               nan: ptr_new(), $                 ;Search for NaN's when scaling?
+               paint: 0B, $                      ;Paint the image pixel-by-pixel?
+               palette: ptr_new(), $             ;Color table to be loaded
+               range: ptr_new(), $               ;Range at which the color table saturates
+               scale: ptr_new(), $               ;Byte-scale the image
+               top: ptr_new(), $                 ;If scaled, maximum scaled value
+               xdelta_minus: ptr_new(), $
+               xdelta_plus:  ptr_new(), $
+               Xmin: ptr_new(), $                ;X-location of bottom-left corner of pixels
+               Xmax: ptr_new(), $                ;X-location of upper-right corner of pixels
+               ydelta_minus: ptr_new(), $
+               ydelta_plus:  ptr_new(), $
+               Ymin: ptr_new(), $                ;Y-location of bottom-left corner of pixels
+               Ymax: ptr_new() $                 ;Y-location of upper-right corner of pixels
+             }
 end
