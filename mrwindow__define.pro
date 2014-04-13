@@ -224,6 +224,7 @@
 ;                           property. Added the GetRefresh method for convenience. - MRA
 ;       2014/03/26  -   Set the current display when the graphics window is made current. - MRA
 ;       2014/04/01  -   Check if CDF cancel buttons were pressed to prevent errors. - MRA
+;       2014/04/11  -   Added the SetSave method. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -1390,7 +1391,7 @@ pro MrWindow::Save, filename
         return
     endif
     
-    self._SaveAs -> Output, filename
+    self._SaveAs -> Save, filename
 end
 
 
@@ -1418,6 +1419,32 @@ pro MrWindow::SetCurrent
     
     ;Set the display window
     wset, self.winID
+end
+
+
+;+
+;   A method for configuring postscript and ImageMagick output. See MrSaveAs::SetProperties
+;   for details.
+;
+; :Keywords:
+;       _REF_EXTRA:         out, optional, type=any
+;                           Any keyword accepted by MrSaveAs::SetProperty is accepted via
+;                               keyword inheritance.
+;-
+pro MrWindow::SetSave, $
+_REF_EXTRA = extra
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+
+    ;Set SaveAs properties
+    if n_elements(extra) gt 0 then self._SaveAs -> SetProperty, _EXTRA=extra
 end
 
 

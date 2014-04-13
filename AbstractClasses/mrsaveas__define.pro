@@ -61,7 +61,28 @@
 ;       To incorporate into a widget program, use the Notify_Realize event handler
 ;       for the Widget_Draw object. In the callback procedure, pass the draw widget's
 ;       widget ID to the SaveAs object via the SetProperty method.
-;       
+;
+;   FONTS
+;       `Device Fonts    <http://www.exelisvis.com/docs/Using_Device_Fonts.html>`
+;       `Embedded Format <http://exelisvis.com/docs/Embedded_Formatting_Comm.html>`
+;       `Hershey Fonts   <http://exelisvis.com/docs/Using_Hershey_Vector_Fon.html>`
+;       `True-Type Fonts <http://www.exelisvis.com/docs/Using_TrueType_Fonts.html>`
+;       `PS_Show_Fonts   <http://exelisvis.com/docs/PS_SHOW_FONTS.html>`
+;
+; :Uses:
+;   Uses the following external programs::
+;       cgErrorMSG.pro
+;       cgPickFile.pro
+;       cgPS_Open.pro
+;       cgPS_Close.pro
+;       cgPS2PDF.pro
+;       cgRootName.pro
+;       cgSnapshot.pro
+;       cgWindow_GetDefs.pro
+;       FSC_PSConfig__Define.pro
+;       isMember.pro
+;       remove_tags.pro
+;       WindowAvailable.pro (Coyote Graphics)
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -86,6 +107,11 @@
 ;                           to be inherited. Added the Draw and SetDisplayWindow methods.
 ;                           Added more control to how buttons are made in Create_SaveAs_Menu.- MRA
 ;       2014/03/18  -   Added the _Group_Leader property. - MRA
+;       2014/04/11  -   Combine all output methods into a single Save method. Removed
+;                           "cg" and "im" prefixes on buttons. Added the SaveAsEvents
+;                           method. Removed the AutoPostScriptFile, AutoRasterFile, 
+;                           CreatePostScriptFile, Output, and SaveAsRaster methods. Added
+;                           the PS_CONFIG property for configuring the postscript device. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -111,218 +137,6 @@ PRO MrSaveAs_SaveAs_Events, event
     
     ;Call the proper method to handle events
     call_method, event_handler.method, event_handler.object, event
-END
-
-
-;+
-; Provides a programmatic way to create a PostScript file from the window.
-; Call by setting the CREATE_PS keyword with cgControl.
-;
-; :Params:
-;     filename:  in, required, type=string
-;         The name of the PostScript file to generate.
-;-
-PRO MrSaveAs::AutoPostScriptFile, filename
-
-    Compile_Opt idl2
-    
-    ; Error handling.
-    Catch, theError
-    IF theError NE 0 THEN BEGIN
-        Catch, /CANCEL
-        void = cgErrorMsg()
-        
-        ; Close the PostScript file.
-        cgPS_Close, /NoFix     
-
-        ; Set the window index number back.
-        IF N_Elements(currentWindow) NE 0 THEN BEGIN
-            IF WindowAvailable(currentWindow) THEN WSet, currentWindow ELSE WSet, -1
-        ENDIF
-        
-        RETURN
-    ENDIF
-    
-    ; Make this window the current graphics windows.
-    self -> SetDisplayWindow, currentWindow
-
-    ; Pick a file name
-    IF N_Elements(filename) EQ 0 THEN filename='cgwindow.ps'
-
-    ; Allow the user to configure the PostScript file.
-    cgPS_Open, GUI=0, $
-               FILENAME=filename, $
-               DECOMPOSED=self.ps_decomposed, $
-               EUROPEAN=self.ps_metric, $
-               ENCAPSULATED=self.ps_encapsulated, $
-               GROUP_LEADER=*self._group_leader, $
-               SCALE_FACTOR=self.ps_scale_factor, $
-               CHARSIZE=self.ps_charsize, $
-               FONT=self.ps_font, $
-               QUIET=self.ps_quiet, $
-               TT_FONT=self.ps_tt_font
-    
-    ; Draw the graphics to the display window.
-    self -> Draw
-    
-    ; Clean up.
-    cgPS_Close, NOMESSAGE=self.ps_quiet
-
-    ; Set the window index number back.
-    IF currentWindow NE -1 THEN WSet, currentWindow ELSE WSet, -1
-
-END
-
-
-;+
-; Provides a programmatic way to create a raster file from the window.
-; Call by setting the create_png, etc. keyword with cgControl.
-;
-; :Params:
-;     filetype:  in, required, type=string
-;         The type of raster file (e.g., PNG, JPEG, etc.).
-;     filename:  in, required, type=string
-;         The name of the output file.
-;-
-PRO MrSaveAs::AutoRasterFile, filetype, filename
-
-    Compile_Opt idl2
-    
-    ; Error handling.
-    Catch, theError
-    IF theError NE 0 THEN BEGIN
-        Catch, /CANCEL
-        void = cgErrorMsg()
-        
-        ; Close the PostScript file.
-        cgPS_Close, /NoFix     
-
-        ; Set the window index number back.
-        IF N_Elements(currentWindow) NE 0 THEN BEGIN
-            IF WindowAvailable(currentWindow) THEN WSet, currentWindow ELSE WSet, -1
-        ENDIF
-        
-        RETURN
-    ENDIF
-    
-    ; Make this window the current graphics windows.
-    self -> SetDisplayWindow, currentWindow
-    if currentWindow eq -1 then return
-
-    IF N_Elements(filetype) EQ 0 then filetype = 'PNG'
-    IF N_Elements(filename) EQ 0 THEN filename = 'cgWindow.' + StrLowCase(filetype)
-    IF StrUpCase(filetype) EQ 'PDF' THEN rastertype = -1 ELSE rastertype = self.im_raster
-    
-    ; Strip the extension off the filename.
-    outname = cgRootName(filename, DIRECTORY=dirName)
-    
-    ; Put it back together without an extension.
-    outputFilename = Filepath(ROOT_DIR=dirName, outname)
-
-    ; What kind of raster file.
-    CASE rasterType OF
-    
-        ; PDF File.
-       -1: BEGIN
-       
-           thisname = outputFilename + '.ps'
-           outname = outputFilename + '.pdf'
-           cgPS_Open, $
-                DECOMPOSED=self.ps_decomposed, $
-                FILENAME=thisname, $
-                GROUP_LEADER=*self._group_leader, $
-                METRIC=self.ps_metric, $
-                KEYWORDS=keywords, $ ; Returned cgPS_Config keywords.
-                SCALE_FACTOR=self.ps_scale_factor, $
-                CHARSIZE=self.ps_charsize, $
-                FONT=self.ps_font, $
-                QUIET=1, $
-                TT_FONT=self.ps_tt_font
-                           
-           ; Draw the graphics.
-           self -> Draw
-           
-           ; Close the file and make a PDF file.
-           cgPS_Close
-           cgPS2PDF, thisname, outname, DELETE_PS=self.ps_delete, /SILENT, SUCCESS=success, $
-              UNIX_CONVERT_CMD=self.pdf_unix_convert_cmd, GS_PATH=self.pdf_path
-           IF ~success THEN BEGIN
-              Message, 'Unable to create PDF file. See cgPS2PDF documentation.'
-           ENDIF ELSE BEGIN
-              IF ~self.ps_quiet THEN Print, 'PDF output will be created here: ' + outname
-           ENDELSE
-           ENDCASE
-    
-        ; Normal raster.
-        0: BEGIN
-
-           void = cgSnapshot(TYPE=fileType, FILENAME=outputFilename, /NODIALOG)
-           Print, 'Output file is located here: ' + outputFilename 
-           ENDCASE
-           
-        ; Raster via ImageMagick.
-        1: BEGIN
-        
-           ; Create a PostScript file first.
-           thisname = outputFilename + '.ps'
-           cgPS_Open, $
-                DECOMPOSED=self.ps_decomposed, $
-                FILENAME=thisname, $
-                GROUP_LEADER=*self._group_leader, $
-                METRIC=self.ps_metric, $
-                KEYWORDS=keywords, $ ; Returned cgPS_Config keywords.
-                SCALE_FACTOR=self.ps_scale_factor, $
-                CHARSIZE=self.ps_charsize, $
-                FONT=self.ps_font, $
-                QUIET=1, $
-                TT_FONT=self.ps_tt_font
-                
-           ; Cannot successfully convert encapsulated landscape file to raster.
-           ; Limitation of ImageMagick, and specifically, GhostScript, which does
-           ; the conversion.
-           IF keywords.encapsulated && keywords.landscape THEN BEGIN
-                Message, 'ImageMagick cannot successfully convert an encapsulated ' + $
-                         'PostScript file in landscape mode to a raster file. Returning...'
-           ENDIF
-           
-           ; Draw the graphics.
-           self -> Draw
-
-           ; Close the file and convert to proper file type.
-            CASE filetype OF
-                'BMP':  cgPS_Close, /BMP, DELETE_PS=self.ps_delete, $
-                            ALLOW_TRANSPARENT=self.im_transparent, $
-                            DENSITY=self.im_density, RESIZE=self.im_resize, $
-                            IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
-                            WIDTH=self.im_width, NOMESSAGE=self.ps_quiet
-                'GIF':  cgPS_Close, /GIF, DELETE_PS=self.ps_delete, $
-                            ALLOW_TRANSPARENT=self.im_transparent, $
-                            DENSITY=self.im_density, RESIZE=self.im_resize, $
-                            IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
-                            WIDTH=self.im_width, NOMESSAGE=self.ps_quiet
-                'JPEG': cgPS_Close, /JPEG, DELETE_PS=self.ps_delete, $
-                            ALLOW_TRANSPARENT=self.im_transparent, $
-                            DENSITY=self.im_density, RESIZE=self.im_resize, $
-                            IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
-                            WIDTH=self.im_width, NOMESSAGE=self.ps_quiet
-                'PNG':  cgPS_Close, /PNG,  DELETE_PS=self.ps_delete, $
-                            ALLOW_TRANSPARENT=self.im_transparent, $
-                            DENSITY=self.im_density, RESIZE=self.im_resize, $
-                            IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
-                            WIDTH=self.im_width, NOMESSAGE=self.ps_quiet
-                'TIFF': cgPS_Close, /TIFF, DELETE_PS=self.ps_delete, $
-                            ALLOW_TRANSPARENT=self.im_transparent, $
-                            DENSITY=self.im_density, RESIZE=self.im_resize, $
-                            IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
-                            WIDTH=self.im_width, NOMESSAGE=self.ps_quiet
-           ENDCASE
-           ;IF ~self.ps_quiet THEN Print, 'Output file is located here: ' + outfilename
-           ENDCASE
-    
-    ENDCASE
-
-    ; Set the window index number back.
-    IF currentWindow NE -1 THEN WSet, currentWindow ELSE WSet, -1
 END
 
 
@@ -428,8 +242,8 @@ IMRASTER=imRaster
 
     ;Put in the PS and PDF options.
     IF ps_pdf THEN BEGIN
-        button = Widget_Button(cgSaveAsID, Value='PostScript File', UNAME='POSTSCRIPT', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'CreatePostscriptFile'})
-        button = Widget_Button(cgSaveAsID, Value='PDF File',        UNAME='PDF',        EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(cgSaveAsID, Value='PostScript File', UNAME='PS',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        button = Widget_Button(cgSaveAsID, Value='PDF File',        UNAME='PDF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
     ENDIF
     
 ;---------------------------------------------------------------------
@@ -443,11 +257,11 @@ IMRASTER=imRaster
             ELSE cgRasterID = cgSaveAsID
     
         ;cgRaster options
-        button = Widget_Button(cgRasterID, Value='cg BMP',  UNAME='RASTER_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(cgRasterID, Value='cg GIF',  UNAME='RASTER_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(cgRasterID, Value='cg JPEG', UNAME='RASTER_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(cgRasterID, Value='cg PNG',  UNAME='RASTER_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(cgRasterID, Value='cg TIFF', UNAME='RASTER_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(cgRasterID, Value='BMP',  UNAME='RASTER_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        button = Widget_Button(cgRasterID, Value='GIF',  UNAME='RASTER_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        button = Widget_Button(cgRasterID, Value='JPEG', UNAME='RASTER_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        button = Widget_Button(cgRasterID, Value='PNG',  UNAME='RASTER_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        button = Widget_Button(cgRasterID, Value='TIFF', UNAME='RASTER_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
     ENDIF ELSE cgRasterID = cgSaveAsID
         
 ;---------------------------------------------------------------------
@@ -463,84 +277,13 @@ IMRASTER=imRaster
             ELSE imRasterID = cgSaveAsID
 
         ;ImageMagick options
-        button = Widget_Button(imRasterID, Value='IM BMP',  UNAME='IMAGEMAGICK_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imRasterID, Value='IM GIF',  UNAME='IMAGEMAGICK_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imRasterID, Value='IM JPEG', UNAME='IMAGEMAGICK_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imRasterID, Value='IM PNG',  UNAME='IMAGEMAGICK_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
-        button = Widget_Button(imRasterID, Value='IM TIFF', UNAME='IMAGEMAGICK_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsRaster'})
+        button = Widget_Button(imRasterID, Value='BMP',  UNAME='IMAGEMAGICK_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        button = Widget_Button(imRasterID, Value='GIF',  UNAME='IMAGEMAGICK_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        button = Widget_Button(imRasterID, Value='JPEG', UNAME='IMAGEMAGICK_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        button = Widget_Button(imRasterID, Value='PNG',  UNAME='IMAGEMAGICK_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        button = Widget_Button(imRasterID, Value='TIFF', UNAME='IMAGEMAGICK_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
     ENDIF
 end
-
-
-;+
-; Sends the window commands to a PostScript file.
-;
-; :Params:
-;     event: in, required, type=structure
-;         An event structure.
-;-
-PRO MrSaveAs::CreatePostScriptFile, event
-    Compile_Opt idl2
-    
-    ; Error handling during postscript output.
-    Catch, PS_Error
-    IF PS_Error NE 0 THEN BEGIN
-        Catch, /CANCEL
-        void = cgErrorMsg()
-        
-        ; Close the PostScript file.
-        cgPS_Close, /NoFix     
-
-        ; Set the window index number back.
-        IF N_Elements(currentWindow) NE 0 THEN BEGIN
-            IF WindowAvailable(currentWindow) THEN WSet, currentWindow ELSE WSet, -1
-        ENDIF
-        RETURN
-    ENDIF
-    
-    ; Make this window the current graphics windows.
-    self -> SetDisplayWindow, currentWindow
-    IF currentWindow EQ -1 THEN RETURN
-    
-    ; Construct a file name, if you have one.
-    ext = self.ps_encapsulated ? '.eps' : '.ps'
-    IF self.saveFile NE "" THEN BEGIN
-        filename = Filepath(ROOT_DIR=self.saveDir, self.saveFile + ext)
-    ENDIF ELSE BEGIN
-         CD, CURRENT=thisDir
-         filename = Filepath(ROOT_DIR=thisDir, 'MrDrawWindow' + ext)
-    ENDELSE
-
-    ; Allow the user to configure the PostScript file.
-    cgPS_Open, /GUI, $
-               CANCEL=cancelled, $
-               CHARSIZE=self.ps_charsize, $
-               DECOMPOSED=self.ps_decomposed, $
-               EUROPEAN=self.ps_metric, $
-               ENCAPSULATED=self.ps_encapsulated, $
-               FILENAME=filename, $
-               FONT=self.ps_font, $
-               GROUP_LEADER=*self._group_leader, $
-               KEYWORDS=keywords, $
-               SCALE_FACTOR=self.ps_scale_factor, $
-               QUIET=self.ps_quiet, $
-               TT_FONT=self.ps_tt_font
-    IF cancelled THEN RETURN
-    
-    ; Save the name of the last output file.
-    self.saveDir = File_DirName(keywords.filename)
-    self.saveFile = cgRootName(keywords.filename)
-    
-    ; Execute the graphics commands.
-    self -> Draw
-    
-    ; Clean up.
-    cgPS_Close
-    
-    ; Set the window index number back.
-    IF WindowAvailable(currentWindow) THEN WSet, currentWindow ELSE WSet, -1
-
-END
 
 
 ;+
@@ -562,87 +305,90 @@ end
 ; This method retrieves properties from the object.
 ; 
 ; :Keywords:
-;     ADJUSTSIZE:               out, optional, type=boolean
+;       ADJUSTSIZE:             out, optional, type=boolean
 ;                               Set this keyword to adjust default character size to the
 ;                                   display window size.
-;     IM_DENSITY:               out, optional, type=integer, default=300
+;       IM_DENSITY:             out, optional, type=integer, default=300
 ;                               Set this keyword to the sampling density when ImageMagick
 ;                                   creates raster image file from PostScript outout.
-;     IM_OPTIONS:               out, optional, type=string, default=""
+;       IM_OPTIONS:             out, optional, type=string, default=""
 ;                               Set this keyword to any ImageMagick options you would like
 ;                                   to pass along to the ImageMagick convert command when
 ;                                   creating raster image files from PostScript output.
-;     IM_RESIZE:                out, optional, type=integer, default=25
+;       IM_RESIZE:              out, optional, type=integer, default=25
 ;                               Set this keyword to percentage that the raster image file
 ;                                   created my ImageMagick from PostScript output should
 ;                                   be resized.
-;     IM_RASTER:                out, optional, type=boolean, default=1
+;       IM_RASTER:              out, optional, type=boolean, default=1
 ;                               Set this keyword to zero to create raster files using the
 ;                                   create_png etc. keywords directly, instead of via
 ;                                   ImageMagick.
-;     IM_TRANSPARENT:           out, optional, type=boolean, default=0
+;       IM_TRANSPARENT:         out, optional, type=boolean, default=0
 ;                               Set this keyword to allow ImageMagick to create transparent
 ;                                   backgrounds when it makes raster image files from
 ;                                   PostScript output.
-;     PDF_PATH:                 out, optional, type=string
+;       PDF_PATH:               out, optional, type=string
 ;                               Set this keyword to the name of the path to the Ghostscript
 ;                                   command for converting PS to PDF.
-;     PDF_UNIX_CONVERT_CMD:     out, optional, type=string
+;       PDF_UNIX_CONVERT_CMD:   out, optional, type=string
 ;                               Set this keyword to the name of an alternative UNIX command
 ;                                   to convert PostScript to PDF.
-;     PS_CHARSIZE:              out, optional, type=float
+;       PS_CHARSIZE:            out, optional, type=float
 ;                               The PostScript character size.
-;     PS_DECOMPOSED:            out, optional, type=boolean, default=0
+;       PS_DECOMPOSED:          out, optional, type=boolean, default=0
 ;                               Set this keyword to zero to set the PostScript color mode
 ;                                   to indexed color and to one to set the PostScript color
 ;                                   mode to decomposed color.
-;     PS_DELETE:                out, optional, type=boolean, default=1
+;       PS_DELETE:              out, optional, type=boolean, default=1
 ;                               Set this keyword to zero if you want to keep the PostScript
 ;                                   output ImageMagick creates when making raster file
 ;                                   output.
-;     PS_ENCAPSULATED:          out, optional, type=boolean, default=0
+;       PS_ENCAPSULATED:        out, optional, type=boolean, default=0
 ;                               Set this keyword to configure PSCONFIG to produce
 ;                                   encapsulated PostScript output by default.
-;     PS_FONT:                  out, optional, type=integer
+;       PS_FONT:                out, optional, type=integer
 ;                               Set this keyword to the type of font you want to use in
 ;                                   PostScript output. It sets the FONT keyword on the
 ;                                   PSConfig command. Normally, 0 (hardware fonts) or
 ;                                   1 (true-type fonts).
-;     PS_METRIC:                out, optional, type=boolean, default=0
+;       PS_KEYWORDS:            out, optional, type=structure
+;                               The current set of keywords in use by cgPS_Config.
+;       PS_METRIC:              out, optional, type=boolean, default=0
 ;                               Set this keyword to configure PSCONFIG to use metric values
 ;                                   and A4 page size in its interface.
-;     PS_QUIET:                 out, optional, type=boolean, default=0
+;       PS_QUIET:               out, optional, type=boolean, default=0
 ;                               Set this keyword to set the QUIET keyword on PS_Start.
-;     PS_SCALE_FACTOR:          out, optional, type=float
+;       PS_SCALE_FACTOR:        out, optional, type=float
 ;                               Set his keyword to the PostScript scale factor you wish to
 ;                                   use in creating PostScript output.
-;     PS_TT_FONT:               out, optional, type=string
+;       PS_TT_FONT:             out, optional, type=string
 ;                               Set this keyword to the name of a true-type font to use in
 ;                                   creating PostScript output.
-;     WINID:                    out, optional, type=long
+;       WINID:                  out, optional, type=long
 ;                               ID of the display window that will be read when raster
 ;                                   output is generated.
-;     WINDOW:                   out, optional, type=object
+;       WINDOW:                 out, optional, type=object
 ;                               A display window with a Draw method.
 ;-
 PRO MrSaveAs::GetProperty, $
 ADJUSTSIZE=adjustsize, $
-IM_DENSITY=im_density, $                      ; Sets the density parameter on ImageMagick convert command.
-IM_RESIZE=im_resize, $                        ; Sets the resize parameter on ImageMagick convert command.
-IM_OPTIONS=im_options, $                      ; Sets extra ImageMagick options on the ImageMagick convert command.
-IM_RASTER=im_raster, $                        ; Sets whether to generate raster files via ImageMagick
-IM_TRANSPARENT=im_transparent, $  ; Sets the "alpha" keyword on ImageMagick convert command.
-PDF_PATH=pdf_path, $                          ; The path to the Ghostscript conversion command.
-PDF_UNIX_CONVERT_CMD=pdf_unix_convert_cmd, $  ; Command to convert PS to PDF.
-PS_CHARSIZE=ps_charsize, $                    ; Select the character size for PostScript output.
+IM_DENSITY=im_density, $
+IM_RESIZE=im_resize, $
+IM_OPTIONS=im_options, $
+IM_RASTER=im_raster, $
+IM_TRANSPARENT=im_transparent, $
+PDF_PATH=pdf_path, $
+PDF_UNIX_CONVERT_CMD=pdf_unix_convert_cmd, $
+PS_CHARSIZE=ps_charsize, $
 PS_DECOMPOSED=ps_decomposed, $
 PS_DELETE=ps_delete, $
 PS_ENCAPSULATED=ps_encapsulated, $
-PS_FONT=ps_font, $                            ; Select the font for PostScript output.
+PS_FONT=ps_font, $
+PS_KEYWORDS=ps_keywords, $
 PS_METRIC=ps_metric, $
-PS_SCALE_FACTOR=ps_scale_factor, $            ; Select the scale factor for PostScript output.
+PS_SCALE_FACTOR=ps_scale_factor, $
 PS_QUIET=ps_quiet, $
-PS_TT_FONT=ps_tt_font, $                      ; Select the true-type font to use for PostScript output.
+PS_TT_FONT=ps_tt_font, $
 WINID=winID, $
 WINDOW=theWindow
     Compile_Opt strictarr
@@ -682,6 +428,8 @@ WINDOW=theWindow
     IF Arg_Present(im_options)      THEN im_options     = self.im_options
     IF Arg_Present(im_resize)       THEN im_resize      = self.im_resize
     IF Arg_Present(im_raster)       THEN im_raster      = self.im_raster
+    
+    IF Arg_Present(ps_keywords)     THEN ps_keywords = self.ps_config -> GetKeywords()
 END
 
 
@@ -695,47 +443,10 @@ END
 ;        The name of the output file. The type of file is determined from the
 ;        file name extension.
 ;-
-PRO MrSaveAs::Output, filename
-    Compile_Opt idl2
-    
-    ; Error handling.
-    Catch, theError
-    IF theError NE 0 THEN BEGIN
-        Catch, /CANCEL
-        void = cgErrorMsg()
-        RETURN
-    ENDIF
-    
-    ; Need a filename?
-    IF N_Elements(filename) EQ 0 THEN filename = 'MrWindow.ps'
-
-    ; The type of file is determined by the filename extension.
-    rootname = cgRootName(filename, DIRECTORY=dir, EXTENSION=ext)
-    CASE StrUpCase(ext) OF
-       'PS':   self -> AutoPostScriptFile, filename
-       'EPS':  self -> AutoPostScriptFile, filename
-       'PDF':  self -> AutoRasterFile, 'PDF', filename
-       'BMP':  self -> AutoRasterFile, 'BMP', filename
-       'GIF':  self -> AutoRasterFile, 'GIF', filename
-       'JPG':  self -> AutoRasterFile, 'JPEG', filename
-       'JPEG': self -> AutoRasterFile, 'JPEG', filename
-       'PNG':  self -> AutoRasterFile, 'PNG', filename
-       'TIF':  self -> AutoRasterFile, 'TIFF', filename
-       'TIFF': self -> AutoRasterFile, 'TIFF', filename
-       ELSE: Message, 'Unknown file type: ' + StrUpCase(ext) + '.'
-    ENDCASE
-END
-
-
-;+
-; This event handler method saves the graphics window as a raster image file.
-; PDF files also pass through here.
-; 
-; :Params:
-;     event: in, required, type=structure
-;        The event structure.
-;-
-PRO MrSaveAs::SaveAsRaster, event
+PRO MrSaveAs::Save, filename, $
+FILETYPE=fileType, $
+MATCH=match, $
+PICK_FILE=pick_file
     Compile_Opt idl2
     
     ; Error handling.
@@ -748,177 +459,244 @@ PRO MrSaveAs::SaveAsRaster, event
         cgPS_Close, /NoFix     
 
         ; Set the window index number back.
-        IF N_Elements(currentWindow) NE 0 THEN BEGIN
+        IF N_Elements(currentWindow) GT 0 THEN BEGIN
             IF WindowAvailable(currentWindow) THEN WSet, currentWindow ELSE WSet, -1
         ENDIF
         
+        RETURN
+    ENDIF
+    
+    ;Defaults
+    pick_file = Keyword_Set(pick_file)
+    match     = (N_Elements(match) EQ 0) ? 1 : keyword_set(match)
+    IF N_Elements(filename) EQ 0 THEN filename = ''
+    IF N_Elements(fileType) EQ 0 THEN fileType = ''
+    
+    ;Set the current graphics windows.
+    self -> SetDisplayWindow, currentWindow
+    IF currentWindow EQ -1 THEN RETURN
+
+;---------------------------------------------------------------------
+; Automatic Output? //////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    IF pick_file EQ 0 THEN BEGIN
+        IF filename EQ '' THEN filename = FilePath(self.saveFile, ROOT_DIR=self.saveDir)
+        outName = cgRootName(filename, DIRECTORY=outDir, EXTENSION=ext)
+        IF fileType EQ '' $
+            THEN typeOut = StrUpCase(ext) $
+            ELSE typeOut = StrUpCase(fileType)
+
+;---------------------------------------------------------------------
+; Pick a File ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ENDIF ELSE BEGIN
+        IF fileType EQ '' THEN void = cgRootName(self.saveFile, EXTENSION=fileType)
+        typeOut = StrUpCase(fileType)
+        
+        ;Open the PS Config GUI
+        IF typeOut EQ 'PDF' OR typeOut EQ 'PS' THEN BEGIN
+            self.ps_config -> GUIFont, CANCEL=cancel, GROUP_LEADER=*self._group_leader, $
+                              FONTTYPE=self.ps_font
+            IF cancel THEN RETURN
+        
+            ;Get the device keywords.
+            psKeywords = self.ps_config -> GetKeywords()
+            filename = psKeywords.filename
+        
+        ;Standard file-selection GUI
+        ENDIF ELSE BEGIN
+            filename = cgPickfile(FILE=self.saveFile, /WRITE, TITLE='Select an Output File...')
+            IF filename EQ '' THEN RETURN
+        ENDELSE
+        
+        ;Parse the file name
+        baseName = cgRootName(filename, DIRECTORY=outDir)
+    ENDELSE
+
+;---------------------------------------------------------------------
+; Save to File ///////////////////////////////////////////////////////
+;---------------------------------------------------------------------  
+    ;Make sure a valid file type was given
+    CASE typeOut OF
+       'PS':   raster = 0B
+       'EPS':  raster = 0B
+       'PDF':  raster = 0B
+       'BMP':  raster = 1B
+       'GIF':  raster = 1B
+       'JPG':  raster = 1B
+       'JPEG': raster = 1B
+       'PNG':  raster = 1B
+       'TIF':  raster = 1B
+       'TIFF': raster = 1B
+       ELSE: Message, 'Unknown file type: "' + typeOut + '".'
+    ENDCASE
+
+    ;Save the file name and directory
+    self.saveFile = baseName + '.' + StrLowCase(typeOut)
+    self.saveDir  = outDir
+    self.ps_config -> SetProperty, DIRECTORY=outDir, FILENAME=baseName + '.' + StrLowCase(typeOut)
+    
+    ;Create the file name without an extension
+    outName = FilePath(baseName, ROOT_DIR=outDir)
+
+;---------------------------------------------------------------------
+; Postscript Device? /////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    IF (typeOut EQ 'PDF') OR (typeOut EQ 'PS') OR self.im_raster THEN BEGIN
+
+    ;---------------------------------------------------------------------
+    ; Open Postscript File ///////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        ;Create a postscript intermediary file. If a raster file extension
+        ;is given to cgPS_Open, the intermediary file is deleted automatically
+        ;when the file is closed. I want to control this behavior, so I ask to
+        ;create a postscript file first.
+        fname_temp = baseName + '.ps'
+        
+        ;Get the configuration keywords
+        ps_keys  = self.ps_config -> GetKeywords()
+        isolatin = ps_keys.isolatin1
+        fontsize = ps_keys.font_size
+        ps_keys  = remove_tags(ps_keys, ['language_level', 'font_size', 'portrait', $
+                                         'tt_font',        'isolatin1'])
+        ps_keys  = create_struct(ps_keys, 'fontsize', fontsize, 'isolatin', isolatin)
+
+        ;Open the file.
+        cgPS_Open, CHARSIZE     =  self.ps_charsize, $
+                   FILENAME     =       fname_temp, $
+                   GROUP_LEADER = *self._group_leader, $
+                   KEYWORDS     =  ps_keywords, $
+                   MATCH        =  match, $
+                   QUIET        =  1B, $
+                   SCALE_FACTOR =  self.ps_scale_factor, $
+                   TT_FONT      =  self.ps_tt_font, $
+                  _EXTRA        =  ps_keys
+                  
+        ;Set the device
+        ps_keywords = remove_tags(ps_keywords, ['pagetype', 'fonttype'])
+        Device, _STRICT_EXTRA=ps_keywords
+
+        ;Update the page size from the MATCH keyword.
+        ps_keywords = remove_tags(ps_keywords, ['language_level', 'font_size', 'portrait', $
+                                                'tt_font',        'isolatin1'])
+        self.ps_config -> SetProperty, _STRICT_EXTRA=ps_keywords
+
+    ;---------------------------------------------------------------------
+    ; Close Postscript Device ////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        CASE typeOut OF
+        ;---------------------------------------------------------------------
+        ; PS /////////////////////////////////////////////////////////////////
+        ;---------------------------------------------------------------------
+            'PS': BEGIN
+                ;Write to the file.
+                self -> Draw
+    
+                ;Close the file.
+                cgPS_Close, OUTFILENAME=fOut
+                outName = n_elements(fOut) gt 0 ? fOut : outName + '.ps'
+            ENDCASE
+            
+        ;---------------------------------------------------------------------
+        ; PDF ////////////////////////////////////////////////////////////////
+        ;---------------------------------------------------------------------
+            'PDF': BEGIN
+                ;Write to the file
+                self -> Draw
+                
+                ;Append the extension to the output file
+                outName = outName + '.pdf'
+                
+                ; Close the file and make a PDF file.
+                cgPS_Close
+                cgPS2PDF, fname_temp, outName, $
+                          DELETE_PS=self.ps_delete, $
+                          /SILENT, $
+                          SUCCESS=success, $
+                          UNIX_CONVERT_CMD=self.pdf_unix_convert_cmd, $
+                          GS_PATH=self.pdf_path
+                
+                ;Successful?
+                IF ~success THEN $
+                   Message, 'Unable to create PDF file. See cgPS2PDF documentation.'
+            ENDCASE
+            
+        ;---------------------------------------------------------------------
+        ; ImageMagic Raster //////////////////////////////////////////////////
+        ;---------------------------------------------------------------------
+            ELSE: BEGIN
+                ; Cannot successfully convert encapsulated landscape file to raster.
+                ; Limitation of ImageMagick, and specifically, GhostScript, which does
+                ; the conversion.
+                IF ps_keywords.encapsulated && ps_keywords.landscape THEN BEGIN
+                    Message, 'ImageMagick cannot successfully convert an encapsulated ' + $
+                             'PostScript file in landscape mode to a raster file. Returning...'
+                ENDIF
+                
+                ;Write the graphics to the file.
+                self -> Draw
+
+                ;Close the file. The intermediate postscript file will be deleted.
+                cgPS_Close, ALLOW_TRANSPARENT =  self.im_transparent, $
+                            DELETE_PS         =  self.ps_delete, $
+                            DENSITY           =  self.im_density, $
+                            FILETYPE          =       typeOut, $
+                            IM_OPTIONS        =  self.im_options, $
+                            OUTFILENAME       =       fnameOut, $
+                            RESIZE            =  self.im_resize, $
+                            WIDTH             = *self.im_width
+                
+                outName = fnameOut
+            ENDCASE
+        ENDCASE
+
+;---------------------------------------------------------------------
+; Screen Shot ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ENDIF ELSE BEGIN
+       void = cgSnapshot(TYPE=typeOut, FILENAME=outName + '.' + StrLowCase(typeOut), /NODIALOG)
+    ENDELSE
+    
+    ;Indicate where the file was saved.
+    IF ~self.ps_quiet THEN Print, typeOut + ' file located here: ' + outName
+    
+    ;Set the window index number back.
+    IF currentWindow NE -1 THEN WSet, currentWindow ELSE WSet, -1
+END
+
+
+;+
+; This event handler method saves the graphics window as a raster image file.
+; PDF files also pass through here.
+; 
+; :Params:
+;     event: in, required, type=structure
+;        The event structure.
+;-
+PRO MrSaveAs::SaveAsEvents, event
+    Compile_Opt idl2
+    
+    ; Error handling.
+    Catch, theError
+    IF theError NE 0 THEN BEGIN
+        Catch, /CANCEL
+        void = cgErrorMsg()
         RETURN
     ENDIF
 
     ; Only going in here for down event.
     IF event.select NE 1 THEN RETURN
     
-    buttonValue = Widget_Info(event.id, /UNAME)
+    ;The button's user value determines the type of file to create. 
+    Widget_Control, event.id, GET_VALUE=buttonValue
+    uName = Widget_Info(event.id, /UNAME)
     
-    ; Is this a PDF file or a raster file?
-    IF buttonValue EQ 'PDF' THEN BEGIN
-       rasterType = -1
-       filetype = 'PDF'
-    ENDIF ELSE BEGIN
-    
-        ; Determine if this is normal raster (0) or ImageMagick raster (1).
-        IF StrMid(buttonValue, 0, 6) EQ 'RASTER' THEN BEGIN
-            fileType = StrMid(buttonValue, 7)
-            rasterType = 0 
-        ENDIF ELSE BEGIN
-            filetype = StrMid(buttonValue, 12)
-            rasterType = 1
-        ENDELSE
-        
-    ENDELSE
-    
-    ; Make this window the current graphics windows.
-    self -> SetDisplayWindow, currentWindow
-    IF currentWindow EQ -1 THEN RETURN
-    
-    ; Construct a file name, if you have one.
-    CASE filetype OF
-       'BMP':  ext = '.bmp'
-       'GIF':  ext = '.gif'
-       'JPEG': ext = '.jpg'
-       'PDF':  ext = '.pdf'
-       'PNG':  ext = '.png'
-       'TIFF': ext = '.tif'
-    ENDCASE
-    IF self.saveFile NE "" THEN BEGIN
-        filename = Filepath(ROOT_DIR=self.saveDir, self.saveFile + ext)
-    ENDIF ELSE BEGIN
-         CD, CURRENT=thisDir
-         filename = Filepath(ROOT_DIR=thisDir, 'MrDrawWindow' + ext)
-    ENDELSE
-    
-    ; Get a filename from the user.
-    CASE filetype OF
-       'BMP':  filename = cgPickfile(FILE=filename, /WRITE, TITLE='Select an Output File...')
-       'GIF':  filename = cgPickfile(FILE=filename, /WRITE, TITLE='Select an Output File...')
-       'JPEG': filename = cgPickfile(FILE=filename, /WRITE, TITLE='Select an Output File...')
-       'PDF':  filename = cgPickfile(FILE=filename, /WRITE, TITLE='Select an Output File...')
-       'PNG':  filename = cgPickfile(FILE=filename, /WRITE, TITLE='Select an Output File...')
-       'TIFF': filename = cgPickfile(FILE=filename, /WRITE, TITLE='Select an Output File...')
-    ENDCASE
-    IF filename EQ "" THEN RETURN
-    
-    ; Parset the name.
-    root_name = cgRootName(filename, DIRECTORY=dirName)
-    outname = Filepath(ROOT_DIR=dirname, root_name)
-    
-    ; Save this name.
-    self.saveFile = root_name
-    self.saveDir = dirName
+    ;Extract the file type from the user name
+    fileType = StregEx(uName, '(RASTER_|IMAGEMAGICK_)?([A-Z]+)', /SUBEXP, /EXTRACT)
+    fileType = fileType[2]
 
-    ; What kind of raster file.
-    CASE rasterType OF
-    
-        ; PDF File.
-       -1: BEGIN
-       
-           thisname = outname + '.ps'
-           outname = outname + '.pdf'
-           cgPS_Open, $
-                DECOMPOSED=self.ps_decomposed, $
-                FILENAME=thisname, $
-                GROUP_LEADER=*self._group_leader, $
-                METRIC=self.ps_metric, $
-                KEYWORDS=keywords, $ ; Returned PSConfig keywords.
-                SCALE_FACTOR=self.ps_scale_factor, $
-                CHARSIZE=self.ps_charsize, $
-                FONT=self.ps_font, $
-                QUIET=self.ps_quiet, $
-                TT_FONT=self.ps_tt_font
-                           
-           ; Draw the graphics.
-           self -> Draw
-           
-           ; Close the file and make a PDF file.
-           cgPS_Close
-           cgPS2PDF, thisname, outname, DELETE_PS=self.ps_delete, /SILENT, SUCCESS=success, $
-              UNIX_CONVERT_CMD=self.pdf_unix_convert_cmd, GS_PATH=self.pdf_path
-           IF ~success THEN BEGIN
-              Message, 'Unable to create PDF file. See cgPS2PDF documentation.'
-           ENDIF ELSE BEGIN
-              IF ~self.ps_quiet THEN Print, 'PDF output will be created here: ' + outname
-           ENDELSE
-           ENDCASE
-    
-        ; Normal raster.
-        0: BEGIN
-           void = cgSnapshot(TYPE=fileType, FILENAME=outname, /NODIALOG)
-           IF ~self.ps_quiet THEN Print, 'Output file located here: ' + outname 
-           ENDCASE
-           
-        ; Raster via ImageMagick.
-        1: BEGIN
-        
-           ; Create a PostScript file first.
-           thisname = outname + '.ps'
-           cgPS_Open, $
-                DECOMPOSED=self.ps_decomposed, $
-                FILENAME=thisname, $
-                GROUP_LEADER=*self._group_leader, $
-                METRIC=self.ps_metric, $
-                KEYWORDS=keywords, $ ; Returned PSConfig keywords.
-                SCALE_FACTOR=self.ps_scale_factor, $
-                CHARSIZE=self.ps_charsize, $
-                FONT=self.ps_font, $
-                QUIET=1, $
-                TT_FONT=self.ps_tt_font
-                
-           ; Cannot successfully convert encapsulated landscape file to raster.
-           ; Limitation of ImageMagick, and specifically, GhostScript, which does
-           ; the conversion.
-           IF keywords.encapsulated && keywords.landscape THEN BEGIN
-                Message, 'ImageMagick cannot successfully convert an encapsulated ' + $
-                         'PostScript file in landscape mode to a raster file. Returning...'
-           ENDIF
-           
-           ; Draw the graphics.
-           self -> Draw
-
-           ; Close the file and convert to proper file type.
-           CASE filetype OF
-                'BMP':  cgPS_Close, /BMP, DELETE_PS=self.ps_delete, $
-                            ALLOW_TRANSPARENT=self.im_transparent, $
-                            DENSITY=self.im_density, RESIZE=self.im_resize, $
-                            IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
-                            WIDTH=self.im_width
-                'GIF':  cgPS_Close, /GIF, DELETE_PS=self.ps_delete, $
-                            ALLOW_TRANSPARENT=self.im_transparent, $
-                            DENSITY=self.im_density, RESIZE=self.im_resize, $
-                            IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
-                            WIDTH=self.im_width
-                'JPEG': cgPS_Close, /JPEG, DELETE_PS=self.ps_delete, $
-                            ALLOW_TRANSPARENT=self.im_transparent, $
-                            DENSITY=self.im_density, RESIZE=self.im_resize, $
-                            IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
-                            WIDTH=self.im_width
-                'PNG':  cgPS_Close, /PNG,  DELETE_PS=self.ps_delete, $
-                            ALLOW_TRANSPARENT=self.im_transparent, $
-                            DENSITY=self.im_density, RESIZE=self.im_resize, $
-                            IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
-                            WIDTH=self.im_width
-                'TIFF': cgPS_Close, /TIFF, DELETE_PS=self.ps_delete, $
-                            ALLOW_TRANSPARENT=self.im_transparent, $
-                            DENSITY=self.im_density, RESIZE=self.im_resize, $
-                            IM_OPTIONS=self.im_options, OUTFILENAME=outfilename, $
-                            WIDTH=self.im_width
-           ENDCASE
-           IF ~self.ps_quiet THEN Print, 'Output will be created here: ' + outfilename
-           ENDCASE
-    
-    ENDCASE
-    
-    ; Set the window index number back.
-    IF currentWindow NE -1 THEN WSet, currentWindow ELSE WSet, -1
+    ;Save the file
+    self -> Save, FILETYPE=fileType, /PICK_FILE
 END
 
 
@@ -1128,29 +906,33 @@ end
 ;     WINDOW:                   in, optional, type=object
 ;                               A display window with a Draw method. Required for
 ;                                   post-script output.
+;       _REF_EXTRA:         in, optional, type=any
+;                           Any keyword accepted by cgPS_Config.pro is also accepted via
+;                               keyword inheritance.
 ;-
 PRO MrSaveAs::SetProperty, $
-ADJUSTSIZE=adjustsize, $       ; Adjust the default charsize to match display size.
-GROUP_LEADER=group_leader, $                  ; ID of a widget to serve as the group leader
-IM_DENSITY=im_density, $                      ; Sets the density parameter on ImageMagick convert command.
-IM_OPTIONS=im_options, $                      ; Sets extra ImageMagick options on the ImageMagick convert command.
-IM_RASTER=im_raster, $                        ; Sets whether to use ImageMagick to create raster files.
-IM_RESIZE=im_resize, $                        ; Sets the resize parameter on ImageMagick convert command.
-IM_TRANSPARENT=im_transparent, $              ; Sets the "alpha" keyword on ImageMagick convert command.
-IM_WIDTH = im_width, $                        ; Sets the final width of the raster files create with ImageMagick.
-PDF_UNIX_CONVERT_CMD=pdf_unix_convert_cmd, $  ; Command to convert PS to PDF.
-PDF_PATH=pdf_path, $                          ; The path to the Ghostscript conversion command.
-PS_CHARSIZE=ps_charsize, $                    ; Select the character size for PostScript output.
-PS_DECOMPOSED=ps_decomposed, $                ; Sets the PostScript color mode.
-PS_DELETE=ps_delete, $                        ; Delete the PostScript file when making IM raster files.
-PS_ENCAPSULATED=ps_encapsulated, $            ; Select encapusulated PostScript output.
-PS_FONT=ps_font, $                            ; Select the font for PostScript output.
-PS_METRIC=ps_metric, $                        ; Select metric measurements in PostScript output.
-PS_QUIET=ps_quiet, $                          ; Select the QUIET keyword for PS_Start.
-PS_SCALE_FACTOR=ps_scale_factor, $            ; Select the scale factor for PostScript output.
-PS_TT_FONT=ps_tt_font, $                      ; Select the true-type font to use for PostScript output.
+ADJUSTSIZE=adjustsize, $
+GROUP_LEADER=group_leader, $
+IM_DENSITY=im_density, $
+IM_OPTIONS=im_options, $
+IM_RASTER=im_raster, $
+IM_RESIZE=im_resize, $
+IM_TRANSPARENT=im_transparent, $
+IM_WIDTH = im_width, $
+PDF_UNIX_CONVERT_CMD=pdf_unix_convert_cmd, $
+PDF_PATH=pdf_path, $
+PS_CHARSIZE=ps_charsize, $
+PS_DECOMPOSED=ps_decomposed, $
+PS_DELETE=ps_delete, $
+PS_ENCAPSULATED=ps_encapsulated, $
+PS_FONT=ps_font, $
+PS_METRIC=ps_metric, $
+PS_QUIET=ps_quiet, $
+PS_SCALE_FACTOR=ps_scale_factor, $
+PS_TT_FONT=ps_tt_font, $
 WINID=winID, $
-WINDOW=theWindow
+WINDOW=theWindow, $
+_REF_EXTRA=extra
     Compile_Opt idl2
     
     ; Error handling.
@@ -1165,25 +947,45 @@ WINDOW=theWindow
     IF N_Elements(theWindow)            GT 0 THEN  self._saveWindow   = theWindow
     IF N_Elements(group_leader)         GT 0 THEN *self._group_leader = group_leader
     
-    IF N_Elements(adjustsize)           GT 0 THEN self.adjustsize = Keyword_Set(adjustsize)
+    IF N_Elements(adjustsize)           GT 0 THEN  self.adjustsize = Keyword_Set(adjustsize)
 
-    IF N_Elements(im_transparent)       GT 0 THEN self.im_transparent       = im_transparent
-    IF N_Elements(im_density)           GT 0 THEN self.im_density           = im_density
-    IF N_Elements(im_resize)            GT 0 THEN self.im_resize            = im_resize
-    IF N_Elements(im_options)           GT 0 THEN self.im_options           = im_options
-    IF N_Elements(im_raster)            GT 0 then self.im_raster            = im_raster
-    IF N_Elements(im_width)             GT 0 then self.im_width             = im_width
-    IF N_Elements(pdf_unix_convert_cmd) GT 0 THEN self.pdf_unix_convert_cmd = pdf_unix_convert_cmd
-    IF N_Elements(pdf_path)             GT 0 THEN self.pdf_path             = pdf_path
-    IF N_Elements(ps_decomposed)        GT 0 THEN self.ps_decomposed        = ps_decomposed
-    IF N_Elements(ps_delete)            GT 0 THEN self.ps_delete            = ps_delete
-    IF N_Elements(ps_metric)            GT 0 THEN self.ps_metric            = ps_metric
-    IF N_Elements(ps_encapsulated)      GT 0 THEN self.ps_encapsulated      = ps_encapsulated
-    IF N_Elements(ps_charsize)          GT 0 THEN self.ps_charsize          = ps_charsize
-    IF N_Elements(ps_font)              GT 0 THEN self.ps_font              = ps_font
-    IF N_Elements(ps_quiet)             GT 0 THEN self.ps_quiet             = ps_quiet
-    IF N_Elements(ps_scale_factor)      GT 0 THEN self.ps_scale_factor      = ps_scale_factor
-    IF N_Elements(ps_tt_font)           GT 0 THEN self.ps_tt_font           = ps_tt_font    
+    IF N_Elements(im_transparent)       GT 0 THEN  self.im_transparent       = im_transparent
+    IF N_Elements(im_density)           GT 0 THEN  self.im_density           = im_density
+    IF N_Elements(im_resize)            GT 0 THEN  self.im_resize            = im_resize
+    IF N_Elements(im_options)           GT 0 THEN  self.im_options           = im_options
+    IF N_Elements(im_raster)            GT 0 then  self.im_raster            = im_raster
+    IF N_Elements(im_width)             GT 0 then *self.im_width             = im_width
+    IF N_Elements(pdf_unix_convert_cmd) GT 0 THEN  self.pdf_unix_convert_cmd = pdf_unix_convert_cmd
+    IF N_Elements(pdf_path)             GT 0 THEN  self.pdf_path             = pdf_path
+    
+    IF N_Elements(ps_delete)            GT 0 THEN  self.ps_delete            = ps_delete
+    IF N_Elements(ps_charsize)          GT 0 THEN  self.ps_charsize          = ps_charsize
+    IF N_Elements(ps_quiet)             GT 0 THEN  self.ps_quiet             = ps_quiet
+    IF N_Elements(ps_scale_factor)      GT 0 THEN  self.ps_scale_factor      = ps_scale_factor
+    IF N_Elements(ps_tt_font)           GT 0 THEN  self.ps_tt_font           = ps_tt_font
+;    IF N_Elements(ps_metric)            GT 0 THEN  self.ps_metric            = ps_metric
+;    IF N_Elements(ps_font)              GT 0 THEN  self.ps_font              = ps_font
+;    IF N_Elements(ps_decomposed)        GT 0 THEN  self.ps_decomposed        = ps_decomposed
+;    IF N_Elements(ps_encapsulated)      GT 0 THEN  self.ps_encapsulated      = ps_encapsulated
+
+    ;Remove duplicate keywords from the EXTRA array, if they are present
+    IF N_Elements(extra) GT 0 THEN BEGIN
+        tf_member = isMember(['FONTTYPE', 'TRUETYPE'], extra, /FOLD_CASE, $
+                             NONMEMBER_INDS=iExtra, N_NONMEMBERS=nExtra)
+        IF Max(tf_member) GT 0 THEN BEGIN
+            message, 'Cannot set FONTTYPE or TRUETYPE keywords. Use PS_FONT and PS_TT_FONT instead.', /INFORMATIONAL
+            IF nExtra GT 0 $
+                THEN extra = extra[iExtra] $
+                ELSE void  = temporary(extra)
+        ENDIF
+    ENDIF
+
+    
+    self.ps_config -> SetProperty, DECOMPOSED   = ps_decomposed, $
+                                   ENCAPSULATED = ps_encapsulated, $
+                                   FONTTYPE     = ps_font, $
+                                   METRIC       = ps_metric, $
+                                  _STRICT_EXTRA = extra
 END
 
 
@@ -1191,7 +993,8 @@ END
 ;   Clean up after the object is destroyed -- destroy pointers and object references.
 ;-
 pro MrSaveAs::cleanup
-    ;Do nothing
+    ptr_free, self.im_width
+    obj_destroy, self.ps_config
 end
 
 
@@ -1270,25 +1073,25 @@ end
 ;                                   creating PostScript output.
 ;-
 function MrSaveAs::init, winID, theWindow, $
-ADJUSTSIZE=adjustsize, $                      ; Adjust the default charsize to match display size.
-GROUP_LEADER=group_leader, $                  ; ID of a widget to serve as the group leader
-IM_DENSITY=im_density, $                      ; Sets the density parameter on ImageMagick convert command.
-IM_OPTIONS=im_options, $                      ; Sets extra ImageMagick options on the ImageMagick convert command.
-IM_RASTER=im_raster, $                        ; Sets whether to use ImageMagick to create raster files.
-IM_RESIZE=im_resize, $                        ; Sets the resize parameter on ImageMagick convert command.
-IM_TRANSPARENT=im_transparent, $              ; Sets the "alpha" keyword on ImageMagick convert command.
-IM_WIDTH = im_width, $                        ; Sets the final width of the raster files create with ImageMagick.
-PDF_UNIX_CONVERT_CMD=pdf_unix_convert_cmd, $  ; Command to convert PS to PDF.
-PDF_PATH=pdf_path, $                          ; The path to the Ghostscript conversion command.
-PS_CHARSIZE=ps_charsize, $                    ; Select the character size for PostScript output.
-PS_DECOMPOSED=ps_decomposed, $                ; Sets the PostScript color mode.
-PS_DELETE=ps_delete, $                        ; Delete the PostScript file when making IM raster files.
-PS_ENCAPSULATED=ps_encapsulated, $            ; Select encapusulated PostScript output.
-PS_FONT=ps_font, $                            ; Select the font for PostScript output.
-PS_METRIC=ps_metric, $                        ; Select metric measurements in PostScript output.
-PS_QUIET=ps_quiet, $                          ; Select the QUIET keyword for PS_Start.
-PS_SCALE_FACTOR=ps_scale_factor, $            ; Select the scale factor for PostScript output.
-PS_TT_FONT=ps_tt_font                         ; Select the true-type font to use for PostScript output.
+ADJUSTSIZE=adjustsize, $
+GROUP_LEADER=group_leader, $
+IM_DENSITY=im_density, $
+IM_OPTIONS=im_options, $
+IM_RASTER=im_raster, $
+IM_RESIZE=im_resize, $
+IM_TRANSPARENT=im_transparent, $
+IM_WIDTH = im_width, $
+PDF_UNIX_CONVERT_CMD=pdf_unix_convert_cmd, $
+PDF_PATH=pdf_path, $
+PS_CHARSIZE=ps_charsize, $
+PS_DECOMPOSED=ps_decomposed, $
+PS_DELETE=ps_delete, $
+PS_ENCAPSULATED=ps_encapsulated, $
+PS_FONT=ps_font, $
+PS_METRIC=ps_metric, $
+PS_QUIET=ps_quiet, $
+PS_SCALE_FACTOR=ps_scale_factor, $
+PS_TT_FONT=ps_tt_font
     compile_opt strictarr
     
     ;Error handling
@@ -1302,34 +1105,27 @@ PS_TT_FONT=ps_tt_font                         ; Select the true-type font to use
 ;---------------------------------------------------------------------
 ;Get Default Values //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    
-    ; Get the global defaults.
-    cgWindow_GetDefs, $
-;       AdjustSize = d_adjustsize, $                 ; Adjust charsize to window size.
-       
-       ; PDF properties.
-       PDF_Unix_Convert_Cmd = d_pdf_unix_convert_cmd, $ ; Command to convert PS to PDF.
-       PDF_Path             = d_pdf_path, $             ; The path to the Ghostscript conversion command.
-   
-       ; ImageMagick Properties.
-       IM_Transparent = d_im_transparent, $         ; Sets the "alpha" keyword on ImageMagick convert command.
-       IM_Density     = d_im_density, $             ; Sets the density parameter on ImageMagick convert command.
-       IM_Raster      = d_im_raster, $              ; Create raster files via ImageMagick.
-       IM_Resize      = d_im_resize, $              ; Sets the resize parameter on ImageMagick convert command.
-       IM_Options     = d_im_options, $             ; Sets extra ImageMagick options on the ImageMagick convert command.
-       IM_Width       = d_im_width, $               ; The width of the raster file output.
-        
-       ; PostScript properties.
-       PS_Decomposed   = d_ps_decomposed, $         ; Sets the PostScript color mode.
-       PS_Delete       = d_ps_delete, $             ; Delete PS file when making IM raster.
-       PS_Metric       = d_ps_metric, $             ; Select metric measurements in PostScript output.
-       PS_Encapsulated = d_ps_encapsulated, $       ; Create Encapsulated PostScript output.    
-       PS_FONT         = d_ps_font, $               ; Select the font for PostScript output.
-       PS_CHARSIZE     = d_ps_charsize, $           ; Select the character size for PostScript output.
-       PS_QUIET        = d_ps_quiet, $              ; Select the QUIET keyword for PS_Start.
-       PS_SCALE_FACTOR = d_ps_scale_factor, $       ; Select the scale factor for PostScript output.
-       PS_TT_FONT      = d_ps_tt_font               ; Select the true-type font to use for PostScript output.
-   
+    cgWindow_GetDefs, AdjustSize = d_adjustsize, $
+                      ; PDF properties.
+                      PDF_Unix_Convert_Cmd = d_pdf_unix_convert_cmd, $
+                      PDF_Path             = d_pdf_path, $
+                      ; ImageMagick Properties.
+                      IM_Transparent = d_im_transparent, $
+                      IM_Density     = d_im_density, $
+                      IM_Raster      = d_im_raster, $
+                      IM_Resize      = d_im_resize, $
+                      IM_Options     = d_im_options, $
+                      IM_Width       = d_im_width, $
+                      ; PostScript properties.
+                      PS_Decomposed   = d_ps_decomposed, $
+                      PS_Delete       = d_ps_delete, $
+                      PS_Metric       = d_ps_metric, $
+                      PS_Encapsulated = d_ps_encapsulated, $
+                      PS_FONT         = d_ps_font, $
+                      PS_CHARSIZE     = d_ps_charsize, $
+                      PS_QUIET        = d_ps_quiet, $
+                      PS_SCALE_FACTOR = d_ps_scale_factor, $
+                      PS_TT_FONT      = d_ps_tt_font
      
 ;---------------------------------------------------------------------
 ;Set Object Properties ///////////////////////////////////////////////
@@ -1340,14 +1136,18 @@ PS_TT_FONT=ps_tt_font                         ; Select the true-type font to use
     ;Heap Variables
     self._group_leader = ptr_new(/ALLOCATE_HEAP)
     if n_elements(group_leader) gt 0 then *self._group_leader = group_leader
+    
+    ;Objects
+    self.ps_config = obj_new('FSC_PSConfig')
 
-;    self.adjustsize = d_adjustsize
-    self.im_transparent = n_elements(im_transparent) gt 0 ? im_transparent : d_im_transparent
-    self.im_density     = n_elements(im_density)     gt 0 ? im_density     : d_im_density
-    self.im_options     = n_elements(im_options)     gt 0 ? im_options     : d_im_options
-    self.im_raster      = n_elements(im_raster)      gt 0 ? im_raster      : d_im_raster
-    self.im_resize      = n_elements(im_resize)      gt 0 ? im_resize      : d_im_resize
-    self.im_width       = n_elements(im_width)       gt 0 ? im_width       : d_im_width
+    ;Defaults
+    self.adjustsize     = n_elements(adjust_size)    gt 0 ? adjustsize        : d_adjustsize
+    self.im_transparent = n_elements(im_transparent) gt 0 ? im_transparent    : d_im_transparent
+    self.im_density     = n_elements(im_density)     gt 0 ? im_density        : d_im_density
+    self.im_options     = n_elements(im_options)     gt 0 ? im_options        : d_im_options
+    self.im_raster      = n_elements(im_raster)      gt 0 ? im_raster         : d_im_raster
+    self.im_resize      = n_elements(im_resize)      gt 0 ? im_resize         : d_im_resize
+    self.im_width       = n_elements(im_width)       gt 0 ? ptr_new(im_width) : ptr_new(d_im_width)
 
     self.pdf_unix_convert_cmd = n_elements(pdf_unix_convert_cmd) gt 0 ? pdf_unix_convert_cmd : d_pdf_unix_convert_cmd
     self.pdf_path             = n_elements(pdf_path)             gt 0 ? pdf_path             : d_pdf_path
@@ -1362,6 +1162,12 @@ PS_TT_FONT=ps_tt_font                         ; Select the true-type font to use
     self.ps_scale_factor = n_elements(ps_scale_factor) gt 0 ? ps_scale_factor : d_ps_scale_factor
     self.ps_tt_font      = n_elements(ps_tt_font)      gt 0 ? ps_tt_font      : d_ps_tt_font
     
+    ;Default save file and location
+    CD, CURRENT=current
+    self.saveFile = 'MrWindow.png'
+    self.saveDir  = current + path_sep()
+    self.ps_config -> SetProperty, DIRECTORY=self.saveDir, FILENAME='MrWindow.ps'
+    
     return, 1
 end
 
@@ -1372,6 +1178,31 @@ end
 ; :Params:
 ;       CLASS:          out, optional, type=structure
 ;                       The class definition structure.
+;
+; :Fields:
+;       _SAVEWINDOW:            Window in which graphics are displayed.
+;       _SAVEWINID:             ID of the window from which the image will be read.
+;       _GROUP_LEADER:          ID of a widget to serve as a group leader.
+;       PS_CONFIG:              A FSC_PSCONFIG object.
+;       PS_DECOMPOSED:          Sets the PostScript color mode.
+;       PS_DELETE:              Delete the PS file when making IM image file.
+;       PS_ENCAPSULATED:        Encapsulated PostScript
+;       PS_METRIC:              Metric measurements in PostScript.
+;       PS_CHARSIZE:            The character size to use for PostScript output.
+;       PS_FONT:                The PostScript font to use.
+;       PS_QUIET:               Select the QUIET keyword for PS_Start.
+;       PS_SCALE_FACTOR:        The PostScript scale factor.
+;       PS_TT_FONT:             The name of a true-type font to use for PostScript output.
+;       PDF_UNIX_CONVERT_CMD:   The name of an alternative UNIX command to convert PS to PDF.
+;       PDF_PATH:               The name of the path to a Ghostscript conversion command.
+;       IM_TRANSPARENT:         Sets the "alpha" keyword on ImageMagick convert command.
+;       IM_DENSITY:             Sets the density parameter on ImageMagick convert command.
+;       IM_RESIZE:              Sets the resize parameter on ImageMagick convert command.
+;       IM_OPTIONS:             Sets extra ImageMagick options on the ImageMagick convert command.
+;       IM_RASTER:              Create raster files via ImageMagick
+;       IM_WIDTH:               Sets the width of the final raster output with ImageMagick
+;       SAVEFILE:               Last file saved.
+;       SAVEDIR:                Directory in which the last file was saved.
 ;-
 pro MrSaveAs__define, class
     compile_opt strictarr
@@ -1384,28 +1215,30 @@ pro MrSaveAs__define, class
              _group_leader: ptr_new(), $   ; ID of a widget to serve as a group leader.
               
              ; PostScript options.
-             ps_decomposed: 0L, $          ; Sets the PostScript color mode.
-             ps_delete: 0L, $              ; Delete the PS file when making IM image file.
-             ps_encapsulated: 0L, $        ; Encapsulated PostScript
-             ps_metric: 0L, $              ; Metric measurements in PostScript.
-             ps_charsize: 0.0, $           ; The character size to use for PostScript output.
-             ps_font: 0, $                 ; The PostScript font to use.
-             ps_quiet: 0, $                ; Select the QUIET keyword for PS_Start.
-             ps_scale_factor: 0, $         ; The PostScript scale factor.
-             ps_tt_font: "", $             ; The name of a true-type font to use for PostScript output.
+             adjustsize:      0B, $
+             ps_config:       obj_new(), $
+             ps_decomposed:   0B, $
+             ps_delete:       0B, $
+             ps_encapsulated: 0B, $
+             ps_metric:       0B, $
+             ps_charsize:     0.0, $
+             ps_font:         0, $
+             ps_quiet:        0B, $
+             ps_scale_factor: 0.0, $
+             ps_tt_font:      "", $
              
              ; PDF options.
-             pdf_unix_convert_cmd: "", $   ; The name of an alternative UNIX command to convert PS to PDF.
-             pdf_path: "", $               ; The name of the path to a Ghostscript conversion command.
+             pdf_unix_convert_cmd: "", $
+             pdf_path:             "", $
 
              ; ImageMagick output parameters.
-             im_transparent: 0B, $         ; Sets the "alpha" keyword on ImageMagick convert command.
-             im_density: 0L, $             ; Sets the density parameter on ImageMagick convert command.
-             im_resize: 0L, $              ; Sets the resize parameter on ImageMagick convert command.
-             im_options: "", $             ; Sets extra ImageMagick options on the ImageMagick convert command.
-             im_raster: 0L, $              ; Create raster files via ImageMagick
-             im_width: 0L, $               ; Sets the width of the final raster output with ImageMagick
+             im_transparent: 0B, $
+             im_density:     0L, $
+             im_resize:      0L, $
+             im_options:     "", $
+             im_raster:      0B, $
+             im_width:       Ptr_New(), $
               
-             saveFile: '', $               ;Last file saved.
-             saveDir: ''}                  ;Directory in which the last file was saved. 
+             saveFile:       '', $
+             saveDir:        ''}
 end
