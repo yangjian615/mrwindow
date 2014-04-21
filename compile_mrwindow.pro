@@ -78,7 +78,6 @@
 .comp ./utilities/epoch_to_ssm.pro
 .comp ./utilities/getindexrange.pro
 .comp ./utilities/getmrwindows.pro
-.comp ./utilities/ht_velocity.pro
 .comp ./utilities/ismember.pro
 .comp ./utilities/linspace.pro
 .comp ./utilities/moveplot_gui.pro
@@ -87,6 +86,7 @@
 .comp ./utilities/mraplot.pro
 .comp ./utilities/mrcmpversion.pro
 .comp ./utilities/mrgetwindow.pro
+.comp ./utilities/mrhtvelocity.pro
 .comp ./utilities/mrisnull.pro
 .comp ./utilities/mrlayout.pro
 .comp ./utilities/mrnull.pro

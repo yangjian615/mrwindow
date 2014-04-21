@@ -312,9 +312,9 @@ pro MrGrLayout::CalcPositions
                                       OXMARGIN  =  self.oxmargin, $
                                       OYMARGIN  =  self.oymargin, $
                                       P_REGION  =       p_region, $
-                                      XGAP      =  self.xgap, $
+                                      XGAP      = *self.xgap, $
                                       IXMARGIN  =  self.ixmargin, $
-                                      YGAP      =  self.ygap, $
+                                      YGAP      = *self.ygap, $
                                       IYMARGIN  =  self.iymargin)
     
     ;Save the window and region
@@ -1118,8 +1118,8 @@ POSITION = position
             position = (*self.layout_positions)[*, aIndex]
         endif else begin
             position = MrLayout(layout, ASPECT=*self.aspect, CHARSIZE=self.charsize, $
-                                OXMARGIN=self.oxmargin, IXMARGIN=self.ixmargin, XGAP=self.xgap, $
-                                OYMARGIN=self.oymargin, IYMARGIN=self.iymargin, YGAP=self.ygap)
+                                OXMARGIN=self.oxmargin, IXMARGIN=self.ixmargin, XGAP=*self.xgap, $
+                                OYMARGIN=self.oymargin, IYMARGIN=self.iymargin, YGAP=*self.ygap)
         endelse
     endif
 end
@@ -1639,8 +1639,8 @@ pro MrGrLayout::whichLayout
     print, FORMAT='(%"  OYMARGIN:  [%i, %i]")', self.oymargin
     print, FORMAT='(%"  IXMargin:  [%i, %i]")', self.ixmargin
     print, FORMAT='(%"  IYMargin:  [%i, %i]")', self.iymargin
-    print, FORMAT='(%"  XGap:      %i")', self.xgap
-    print, FORMAT='(%"  YGap:      %i")', self.ygap
+    print, FORMAT='(%"  XGap:      %i")', *self.xgap
+    print, FORMAT='(%"  YGap:      %i")', *self.ygap
 
 ;---------------------------------------------------------------------
 ;LAYOUT POSITIONS & LOCATIONS ////////////////////////////////////////
