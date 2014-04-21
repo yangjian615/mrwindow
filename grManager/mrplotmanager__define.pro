@@ -158,14 +158,15 @@ pro MrPlotManager::AdjustLayout_Property, event
     
     ;Spawn a GUI to get user input about the layout
     new_layout = plotpositions_gui(self.tlb, $
-                                   LAYOUT  = self.GrLayout, $
-                                   XGAP    = self.xgap, $
-                                   XMARGIN = self.oxmargin, $
-                                   YGAP    = self.ygap, $
-                                   YMARGIN = self.oymargin)
+                                   LAYOUT  =  self.GrLayout, $
+                                   XGAP    = *self.xgap, $
+                                   XMARGIN =  self.oxmargin, $
+                                   YGAP    = *self.ygap, $
+                                   YMARGIN =  self.oymargin)
     if ptr_valid(new_layout) eq 0 then return
-    
+
     ;Update the layout
+    self -> Refresh, /DISABLE
     self -> SetProperty, LAYOUT   = (*new_layout).layout, $
                          XGAP     = (*new_layout).xgap, $
                          OXMARGIN = (*new_layout).xmargin, $
@@ -173,7 +174,7 @@ pro MrPlotManager::AdjustLayout_Property, event
                          OYMARGIN = (*new_layout).ymargin
     
     ;Redraw
-    self -> Draw
+    self -> Refresh
     
     ;Free the pointer
     ptr_free, new_layout

@@ -58,6 +58,8 @@
 ;       2014/02/12  -   [XY]MARGIN renamed to O[XY]MARGIN. [IO][XY]MARGIN now have the
 ;                           same meaning as their direct graphics keywords. - MRA
 ;       2014/03/10  -   Added the GetPosition and GetLayout methods. - MRA
+;       2014/04/16  -   XGAP and YGAP are now pointers, reflecting the fact that they
+;                           can be scalars or vectors. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -77,19 +79,19 @@ function MrLayout::_OverloadPrint
     undefined = '<undefined>'
     
     ;Create the string
-    charsize = string('CharSize', '=', self.charsize, FORMAT='(a-26, a-2, f0)')
-    layout   = string('Layout',   '=', self.layout,   FORMAT='(a-26, a-2, 3(i0, 2x))')
-    oxmargin = string('OXMargin', '=', self.oxmargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
-    oymargin = string('OYMargin', '=', self.oymargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
-    position = string('Position', '=', self.position, FORMAT='(a-26, a-2, 4(f0, 2x))')
-    xmargin  = string('IXMargin', '=', self.ixmargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
-    xgap     = string('XGap',     '=', self.xgap,     FORMAT='(a-26, a-2, f0)')
-    x_region = string('X_Region', '=', self.x_region, FORMAT='(a-26, a-2, 4(f0, 2x))')
-    x_window = string('X_Window', '=', self.x_window, FORMAT='(a-26, a-2, 4(f0, 2x))')
-    ymargin  = string('IYMargin', '=', self.iymargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
-    ygap     = string('YGap',     '=', self.ygap,     FORMAT='(a-26, a-2, f0)')
-    y_region = string('Y_Region', '=', self.y_region, FORMAT='(a-26, a-2, 4(f0, 2x))')
-    y_window = string('Y_Window', '=', self.y_window, FORMAT='(a-26, a-2, 4(f0, 2x))')
+    charsize = string('CharSize', '=',  self.charsize, FORMAT='(a-26, a-2, f0)')
+    layout   = string('Layout',   '=',  self.layout,   FORMAT='(a-26, a-2, 3(i0, 2x))')
+    oxmargin = string('OXMargin', '=',  self.oxmargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
+    oymargin = string('OYMargin', '=',  self.oymargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
+    position = string('Position', '=',  self.position, FORMAT='(a-26, a-2, 4(f0, 2x))')
+    xmargin  = string('IXMargin', '=',  self.ixmargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
+    xgap     = string('XGap',     '=', *self.xgap,     FORMAT='(a-26, a-2, f0)')
+    x_region = string('X_Region', '=',  self.x_region, FORMAT='(a-26, a-2, 4(f0, 2x))')
+    x_window = string('X_Window', '=',  self.x_window, FORMAT='(a-26, a-2, 4(f0, 2x))')
+    ymargin  = string('IYMargin', '=',  self.iymargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
+    ygap     = string('YGap',     '=', *self.ygap,     FORMAT='(a-26, a-2, f0)')
+    y_region = string('Y_Region', '=',  self.y_region, FORMAT='(a-26, a-2, 4(f0, 2x))')
+    y_window = string('Y_Window', '=',  self.y_window, FORMAT='(a-26, a-2, 4(f0, 2x))')
     
     ;Pointers may or may not have a value
     aspect = string('Aspect', '=', FORMAT='(a-26, a-2)')
@@ -147,17 +149,17 @@ function MrLayout::CalcPosition
     endif
 
     ;Calculate positions
-    position = MrPlotLayout(self.layout, $
-                            ASPECT   = *self.aspect, $
-                            CHARSIZE =  self.charsize, $
-                            OXMARGIN =  self.oxmargin, $
-                            OYMARGIN =  self.oymargin, $
-                            P_REGION =       p_region, $
-                            P_WINDOW =       p_window, $
-                            XGAP     =  self.xgap, $
-                            XMARGIN  =  self.xmargin, $
-                            YGAP     =  self.ygap, $
-                            YMARGIN  =  self.ymargin)
+    position = MrLayout(self.layout, $
+                        ASPECT   = *self.aspect, $
+                        CHARSIZE =  self.charsize, $
+                        OXMARGIN =  self.oxmargin, $
+                        OYMARGIN =  self.oymargin, $
+                        P_REGION =       p_region, $
+                        P_WINDOW =       p_window, $
+                        XGAP     = *self.xgap, $
+                        XMARGIN  =  self.xmargin, $
+                        YGAP     = *self.ygap, $
+                        YMARGIN  =  self.ymargin)
     
     ;Save the window and region
     self.x_region = p_region[[0,2]]
@@ -269,11 +271,11 @@ Y_WINDOW=y_window
     if arg_present(oymargin) then oymargin =  self.oymargin
     if arg_present(position) then position =  self.position
     if arg_present(xmargin)  then xmargin  =  self.xmargin
-    if arg_present(xgap)     then xgap     =  self.xgap
+    if arg_present(xgap)     then xgap     = *self.xgap
     if arg_present(x_region) then x_region =  self.x_region
     if arg_present(x_window) then x_window =  self.x_window
     if arg_present(ymargin)  then ymargin  =  self.ymargin
-    if arg_present(ygap)     then ygap     =  self.ygap
+    if arg_present(ygap)     then ygap     = *self.ygap
     if arg_present(y_region) then y_region =  self.y_region
     if arg_present(y_window) then y_window =  self.y_window
     if arg_present(margin)   then margin   = [self.xmargin[0], self.ymargin[0], $
@@ -373,8 +375,8 @@ YGAP=ygap
     if n_elements(layout)   ne 0 then  self.layout   = layout
     if n_elements(oxmargin) gt 0 then  self.oxmargin = oxmargin
     if n_elements(oymargin) gt 0 then  self.oymargin = oymargin
-    if n_elements(xgap)     ne 0 then  self.xgap     = xgap
-    if n_elements(ygap)     ne 0 then  self.ygap     = ygap
+    if n_elements(xgap)     ne 0 then *self.xgap     = xgap
+    if n_elements(ygap)     ne 0 then *self.ygap     = ygap
     
     ;Update the position to fit the new layout?
     if update_layout eq 1 then begin
@@ -399,6 +401,8 @@ end
 ;-
 pro MrLayout::cleanup
     ptr_free, self.aspect
+    ptr_free, self.xgap
+    ptr_free, self.ygap
 end
 
 
@@ -482,13 +486,15 @@ YGAP=ygap
     if n_elements(ixmargin) gt 0 then self.ixmargin = ixmargin else self.ixmargin = [0,0]
     if n_elements(oxmargin) gt 0 then self.oxmargin = oxmargin else self.oxmargin = [10, 3]
     if n_elements(oymargin) gt 0 then self.oymargin = oymargin else self.oymargin = [4,2]
-    if n_elements(xgap)     gt 0 then self.xgap     = xgap     else self.xgap     = 14
-    if n_elements(ygap)     gt 0 then self.ygap     = ygap     else self.ygap     = 6
     
     ;Default pointers
     self.aspect = ptr_new(/ALLOCATE_HEAP)
+    self.xgap   = ptr_new(/ALLOCATE_HEAP)
+    self.ygap   = ptr_new(/ALLOCATE_HEAP)
     if n_elements(layout) gt 0 then  self.layout = layout else self.layout = [0,0,0]
     if n_elements(aspect) gt 0 then *self.aspect = aspect
+    if n_elements(xgap)   gt 0 then *self.xgap   = xgap   else *self.xgap = 14
+    if n_elements(ygap)   gt 0 then *self.ygap   = ygap   else *self.ygap = 6
     
     ;Default position
     if array_equal(self.layout, [0,0,0]) then begin
@@ -545,10 +551,10 @@ pro MrLayout__define, class
                oxmargin: [0.0,0.0], $
                oymargin: [0.0,0.0], $
                position: fltarr(4), $
-               xgap:     0.0, $
+               xgap:     ptr_new(), $
                x_region: [0.0, 0.0], $
                x_window: [0.0, 0.0], $
-               ygap:     0.0, $
+               ygap:     ptr_new(), $
                y_region: [0.0, 0.0], $
                y_window: [0.0, 0.0] $
              }

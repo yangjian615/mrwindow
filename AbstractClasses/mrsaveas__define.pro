@@ -112,6 +112,11 @@
 ;                           method. Removed the AutoPostScriptFile, AutoRasterFile, 
 ;                           CreatePostScriptFile, Output, and SaveAsRaster methods. Added
 ;                           the PS_CONFIG property for configuring the postscript device. - MRA
+;       2014/04/16  -   Check the window object for a SetCurrent method when setting the
+;                           display window. Check for the !cgPickFile_* system variables
+;                           to point a new object to the last saved location. Double
+;                           directory structures are no longer added to postscript
+;                           filenames. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -571,16 +576,18 @@ PICK_FILE=pick_file
                    SCALE_FACTOR =  self.ps_scale_factor, $
                    TT_FONT      =  self.ps_tt_font, $
                   _EXTRA        =  ps_keys
-                  
+
         ;Set the device
         ps_keywords = remove_tags(ps_keywords, ['pagetype', 'fonttype'])
-        Device, _STRICT_EXTRA=ps_keywords
+        device, _STRICT_EXTRA=ps_keywords
 
         ;Update the page size from the MATCH keyword.
         ps_keywords = remove_tags(ps_keywords, ['language_level', 'font_size', 'portrait', $
                                                 'tt_font',        'isolatin1'])
-        self.ps_config -> SetProperty, _STRICT_EXTRA=ps_keywords
 
+        ;Remove the directory from the file name
+        ps_keywords.filename = file_basename(ps_keywords.filename)
+        self.ps_config -> SetProperty, _STRICT_EXTRA=ps_keywords
     ;---------------------------------------------------------------------
     ; Close Postscript Device ////////////////////////////////////////////
     ;---------------------------------------------------------------------
@@ -818,11 +825,15 @@ end
 ;-
 PRO MrSaveAs::SetDisplayWindow, currentWindow
     Compile_Opt strictarr
-    
+    on_error, 2
+
     ;Set the window
     ;   - Check the winID property
     ;   - See if a window is open
-    IF WindowAvailable(self._saveWinID) THEN BEGIN
+    IF obj_valid(self._saveWindow) && obj_hasmethod(self._saveWindow, 'SetCurrent') THEN BEGIN
+        currentWindow = !D.Window
+        self._saveWindow -> SetCurrent
+    ENDIF ELSE IF WindowAvailable(self._saveWinID) THEN BEGIN
         currentWin = !D.Window
         wset, self._saveWinID
     ENDIF ELSE IF WindowAvailable(!D.Window) THEN BEGIN
@@ -832,7 +843,7 @@ PRO MrSaveAs::SetDisplayWindow, currentWindow
         currentWindow = -1
         message, 'No windows are available to read.'
     ENDELSE
-end
+END
 
 
 ;+
@@ -1162,10 +1173,17 @@ PS_TT_FONT=ps_tt_font
     self.ps_scale_factor = n_elements(ps_scale_factor) gt 0 ? ps_scale_factor : d_ps_scale_factor
     self.ps_tt_font      = n_elements(ps_tt_font)      gt 0 ? ps_tt_font      : d_ps_tt_font
     
-    ;Default save file and location
+    ;Default save file location
     CD, CURRENT=current
-    self.saveFile = 'MrWindow.png'
-    self.saveDir  = current + path_sep()
+    defsysv, '!cgPickFile_LastDir', EXISTS=exists
+    self.saveDir = exists ? !cgPickFile_LastDir : current + path_sep()
+    
+    ;Default save file name
+    defsysv, '!cgPickfile_LastFile', EXISTS=exists
+    self.saveFile = exists ? !cgPickFile_LastFile : 'MrWindow.png'
+    
+    ;PS file locations
+    ps_filename = cgRootName(self.saveFile) + '.ps'
     self.ps_config -> SetProperty, DIRECTORY=self.saveDir, FILENAME='MrWindow.ps'
     
     return, 1

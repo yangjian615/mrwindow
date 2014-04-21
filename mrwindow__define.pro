@@ -1431,7 +1431,10 @@ end
 ;                           Any keyword accepted by MrSaveAs::SetProperty is accepted via
 ;                               keyword inheritance.
 ;-
-pro MrWindow::SetSave, $
+pro MrWindow::SetFont, fontName, $
+HARDWARE=hardware, $
+HERSHEY=hershey, $
+TT_FONT=tt_font, $
 _REF_EXTRA = extra
     compile_opt strictarr
     
@@ -1442,7 +1445,100 @@ _REF_EXTRA = extra
         void = cgErrorMsg()
         return
     endif
+    
+    ;Defaults
+    hardware = keyword_set(hardware)
+    hershey  = keyword_set(hershey)
+    tt_font  = keyword_set(tt_font)
+    
+    ;If no font was selected, choose the current font
+    if (hardware + hershey + tt_font) eq 0 then begin
+        case !p.font of
+            -1: hershey  = 1
+             0: hardware = 1
+             1: tt_font  = 1
+             else: ;No other options
+        endcase
+    endif
+    
+    ;Dependencies
+    if hardware + hershey + tt_font ne 1 then $
+        message, 'One and only one font type may be chosen: HARDWARE | HERSHEY | TT_FONT.'
 
+    ;Store the font
+    case 1 of
+        hershey:  self.font = -1
+        hardware: self.font =  0
+        tt_font:  self.font =  1
+    endcase
+
+;---------------------------------------------------------------------
+;Hershey Fonts ///////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if hershey then begin
+        if n_elements(fontName) eq 0 then fontName = 'Simplex Roman'
+        
+        ;Available Hershey fonts
+        fonts = ['', '', 'SIMPLEX ROMAN', 'SIMPLEX GREEK', 'DUPLEX ROMAN', 'COMPLEX ROMAN', $
+                 'COMPLEX ROMAN', 'COMPLEX ITALIC', 'MATH AND SPECIAL', '', 'GOTHIC ENGLISH', $
+                 'SIMPLEX SCRIPT', 'COMPLEX SCRIPT', 'GOTHIC ITALIAN', 'GOTHIC GERMAN', $
+                 'CYRILLIC', 'TRIPLEX ROMAN', 'TRIPLEX ITALIAN', '', 'MISCELLANEOUS']
+                 
+        ;Get the font number
+        if size(fontName, /TYPE) eq 'STRING' then begin
+            fontIndex = where(fonts eq strupcase(fontName), count)
+            if count ne 1 then message, 'No font names match "' + fontName + '".'
+            fontIndex = fontIndex[0]
+        endif else begin
+            fontIndex = fontName
+        endelse
+    
+        ;Set the font by writing something to an invisible pixmap window
+        case !d.name of
+            'WIN': begin
+                theWin = MrGetWindow(/FREE, /PIXMAP)
+                xyouts, 0, 0, '!' + string(fontIndex, FORMAT='i0') + 'Change Font 123'
+                wdelete, theWin
+            endcase
+            
+            'X': begin
+                theWin = MrGetWindow(/FREE, /PIXMAP)
+                xyouts, 0, 0, '!' + string(fontIndex, FORMAT='i0') + 'Change Font 123'
+                wdelete, theWin
+            endcase
+            
+            'PS': begin
+                ;Temporarily swtich out of PS mode
+                if strupcase(!version.os_family) eq 'WINDOWS' $
+                    then set_plot, 'WIN' $
+                    else set_plot, 'x'
+                
+                ;Set the font
+                theWin = MrGetWindow(/FREE, /PIXMAP)
+                xyouts, 0, 0, '!' + string(fontIndex, FORMAT='i0') + 'Change Font 123'
+                wdelete, theWin
+                
+                ;Return to postscript
+                set_plot, 'PS'
+            endcase
+            
+            else: ;Do nothing
+        endcase
+;---------------------------------------------------------------------
+; True-Type Fonts ////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    endif else if tt_font then begin
+        cgTT_Font, fontName
+    
+;---------------------------------------------------------------------
+; Device or Hardware Fonts ///////////////////////////////////////////
+;---------------------------------------------------------------------
+    endif else begin
+        
+    endelse
+    
+    ;Store the font name
+    self.fontName = fontName
     ;Set SaveAs properties
     if n_elements(extra) gt 0 then self._SaveAs -> SetProperty, _EXTRA=extra
 end
@@ -2331,6 +2427,8 @@ pro MrWindow__define, class
               drawID: 0, $                      ;Widget ID of the draw widget
               _selection: obj_new(), $          ;Container of selected objects
               focus: obj_new(), $               ;Object of focus
+              font: 0, $
+              fontName: '', $
               pixID: 0, $                       ;Window ID of the pixmap
               menuID: 0, $                      ;Widget ID of the menu bar
               name: '', $                       ;Name of the window
