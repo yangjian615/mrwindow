@@ -926,11 +926,13 @@ ISA=isa, $
 CHARSIZE = charsize, $
 CHARTHICK = charthick, $
 FONT = font, $
+RANGE = range, $
 TICKLEN = ticklen, $
 TITLE = title, $
 THICK = thick, $
 XCHARSIZE = xcharsize, $
 XGRIDSTYLE = xgridstyle, $
+XLOG = xlog, $
 XMINOR = xminor, $
 XRANGE = xrange, $
 XSTYLE = xstyle, $
@@ -945,6 +947,7 @@ XTICKV = xtickv, $
 XTITLE = xtitle, $
 YCHARSIZE = ycharsize, $
 YGRIDSTYLE = ygridstyle, $
+YLOG = ylog, $
 YMINOR = yminor, $
 YRANGE = yrange, $
 YSTYLE = ystyle, $
@@ -959,6 +962,7 @@ YTICKV = ytickv, $
 YTITLE = ytitle, $
 ZCHARSIZE = zcharsize, $
 ZGRIDSTYLE = zgridstyle, $
+ZLOG = zlog, $
 ZMINOR = zminor, $
 ZRANGE = zrange, $
 ZSTYLE = zstyle, $
@@ -1009,6 +1013,7 @@ ZTITLE = ztitle
                                        TITLE       = title, $
                                        XCHARSIZE   = xcharsize, $
                                        XGRIDSTYLE  = xgridstyle, $
+                                       XLOG        = xlog, $
                                        XMINOR      = xminor, $
                                        XRANGE      = xrange, $
                                        XSTYLE      = xstyle, $
@@ -1023,6 +1028,7 @@ ZTITLE = ztitle
                                        XTITLE      = xtitle, $
                                        YCHARSIZE   = ycharsize, $
                                        YGRIDSTYLE  = ygridstyle, $
+                                       YLOG        = ylog, $
                                        YMINOR      = yminor, $
                                        YRANGE      = yrange, $
                                        YSTYLE      = ystyle, $
@@ -1037,6 +1043,7 @@ ZTITLE = ztitle
                                        YTITLE      = ytitle, $
                                        ZCHARSIZE   = zcharsize, $
                                        ZGRIDSTYLE  = zgridstyle, $
+;                                       ZLOG        = zlog, $
                                        ZMINOR      = zminor, $
                                        ZRANGE      = zrange, $
                                        ZSTYLE      = zstyle, $
@@ -1049,11 +1056,12 @@ ZTITLE = ztitle
                                        ZTICKUNITS  = ztickunits, $
                                        ZTICKV      = ztickv, $
                                        ZTITLE      = ztitle
+        endif
                                        
 ;---------------------------------------------------------------------
 ;Axis Objects ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-        endif else if oClass eq 'MRAXIS' then begin
+        if oClass eq 'MRAXIS' then begin
             allObjs[i] -> GetProperty, DIRECTION=direction
             
             case direction of
@@ -1082,7 +1090,7 @@ ZTITLE = ztitle
                 endcase
                 
                 'Y': begin
-                    allObjs[i] -> SetProperty, AXIS_RANGE   = xrange, $
+                    allObjs[i] -> SetProperty, AXIS_RANGE   = yrange, $
                                                CHARSIZE     = charsize, $
                                                CHARTHICK    = charthick, $
                                                COLOR        = color, $
@@ -1107,7 +1115,7 @@ ZTITLE = ztitle
                 endcase
                 
                 'Z': begin
-                    allObjs[i] -> SetProperty, AXIS_RANGE   = xrange, $
+                    allObjs[i] -> SetProperty, AXIS_RANGE   = zrange, $
                                                CHARSIZE     = charsize, $
                                                CHARTHICK    = charthick, $
                                                COLOR        = color, $
@@ -1130,11 +1138,20 @@ ZTITLE = ztitle
                                                XCHARSIZE    = zcharsize
                 endcase
             endcase
-                                       
+
+;---------------------------------------------------------------------
+; Images /////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+        endif else if oClass eq 'MRIMAGE' then begin
+            allObjs[i] -> SetProperty, RANGE=range
+            
+        endif else if oClass eq 'WECOLORBAR' then begin
+            allObjs[i] -> SetProperty, RANGE=range, CHARSIZE=charsize, CHARTHICK=charthick
+            
 ;---------------------------------------------------------------------
 ;Other Annotation Objects ////////////////////////////////////////////
 ;---------------------------------------------------------------------
-        endif else if IsMember(['MRTEXT', 'WECOLORBAR', 'WELEGENDITEM'], oClass) then begin
+        endif else if IsMember(['MRTEXT', 'WELEGENDITEM'], oClass) then begin
             allObjs[i] -> SetProperty, CHARSIZE = charsize, $
                                        CHARTHICK = charthick
         endif

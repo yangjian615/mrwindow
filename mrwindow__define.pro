@@ -225,6 +225,10 @@
 ;       2014/03/26  -   Set the current display when the graphics window is made current. - MRA
 ;       2014/04/01  -   Check if CDF cancel buttons were pressed to prevent errors. - MRA
 ;       2014/04/11  -   Added the SetSave method. - MRA
+;       2014/05/12  -   Save method now knows when and how to turn Refresh on. - MRA
+;       2014/05/15  -   Set the grid layout after the window has been created to ensure
+;                           graphics are positioned properly. - MRA
+;       2014/05/16  -   The Focus method selects only the fore-most graphics object. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -543,6 +547,7 @@ pro MrWindow::Draw_Events, event
     ;If a button press happened, we need to focus first. If anything else happened,
     ;we need to know if the object of focus is zoomable right away.
     if event.type ne 0 then tf_zoomable = self -> isZoomable()
+
 ;---------------------------------------------------------------------
 ;Button Press Events /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -761,7 +766,9 @@ end
 
 
 ;+
-;   Event handler for Focus events. Find the closest plot to the clicked point.
+;   Determine if a graphics object was clicked. If no keyboard modifiers are pressed,
+;   the fore-most object will be selected. If keyboard modifiers are pressed, the fore-
+;   most object will be selected.
 ;
 ; :Private:
 ;
@@ -801,11 +808,23 @@ pro MrWindow::Focus, event
                                     ISA=['MRPLOT', 'MRIMAGE', 'MRCOLORBAR', 'MRCONTOUR'])
         if nHits eq 0 then return
 
+        ;Were modifiers pressed?
+        ;   If not, select the top-most object.
+        ;   If said object is overplotted, choose its target instead.
+        if total(event.modifiers) gt 0 then begin
+            newSelect = newSelect[nHits-1]
+            if newSelect -> GetOverplot(TARGET=target) then newSelect = target
+        endif else begin
+            newSelect = newSelect[nHits-1]
+            if newSelect -> GetOverplot(TARGET=target) then newSelect = target
+        endelse
+
         ;Remove all selected items
         self._selection -> Remove, /ALL
         
         ;Add the selected items
         self._selection -> Add, newSelect
+        
 ;---------------------------------------------------------------------
 ;Container Index Given? //////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -824,8 +843,8 @@ pro MrWindow::Focus, event
 ;---------------------------------------------------------------------
 ;Set Focus ///////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    ;Set the coordinate system
-    if n_elements(newSelect) eq 1 && obj_valid(newSelect) then newSelect -> RestoreCoords
+    if n_elements(newSelect) eq 1 && obj_valid(newSelect) $
+        then newSelect -> RestoreCoords
 end
 
 
@@ -1066,14 +1085,14 @@ function MrWindow::IsZoomable
         void = cgErrorMsg()
         return, 0
     endif
-    
+
     ;Get the object and determine if it is zoomable or not.
     oGraphic = self -> GetSelect(COUNT=count)
     if count ne 1 then return, 0
     
     oType = typename(oGraphic)
     tf_zoomable = IsMember([(*self.gTypes).data, (*self.gTypes).colorbar], oType)
-    
+
     return, tf_zoomable
 end
 
@@ -1387,11 +1406,31 @@ pro MrWindow::Save, filename
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self._refresh = thisRefresh
         void = cgErrorMsg()
         return
     endif
     
+    ;Get the refresh state
+    thisRefresh = self._refresh
+    
+    ;Get the file extension
+    void = cgRootName(filename, EXTENSION=extension)
+    extension = strupcase(extension)
+    
+    ;Turn refresh on
+    ;   - Raster files without ImageMagick require a snapshot. Must draw first.
+    ;   - All other files will be drawn later.
+    self._SaveAs -> GetProperty, IM_RASTER=im_raster
+    if (im_raster eq 0) && (extension ne 'PS' && extension ne 'EPS') $
+        then self -> Refresh $
+        else self._refresh = 1
+
+    ;Save the plot
     self._SaveAs -> Save, filename
+    
+    ;Return to the original refresh state.
+    self._refresh = thisRefresh
 end
 
 
@@ -1928,12 +1967,17 @@ pro MrWindow::Wheel_Zoom, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Refresh, DISABLE=~refreshIn
         void = cgErrorMsg()
         return
     endif
     
     ;Only listen to wheel events.
     if event.type ne 7 || self.wmode eq 0 then return
+    
+    ;Momentarily turn off refresh
+    refreshIn = self -> GetRefresh()
+    self -> Refresh, /DISABLE
     
     ;Figure out which type of object has the focus.
     oGraphic = self -> GetSelect()
@@ -1953,6 +1997,9 @@ pro MrWindow::Wheel_Zoom, event
         
         else: ;do nothing
     endcase
+    
+    ;Turn refresh back on
+    self -> Refresh, DISABLE=~refreshIn
 end
 
 
@@ -2303,18 +2350,9 @@ _REF_EXTRA = extra
     self.ysize = ysize
     self._selection = obj_new('MrIDL_Container')
     self._saveas    = obj_new('MrSaveAs', void, self)
-
-    self -> SetProperty, _EXTRA=extra
     
     ;Wait until here set REFRESH so that nothing is drawn or realized
     self._refresh = refresh
-        
-    ;Add objects
-    if n_elements(arrows)       gt 0 then self -> Add, arrows
-    if n_elements(colorbars)    gt 0 then self -> Add, colorbars
-    if n_elements(plotObjects)  gt 0 then self -> Add, plotObjects
-    if n_elements(imageObjects) gt 0 then self -> Add, imageObjects
-    if n_elements(text)         gt 0 then self -> Add, text
 
 ;---------------------------------------------------------------------
 ;Display Window //////////////////////////////////////////////////////
@@ -2379,7 +2417,13 @@ _REF_EXTRA = extra
                                   UVALUE={object: self, method: 'Draw_Events'})
 	endelse
 
+    ;Set properties after the window has been created.
+    self -> SetProperty, _EXTRA=extra
+
+    ;Add to the container of open windows
     self -> SysVAdd, self
+    
+    ;Draw
     self -> Draw
 
     return, 1

@@ -1271,9 +1271,13 @@ pro MrZoom::UnZoom, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        self -> Refresh, DISABLE=~refreshIn
         void = cgErrorMsg()
         return
     endif
+    
+    refreshIn = self -> GetRefresh()
+    self -> Refresh, /DISABLE
     
     ;Set the x- and y-range
     oGraphic = self -> GetSelect()
@@ -1284,7 +1288,7 @@ pro MrZoom::UnZoom, event
     self -> Apply_Bindings, oGraphic, /XAXIS, /YAXIS
     
     ;Redraw
-    self -> Draw
+    self -> Refresh
 end
 
 

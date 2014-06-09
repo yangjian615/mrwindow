@@ -117,6 +117,8 @@
 ;                           to point a new object to the last saved location. Double
 ;                           directory structures are no longer added to postscript
 ;                           filenames. - MRA
+;       2014/05/16  -   Choosing non-ImageMagick options from the SaveAs menu now uses
+;                           cgSnapShot instead of ImageMagick when IM is installed. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -451,7 +453,8 @@ END
 PRO MrSaveAs::Save, filename, $
 FILETYPE=fileType, $
 MATCH=match, $
-PICK_FILE=pick_file
+PICK_FILE=pick_file, $
+RESIZE=resize
     Compile_Opt idl2
     
     ; Error handling.
@@ -470,7 +473,6 @@ PICK_FILE=pick_file
         
         RETURN
     ENDIF
-    
     ;Defaults
     pick_file = Keyword_Set(pick_file)
     match     = (N_Elements(match) EQ 0) ? 1 : keyword_set(match)
@@ -480,13 +482,12 @@ PICK_FILE=pick_file
     ;Set the current graphics windows.
     self -> SetDisplayWindow, currentWindow
     IF currentWindow EQ -1 THEN RETURN
-
 ;---------------------------------------------------------------------
 ; Automatic Output? //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     IF pick_file EQ 0 THEN BEGIN
         IF filename EQ '' THEN filename = FilePath(self.saveFile, ROOT_DIR=self.saveDir)
-        outName = cgRootName(filename, DIRECTORY=outDir, EXTENSION=ext)
+        baseName = cgRootName(filename, DIRECTORY=outDir, EXTENSION=ext)
         IF fileType EQ '' $
             THEN typeOut = StrUpCase(ext) $
             ELSE typeOut = StrUpCase(fileType)
@@ -495,6 +496,7 @@ PICK_FILE=pick_file
 ; Pick a File ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ENDIF ELSE BEGIN
+        ;Default file type
         IF fileType EQ '' THEN void = cgRootName(self.saveFile, EXTENSION=fileType)
         typeOut = StrUpCase(fileType)
         
@@ -556,7 +558,7 @@ PICK_FILE=pick_file
         ;is given to cgPS_Open, the intermediary file is deleted automatically
         ;when the file is closed. I want to control this behavior, so I ask to
         ;create a postscript file first.
-        fname_temp = baseName + '.ps'
+        fname_temp = FilePath(baseName + '.ps', ROOT_DIR=outDir)
         
         ;Get the configuration keywords
         ps_keys  = self.ps_config -> GetKeywords()
@@ -570,12 +572,12 @@ PICK_FILE=pick_file
         cgPS_Open, CHARSIZE     =  self.ps_charsize, $
                    FILENAME     =       fname_temp, $
                    GROUP_LEADER = *self._group_leader, $
-                   KEYWORDS     =  ps_keywords, $
-                   MATCH        =  match, $
-                   QUIET        =  1B, $
+                   KEYWORDS     =       ps_keywords, $
+                   MATCH        =       match, $
+                   QUIET        =       1B, $
                    SCALE_FACTOR =  self.ps_scale_factor, $
                    TT_FONT      =  self.ps_tt_font, $
-                  _EXTRA        =  ps_keys
+                   _EXTRA       =  ps_keys
 
         ;Set the device
         ps_keywords = remove_tags(ps_keywords, ['pagetype', 'fonttype'])
@@ -588,6 +590,7 @@ PICK_FILE=pick_file
         ;Remove the directory from the file name
         ps_keywords.filename = file_basename(ps_keywords.filename)
         self.ps_config -> SetProperty, _STRICT_EXTRA=ps_keywords
+        
     ;---------------------------------------------------------------------
     ; Close Postscript Device ////////////////////////////////////////////
     ;---------------------------------------------------------------------
@@ -687,6 +690,7 @@ PRO MrSaveAs::SaveAsEvents, event
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
+        if n_elements(thisIM) gt 0 then self.im_raster = thisIM
         void = cgErrorMsg()
         RETURN
     ENDIF
@@ -701,9 +705,21 @@ PRO MrSaveAs::SaveAsEvents, event
     ;Extract the file type from the user name
     fileType = StregEx(uName, '(RASTER_|IMAGEMAGICK_)?([A-Z]+)', /SUBEXP, /EXTRACT)
     fileType = fileType[2]
+    
+    ;ImageMagick or cgSnapshot for raster files?
+    IF StregEx(uName, 'IMAGEMAGICK', /BOOLEAN) $
+        THEN tf_imagemagick = 1 $
+        ELSE tf_imagemagick = 0
+
+    ;Toggle IM?
+    thisIM = self.im_raster
+    self.im_raster = tf_imagemagick
 
     ;Save the file
     self -> Save, FILETYPE=fileType, /PICK_FILE
+    
+    ;Toggle IM back.
+    self.im_raster = thisIM
 END
 
 
@@ -1157,7 +1173,7 @@ PS_TT_FONT=ps_tt_font
     self.im_density     = n_elements(im_density)     gt 0 ? im_density        : d_im_density
     self.im_options     = n_elements(im_options)     gt 0 ? im_options        : d_im_options
     self.im_raster      = n_elements(im_raster)      gt 0 ? im_raster         : d_im_raster
-    self.im_resize      = n_elements(im_resize)      gt 0 ? im_resize         : d_im_resize
+    self.im_resize      = n_elements(im_resize)      gt 0 ? im_resize         : 100
     self.im_width       = n_elements(im_width)       gt 0 ? ptr_new(im_width) : ptr_new(d_im_width)
 
     self.pdf_unix_convert_cmd = n_elements(pdf_unix_convert_cmd) gt 0 ? pdf_unix_convert_cmd : d_pdf_unix_convert_cmd

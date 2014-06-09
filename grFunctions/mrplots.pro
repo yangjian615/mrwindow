@@ -48,9 +48,6 @@
 ;                           Z coordinate(s) of the points to be connected.
 ;
 ; :Keywords:
-;       CURRENT:            in, optional, type=boolean, default=0
-;                           If set, the plot will be added to the current MrWindow
-;                               graphics window.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrPlotS__define.
 ;
@@ -74,7 +71,6 @@
 ;       2013/11/27  -   Written by Matthew Argall.
 ;-
 function MrPlotS, x, y, z, $
- CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -90,7 +86,7 @@ _REF_EXTRA = extra
     current = keyword_set(current)
 
     ;Create the plot
-    thePlotS = obj_new('MrPlotS', x, y, z, CURRENT=current, _STRICT_EXTRA=extra)
+    thePlotS = obj_new('MrPlotS', x, y, z, _STRICT_EXTRA=extra)
     
     return, thePlotS
 end

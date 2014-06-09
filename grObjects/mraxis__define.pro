@@ -840,17 +840,20 @@ PRO MrAxis::SetLocation, location
         IF nLoc EQ 2 THEN BEGIN
             CASE self.direction OF
                 'X': BEGIN
-                    yloc = location[0]
-                    zloc = location[1]
+                    xloc = location[0]
+                    yloc = location[1]
+                    zloc = 0
                 ENDCASE
                 
                 'Y': BEGIN
                     xloc = location[0]
-                    zloc = location[1]
+                    yloc = location[1]
+                    zloc = 0
                 ENDCASE
                 
                 'Z': BEGIN
-                    xloc = location[0]
+                    xloc = 0
+                    yloc = location[0]
                     zloc = location[1]
                 ENDCASE
             ENDCASE

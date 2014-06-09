@@ -157,7 +157,7 @@ TARGET=target
     
     ;Get the overplot state and the target.
     tf_overplot = self.overplot
-    if tf_overplot then if arg_present(target) then target = *self.target
+    if tf_overplot then if arg_present(target) then target = self.target
     
     return, tf_overplot
 end
@@ -324,7 +324,7 @@ DISABLE=disable
         self.target = target
         
         ;Fill and trim holes
-        self.window -> FillHoles, /TRIMLAYOUT
+        if layout[2] gt 0 then self.window -> TrimLayout
     endelse
     
     ;Re-enable refreshing
@@ -610,7 +610,12 @@ _REF_EXTRA = extra
 
 ;---------------------------------------------------------------------
 ;Window and Layout ///////////////////////////////////////////////////
-;---------------------------------------------------------------------    
+;---------------------------------------------------------------------
+    ;If a target was given, get its position
+    ;   - This will prevent MrGrAtom from adding the graphic to the automatically
+    ;     updating grid-layout
+    if obj_valid(target) then target -> GetProperty, POSITION=position
+  
     ;Layout -- Must be done before initializing MrGrAtom
     self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
     
