@@ -1231,7 +1231,8 @@ end
 ;       THEOBJECTS:         in, required, type=objarr()
 ;                           The objects whose axes are to be unbound.
 ;-
-pro MrZoom::UnBind, bindingList, theObjects
+pro MrZoom::UnBind, bindingList, theObjects, $
+ALL=all
     compile_opt idl2
     
     ;Error handling
@@ -1670,6 +1671,13 @@ pro MrZoom::cleanup
         void = cgErrorMsg()
         return
     endif
+    
+    ;Do not delete graphics that have been bound together
+    ;   - This will be taken care of later
+    self.bind_x -> Delete, /ALL, DESTROY=0
+    self.bind_y -> Delete, /ALL, DESTROY=0
+    self.bind_z -> Delete, /ALL, DESTROY=0
+    self.bind_c -> Delete, /ALL, DESTROY=0
     
     ;Destroy the linked lists that bind axes together
     obj_destroy, self.bind_x

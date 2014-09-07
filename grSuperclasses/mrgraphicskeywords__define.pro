@@ -395,13 +395,13 @@ FUNCTION MrGraphicsKeywords::INIT, $
 ;---------------------------------------------------------------------
 ;Default Values //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    IF N_Elements(background) EQ 0 THEN background = 'white'
-    IF N_Elements(axiscolor) EQ 0 THEN axiscolor = 'opposite' 
-    IF N_Elements(color) EQ 0 THEN color = 'opposite'
-    IF N_Elements(charsize) EQ 0 THEN charsize = cgDefCharSize(FONT=!P.Font)
     device = keyword_set(device)
     normal = keyword_set(normal)
-    data = keyword_set(data)
+    data   = keyword_set(data)
+    IF N_Elements(background) EQ 0 THEN background = 'white'
+    IF N_Elements(axiscolor)  EQ 0 THEN axiscolor = 'opposite' 
+    IF N_Elements(color)      EQ 0 THEN color = 'opposite'
+    IF N_Elements(charsize)   EQ 0 THEN charsize = cgDefCharSize(FONT=!P.Font)
     
     ;For all direct graphics types, DATA is either ignored (in which case NORMAL is the
     ;default) or it is the default coordinate system.
@@ -471,7 +471,7 @@ FUNCTION MrGraphicsKeywords::INIT, $
     
     self.zcharsize     = Ptr_New(/Allocate_Heap)
     self.zgridstyle    = Ptr_New(/Allocate_Heap)
-    self.zmargin      = Ptr_New(/Allocate_Heap)
+    self.zmargin       = Ptr_New(/Allocate_Heap)
     self.zminor        = Ptr_New(/Allocate_Heap)
     self.zrange        = Ptr_New(/Allocate_Heap)
     self.zstyle        = Ptr_New(/Allocate_Heap)
@@ -967,7 +967,7 @@ PRO MrGraphicsKeywords::SetProperty, $
             self.device = 0B
         ENDIF
     ENDIF
-    
+
 ;---------------------------------------------------------------------
 ; X //////////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------

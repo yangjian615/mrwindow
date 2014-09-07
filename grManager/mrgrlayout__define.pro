@@ -178,6 +178,11 @@
 ;                           an extra row was added to the layout. Fixed. - MRA
 ;       2014/04/03  -   Return scalars when converting locations, if possible. - MRA
 ;       2014/04/04  -   Trim layout was finding the max [col,row] incorrectly. Fixed. - MRA
+;       2014/06/09  -   Problem arose when removing a fixed position from the layout
+;                           when no graphics were in the auto-updating layout. Fixed.
+;                           When adding a plot to the layout, the layout no longer tries
+;                           to update itself to match the layout of the given graphic
+;                           unless the layout is bigger. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -266,7 +271,10 @@ UPDATE_LAYOUT=update_layout
         self -> Make_Location, oLayout, $
                                POSITION=position, $
                                UPDATE_LAYOUT=update_layout
-        if n_elements(layout) eq 0 then layout = oLayout
+        
+        ;The layout may have changed in order to accommodate graphics that
+        ;were already in the layout.
+        layout = oLayout
         if update_layout eq 0 then return
         
         ;Add them to the layout
@@ -305,17 +313,25 @@ pro MrGrLayout::CalcPositions
         then message, 'Cannot calculate position. Layout must have at least ' + $
                       'one column and one row.'
 
+    ;Reset the column and row sizes if the layout changes
+    nColWidth  = n_elements(*self.col_width)
+    nRowHeight = n_elements(*self.row_height)
+    if nColWidth  gt 0 && nColWidth  ne self.grLayout[0] then void = temporary(*self.col_width)
+    if nRowHeight gt 0 && nRowHeight ne self.grLayout[1] then void = temporary(*self.row_height)
+
     ;Calculate positions
     *self.layout_positions = MrLayout(self.GrLayout, $
-                                      ASPECT    = *self.aspect, $
-                                      CHARSIZE  =  self.charsize, $
-                                      OXMARGIN  =  self.oxmargin, $
-                                      OYMARGIN  =  self.oymargin, $
-                                      P_REGION  =       p_region, $
-                                      XGAP      = *self.xgap, $
-                                      IXMARGIN  =  self.ixmargin, $
-                                      YGAP      = *self.ygap, $
-                                      IYMARGIN  =  self.iymargin)
+                                      ASPECT     = *self.aspect, $
+                                      CHARSIZE   =  self.charsize, $
+                                      COL_WIDTH  = *self.col_width, $
+                                      IXMARGIN   =  self.ixmargin, $
+                                      IYMARGIN   =  self.iymargin, $
+                                      OXMARGIN   =  self.oxmargin, $
+                                      OYMARGIN   =  self.oymargin, $
+                                      P_REGION   =       p_region, $
+                                      ROW_HEIGHT = *self.row_height, $
+                                      XGAP       = *self.xgap, $
+                                      YGAP       = *self.ygap)
     
     ;Save the window and region
     self.x_region = p_region[[0,2]]
@@ -1050,28 +1066,16 @@ POSITION = position
     ;Change the Grid Layout? /////////////////////////////////////////////
     ;---------------------------------------------------------------------
         if array_equal(self.GrLayout, layout[0:1]) eq 0 then begin
-            ;Get the index of all taken locations
-            void = self -> IsAvailable(ITAKEN=iTaken, NTAKEN=nTaken)
-            
-            ;If there are some
-            if nTaken gt 0 then begin
-                ;Find the largest column and row containing a plot
-                crTaken = self -> ConvertLocation(iTaken, layout[0:1], /AINDEX, /TO_COLROW)
-                crTaken = [max(colrow[0,*]), max(colrow[1,*])]
+            ;Create a new layout that can contain all graphics
+            gridLayout = layout[0:1] > self.GrLayout
                 
-                ;Find a layout that includes all of the plots yet is closest to the
-                ;desired location.
-                gridLayout = crTaken > layout[0:1]
-                
-            ;If all locations are available, use the desired grid layout
-            endif else gridLayout = layout[0:1]
+            ;If the new layout has changed, update it
+            if update_layout && array_equal(self.GrLayout, gridLayout) eq 0 $
+                then self -> SetProperty, LAYOUT=gridLayout
             
             ;Get the plot index in the potentially new layout
             pIndex = self -> ConvertLocation(colrow, gridLayout, /COLROW, /TO_PINDEX)
             layout = [gridLayout, pIndex]
-            
-            ;Update the grid layout?
-            if update_layout then self -> SetProperty, LAYOUT=gridLayout
         endif
     
 ;---------------------------------------------------------------------
@@ -1241,11 +1245,20 @@ FILLHOLES = fillHoles
 ;Layout Positions ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     endif else begin
-        aIndexAll = indgen(self.nPlots - self.nFixed)
-        
+        ;Number of plots in the layout
+        nInLayout = self.nPlots - self.nFixed
+        if nInLayout eq 0 then return
+    
+        ;Array-indices of the current plots
+        aIndexAll = indgen(nInLayout)
+    
+        ;Convert the given plot-index to an array index
         aIndex = self -> ConvertLocation(pIndex, /PINDEX, /TO_AINDEX)
-        void = isMember(aIndex, aIndexAll, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
         
+        ;Indices being kept will not match any of the AINDEX values.
+        void = isMember(aIndex, aIndexAll, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
+    
+        ;Remove
         if nKeep eq 0 then begin
             self -> ClearLayout, /LAYOUT
         endif else begin

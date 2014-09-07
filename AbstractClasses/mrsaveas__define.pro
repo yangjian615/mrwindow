@@ -119,6 +119,8 @@
 ;                           filenames. - MRA
 ;       2014/05/16  -   Choosing non-ImageMagick options from the SaveAs menu now uses
 ;                           cgSnapShot instead of ImageMagick when IM is installed. - MRA
+;       2014/08/18  -   File extension '.eps' now generates and encapsulated postscript
+;                           file without having to set keywords beforehand. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -482,6 +484,7 @@ RESIZE=resize
     ;Set the current graphics windows.
     self -> SetDisplayWindow, currentWindow
     IF currentWindow EQ -1 THEN RETURN
+
 ;---------------------------------------------------------------------
 ; Automatic Output? //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -522,20 +525,25 @@ RESIZE=resize
 
 ;---------------------------------------------------------------------
 ; Save to File ///////////////////////////////////////////////////////
-;---------------------------------------------------------------------  
+;---------------------------------------------------------------------
+    encapsulated = self.ps_encapsulated
+    
     ;Make sure a valid file type was given
     CASE typeOut OF
-       'PS':   raster = 0B
-       'EPS':  raster = 0B
-       'PDF':  raster = 0B
-       'BMP':  raster = 1B
-       'GIF':  raster = 1B
-       'JPG':  raster = 1B
-       'JPEG': raster = 1B
-       'PNG':  raster = 1B
-       'TIF':  raster = 1B
-       'TIFF': raster = 1B
-       ELSE: Message, 'Unknown file type: "' + typeOut + '".'
+        'BMP':  raster = 1B
+        'GIF':  raster = 1B
+        'JPG':  raster = 1B
+        'JPEG': raster = 1B
+        'PNG':  raster = 1B
+        'TIF':  raster = 1B
+        'TIFF': raster = 1B
+        'PS':   raster = 0B
+        'PDF':  raster = 0B
+        'EPS': BEGIN
+            raster       = 0B
+            encapsulated = 1B
+        ENDCASE
+        ELSE: Message, 'Unknown file type: "' + typeOut + '".'
     ENDCASE
 
     ;Save the file name and directory
@@ -549,7 +557,7 @@ RESIZE=resize
 ;---------------------------------------------------------------------
 ; Postscript Device? /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    IF (typeOut EQ 'PDF') OR (typeOut EQ 'PS') OR self.im_raster THEN BEGIN
+    IF Max(typeOut EQ ['PDF', 'PS', 'EPS']) OR self.im_raster THEN BEGIN
 
     ;---------------------------------------------------------------------
     ; Open Postscript File ///////////////////////////////////////////////
@@ -562,14 +570,16 @@ RESIZE=resize
         
         ;Get the configuration keywords
         ps_keys  = self.ps_config -> GetKeywords()
+        IF typeOut NE 'EPS' THEN encapsulated = ps_keys.encapsulated
         isolatin = ps_keys.isolatin1
         fontsize = ps_keys.font_size
         ps_keys  = remove_tags(ps_keys, ['language_level', 'font_size', 'portrait', $
-                                         'tt_font',        'isolatin1'])
+                                         'tt_font',        'isolatin1', 'encapsulated'])
         ps_keys  = create_struct(ps_keys, 'fontsize', fontsize, 'isolatin', isolatin)
 
         ;Open the file.
         cgPS_Open, CHARSIZE     =  self.ps_charsize, $
+                   ENCAPSULATED =       encapsulated, $
                    FILENAME     =       fname_temp, $
                    GROUP_LEADER = *self._group_leader, $
                    KEYWORDS     =       ps_keywords, $
@@ -605,6 +615,18 @@ RESIZE=resize
                 ;Close the file.
                 cgPS_Close, OUTFILENAME=fOut
                 outName = n_elements(fOut) gt 0 ? fOut : outName + '.ps'
+            ENDCASE
+            
+        ;---------------------------------------------------------------------
+        ; EPS ////////////////////////////////////////////////////////////////
+        ;---------------------------------------------------------------------
+            'EPS': BEGIN
+                ;Write to the file.
+                self -> Draw
+    
+                ;Close the file.
+                cgPS_Close, OUTFILENAME=fOut
+                outName = n_elements(fOut) gt 0 ? fOut : outName + '.eps'
             ENDCASE
             
         ;---------------------------------------------------------------------

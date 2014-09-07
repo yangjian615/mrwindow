@@ -81,6 +81,7 @@
 ;       07/31/2013  -   Added the graphic property for use with DATA coordinates.
 ;       2013/11/20  -   Inherit MrGrAtom. Rename GRAPHIC to TARGET. - MRA
 ;       2014/02/03  -   Renamed from weText to MrText. Added the Place method. - MRA
+;       2014/08/29  -   Added the RELATIVE property. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -295,11 +296,19 @@ NOERASE=noerase
     ;Convert from data to normal coordinates if DATA is set and a graphic was given.
     ;In this way the text does not have to be drawn immediately after the plot is
     ;drawn.
-    IF self.data EQ 1 AND Obj_Valid(self.target) $
-        THEN self.target -> RestoreCoords
+    IF self.data EQ 1 AND Obj_Valid(self.target) THEN BEGIN
+        self.target -> RestoreCoords
+        IF self.relative THEN BEGIN
+            xloc = (*self.xloc * (!x.crange[1] - !x.crange[0])) + !x.crange[0]
+            yloc = (*self.yloc * (!y.crange[1] - !y.crange[0])) + !y.crange[0]
+        ENDIF
+    ENDIF ELSE BEGIN
+        xloc = *self.xloc
+        yloc = *self.yloc
+    ENDELSE
 
     ;Draw the text
-    cgText, *self.xloc, *self.yloc, *self.text, $
+    cgText, xloc, yloc, *self.text, $
             ALIGNMENT   =  self.alignment, $
             CHARSIZE    =  self.charsize, $
             CHARTHICK   =  self.charthick, $
@@ -389,6 +398,9 @@ END
 ;                           window as well. Clicking once in the window will set the
 ;                           parameters so you don't have to click every time the window is
 ;                           resized.
+;       RELATIVE:       out, optional, type=boolean, default=0
+;                       If set, then `XLOC` and `YLOC` specify the location with respect
+;                           to the normalized data coordinates of `TARGET`.
 ;       T3D:            out, optional, type=boolean
 ;                       If set, output will be transformed into 3D using !P.T
 ;       TARGET:         out, optional, type=object
@@ -437,6 +449,7 @@ NORMAL=normal, $
 ORIENTATION=orientation, $
 OUTLOC=outloc, $
 PLACE=place, $
+RELATIVE=relative, $
 T3D=t3d, $
 TARGET=target, $
 TEXT_AXES=text_axes, $
@@ -469,6 +482,7 @@ _REF_EXTRA=extra
     IF Arg_Present(normal)      GT 0 THEN normal      =  self.normal
     IF Arg_Present(orientation) GT 0 THEN orientation = *self.orientation
     IF Arg_Present(outloc)      GT 0 THEN outloc      =  self.outloc
+    IF Arg_Present(relative)    GT 0 THEN relative    =  self.relative
     IF Arg_Present(t3d)         GT 0 THEN t3d         =  self.t3d
     IF Arg_Present(text_axes)   GT 0 THEN text_axes   =  self.text_axes
     IF Arg_Present(tt_font)     GT 0 THEN tt_font     = *self.tt_font
@@ -560,6 +574,9 @@ END
 ;                           window as well. Clicking once in the window will set the
 ;                           parameters so you don't have to click every time the window is
 ;                           resized.
+;       RELATIVE:       in, optional, type=boolean, default=0
+;                       If set, then `XLOC` and `YLOC` specify the location with respect
+;                           to the normalized data coordinates of `TARGET`.
 ;       T3D:            in, optional, type=boolean
 ;                       If set, output will be transformed into 3D using !P.T
 ;       TARGET:         in, optional, type=object
@@ -607,6 +624,7 @@ NOCLIP=noclip, $
 NORMAL=normal, $
 ORIENTATION=orientation, $
 PLACE=place, $
+RELATIVE=relative, $
 T3D=t3d, $
 TARGET=target, $
 TEXT_AXES=text_axes, $
@@ -631,18 +649,17 @@ _REF_EXTRA=extra
     IF N_Elements(charthick)   GT 0 THEN  self.charthick   = charthick
     IF N_Elements(clip)        GT 0 THEN *self.clip        = clip
     IF N_Elements(color)       GT 0 THEN  self.color       = color
-    IF N_Elements(data)        GT 0 THEN  self.data        = data
-    IF N_Elements(device)      GT 0 THEN  self.device      = device
     IF N_Elements(font)        GT 0 THEN  self.font        = font
     IF N_Elements(noclip)      GT 0 THEN  self.noclip      = keyword_set(noclip)
-    IF N_Elements(normal)      GT 0 THEN  self.normal      = normal
     IF N_Elements(orientation) GT 0 THEN *self.orientation = orientation
     IF N_Elements(t3d)         GT 0 THEN  self.t3d         = keyword_set(t3d)
     IF N_Elements(text_axes)   GT 0 THEN  self.text_axes   = text_axes
     IF N_Elements(tt_font)     GT 0 THEN *self.tt_font     = tt_font
     IF N_Elements(z)           GT 0 THEN *self.z           = z
     
-    ;DATA, DEVICE, and NORMAL depend on each other. DATA takes precendence, so set last.
+    ;DATA, DEVICE, NORMAL, and RELATIVE depend on each other.
+    ;   - DATA takes precendence, so set last.
+    ;   - RELATIVE automatically sets DATA = 1
     IF N_Elements(device) GT 0 THEN BEGIN
         self.device = keyword_set(device)
         IF self.device THEN BEGIN
@@ -657,6 +674,12 @@ _REF_EXTRA=extra
             self.data = 0B
             self.device = 0B
         ENDIF
+    ENDIF
+
+    ;A relative position is with respect to the dataspace.
+    IF N_Elements(relative) GT 0 THEN BEGIN
+        self.relative = keyword_set(relative)
+        IF self.relative THEN data = 1
     ENDIF
     
     IF N_Elements(data) GT 0 THEN BEGIN
@@ -767,6 +790,9 @@ END
 ;       ORIENTATION:    in, optional, type=float, default=0.0
 ;                       Use this keyword to specify the counterclockwise angle of rotation
 ;                           of the text in degrees from the horizontal.
+;       RELATIVE:       in, optional, type=boolean, default=0
+;                       If set, then `XLOC` and `YLOC` specify the location with respect
+;                           to the normalized data coordinates of `TARGET`.
 ;       T3D:            in, optional, type=boolean, default=0
 ;                       If set, output will be transformed into 3D using !P.T
 ;       TARGET:         in, optional, type=object, default=obj_new()
@@ -805,6 +831,7 @@ MAP_OBJECT=map_object, $
 NOCLIP=noclip, $
 NORMAL=normal, $
 ORIENTATION=orientation, $
+RELATIVE=relative, $
 T3D=t3d, $
 TARGET=target, $
 TEXT_AXES=text_axes, $
@@ -853,11 +880,12 @@ _REF_EXTRA=extra
 ;Object Properties ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;Set defaults
-    place  = keyword_set(place)
-    data   = keyword_set(data)
-    device = keyword_set(device)
-    normal = keyword_set(normal)
-    t3d    = keyword_set(t3d)
+    place    = keyword_set(place)
+    data     = keyword_set(data)
+    device   = keyword_set(device)
+    normal   = keyword_set(normal)
+    relative = keyword_set(relative)
+    t3d      = keyword_set(t3d)
     
     if n_elements(alignment) eq 0 then alignment = 0.0
     if n_elements(charsize)  eq 0 then charsize  = 1.5
@@ -879,7 +907,7 @@ _REF_EXTRA=extra
     ;Objects
     self.target     = Obj_New()
     self.map_object = Obj_New()
-    
+
     ;Set object properties
     self -> SetProperty, XLOC=x, $
                          YLOC=y, $
@@ -897,6 +925,7 @@ _REF_EXTRA=extra
                          NOCLIP=noclip, $
                          NORMAL=normal, $
                          ORIENTATION=orientation, $
+                         RELATIVE=relative, $
                          T3D=t3d, $
                          TARGET=target, $
                          TEXT_AXES=text_axes, $
@@ -932,6 +961,7 @@ END
 ;       normal:         [xloc, yloc] are specified in normal coordinates.
 ;       orientation:    Counter-clockwise angle of orientation of the text.
 ;       outloc:         If text is placed interactively, the location.
+;       relative:       Location is given in terms of a normalized dataspace.
 ;       t3d:            Transform to 3D space.
 ;       text_axes:      
 ;       tt_font:        TrueType font to use.
@@ -962,6 +992,7 @@ PRO MrText__define, class
               normal:      0B, $
               orientation: Ptr_New(), $
               outloc:      fltarr(2), $
+              relative:    0B, $
               t3d:         0B, $
               target:      obj_new(), $
               text_axes:   0, $

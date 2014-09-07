@@ -161,9 +161,9 @@ NOERASE=noerase
                     CLIP       = *self.clip, $
                     DATA       =  self.data, $
                     DEVICE     =  self.device, $
+                    NOCLIP     =  self.noclip, $
                     NORMAL     =  self.normal, $
                     LINESTYLE  =  self.linestyle, $
-                    NOCLIP     =  self.noclip, $
                     T3D        =  self.t3d, $
                     THICK      =  self.thick, $
                     Z          =  self.zvalue
@@ -274,7 +274,8 @@ LINESTYLE=linestyle, $
 NOCLIP=noclip, $
 T3D=t3d, $
 THICK=thick, $
-ZVALUE=zvalue
+ZVALUE=zvalue, $
+_REF_EXTRA=extra
 
     compile_opt idl2
     
@@ -316,6 +317,9 @@ ZVALUE=zvalue
     IF Arg_Present(target) GT 0 THEN IF Obj_Valid(self.target) GT 0 $
         THEN target = self.target $
         ELSE target = Obj_New()
+    
+    ;Superclass properties
+    if n_elements(extra) gt 0 then self -> MrGrAtom::GetProperty, _STRICT_EXTRA=extra
 end
 
 
@@ -571,8 +575,9 @@ end
 ;                           will allow you to convert the `x` and `y` parameters from
 ;                           longitude and latitude, respectively, to projected meter space
 ;                           before drawing. X and Y must both be present.
-;       NOCLIP:         in, optional, type=boolean, default=0
-;                       If set, suppresses clipping of the polygons.
+;       NOCLIP:         in, optional, type=boolean, default=1
+;                       If set, suppresses clipping of the polygons. Set to 0 to enable
+;                           clipping.
 ;       NORMAL:         in, optional, type=boolean, default=0
 ;                       Set to indicate the polygon vertices are in normalized coordinates.
 ;       PSYM:           in, optional, type=integer
@@ -638,22 +643,19 @@ _REF_EXTRA=extra
 ;Superclass & Window /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;Window is obtained by MrGrAtom
-    if self -> MrGrAtom::INIT(TARGET=target, /CURRENT) eq 0 then $
+    if self -> MrGrAtom::INIT(TARGET=target, /CURRENT, WINREFRESH=winRefresh) eq 0 then $
         message, 'Unable to initialize MrGrAtom'
-    
-    ;Refresh the window?
-    self.window -> GetProperty, REFRESH=refreshIn
-    if refreshIn then self.window -> Refresh, /DISABLE
 
 ;---------------------------------------------------------------------
 ;Keywords ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
     setDefaultValue, symsize, 1.0
-    setDefaultValue, thick, 1.0
-    setDefaultValue, data, 0, /BOOLEAN
-    setDefaultValue, device, 0, /BOOLEAN
-    setDefaultValue, normal, 0, /BOOLEAN
+    setDefaultValue, thick,   1.0
+    setDefaultValue, noclip,  1,  /BOOLEAN
+    setDefaultValue, data,    0,  /BOOLEAN
+    setDefaultValue, device,  0,  /BOOLEAN
+    setDefaultValue, normal,  0,  /BOOLEAN
     if normal + device eq 0 then data = 1B
     
     ;Allocate heap for the variables
@@ -697,7 +699,7 @@ _REF_EXTRA=extra
     ;Draw?
     if n_elements(target) eq 0 $
         then self -> Refresh $
-        else if refreshIn then self -> Refresh
+        else if winRefresh then self -> Refresh
 
     return, 1
 end

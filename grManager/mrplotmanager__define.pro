@@ -137,6 +137,8 @@
 ;                           the Get method. - MRA
 ;       2014/03/15  -   SetGlobal can now segregate object classes. - MRA
 ;       2014/03/26  -   Added MrVector to the list of known graphics. - MRA
+;       2014/06/09  -   Removing graphics at fixed locations was not updating plot
+;                           indices of other graphics. Fixed. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -358,6 +360,10 @@ QUIET = quiet
     
     ;Make sure a location and position is defined for each plot
     for i = 0, nObj - 1 do begin
+        ;Valid object?
+        if obj_valid(theObjects[i]) eq 0 then continue
+
+        ;What type of object and where are we putting it?
         skip = 0
         if nIndex gt 0 then thisIndex = index[i]
         ImA = self -> WhatAmI(theObjects[i])
@@ -522,6 +528,7 @@ end
 ;                       If set, the draw method will be called after filling holes.
 ;-
 pro MrPlotManager::FillHoles, $
+FIXED=fixed, $
 TRIMLAYOUT=trimLayout, $
 DRAW=draw
     compile_opt idl2
@@ -531,6 +538,41 @@ DRAW=draw
     if the_error ne 0 then begin
         catch, /cancel
         void = cgErrorMsg()
+        return
+    endif
+        
+;---------------------------------------------------------------------
+; Fixed Locations? ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if keyword_set(fixed) then begin
+        allDataObjs = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=count)
+        if count eq 0 then return
+        pIndex = intarr(count)
+        
+        ;Get all of the plot indices
+        for i = 0, count - 1 do begin
+            allDataObjs[i] -> GetProperty, LAYOUT=tempLayout
+            pIndex[i]  = tempLayout[2]
+        endfor
+        
+        ;Find the fixed locations
+        iFixed = where(pIndex lt 0, nFixed)
+        if nFixed eq 0 then return
+        
+        ;Sort the plot indices from least to most negative
+        iSort = sort(pIndex)
+        pIndex = reverse(pIndex[iSort])
+        iFixed = reverse(iFixed[iSort])
+
+        ;Number them from -1 to -nFixed
+        ;   - Do not update the layout, thereby recalculating all positions. We just
+        ;       want to change the plot index, keeping everything else the same.
+        new_pIndex = -(indgen(nFixed)+1)
+        for i = 0, nFixed - 1 do begin
+            if new_pIndex ne pIndex[i] $
+                then allDataObjs[iFixed[i]] -> SetLayout, [self.GrLayout, new_pIndex[i]], UPDATE_LAYOUT=0
+        endfor
+        
         return
     endif
         
@@ -761,6 +803,7 @@ TYPE = type
     
     if n_elements(Child_Object) gt 0 then begin
         nRemove = n_elements(Child_Object)
+        tf_removed_fixed = 0B
         
         ;Objects that are of type "data" may fall into the auto-updating plot layout.
         ;As such, when they are removed from the container, they also need to be removed
@@ -775,11 +818,12 @@ TYPE = type
             if (tf_data[i] eq 1) then begin
                 ;Get their position and layout.
                 Child_Object[i] -> GetLayout, LAYOUT=layout, POSITION=position
+                if layout[2] lt 0 then tf_removed_fixed = 1B
             
                 ;Remove from the layout
                 self -> RemoveFromLayout, layout[2]
             endif
-            
+             
             ;Remove from the container.
             self -> MrIDL_Container::Remove, Child_Object[i], DESTROY=destroy
         endfor
@@ -788,6 +832,19 @@ TYPE = type
 ;---------------------------------------------------------------------
 ;Draw ////////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+
+    ;
+    ; Fill fixed positions after each remove
+    ;   - When fixed locations are removed via ::RemoveFromLayout, their location gets
+    ;       deleted from the fixed positions list and the empty position is truncated.
+    ;   - Said list and the actual graphics are not connected. Graphics at fixed locations
+    ;       may find themselves outside the list (the end of which is marked by self.nFixed)
+    ;   - Therefore, we must close the disjoint between the list and the actual graphics.
+    ;   - This is not necessary for the auto-updating grid because the grid does not get
+    ;       truncated.
+    ;
+    if tf_removed_fixed then self -> FillHoles, /FIXED
+
 
     ;Fill holes?
     if fillHoles eq 1 then self -> FillHoles
@@ -1146,7 +1203,8 @@ ZTITLE = ztitle
             allObjs[i] -> SetProperty, RANGE=range
             
         endif else if oClass eq 'WECOLORBAR' then begin
-            allObjs[i] -> SetProperty, RANGE=range, CHARSIZE=charsize, CHARTHICK=charthick
+            allObjs[i] -> SetProperty, RANGE=range, CHARSIZE=charsize, $
+                                       CHARTHICK=charthick, TCHARSIZE=charsize
             
 ;---------------------------------------------------------------------
 ;Other Annotation Objects ////////////////////////////////////////////
@@ -1300,6 +1358,7 @@ function MrPlotManager::WhatAmI, objRef
         'MRCOLORFILL':  ImA = 'COLORFILL'
         'MRCONTOUR':    ImA = 'CONTOUR'
         'MRIMAGE':      ImA = 'IMAGE'
+        'MRLEGEND':     ImA = 'LEGEND'
         'MRPLOT':       ImA = 'PLOT'
         'MRPLOTS':      ImA = 'PLOTS'
         'MRTEXT':       ImA = 'TEXT'
@@ -1340,7 +1399,7 @@ pro MrPlotManager::Config
               colorbar: ['WECOLORBAR'], $
               contour: ['MRCONTOUR'], $
               image: ['MRIMAGE'], $
-              legend: ['WELEGENDITEM'], $
+              legend: ['WELEGENDITEM', 'MRLEGEND'], $
               overplot: ['WEOVERPLOT'], $
               plot: ['MRPLOT'], $
               plots: ['MRPLOTS'], $
@@ -1349,7 +1408,8 @@ pro MrPlotManager::Config
               vector: ['MRVECTOR'], $
               ImAData: ['PLOT', 'IMAGE', 'CONTOUR', 'VECTOR'], $     ;TO BE USED WITH ::WHATAMI
               data: ['MRPLOT', 'MRIMAGE', 'MRCONTOUR', 'MRVECTOR'], $
-              annotate: ['WECOLORBAR', 'MRAXIS', 'WELEGENDITEM', 'WEARROW', 'MRTEXT', 'MRPLOTS', 'WEOVERPLOT', 'MRCOLORFILL'], $
+              annotate: ['WECOLORBAR', 'MRAXIS', 'WELEGENDITEM', 'WEARROW', 'MRTEXT', $
+                         'MRPLOTS', 'WEOVERPLOT', 'MRCOLORFILL', 'MRLEGEND'], $
               files: ['CDF_PLOT'] $
             }
     

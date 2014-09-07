@@ -1155,8 +1155,8 @@ end
 ;                               For function event handling, set the `FUNC_HANDLERS`
 ;                               keyword. If set, all other *_HANDLER keywords are ignored.
 ;       FUNC_HANDLERS:      in, optional, type=boolean, default=0
-;                           If set, `EVENT_HANDLER` describes a callback function
-;                               instead of a callback procedure.
+;                           If set, then if `EVENT_HANDLER` is a string it specifies the
+;                               name of a callback function instead of a callback procedure.
 ;       FUNC_GET_VALUE:     in, optional, type=string/structure, default=''
 ;                           A string specifying the name of a function to be called
 ;                               when the value of the base is changed. Alternatively,

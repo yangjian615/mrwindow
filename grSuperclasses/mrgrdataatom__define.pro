@@ -619,7 +619,7 @@ _REF_EXTRA = extra
     ;Layout -- Must be done before initializing MrGrAtom
     self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
     
-    ;Was the /OVERPLOT keyword set, instead of giving a target
+    ;Was the /OVERPLOT keyword set instead of giving a target
     if MrIsA(target, /SCALAR, 'INT') $
         then if keyword_set(target) then target = self -> _GetTarget()
 

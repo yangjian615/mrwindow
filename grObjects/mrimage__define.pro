@@ -292,6 +292,7 @@ end
 ;   Clear data from interal storage
 ;-
 pro MrImage::ClearData, $
+ALL=all, $
 CENTERS=centers, $
 CORNERS=corners, $
 DELTAS=deltas, $
@@ -316,6 +317,7 @@ YMIN=ymin
     endif
     
     ;Individual quantities
+    all          = keyword_set(all)
     indep        = keyword_set(indep)
     dep          = keyword_set(dep)
     xdelta_plus  = keyword_set(xdelta_plus)
@@ -327,14 +329,21 @@ YMIN=ymin
     ymax         = keyword_set(ymax)
     ymin         = keyword_set(ymin)
     
+    ;All?
+    if all then begin
+        centers = 1
+        deltas  = 1
+        corners = 1
+    endif
+    
     ;Centers?
-    if keyword_set(centers) then begin
+    if centers then begin
         indep = 1
         dep   = 1
     endif
     
     ;Deltas?
-    if keyword_set(deltas) then begin
+    if deltas then begin
         xdelta_plus  = 1
         xdelta_minus = 1
         ydelta_plus  = 1
@@ -342,58 +351,28 @@ YMIN=ymin
     endif
     
     ;Corners?
-    if keyword_set(corners) then begin
+    if corners then begin
         xmax = 1
         xmin = 1
         ymax = 1
         ymin = 1
     endif
             
-    ;Pixel Centers.
-    if dep then if n_elements(*self.dep) gt 0 then begin
-        ptr_free, self.dep
-        self.dep = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if indep then if n_elements(*self.indep) gt 0 then begin
-        ptr_free, self.indep
-        self.indep = ptr_new(/ALLOCATE_HEAP)
-    endif
+    ;Pixel Centers
+    if dep   then if n_elements(*self.dep)   gt 0 then void = temporary(*self.dep)
+    if indep then if n_elements(*self.indep) gt 0 then void = temporary(*self.indep)
     
     ;Pixel Corners
-    if xmin then if n_elements(*self.xmin) gt 0 then begin
-        ptr_free, self.xmin
-        self.xmin = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if xmax then if n_elements(*self.xmax) gt 0 then begin
-        ptr_free, self.xmax
-        self.xmax = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if ymin then if n_elements(*self.ymin) gt 0 then begin
-        ptr_free, self.ymin
-        self.ymin = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if ymax then if n_elements(*self.ymax) gt 0 then begin
-        ptr_free, self.ymax
-        self.ymax = ptr_new(/ALLOCATE_HEAP)
-    endif
+    if xmin then if n_elements(*self.xmin) gt 0 then void = temporary(*self.xMin)
+    if xmax then if n_elements(*self.xmax) gt 0 then void = temporary(*self.xMax)
+    if ymin then if n_elements(*self.ymin) gt 0 then void = temporary(*self.yMin)
+    if ymax then if n_elements(*self.ymax) gt 0 then void = temporary(*self.yMax)
     
     ;Pixel Deltas
-    if xdelta_minus then if n_elements(*self.xdelta_minus) gt 0 then begin
-        ptr_free, self.xdelta_minus
-        self.xdelta_minus = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if xdelta_plus then if n_elements(*self.xdelta_plus) gt 0 then begin
-        ptr_free, self.xdelta_plus
-        self.xdelta_plus = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if ydelta_minus then if n_elements(*self.ydelta_minus) gt 0 then begin
-        ptr_free, self.ydelta_minus
-        self.ydelta_minus = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if ydelta_plus then if n_elements(*self.ydelta_plus) gt 0 then begin
-        ptr_free, self.ydelta_plus
-        self.ydelta_plus = ptr_new(/ALLOCATE_HEAP)
-    endif
+    if xdelta_minus then if n_elements(*self.xdelta_minus) gt 0 then void = temporary(*self.xdelta_minus)
+    if xdelta_plus  then if n_elements(*self.xdelta_plus)  gt 0 then void = temporary(*self.xdelta_plus)
+    if ydelta_minus then if n_elements(*self.ydelta_minus) gt 0 then void = temporary(*self.ydelta_minus)
+    if ydelta_plus  then if n_elements(*self.ydelta_plus)  gt 0 then void = temporary(*self.ydelta_plus)
 end
 
 
@@ -415,7 +394,7 @@ NOERASE=noerase
     endif
     
     if self.hide then return
-    
+
     ;Now display the image
     self -> doImage, NOERASE=noerase
     self -> SaveCoords
@@ -451,7 +430,6 @@ NOERASE=noerase
     endif
 
     if n_elements(noerase) eq 0 then noerase = *self.noerase
-
 ;---------------------------------------------------------------------
 ; PAINT PIXEL-BY-PIXEL? //////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -590,10 +568,10 @@ NOERASE=noerase
 ;---------------------------------------------------------------------
     endif else begin
         MraImage, (*self.image)[icol, irow], $
-                   (*self.Xmin)[icol, irow], $
-                   (*self.Ymin)[icol, irow], $
-                   (*self.Xmax)[icol, irow], $
-                   (*self.Ymax)[icol, irow], $
+                   (*self.xMin_out)[icol, irow], $
+                   (*self.yMin)[icol, irow], $
+                   (*self.xMax_out)[icol, irow], $
+                   (*self.yMax)[icol, irow], $
                 
                   ;IMAGE_PLOTS Keywords
                   AXES          = *self.axes, $
@@ -838,6 +816,7 @@ PAINT = paint, $
 PALETTE = palette, $
 POLAR = polar, $
 RANGE = range, $
+RLOG = rlog, $
 SCALE = scale, $
 TOP = top, $
 
@@ -864,6 +843,7 @@ _REF_EXTRA = extra
     if arg_present(INIT_YRANGE) then init_yrange =  self.init_yrange
     if arg_present(layout)      then layout      =  self.layout -> GetLayout()
     if arg_present(position)    then position    =  self.layout -> GetPosition()
+    if arg_present(rlog)        then rlog        =  self.rlog
     if arg_present(xmin) then if n_elements(*self.Xmin) gt 0 then xmin = *self.Xmin
     if arg_present(xmax) then if n_elements(*self.Xmax) gt 0 then xmax = *self.Xmax
     if arg_present(ymin) then if n_elements(*self.Ymin) gt 0 then ymin = *self.Ymin
@@ -942,6 +922,16 @@ YLOG=ylog
     ylog   = n_elements(ylog)   eq 0 ? self.ylog   : keyword_set(ylog)
     center = n_elements(center) eq 0 ? self.center : keyword_set(center)
 
+    ;Polar plots cannot have XLOG or YLOG set.
+    if self.polar && xlog then begin
+        message, 'XLOG cannot be set for polar plots. Use RLOG. Setting XLOG=0', /INFORMATIONAL
+        xlog = 0
+    endif
+    if self.polar && ylog then begin
+        message, 'YLOG cannot be set for polar plots. Use RLOG. Setting YLOG=0', /INFORMATIONAL
+        ylog = 0
+    endif 
+
     ;Paint the image?
     ;   - SetData will set PAINT=1 if more than just X and Y were given. Leave as is.
     ;   - If only X and Y were given, we need to decide if the image needs to be pained.
@@ -960,6 +950,9 @@ YLOG=ylog
     dims = size(*self.image, /DIMENSIONS)
     dims = dims[0:1]
     
+    ;Determine the corners of each pixel
+    ;   - Valid for cartesian and polar plots.
+    ;   - Additional work for /RLOG (see SetProperty method).
     case n_params() of
         2: MrPixelPoints,  dims, x, y,                 Xmin, Ymin, Xmax, Ymax, /DIMENSIONS, CENTER=center, XLOG=xlog, YLOG=ylog
         4: MrPixelCorners, dims, x, y, x0, y0,         Xmin, Ymin, Xmax, Ymax, /DIMENSIONS
@@ -971,10 +964,10 @@ YLOG=ylog
     self.xlog   = xlog
     self.ylog   = ylog
     self.center = center
-    *self.Xmin  = Xmin
-    *self.Xmax  = Xmax
-    *self.Ymin  = Ymin
-    *self.Ymax  = Ymax
+    *self.xMin  = xMin
+    *self.xMax  = xMax
+    *self.yMin  = yMin
+    *self.yMax  = yMax
     
     self.window -> Draw
 end
@@ -1041,11 +1034,11 @@ TV=tv
             if n_elements(x) ne 1 then message, 'X must be a scalar.'
             
             ;Clear the data
-            self -> ClearData, /DELTAS, /CORNERS
+            self -> ClearData, /ALL
             
             ;Set the data
-            *self.indep = x
-            *self.image = theImage
+            *self.indep  = x
+            *self.image  = theImage
             self.nparams = 2B
         endcase
     
@@ -1059,12 +1052,12 @@ TV=tv
             endif
             
             ;Clear data
-            self -> ClearData, /DELTAS, /CORNERS
+            self -> ClearData, /ALL
             
             ;Store the data
             *self.image = theImage
             *self.indep = x
-            *self.dep = y
+            *self.dep   = y
             
             ;Find the pixel locations
             if self.tv eq 0 then self -> SetPixelLocations, x, y
@@ -1076,10 +1069,14 @@ TV=tv
     ;---------------------------------------------------------------------
         5: begin
             ;Clear data
-            self -> ClearData, /DELTAS, /CENTERS
+            self -> ClearData, /ALL
         
             ;Set the data
             *self.image = theImage
+            *self.xMin = x
+            *self.xMax = x0
+            *self.yMin = y
+            *self.yMax = y0
             self -> SetPixelLocations, x, y, x0, y0
             
             ;Paint each pixel
@@ -1092,12 +1089,12 @@ TV=tv
     ;---------------------------------------------------------------------
         7: begin
             ;Clear data
-            self -> ClearData, /DELTAS
+            self -> ClearData, /ALL
             
             ;Store the data
-            *self.image = theImage
-            *self.indep = x
-            *self.dep   = y
+            *self.image        = theImage
+            *self.indep        = x
+            *self.dep          = y
             *self.xdelta_minus = x0
             *self.xdelta_plus  = x1
             *self.ydelta_minus = y0
@@ -1105,20 +1102,24 @@ TV=tv
             self -> SetPixelLocations, x, y, x0, y0, x1, y1
             
             ;Paint the pixels
-            self.paint = 1B
+            self.paint   = 1B
             self.nparams = 7B
         endcase
         else: message, 'Incorrect number of parameters.'
     endcase
-            
+
     ;Get the new ranges
     *self.range = [min(theImage, /NAN, MAX=imMax), imMax]
-    if n_elements(*self.xmin) eq 0 $
-        then *self.xrange = [self.xlog, imDims[0]-1] $
-        else *self.xrange = [min(*self.xmin), max(*self.xmax)]
-    if n_elements(*self.ymin) eq 0 $
-        then *self.yrange = [self.ylog, imDims[1]-1] $
-        else *self.yrange = [min(*self.ymin), max(*self.ymax)]
+    case 1 of
+        n_elements(*self.xmin)  gt 0: *self.xrange = [min(*self.xmin), max(*self.xmax)]
+        n_elements(*self.indep) gt 0: *self.xrange = [min(*self.indep, MAX=xMax), xmax]
+        else:                         *self.xrange = [self.xlog, imDims[0]-1]
+    endcase
+    case 1 of
+        n_elements(*self.ymin) gt 0: *self.yrange = [min(*self.ymin), max(*self.ymax)]
+        n_elements(*self.dep)  gt 0: *self.yrange = [min(*self.dep, MAX=yMax), yMax]
+        else:                        *self.yrange = [self.ylog, imDims[1]-1]
+    endcase
 
     ;To make the image zoomable, we need to know the data location of each pixel.
     ;These are the pixel centers. If no pixel centers were given, then create them
@@ -1208,6 +1209,7 @@ NAN = nan, $
 PALETTE = palette, $
 POLAR = polar, $
 RANGE = range, $
+RLOG = rlog, $
 SCALE = scale, $
 TOP = top, $
 
@@ -1240,11 +1242,11 @@ _REF_EXTRA = extra
     if n_elements(RANGE)         ne 0 then *self.range         = range
     if n_elements(SCALE)         ne 0 then *self.scale         = keyword_set(scale)
     if n_elements(TOP)           ne 0 then *self.top           = top
-    
+
     ;CTIndex takes precedence over PALETTE, so it must be reset.
     if n_elements(PALETTE) gt 0 then begin
         *self.palette = palette
-        void = temporary(*self.cgIndex)
+        void = temporary(*self.ctIndex)
     endif
     
     ;Log-scale the axes or pixel centers given?
@@ -1253,10 +1255,10 @@ _REF_EXTRA = extra
     nCenter = n_elements(center)
     nPolar  = n_elements(polar)
     if nxlog + nylog + nCenter + nPolar gt 0 then begin
+        if nPolar  gt 0 then self.polar  = keyword_set(polar)
         if nxlog   gt 0 then self.xlog   = keyword_set(xlog)
         if nylog   gt 0 then self.ylog   = keyword_set(ylog)
         if nCenter gt 0 then self.center = keyword_set(center)
-        if nPolar  gt 0 then self.polar  = keyword_set(polar)
         
         ;If only X and Y were given, pixel locations have to be recalculated
         ;   - Cannot easily determine if the image needs to be painted or pasted
@@ -1266,10 +1268,36 @@ _REF_EXTRA = extra
             then self -> SetPixelLocations, *self.indep, *self.dep
     endif
     
+    ;Radial log-scale?
+    ;   - SetPixelLocations will determine the four corners of each pixel
+    ;       for all types of plots.
+    ;   - For polar plots with a logarithmically-scaled axis
+    ;   - Must NOT set RLOG when calling mraImage in the DoDraw method (would compute log again).
+    if n_elements(rlog) gt 0 then begin
+        self.rlog = keyword_set(rlog)
+        
+        ;Take the log of the radius?
+        if self.polar && self.rlog then begin
+            ;Be careful not to overwrite original data.
+            if self.xMin_out eq self.xMin $
+                then  self.xMin_out = ptr_new(MrLog(xMin)) $
+                else *self.xMin_out = MrLog(xMin)
+            
+            if self.xMax_out eq self.xMax $
+                then  self.xMax_out = ptr_new(MrLog(xMax)) $
+                else *self.xMax_out = MrLog(xMax)
+    
+        ;If RLOG=0, re-use the pointers to save space
+        endif else begin
+            self.xMin_out = self.xMin
+            self.xMax_out = self.xMax
+        endelse
+    endif
+    
     ;Superclass properties
     if n_elements(extra) gt 0 $
         then self -> MrGrDataAtom::SetProperty, _EXTRA=extra
-    
+
     ;Refresh the window
     self.window -> Draw
 end
@@ -1431,6 +1459,7 @@ NAN = nan, $
 PAINT = paint, $
 PALETTE = palette, $
 RANGE = range, $
+RLOG = rlog, $
 SCALE = scale, $
 TOP = top, $
 
@@ -1476,6 +1505,7 @@ _REF_EXTRA = extra
     setDefaultValue, iDisplay, 0
     setDefaultValue, paint,    0, /BOOLEAN
     setDefaultValue, polar,    0, /BOOLEAN
+    setDefaultValue, rlog,     0, /BOOLEAN
     setDefaultValue, tv,       0, /BOOLEAN
     setDefaultValue, xsize,  600
     setDefaultValue, xlog,     0, /BOOLEAN
@@ -1505,10 +1535,12 @@ _REF_EXTRA = extra
     self.xdelta_plus   = ptr_new(/ALLOCATE_HEAP)
     self.ydelta_minus  = ptr_new(/ALLOCATE_HEAP)
     self.ydelta_plus   = ptr_new(/ALLOCATE_HEAP)
-    self.Xmax          = ptr_new(/ALLOCATE_HEAP)
-    self.Xmin          = ptr_new(/ALLOCATE_HEAP)
-    self.Ymax          = ptr_new(/ALLOCATE_HEAP)
-    self.Ymin          = ptr_new(/ALLOCATE_HEAP)
+    self.xMax          = ptr_new(/ALLOCATE_HEAP)
+    self.xMin          = ptr_new(/ALLOCATE_HEAP)
+    self.xMax_out      = ptr_new(/ALLOCATE_HEAP)
+    self.xMin_out      = ptr_new(/ALLOCATE_HEAP)
+    self.yMax          = ptr_new(/ALLOCATE_HEAP)
+    self.yMin          = ptr_new(/ALLOCATE_HEAP)
 
 ;---------------------------------------------------------------------
 ; Set Data ///////////////////////////////////////////////////////////
@@ -1547,6 +1579,7 @@ _REF_EXTRA = extra
                          NAN = nan, $
                          PALETTE = palette, $
                          POLAR = polar, $
+                         RLOG = rlog, $
                          RANGE = range, $
                          SCALE = scale, $
                          TOP = top, $
@@ -1607,27 +1640,32 @@ pro MrImage__define
                init_yrange: dblarr(2), $         ;Initial y-range
               
                ;mraImage Keywords
-               axes: ptr_new(), $                ;Draw axes around the image?
-               bottom: ptr_new(), $              ;If scaled, minimum scaled value
-               center: 0B, $                     ;Center of pixel locations was given?
-               ctindex: ptr_new(), $             ;Color index to load
-               data_pos: ptr_new(), $            ;A data position for the image
-               missing_value: ptr_new(), $       ;Value to be treated as missing
-               missing_color: ptr_new(), $       ;Color of missing value
-               nan: ptr_new(), $                 ;Search for NaN's when scaling?
-               paint: 0B, $                      ;Paint the image pixel-by-pixel?
-               palette: ptr_new(), $             ;Color table to be loaded
-               polar: 0B, $                      ;Create a polar image?
-               range: ptr_new(), $               ;Range at which the color table saturates
-               scale: ptr_new(), $               ;Byte-scale the image
-               top: ptr_new(), $                 ;If scaled, maximum scaled value
-               xdelta_minus: ptr_new(), $
-               xdelta_plus:  ptr_new(), $
-               Xmin: ptr_new(), $                ;X-location of bottom-left corner of pixels
-               Xmax: ptr_new(), $                ;X-location of upper-right corner of pixels
-               ydelta_minus: ptr_new(), $
-               ydelta_plus:  ptr_new(), $
-               Ymin: ptr_new(), $                ;Y-location of bottom-left corner of pixels
-               Ymax: ptr_new() $                 ;Y-location of upper-right corner of pixels
+               axes:          ptr_new(), $      ;Draw axes around the image?
+               bottom:        ptr_new(), $      ;If scaled, minimum scaled value
+               center:        0B, $             ;Center of pixel locations was given?
+               ctindex:       ptr_new(), $      ;Color index to load
+               data_pos:      ptr_new(), $      ;A data position for the image
+               missing_value: ptr_new(), $      ;Value to be treated as missing
+               missing_color: ptr_new(), $      ;Color of missing value
+               nan:           ptr_new(), $      ;Search for NaN's when scaling?
+               paint:         0B, $             ;Paint the image pixel-by-pixel?
+               palette:       ptr_new(), $      ;Color table to be loaded
+               polar:         0B, $             ;Create a polar image?
+               range:         ptr_new(), $      ;Range at which the color table saturates
+               rlog:          0B, $             ;Log-scale the radius of a polar image
+               scale:         ptr_new(), $      ;Byte-scale the image
+               top:           ptr_new(), $      ;If scaled, maximum scaled value
+               xdelta_minus:  ptr_new(), $      ;Distance from center of pixel to left edge
+               xdelta_plus:   ptr_new(), $      ;Distance from center of pixel to right edge
+               xMin:          ptr_new(), $      ;Left edge of pixels
+               xMin_out:      ptr_new(), $      ;Left edge of pixels
+               xMax:          ptr_new(), $      ;Right edge of pixels
+               xMax_out:      ptr_new(), $      ;Right edge of pixels
+               y0:            ptr_new(), $      ;Pixel-coordinate used when painting pixels
+               y1:            ptr_new(), $      ;Pixel-coordinate used when painting pixels
+               ydelta_minus:  ptr_new(), $      ;Distance from center of pixel to bottom edge
+               ydelta_plus:   ptr_new(), $      ;Distance from center of pixel to top edge
+               Ymin:          ptr_new(), $      ;Bottom of pixels
+               Ymax:          ptr_new() $       ;Top of pixels
              }
 end

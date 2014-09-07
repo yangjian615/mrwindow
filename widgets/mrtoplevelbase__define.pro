@@ -691,11 +691,12 @@ YOFFSET=yoffset
 
     ;Start xmanager
     if keyword_set(just_register) then begin
-        xmanager, self._register_name, self._id, JUST_REG=1, /NO_BLOCK, $
+        xmanager, self._register_name, self._id, GROUP_LEADER=group_leader, $
+                  /JUST_REG, /NO_BLOCK, $
                   EVENT_HANDLER=event_handler, CLEANUP=cleanup
     endif else begin
         xmanager, self._register_name, self._id, GROUP_LEADER=group_leader, $
-                  NO_BLOCK=1-keyword_set(block), EVENT_HANDLER=event_handler
+                  NO_BLOCK=~keyword_set(block), EVENT_HANDLER=event_handler
     endelse
 end
 

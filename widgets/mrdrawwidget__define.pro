@@ -124,7 +124,7 @@ pro MrDrawWidget_Event_Pro, event
     ;If an event handler was provided, forward the events then return.
     ORef -> GetProperty, DRAW_HANDLER=draw_handler
     case size(draw_handler, /TNAME) of
-        'OBJREF': begin
+        'STRUCT': begin
             if obj_valid(draw_handler) then begin
                 Call_Method, draw_handler.method, draw_handler.object, event
                 return
@@ -145,7 +145,7 @@ pro MrDrawWidget_Event_Pro, event
     if size(event, /SNAME) eq 'WIDGET_DROP' then begin
         oRef -> GetProperty, DROP_HANDLER=drop_eh
         case size(drop_eh, /TNAME) of
-            'OBJREF': Call_Method, drop_eh.method, viewport_en.object, event
+            'STRUCT': Call_Method, drop_eh.method, drop_eh.object, event
             'STRING': if drop_eh ne '' then Call_Procedure, drop_eh, event
         endcase
         
@@ -162,7 +162,7 @@ pro MrDrawWidget_Event_Pro, event
     ;---------------------------------------------------------------------
     ; Object for Draw Event Callback? ////////////////////////////////////
     ;---------------------------------------------------------------------
-    self -> GetProperty, EVENT_HANDLER=oEH, MOUSE_DOWN_HANDLER=mDownH, $
+    self -> GetProperty, EVENT_HANDLER=oEH,     MOUSE_DOWN_HANDLER=mDownH, $
                          MOUSE_UP_HANDLER=mUpH, MOUSE_MOTION_HANDLER=mMotionH, $
                          KEYBOARD_HANDLER=keyH, SELECTION_CHANGE_HANDLER=selectH, $
                          MOUSE_WHEEL_HANDLER=mWheelH
@@ -208,9 +208,9 @@ pro MrDrawWidget_Event_Pro, event
     ; More Pro/Method Callback ///////////////////////////////////////////
     ;---------------------------------------------------------------------
         'VIEWPORT_MOVE': begin
-            oRef -> GetProperty, VIEWPORT_HANDLER=viewport_en
+            oRef -> GetProperty, VIEWPORT_HANDLER=viewport_eh
             case size(viewport_en, /TNAME) of
-                'OBJREF': Call_Method, viewport_en.method, viewport_en.object, event
+                'STRUCT': Call_Method, viewport_eh.method, viewport_eh.object, event
                 'STRING': if viewport_en ne '' then Call_Procedure, viewport_en, event
             endcase
         endcase
@@ -218,7 +218,7 @@ pro MrDrawWidget_Event_Pro, event
         'EXPOSE': begin
             oRef -> GetProperty, EXPOSE_HANDLER=expose_eh
             case size(expose_eh, /TNAME) of
-                'OBJREF': Call_Method, expose_eh.method, expose_eh.object, event
+                'STRUCT': Call_Method, expose_eh.method, expose_eh.object, event
                 'STRING': if expose_eh ne '' then Call_Procedure, expose_eh, event
             endcase
         endcase
@@ -454,7 +454,6 @@ _EXTRA=extraKeywords
     ;Defaults
     noerase      = keyword_set(noerase)
     hourglass    = keyword_set(hourglass)
-    erase_window = keyword_set(erase_window)
     if n_elements(background_color) eq 0 then background_color = self._background
 
     ;Enable the hourglass mouse cursor, if needed.
@@ -535,6 +534,72 @@ end
 
 
 ;+
+;   Copy the contents of the window.
+;
+; :Params:
+;       WINDOW_ID:          in, optional, type=integer, default=!d.window
+;                           Window ID of the window into which the image will be copied.
+;
+; :Keywords:
+;       DESTINATION:        in, optional, type=intarr(2), default=[0\,0]
+;                           The coordinate of the lower-left corner within the window
+;                               where the image is to be copied to.
+;       EXTENT:             in, optional, type=intarr(2), default=[!d.x_size\, !d.y_size]
+;                           Number of pixels in the x- and y-direction to be copied,
+;                               starting at `ORIGIN`.
+;       IMAGE:              out, optional, type=bytarr(N\,M\,3)
+;                           A named variable into which the image will be copied. If
+;                               present, the image will not be copied to a different window.
+;       ORIGIN:             in, optional, type=intarr(2), default=[0\,0]
+;                           Coordinates specifinying the x- and y-location at which to
+;                               begin copying the image.
+;-
+pro MrDrawWidget::Copy, window_id, $
+ DESTINATION=destination, $
+ EXTENT=extent, $
+ IMAGE=theImage, $
+ ORIGIN=origin
+   compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        wset, currentWin
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Get the current window
+    currentWin = !d.window
+    
+    ;Defaults
+    if n_elements(window_id)   eq 0 then window_id   = currentWin
+    if n_elements(origin)      eq 0 then origin      = [0,0]
+    if n_elements(extent)      eq 0 then extent      = [!d.x_size, !d.y_size]
+    if n_elements(destination) eq 0 then destination = [0,0]
+    
+    ;Return the image?
+    if arg_present(theImage) then begin
+        theImage = cgSnapshot(origin[0], origin[1], extent[0], extent[1], TRUE=3)
+        
+    ;Copy from one window to another
+    endif else begin
+        ;Set the window
+        if window_id ne -1 $
+            then wset, window_id $
+            else message, 'No window to copy into.'
+
+        ;Copy window
+        device, COPY=[origin[0], origin[1], extent[0], extent[1], dest[0], dest[1], self._winID]
+    endelse
+    
+    ;Return to the current window
+    wset, currentWin
+end
+
+
+;+
 ;   The purpose of this method is to erase the draw window.
 ;-
 pro MrDrawWidget::Erase
@@ -553,7 +618,7 @@ pro MrDrawWidget::Erase
     
     ;Erase the window.
     if (!d.flags and 256) ne 0 then wset, self._winID
-    cgErase, color=cgcolor(self_background)
+    cgErase, color=cgcolor(self._background)
 end
 
 
@@ -601,9 +666,13 @@ end
 ;                   The new Y size of the canvas area of the draw widget, in pixels.
 ;
 ; :Keywords:
+;       CM:         in, optional, type=boolean, default=0
+;                   If set, `XSIZE` and `YSIZE` are given in centimeters.
 ;       DRAW:       in, optional, type=boolean, default=1
 ;                   Set this keyword to call the draw method when the draw widget
 ;                       resizing is completed.
+;       INCHES:     in, optional, type=boolean, default=0
+;                   If set, `XSIZE` and `YSIZE` are given in inches.
 ;       SCREEN:     in, optional, type=boolean, default=0
 ;                   Normally, the XSIZE and YSIZE keywords apply to the draw widget canvas.
 ;                       If the SCREEN keyword is set, the keywords apply to the screen
@@ -617,7 +686,9 @@ end
 ;                   Any extra keywords appropriate for the DRAW method.
 ;-
 PRO MrDrawWidget::Resize, xsize, ysize, $
+ CM=cm, $
  DRAW=draw, $
+ INCHES=inches, $
  SCREEN=screen, $
  VIEWPORT=viewport, $
 _EXTRA=extraKeywords
@@ -633,13 +704,35 @@ _EXTRA=extraKeywords
 
     IF N_Elements(xsize) EQ 0 THEN Message, "XSIZE parameter is missing."
     IF N_Elements(ysize) EQ 0 THEN Message, "YSIZE parameter is missing."
+    
+    ;Convert to pixels?
+    cm     = Keyword_Set(cm)
+    inches = Keyword_Set(inches)
+    CASE 1 OF
+        cm: BEGIN
+            _xsize = xsize * !d.x_px_cm
+            _ysize = ysize * !d.y_px_cm
+        ENDCASE
+        
+        inches: BEGIN
+            _xsize = xsize * 2.54 * !d.x_px_cm
+            _ysize = ysize * 2.54 * !d.y_px_cm
+        ENDCASE
+        
+        ELSE: BEGIN
+            _xsize = xsize
+            _ysize = ysize
+        ENDCASE
+    ENDCASE
 
+    ;Resize the widget
     CASE 1 OF
         KEYWORD_SET(screen):   Widget_Control, self._id, Scr_XSize=xsize, Scr_YSize=ysize
         KEYWORD_SET(viewport): Widget_Control, self._id, XSize=xsize, YSize=ysize
         ELSE:                  Widget_Control, self._id, Draw_XSize=xsize, Draw_YSize=ysize
     ENDCASE
 
+    ;Redraw
     IF Keyword_Set(draw) THEN self -> Draw, _Extra=extraKeywords
 END
 
@@ -842,14 +935,34 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        if currentWin ne -1 then wset, currentWin
         void = cgErrorMsg()
         return
     endif
 
+    currentWin = !d.window
     if widget_info(self._id, /VALID_ID) eq 0 then return
 
+    ;Object Properties
     if arg_present(background_color) then background_color = self._background
     if arg_present(noerase)          then noerase          = self._noerase
+    
+    ;Window sizes
+    if arg_present(xsize) || arg_present(ysize) then begin
+        if (!d.flags and 256) gt 0 then begin
+            ;Set the window
+            wset, self._winID
+            
+            ;Get the window sizes
+            xsize = !d.x_size
+            ysize = !d.y_size
+            
+            ;Reset the window
+            if currentWin ne -1 then wset, currentWin
+        endif else begin
+            message, 'Windows not supported. Cannot return window sizes.', /INFORMATIONAL
+        endelse
+    endif
     
     ;Widget_Control Options
     if arg_present(windowID)        then widget_control, self._id, GET_VALUE=windowID
@@ -1015,7 +1128,7 @@ _REF_EXTRA=extra
         void = cgErrorMsg()
         return
     endif
-
+    
     ; Make sure you have a valid widget here.
     IF Widget_Info(self._id, /Valid_ID) NE 1 THEN RETURN
     
@@ -1065,8 +1178,8 @@ _REF_EXTRA=extra
     if n_elements(event_handler) gt 0 then begin
         if size(event_handler, /TNAME) eq 'OBJREF' then begin
             if obj_valid(event_handler) $
-                then *self._event_handler = event_handler $
-                else *self._event_handler = obj_new()
+                then self._event_handler = event_handler $
+                else self._event_handler = obj_new()
         endif else begin
             message, 'EVENT_HANDLER must be an object reference.', /INFORMATIONAL
             help, event_handler
@@ -1189,8 +1302,10 @@ pro MrDrawWidget::cleanup
     ptr_free, self._viewport_handler
 
     ;Destroy the pixmap object
-    if obj_valid(self._oTLB)   then self._oTLB -> Destroy
     if obj_valid(self._pixmap) then obj_destroy, self._pixmap
+
+    ;Destroy the widget, if it still exists
+    if widget_info(self._id, /VALID_ID) then widget_control, self._id, /DESTROY
     
     ;Clean up the superclasses
     self -> MrWidgetAtom::Cleanup
@@ -1212,6 +1327,9 @@ end
 ;       APP_SCROLL:     in, optional, type=boolean
 ;                       A memory-saving way of scrolling draw widgets.
 ;                           See WIDGET_DRAW documentation.
+;       ASPECT:         in, optional, type=float
+;                       The aspect ratio (`XSIZE`:`YSIZE`) of the draw widget to be made.
+;                           An aspect ratio of 1.0 produces a square window.
 ;   BACKGROUND_COLOR:   in, optional, type=string, default='White'
 ;                       The name of the initial color for the draw widget. Used when
 ;                           realized and if the draw widget is set up to erase before
@@ -1359,6 +1477,7 @@ function MrDrawWidget::init, parent,   $
  WINDOW_TITLE=window_title, $
 ;Widget_Draw Keywords
  APP_SCROLL=app_scroll, $
+ ASPECT=aspect, $
 ; CLASSNAME=classname, $
 ; COLOR_MODEL=color_model, $
 ; COLORS=colors, $
@@ -1419,20 +1538,29 @@ _REF_EXTRA=extra
     refresh       = keyword_set(refresh)
     if n_elements(background_color) eq 0 then background_color = 'White'
     if n_elements(retain)           eq 0 then retain=(!version.os_family eq 'windows') ? 1 : 2
-    if n_elements(xsize)            eq 0 then xsize = 300
-    if n_elements(ysize)            eq 0 then ysize = 300
+    if n_elements(xsize)            eq 0 then xsize = 640
+    if n_elements(ysize)            eq 0 then ysize = 512
 
-    ;Default handlers
-    if n_elements(draw_handler)         eq 0 then draw_handler         = self
-    if n_elements(drag_notify)          eq 0 then drag_notify          = {object: self, method: 'Drag_Notify'}
-    if n_elements(drop_handler)         eq 0 then drop_handler         = {object: self, method: 'Drop_Events'}
-    if n_elements(expose_handler)       eq 0 then expose_handler       = {object: self, method: 'Expose_Events'}
+    ;Event handlers
+    if n_elements(event_handler)        eq 0 then event_handler        = self
     if n_elements(keyboard_handler)     eq 0 then keyboard_handler     = ''
     if n_elements(mouse_up_handler)     eq 0 then mouse_up_handler     = ''
     if n_elements(mouse_down_handler)   eq 0 then mouse_down_handler   = ''
     if n_elements(mouse_motion_handler) eq 0 then mouse_motion_handler = ''
     if n_elements(mouse_wheel_handler)  eq 0 then mouse_wheel_handler  = ''
+    
+    ;Callback Functions
+    if n_elements(drag_notify)          eq 0 then drag_notify          = {object: self, method: 'Drag_Notify'}
+    if n_elements(drop_handler)         eq 0 then drop_handler         = {object: self, method: 'Drop_Events'}
+    if n_elements(expose_handler)       eq 0 then expose_handler       = {object: self, method: 'Expose_Events'}
     if n_elements(viewport_handler)     eq 0 then viewport_handler     = {object: self, method: 'Viewport_Events'}
+    
+    ;Aspect ratio
+    if n_elements(aspect) gt 0 then begin
+        if aspect ge 1 $
+            then yrange = round(xrange / aspect) $
+            else xrange = round(yrange * aspect)
+    endif
     
     ;Allocate heap
     self._drag_notify          = ptr_new(/ALLOCATE_HEAP)
@@ -1458,9 +1586,11 @@ _REF_EXTRA=extra
     
     ;Use a normal widget base as the parent.
     endif else begin
-        self._oTLB = parent
         parentID = parent
     endelse
+    
+    ;Set the top-level base widget ID
+    self._tlbID = parentID
     
 ;---------------------------------------------------------------------
 ; Create the Draw Widget /////////////////////////////////////////////
@@ -1490,19 +1620,23 @@ _REF_EXTRA=extra
                           )
 
 ;---------------------------------------------------------------------
-; Superclasses ///////////////////////////////////////////////////////
+; Set Object Properties //////////////////////////////////////////////
 ;---------------------------------------------------------------------
-
+    
+    ;Properties
     self._background = background_color
     self._noerase    = noerase
     self._refresh    = refresh
 
+    ;Superclass
     success = self -> MrWidgetAtom::INIT(NOTIFY_REALIZE=notify_realize, $
                                          EVENT_HANDLER=draw_handler, $
-                                         _STRICT_EXTRA=extra)
+                                        _STRICT_EXTRA=extra)
     if success eq 0 then message, 'MrWidgetAtom could not be initialized.'
     
-    self -> SetProperty, FUNC_HANDLERS=func_handlers, $
+    ;Event handlers
+    self -> SetProperty, EVENT_HANDLER=event_handler,  $
+                         FUNC_HANDLERS=func_handlers, $
                          DRAG_NOTIFY=drag_notify, $
                          DROP_HANDLER=drop_handler, $
                          EXPOSE_HANDLER=expose_handler, $
@@ -1543,6 +1677,7 @@ pro MrDrawWidget__define, class
              inherits MrWidgetAtom, $
              inherits MrIDL_Container, $
              inherits MrGraphicsEventAdapter, $
+             _tlbID:      0L, $             ;Widget ID of the top-level base.
              _oTLB:       obj_new(), $      ;A top-level base widget object, if required.
              _winID:      0L, $             ;The window ID of the draw window.
              _background: '', $             ;Background color of the display.
@@ -1550,6 +1685,7 @@ pro MrDrawWidget__define, class
              _refresh:    0B, $             ;Refresh the graphics window
              
              ;Draw Event Handlers
+             _event_handler:        obj_new(), $
              _keyboard_handler:     '', $
              _mouse_down_handler:   '', $
              _mouse_up_handler:     '', $
@@ -1561,8 +1697,6 @@ pro MrDrawWidget__define, class
              _drag_notify:      ptr_new(), $
              _drop_handler:     ptr_new(), $
              _expose_handler:   ptr_new(), $
-             _viewport_handler: ptr_new(), $
-            
-             _pixmap: obj_new() $       ; the identifier of a pixmapwidget that can carry out window refresh.
+             _viewport_handler: ptr_new() $
            }
 end

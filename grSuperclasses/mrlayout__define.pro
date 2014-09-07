@@ -150,16 +150,18 @@ function MrLayout::CalcPosition
 
     ;Calculate positions
     position = MrLayout(self.layout, $
-                        ASPECT   = *self.aspect, $
-                        CHARSIZE =  self.charsize, $
-                        OXMARGIN =  self.oxmargin, $
-                        OYMARGIN =  self.oymargin, $
-                        P_REGION =       p_region, $
-                        P_WINDOW =       p_window, $
-                        XGAP     = *self.xgap, $
-                        XMARGIN  =  self.xmargin, $
-                        YGAP     = *self.ygap, $
-                        YMARGIN  =  self.ymargin)
+                        ASPECT     = *self.aspect, $
+                        CHARSIZE   =  self.charsize, $
+                        COL_WIDTH  = *self.col_width, $
+                        OXMARGIN   =  self.oxmargin, $
+                        OYMARGIN   =  self.oymargin, $
+                        P_REGION   =       p_region, $
+                        P_WINDOW   =       p_window, $
+                        ROW_HEIGHT = *self.row_height, $
+                        XGAP       = *self.xgap, $
+                        XMARGIN    =  self.xmargin, $
+                        YGAP       = *self.ygap, $
+                        YMARGIN    =  self.ymargin)
     
     ;Save the window and region
     self.x_region = p_region[[0,2]]
@@ -203,6 +205,9 @@ end
 ; :Keywords:
 ;       ASPECT:         out, optional, type=float
 ;                       Aspect ratio of the plot.
+;       COL_WIDTH:      in, optional, type=fltarr
+;                       Width of each column normalized to the plotting window (area
+;                           excluding O[XY]MARGIN.
 ;       LAYOUT:         out, optional, type=intarr(3)/intarr(4)
 ;                       [nCols, nRows, index]. [nCols,nRows] is the number of columns and
 ;                           rows in the display. "index" is the plot index at which to
@@ -220,6 +225,9 @@ end
 ;                           Acts as a matte around the Y_REGION.
 ;       POSITION:       out, optional, type=intarr(4)
 ;                       The normalized position of the graphic on the display.
+;       ROW_HEIGHT:     in, optional, type=fltarr
+;                       Height of each row, normalized to the width of the plotting region
+;                           (area excluding OYMARGIN).
 ;       XMARGIN:        out, optional, type=intarr(2)
 ;                       Width of the left and right margins in character units.
 ;       XGAP:           out, optional, type=integer
@@ -264,22 +272,24 @@ Y_WINDOW=y_window
     endif
     
     ;Set GraphicAtom properties
-    if arg_present(aspect)   then aspect   = *self.aspect
-    if arg_present(charsize) then charsize =  self.charsize
-    if arg_present(layout)   then layout   =  self.layout
-    if arg_present(oxmargin) then oxmargin =  self.oxmargin
-    if arg_present(oymargin) then oymargin =  self.oymargin
-    if arg_present(position) then position =  self.position
-    if arg_present(xmargin)  then xmargin  =  self.xmargin
-    if arg_present(xgap)     then xgap     = *self.xgap
-    if arg_present(x_region) then x_region =  self.x_region
-    if arg_present(x_window) then x_window =  self.x_window
-    if arg_present(ymargin)  then ymargin  =  self.ymargin
-    if arg_present(ygap)     then ygap     = *self.ygap
-    if arg_present(y_region) then y_region =  self.y_region
-    if arg_present(y_window) then y_window =  self.y_window
-    if arg_present(margin)   then margin   = [self.xmargin[0], self.ymargin[0], $
-                                              self.xmargin[1], self.ymargin[1]]
+    if arg_present(aspect)     then aspect     = *self.aspect
+    if arg_present(charsize)   then charsize   =  self.charsize
+    if arg_present(col_width)  then col_width  = *self.col_width
+    if arg_present(layout)     then layout     =  self.layout
+    if arg_present(oxmargin)   then oxmargin   =  self.oxmargin
+    if arg_present(oymargin)   then oymargin   =  self.oymargin
+    if arg_present(position)   then position   =  self.position
+    if arg_present(row_height) then row_height = *self.row_height
+    if arg_present(xmargin)    then xmargin    =  self.xmargin
+    if arg_present(xgap)       then xgap       = *self.xgap
+    if arg_present(x_region)   then x_region   =  self.x_region
+    if arg_present(x_window)   then x_window   =  self.x_window
+    if arg_present(ymargin)    then ymargin    =  self.ymargin
+    if arg_present(ygap)       then ygap       = *self.ygap
+    if arg_present(y_region)   then y_region   =  self.y_region
+    if arg_present(y_window)   then y_window   =  self.y_window
+    if arg_present(margin)     then margin     = [self.oxmargin[0], self.oymargin[0], $
+                                                  self.oxmargin[1], self.oymargin[1]]
 end
 
 
@@ -292,6 +302,9 @@ end
 ;       CHARSIZE:       in, optional, type=float
 ;                       Fraction of IDL's default character size. Used to determine size
 ;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
+;       COL_WIDTH:      in, optional, type=fltarr
+;                       Width of each column normalized to the plotting window (area
+;                           excluding O[XY]MARGIN.
 ;       LAYOUT:         in, optional, type=intarr(3)/intarr(4)
 ;                       [nCols, nRows, index]. [nCols,nRows] is the number of columns and
 ;                           rows in the display. "index" is the plot index at which to
@@ -312,6 +325,9 @@ end
 ;       POSITION:       in, optional, type=intarr(4)
 ;                       The normalized position at which to place the graphic on the
 ;                           display. If provided, then `LAYOUT` will be reset.
+;       ROW_HEIGHT:     in, optional, type=fltarr
+;                       Height of each row, normalized to the width of the plotting region
+;                           (area excluding OYMARGIN).
 ;       UPDATE_LAYOUT:  in, optional, type=boolean, default=1
 ;                       If set, the position will be updated based on the new layout. If
 ;                           `POSITION` was provided, then `LAYOUT`[2:3]=0 to reflect a
@@ -328,15 +344,17 @@ end
 pro MrLayout::SetProperty, $
 ASPECT=aspect, $
 CHARSIZE=charsize, $
+COL_WIDTH=col_width, $
+IXMARGIN=ixmargin, $
+IYMARGIN=iymargin, $
 LAYOUT=layout, $
 MARGIN=margin, $
 OXMARGIN=oxmargin, $
 OYMARGIN=oymargin, $
 POSITION=position, $
+ROW_HEIGHT=row_height, $
 UPDATE_LAYOUT=update_layout, $
-IXMARGIN=ixmargin, $
 XGAP=xgap, $
-IYMARGIN=iymargin, $
 YGAP=ygap
     compile_opt strictarr
     
@@ -368,15 +386,17 @@ YGAP=ygap
     endcase
     
     ;Set Properties. Make sure layout elements are always >= 0.
-    if n_elements(aspect)   ne 0 then *self.aspect   = aspect
-    if n_elements(charsize) gt 0 then  self.charsize = charsize
-    if n_elements(iymargin) ne 0 then  self.iymargin = iymargin
-    if n_elements(ixmargin) ne 0 then  self.ixmargin = ixmargin
-    if n_elements(layout)   ne 0 then  self.layout   = layout
-    if n_elements(oxmargin) gt 0 then  self.oxmargin = oxmargin
-    if n_elements(oymargin) gt 0 then  self.oymargin = oymargin
-    if n_elements(xgap)     ne 0 then *self.xgap     = xgap
-    if n_elements(ygap)     ne 0 then *self.ygap     = ygap
+    if n_elements(aspect)     ne 0 then *self.aspect     = aspect
+    if n_elements(charsize)   gt 0 then  self.charsize   = charsize
+    if n_elements(col_width)  gt 0 then *self.col_width  = col_width
+    if n_elements(iymargin)   ne 0 then  self.iymargin   = iymargin
+    if n_elements(ixmargin)   ne 0 then  self.ixmargin   = ixmargin
+    if n_elements(layout)     ne 0 then  self.layout     = layout
+    if n_elements(oxmargin)   gt 0 then  self.oxmargin   = oxmargin
+    if n_elements(oymargin)   gt 0 then  self.oymargin   = oymargin
+    if n_elements(row_height) gt 0 then *self.row_height = row_height
+    if n_elements(xgap)       ne 0 then *self.xgap       = xgap
+    if n_elements(ygap)       ne 0 then *self.ygap       = ygap
     
     ;Update the position to fit the new layout?
     if update_layout eq 1 then begin
@@ -401,6 +421,8 @@ end
 ;-
 pro MrLayout::cleanup
     ptr_free, self.aspect
+    ptr_free, self.col_width
+    ptr_free, self.row_height
     ptr_free, self.xgap
     ptr_free, self.ygap
 end
@@ -415,6 +437,10 @@ end
 ;       CHARSIZE:       in, optional, type=float, default=1.5
 ;                       Fraction of IDL's default character size. Used to determine size
 ;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
+;       COL_WIDTH:      in, optional, type=fltarr
+;                       Width of each column normalized to the plotting window (area
+;                           excluding O[XY]MARGIN. The default is to make equal-width
+;                           columns.
 ;       LAYOUT:         in, optional, type=intarr(3)/intarr(4), default="[1,1,1,1]"
 ;                       [nCols, nRows, index]. [nCols,nRows] is the number of columns and
 ;                           rows in the display. "index" is the plot index at which to
@@ -435,6 +461,10 @@ end
 ;                           [x0,y0,x1,y1], where (x0,y0) are the normalized coordinates
 ;                           of the lower-left corner and (x1,y1) are the coordinates of
 ;                           the upper-right corner fo the plot.
+;       ROW_HEIGHT:     in, optional, type=fltarr
+;                       Height of each row, normalized to the width of the plotting region
+;                           (area excluding OXMARGIN). The default is to create equal-
+;                           height rows.
 ;       XMARGIN:        in, optional, type=intarr(2), default="[10,3]"
 ;                       Width of the left and right margins in character units.
 ;       XGAP:           in, optional, type=integer, default=14
@@ -447,6 +477,7 @@ end
 function MrLayout::init, $
 ASPECT=aspect, $
 CHARSIZE=charsize, $
+COL_HEIGHT=col_height, $
 IXMARGIN=ixmargin, $
 IYMARGIN=iymargin, $
 LAYOUT=layout, $
@@ -454,6 +485,7 @@ MARGIN=margin, $
 OXMARGIN=oxmargin, $
 OYMARGIN=oymargin, $
 POSITION=position, $
+ROW_WIDTH=row_width, $
 XGAP=xgap, $
 YGAP=ygap
     compile_opt strictarr
@@ -488,13 +520,17 @@ YGAP=ygap
     if n_elements(oymargin) gt 0 then self.oymargin = oymargin else self.oymargin = [4,2]
     
     ;Default pointers
-    self.aspect = ptr_new(/ALLOCATE_HEAP)
-    self.xgap   = ptr_new(/ALLOCATE_HEAP)
-    self.ygap   = ptr_new(/ALLOCATE_HEAP)
-    if n_elements(layout) gt 0 then  self.layout = layout else self.layout = [0,0,0]
-    if n_elements(aspect) gt 0 then *self.aspect = aspect
-    if n_elements(xgap)   gt 0 then *self.xgap   = xgap   else *self.xgap = 14
-    if n_elements(ygap)   gt 0 then *self.ygap   = ygap   else *self.ygap = 6
+    self.aspect     = ptr_new(/ALLOCATE_HEAP)
+    self.col_width  = ptr_new(/ALLOCATE_HEAP)
+    self.row_height = ptr_new(/ALLOCATE_HEAP)
+    self.xgap       = ptr_new(/ALLOCATE_HEAP)
+    self.ygap       = ptr_new(/ALLOCATE_HEAP)
+    if n_elements(layout)     gt 0 then  self.layout     = layout     else self.layout = [0,0,0]
+    if n_elements(aspect)     gt 0 then *self.aspect     = aspect
+    if n_elements(col_width)  gt 0 then *self.col_width  = col_width
+    if n_elements(row_height) gt 0 then *self.row_height = row_height
+    if n_elements(xgap)       gt 0 then *self.xgap       = xgap       else *self.xgap = 14
+    if n_elements(ygap)       gt 0 then *self.ygap       = ygap       else *self.ygap = 6
     
     ;Default position
     if array_equal(self.layout, [0,0,0]) then begin
@@ -518,6 +554,7 @@ end
 ;       ASPECT:         Aspect ratio of the plot.
 ;       CHARSIZE:       Fraction of IDL's default character size. Used to determine size
 ;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
+;       COL_WIDTH:      Normalized width of each column.
 ;       LAYOUT:         [nCols, nRows, index]. [nCols,nRows] is the number of columns and
 ;                           rows in the display. "index" is the plot index at which to
 ;                           place the plot, beginning with 1,1], 1 in the upper-left
@@ -530,6 +567,7 @@ end
 ;                           [x0,y0,x1,y1], where (x0,y0) are the normalized coordinates
 ;                           of the lower-left corner and (x1,y1) are the coordinates of
 ;                           the upper-right corner of the plot.
+;       ROW_HEIGHT:     Normalized height of each row.
 ;       XMARGIN:        Width of the left and right margins in character units.
 ;       XGAP:           Horizontal space between plots, in character units.
 ;       X_REGION:       Left and right coordinates of the region containing the plot
@@ -543,19 +581,21 @@ pro MrLayout__define, class
     compile_opt strictarr
     
     define = { MrLayout, $
-               aspect:   ptr_new(), $
-               charsize: 0.0, $
-               ixmargin: [0.0, 0.0], $
-               iymargin: [0.0, 0.0], $
-               layout:   intarr(3), $
-               oxmargin: [0.0,0.0], $
-               oymargin: [0.0,0.0], $
-               position: fltarr(4), $
-               xgap:     ptr_new(), $
-               x_region: [0.0, 0.0], $
-               x_window: [0.0, 0.0], $
-               ygap:     ptr_new(), $
-               y_region: [0.0, 0.0], $
-               y_window: [0.0, 0.0] $
+               aspect:     ptr_new(), $
+               charsize:   0.0, $
+               col_width:  ptr_new(), $
+               ixmargin:   [0.0, 0.0], $
+               iymargin:   [0.0, 0.0], $
+               layout:     intarr(3), $
+               oxmargin:   [0.0,0.0], $
+               oymargin:   [0.0,0.0], $
+               position:   fltarr(4), $
+               row_height: ptr_new(), $
+               xgap:       ptr_new(), $
+               x_region:   [0.0, 0.0], $
+               x_window:   [0.0, 0.0], $
+               ygap:       ptr_new(), $
+               y_region:   [0.0, 0.0], $
+               y_window:   [0.0, 0.0] $
              }
 end
