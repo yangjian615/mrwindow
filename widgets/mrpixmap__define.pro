@@ -56,26 +56,12 @@
 ;   Get class properties
 ;
 ; :Keywords;
-;   BACKGROUND_COLOR:   out, optional, type=string
-;                       The name of the initial color for the draw widget. Used when
-;                           realized and if the draw widget is set up to erase before
-;                           display (i.e., NOERASE=0).
-;       NOERASE:        out, optional, type=boolean
-;                       If set, the draw widget will not be erased before drawing.
-;       XSIZE:          out, optional, type=integer
-;                       Actual X-size of the dispaly window (pixels).
-;       YSIZE:          out, optional, type=integer
-;                       Actual Y-size of the dispaly window (pixels).
 ;       _REF_EXTRA:     out, optional, type=any
-;                       Any keyword appropriate for the superclass INIT methods.
+;                       Any keyword appropriate for the MrDrawWidget::SetProperty method.
 ;-
 PRO MrPixmap::GetProperty, $
-BACKGROUND=background, $
-NOERASE=noerase, $
-UNITS=units, $
 VISIBLE=visible, $
-XSIZE=xsize, $
-YSIZE=ysize
+_REF_EXTRA=extra
    compile_opt strictarr
 
     ;Error handling
@@ -87,27 +73,10 @@ YSIZE=ysize
     endif
 
     ;Object and widget properties
-    if arg_present(background) then background = self.background
-    if arg_present(noerase)    then noearse    = self.noerase
-    if arg_present(units)      then units      = self.units
-    if arg_present(visible)    then visible    = widget_info(self._id, /MAP)
+    if arg_present(visible) then visible = widget_info(self._id, /MAP)
     
     ;Window sizes
-    if arg_present(xsize) || arg_present(ysize) then begin
-        if (!d.flags and 256) gt 0 then begin
-            ;Set the window
-            wset, self._winID
-            
-            ;Get the window sizes
-            xsize = !d.x_size
-            ysize = !d.y_size
-            
-            ;Reset the window
-            if currentWin ne -1 then wset, currentWin
-        endif else begin
-            message, 'Windows not supported. Cannot return window sizes.', /INFORMATIONAL
-        endelse
-    endif
+    if n_elements(extra) gt 0 then self -> MrWidgetDraw::GetProperty, _EXTRA=extra
 end
 
 
@@ -123,10 +92,8 @@ end
 ;                       If set, the draw widget will not be erased before drawing.
 ;-
 PRO MrPixmap::SetProperty, $
-BACKGROUND=background, $
-NOERASE=noerase, $
-UNITS=units, $
-VISIBLE=visible
+VISIBLE=visible, $
+_REF_EXTRA=extra
    compile_opt strictarr
     
     ;Error handling
@@ -136,35 +103,13 @@ VISIBLE=visible
         void = cgErrorMsg()
         return
     endif
+    
+    ;Superclass
+    if n_elements(extra) gt 0 then self -> MrDrawWidget::SetProperty, _EXTRA=extra
 
     ;Set properties
-    if n_elements(background) gt 0 then self.background = background
-    if n_elements(noerase)    gt 0 then self.noerase    = keyword_set(noerase)
-    if n_elements(units)      gt 0 then self.units      = units
-    
-    if n_elements(visible)    gt 0 then widget_control, self._tlbID, MAP=keyword_set(visible)
+    if n_elements(visible) gt 0 then widget_control, self._tlb, MAP=keyword_set(visible)
 END
-
-
-;+
-;   This is the MrPixmap object class destructor method.
-;
-; :Private:
-;-
-pro MrPixmap::cleanup
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-
-    ;Cleanup the superclass
-    self -> MrDrawWidget::Cleanup
-end
 
 
 ;+
@@ -243,9 +188,11 @@ YSIZE=ysize
     endif
     
     ;Defaults
-    visible = keyword_set(visible)
+    mapIt = keyword_set(visible)
     
     ;Create the parent
+    ;   - Make the parent invisible, not just the draw widget.
+    ;   - Ensure new base does not flash on the screen before becoming invisible
     if n_elements(parent) eq 0 then begin
         parent =  obj_new('MrTopLevelBase', MAP=0, $
                                             GROUP_LEADER=group_leader, $
@@ -255,9 +202,11 @@ YSIZE=ysize
         parent -> GetProperty, ID=parentID
         
     ;Unmap the parent
+    ;   - Widget or object base?
     endif else begin
-        parentID = parent
-        widget_control, parent, MAP=0, /TLB_SIZE_EVENTS
+        if cgObj_IsA(parent, 'MrTopLevelBase') $
+            then parent -> SetProperty, MAP=0 $
+            else widget_control, parent, MAP=0
     endelse
     
     ;Initialize the draw widget
@@ -265,7 +214,6 @@ YSIZE=ysize
                                          ASPECT=aspect, $
                                          BACKGROUND=background, $
                                          GROUP_LEADER=group_leader, $
-                                         MAP=visible, $
                                          NOERASE=noerase, $
                                          REFRESH=refresh, $
                                          RETAIN=retain, $
@@ -281,7 +229,7 @@ YSIZE=ysize
     
     
     ;Make visible?
-    if visible then widget_control, parentID, /MAP
+    if mapIt then widget_control, self._tlb, /MAP
     
     return, 1
 end
@@ -298,7 +246,6 @@ end
 pro MrPixmap__define, class
 
    class = { MrPixmap, $
-             inherits MrDrawWidget, $
-             visible: 0B $
+             inherits MrDrawWidget $
            }
 end

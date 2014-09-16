@@ -178,6 +178,8 @@ END
 ;                           The widget ID of the parent widget for the new SaveAs Menu.
 ;
 ; :Keywords:
+;       BITMAP:             in, optional, type=boolean, default=0
+;                           If set, `VALUE` will be interpreted as a bitmap.
 ;       MENU:               in, optional, type=boolean, default=0
 ;                           If set, all buttons will be placed under a "SaveAs" submenu.
 ;       PS_PDF:             in, optional, type=boolean, default=0
@@ -188,19 +190,24 @@ END
 ;                               Saving is performed with MrScreenCapture.
 ;       cgRaster:           in, optional, type=boolean, default=0
 ;                           If set, JPEG, PNG, TIFF, and GIF buttons will be created.
-;                               Saving is performed either with cgSnapShot or via
-;                               ImageMagick and post-script intermediary files (see PS_PDF).
+;                               Saving is performed with cgSnapShot.
 ;       imRaster:           in, optional, type=boolean, default=0
 ;                           If set, JPEG, PNG, TIFF, and GIF buttons will be created.
 ;                               Saving is performed via ImageMagick and post-script
 ;                               intermediary files (see PS_PDF).
+;       VALUE:              in, optional, type=string/bytarr, default='SaveAs'
+;                           A .bmp file, an image array, or the name of the primary save
+;                               button. In the former two cases, `BITMAP` must be set.
+;                               This keyword is ignored if `MENU`=0.
 ;-
 pro MrSaveAs::Create_SaveAs_Menu, parent, $
+BITMAP=bitmap, $
 MENU=menu, $
 PS_PDF=ps_pdf, $
 MRRASTER=MrRaster, $
 CGRASTER=cgRaster, $
-IMRASTER=imRaster
+IMRASTER=imRaster, $
+VALUE=value
 	Compile_Opt strictarr
 	
 	catch, theError
@@ -211,87 +218,110 @@ IMRASTER=imRaster
 	ENDIF
 	
 	;Defaults
-	menu = keyword_set(menu)
+	menu     = keyword_set(menu)
 	MrRaster = keyword_set(MrRaster)
 	cgRaster = keyword_set(cgRaster)
 	imRaster = keyword_set(imRaster)
 	ps_pdf   = keyword_set(ps_pdf)
+	if n_elements(value) eq 0 then begin
+	    value = 'SaveAs'
+	    bitmap = 0
+	endif
 	
+	;If nothing was set, set everything.
 	IF MrRaster + cgRaster + imRaster + ps_pdf EQ 0 THEN BEGIN
 	    MrRaster = 1
 	    cgRaster = 1
 	    imRaster = 1
 	    ps_pdf   = 1
 	ENDIF
-
-;---------------------------------------------------------------------
-;MrRaster ////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Create a "SaveAs" menu bar button?
-    IF menu $
-        THEN saveID = widget_button(parent, VALUE='SaveAs', /MENU) $
-        ELSE saveID = parent
-	
-	;MrSaveAs options
-    IF MrRaster EQ 1 THEN BEGIN
-        button = widget_button(saveID, VALUE='JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
-        button = widget_button(saveID, VALUE='TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
-        button = widget_button(saveID, VALUE='PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
-        button = widget_button(saveID, VALUE='GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
-    ENDIF
-
-;---------------------------------------------------------------------
-;PS & PDF ////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    ;Create the "cgSaveAs" menu button
-    IF menu AND ps_pdf + cgRaster + imRaster GT 0 $
-        THEN cgSaveAsID = widget_button(saveID, VALUE='cgSaveAs', MENU=menu) $
-        ELSE cgSaveAsID = saveID
-
-    ;Put in the PS and PDF options.
-    IF ps_pdf THEN BEGIN
-        button = Widget_Button(cgSaveAsID, Value='PostScript File', UNAME='PS',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(cgSaveAsID, Value='PDF File',        UNAME='PDF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-    ENDIF
     
+    ;Check if ImageMagick is present.	
+	has_IM = cgHasImageMagick()
+	    
 ;---------------------------------------------------------------------
-;cgRaster ////////////////////////////////////////////////////////////
+; Menu ///////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+	IF menu THEN BEGIN
+	    ;Create a SaveAs button
+	    saveID = widget_button(parent, VALUE=value, /MENU, BITMAP=bitmap)
 
-    IF cgRaster THEN BEGIN
-        ;cgRaster submenu
-        IF menu $
-            THEN cgRasterID = Widget_Button(cgSaveAsID, Value='Raster File', MENU=menu) $
-            ELSE cgRasterID = cgSaveAsID
-    
-        ;cgRaster options
-        button = Widget_Button(cgRasterID, Value='BMP',  UNAME='RASTER_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(cgRasterID, Value='GIF',  UNAME='RASTER_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(cgRasterID, Value='JPEG', UNAME='RASTER_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(cgRasterID, Value='PNG',  UNAME='RASTER_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(cgRasterID, Value='TIFF', UNAME='RASTER_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-    ENDIF ELSE cgRasterID = cgSaveAsID
+        ;Create MrRaster buttons
+        IF MrRaster THEN BEGIN
+            button = widget_button(saveID, VALUE='JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+        ENDIF
         
-;---------------------------------------------------------------------
-;imRaster ////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
+        ;cgSaveAs button
+        IF ps_pdf + cgRaster + (imRaster AND has_IM) GT 0 THEN BEGIN
+            cgSaveAsID = widget_button(saveID, VALUE='cgSaveAs', MENU=menu)
+        
+            ;PS/PDF
+            IF ps_pdf THEN BEGIN
+                button = Widget_Button(cgSaveAsID, Value='PostScript File', UNAME='PS',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(cgSaveAsID, Value='PDF File',        UNAME='PDF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            ENDIF
+        
+            ;cgRaster
+            IF cgRaster THEN BEGIN
+                cgRasterID = Widget_Button(cgSaveAsID, Value='Raster File', MENU=menu)
+                button = Widget_Button(cgRasterID, Value='BMP',  UNAME='RASTER_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(cgRasterID, Value='GIF',  UNAME='RASTER_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(cgRasterID, Value='JPEG', UNAME='RASTER_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(cgRasterID, Value='PNG',  UNAME='RASTER_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(cgRasterID, Value='TIFF', UNAME='RASTER_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            ENDIF
     
-    ; If you can find ImageMagick on this machine, you can convert to better
-    ; looking raster files.
-    IF imRaster and cgHasImageMagick() EQ 1 THEN BEGIN
-        ;ImageMagick submenu
-        IF menu $
-            THEN imRasterID = Widget_Button(cgSaveAsID, Value='Raster File via ImageMagick', MENU=menu) $
-            ELSE imRasterID = cgSaveAsID
+            ;imRaster
+            IF imRaster AND has_IM THEN BEGIN
+                imRasterID = Widget_Button(cgSaveAsID, Value='Raster File via ImageMagick', MENU=menu)
+                button = Widget_Button(imRasterID, Value='BMP',  UNAME='IMAGEMAGICK_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(imRasterID, Value='GIF',  UNAME='IMAGEMAGICK_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(imRasterID, Value='JPEG', UNAME='IMAGEMAGICK_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(imRasterID, Value='PNG',  UNAME='IMAGEMAGICK_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(imRasterID, Value='TIFF', UNAME='IMAGEMAGICK_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            ENDIF
+        ENDIF
+	    
+;---------------------------------------------------------------------
+; Base ///////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ENDIF ELSE BEGIN
 
-        ;ImageMagick options
-        button = Widget_Button(imRasterID, Value='BMP',  UNAME='IMAGEMAGICK_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(imRasterID, Value='GIF',  UNAME='IMAGEMAGICK_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(imRasterID, Value='JPEG', UNAME='IMAGEMAGICK_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(imRasterID, Value='PNG',  UNAME='IMAGEMAGICK_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(imRasterID, Value='TIFF', UNAME='IMAGEMAGICK_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-    ENDIF
+        ;MrRaster
+        IF MrRaster EQ 1 THEN BEGIN
+            button = widget_button(saveID, VALUE='JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+        ENDIF
+
+        ;PS/PSF.
+        IF ps_pdf THEN BEGIN
+            button = Widget_Button(saveID, Value='PostScript File', UNAME='PS',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(saveID, Value='PDF File',        UNAME='PDF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        ENDIF
+
+        ;cgRaster
+        IF cgRaster THEN BEGIN
+            button = Widget_Button(cgRasterID, Value='BMP',  UNAME='RASTER_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(cgRasterID, Value='GIF',  UNAME='RASTER_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(cgRasterID, Value='JPEG', UNAME='RASTER_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(cgRasterID, Value='PNG',  UNAME='RASTER_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(cgRasterID, Value='TIFF', UNAME='RASTER_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        ENDIF
+        
+        ;ImageMagick
+        IF imRaster and has_IM EQ 1 THEN BEGIN
+            button = Widget_Button(imRasterID, Value='BMP',  UNAME='IMAGEMAGICK_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(imRasterID, Value='GIF',  UNAME='IMAGEMAGICK_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(imRasterID, Value='JPEG', UNAME='IMAGEMAGICK_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(imRasterID, Value='PNG',  UNAME='IMAGEMAGICK_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(imRasterID, Value='TIFF', UNAME='IMAGEMAGICK_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        ENDIF
+    ENDELSE
 end
 
 

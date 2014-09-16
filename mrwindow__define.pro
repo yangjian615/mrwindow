@@ -805,7 +805,7 @@ pro MrWindow::Focus, event
     ;---------------------------------------------------------------------
         ;Get all of the objects that are selectable
         newSelect = self -> HitTest(event.x, event.y, COUNT=nHits, $
-                                    ISA=['MRPLOT', 'MRIMAGE', 'MRCOLORBAR', 'MRCONTOUR'])
+                                    ISA=['MRPLOT', 'MRIMAGE', 'MRIMAGE2', 'MRCOLORBAR', 'MRCONTOUR'])
         if nHits eq 0 then return
 
         ;Were modifiers pressed?
@@ -1023,7 +1023,7 @@ COUNT=count
     
     ;Get all of the objects
     allObjs = self -> Get(/ALL, ISA=isa, COUNT=nObjs)
-    
+
     ;Figure out which ones were it
     hitObjs = objarr(nObjs)
     count = 0
@@ -2327,8 +2327,6 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ;Keywords ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-;    cd, CURRENT=current
-    
     ;Default window size
     setDefaultValue, amode, 0, /BOOLEAN
     setDefaultValue, buffer, 0, /BOOLEAN

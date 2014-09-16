@@ -127,14 +127,25 @@ NOERASE=noerase
         return
     endif
 
-    nparams = 0
-    if n_elements(*self.xcoords) gt 0 then nparams += 1
-    if n_elements(*self.ycoords) gt 0 then nparams += 1
-    if n_elements(*self.zcoords) gt 0 then nparams += 1
+    ;Number of parameters
+    nParams = n_elements(*self.xcoords)     eq 0 ? 0 $
+                : n_elements(*self.ycoords) eq 0 ? 1 $
+                : n_elements(*self.zcoords) eq 0 ? 2 $
+                : 3
+                
+    ;Coordinates
+    if nParams ge 1 then xcoords = *self.xcoords
+    if nParams ge 2 then ycoords = *self.ycoords
+    if nParams eq 3 then zcoords = *self.zcoords
+    if self.relative then begin
+        if nParams ge 1 then xcoords = !x.crange[0] + (!x.crange[1] - !x.crange[0])*xcoords
+        if nParams ge 2 then ycoords = !y.crange[0] + (!y.crange[1] - !y.crange[0])*ycoords
+        if nParams eq 3 then zcoords = !z.crange[0] + (!z.crange[1] - !z.crange[0])*zcoords
+    endif
 
     ;cgPlotS
     case nparams of
-        1: cgPlotS, *self.xcoords, $
+        1: cgPlotS, xcoords, $
                     COLOR      = *self.color, $
                     MAP_OBJECT =  self.map_object, $
                     PSYM       =  self.psym, $
@@ -151,7 +162,7 @@ NOERASE=noerase
                     THICK      =  self.thick, $
                     Z          =  self.zvalue
                     
-        2: cgPlotS, *self.xcoords, *self.ycoords, $
+        2: cgPlotS, xcoords, ycoords, $
                     COLOR      = *self.color, $
                     MAP_OBJECT =  self.map_object, $
                     PSYM       =  self.psym, $
@@ -168,7 +179,7 @@ NOERASE=noerase
                     THICK      =  self.thick, $
                     Z          =  self.zvalue
                     
-        3: cgPlotS, *self.xcoords, *self.ycoords, *self.zcoords, $
+        3: cgPlotS, xcoords, ycoords, zcoords, $
                     COLOR      = *self.color, $
                     MAP_OBJECT =  self.map_object, $
                     PSYM       =  self.psym, $
@@ -272,6 +283,7 @@ DEVICE=device, $
 NORMAL=normal, $
 LINESTYLE=linestyle, $
 NOCLIP=noclip, $
+RELATIVE=relative, $
 T3D=t3d, $
 THICK=thick, $
 ZVALUE=zvalue, $
@@ -305,6 +317,7 @@ _REF_EXTRA=extra
     if arg_present(normal)    ne 0 then normal    =  self.normal
     if arg_present(linestyle) ne 0 then linestyle =  self.linestyle
     if arg_present(noclip)    ne 0 then noclip    =  self.noclip
+    if arg_present(relative)  ne 0 then relative  =  self.relative
     if arg_present(t3d)       ne 0 then t3d       =  self.t3d
     if arg_present(thick)     ne 0 then thick     =  self.thick
     if arg_present(zvalue)    ne 0 then zvalue    =  self.zvalue
@@ -410,6 +423,7 @@ DEVICE=device, $
 NORMAL=normal, $
 LINESTYLE=linestyle, $
 NOCLIP=noclip, $
+RELATIVE=relative, $
 T3D=t3d, $
 THICK=thick, $
 ZVALUE=zvalue, $
@@ -455,10 +469,39 @@ _REF_EXTRA=extra
 ;Data, Device, Normal \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
     ;They depend on one another.
+    
+    ;DEVICE
+    if n_elements(device) gt 0 then begin
+        device = keyword_set(device)
+        if device then begin
+            self.data     = 0B
+            self.normal   = 0B
+            self.relative = 0B
+        endif
+        
+        self.device = device
+    endif
+    
+    ;RELATIVE
+    ;   - Must be set before DATA
+    if n_elements(relative) gt 0 then begin
+        relative = keyword_set(relative)
+        if relative then begin
+            if obj_valid(self.target) eq 0 then $
+                message, 'TARGET invalid. Cannot use RELATIVE coordinates.'
+            self.device = 0B
+            self.data   = 1B
+            self.normal = 0B
+        endif
+        
+        self.relative = relative
+    endif
+    
+    ;DATA
     if n_elements(data) gt 0 then begin
         data = keyword_set(data)
         if data then begin
-            if obj_valid(target) eq 0 then $
+            if obj_valid(self.target) eq 0 then $
                 message, 'TARGET invalid. Cannot use DATA coordinates.'
             self.normal = 0B
             self.device = 0B
@@ -467,21 +510,13 @@ _REF_EXTRA=extra
         self.data = data
     endif
     
-    if n_elements(device) gt 0 then begin
-        device = keyword_set(device)
-        if device then begin
-            self.data = 0B
-            self.normal = 0B
-        endif
-        
-        self.device = device
-    endif
-    
+    ;NORMAL
     if n_elements(normal) gt 0 then begin
         normal = keyword_set(normal)
         if normal then begin
-            self.data = 0B
-            self.device = 0B
+            self.data     = 0B
+            self.device   = 0B
+            self.relative = 0B
         endif
         
         self.normal = normal
@@ -609,6 +644,7 @@ end
 ;                           via keyword inheritance.
 ;-
 function MrPlotS::init, xcoords, ycoords, zcoords, $
+RELATIVE=relative, $
 TARGET=target, $
 
 ;cgPlotS Properties
@@ -650,12 +686,13 @@ _REF_EXTRA=extra
 ;Keywords ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    setDefaultValue, symsize, 1.0
-    setDefaultValue, thick,   1.0
-    setDefaultValue, noclip,  1,  /BOOLEAN
-    setDefaultValue, data,    0,  /BOOLEAN
-    setDefaultValue, device,  0,  /BOOLEAN
-    setDefaultValue, normal,  0,  /BOOLEAN
+    setDefaultValue, symsize,  1.0
+    setDefaultValue, thick,    1.0
+    setDefaultValue, noclip,   1,  /BOOLEAN
+    setDefaultValue, data,     0,  /BOOLEAN
+    setDefaultValue, device,   0,  /BOOLEAN
+    setDefaultValue, normal,   0,  /BOOLEAN
+    setDefaultValue, relative, 0,  /BOOLEAN
     if normal + device eq 0 then data = 1B
     
     ;Allocate heap for the variables
@@ -724,22 +761,23 @@ pro MrPlotS__define, class
               zcoords: ptr_new(), $         ;z-coordinates
 
               ;cgPlotS Properties
-              color: ptr_new(), $
+              color:      ptr_new(), $
               map_object: obj_new(), $
-              psym: 0B, $
-              symcolor: ptr_new(), $
-              symsize: 0.0, $
+              psym:       0B, $
+              symcolor:   ptr_new(), $
+              symsize:    0.0, $
               
               ;PlotS Properties
-              clip: ptr_new(), $
-              data: 0B, $
-              device: 0B, $
-              normal: 0B, $
+              clip:      ptr_new(), $
+              data:      0B, $
+              device:    0B, $
+              normal:    0B, $
               linestyle: 0B, $
-              noclip: 0B, $
-              t3d: 0B, $
-              target: obj_new(), $
-              thick: 0.0, $
-              zvalue: 0B $
+              noclip:    0B, $
+              relative:  0B, $
+              t3d:       0B, $
+              target:    obj_new(), $
+              thick:     0.0, $
+              zvalue:    0B $
             }
 end

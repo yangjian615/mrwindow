@@ -70,7 +70,8 @@
 ;       EVENT:              in, optional, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-pro MrWidgetBase_Event_Pro, event
+pro MrWidgetBase_Event_Pro, event, $
+STATUS=status
     compile_opt strictarr
     
     ;Error handling
@@ -81,19 +82,17 @@ pro MrWidgetBase_Event_Pro, event
         return
     endif
     
+    ;First, call MrWidgetAtom in case EVENT_OBJ, EVENT_PRO, or EVENT_FUNC are in use.
+    if n_elements(status) eq 0 then MrWidgetAtom_Event_Pro, event, STATUS=status
+    if status ne 0 then return
+    
     ;Type of event that was generated.
     event_name = size(event, /SNAME)
     widget_control, event.id, GET_UVALUE=oRef
     
-;---------------------------------------------------------------------
-;Callback Object /////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;If another object is handling events, forward the event and exit.
-    oRef -> GetProperty, EVENT_HANDLER=event_handler
-    if obj_valid(event_handler) then begin
-        Call_Method, event_handler.method, event_handler.object, event
-        return
-    endif
+    ;Forward events to an event handler classes?
+    oRef -> GetProperty, EVENT_OBJ=event_obj
+    tf_event_obj = obj_valid(event_obj)
     
 ;---------------------------------------------------------------------
 ;Callback Pro/Method /////////////////////////////////////////////////
@@ -102,22 +101,23 @@ pro MrWidgetBase_Event_Pro, event
     case event_name of
         'WIDGET_KBRD_FOCUS': begin
             oRef -> GetProperty, KBRD_FOCUS_HANDLER=kbrd_focus_eh
-            case size(kbrd_focus_eh, /TNAME) of
-                'OBJREF': Call_Method, kbrd_focus_eh.method, kbrd_focus_eh.object, event
-                'STRING': if kbrd_focus_eh ne '' then Call_Procedure, kbrd_focus_eh, event
-            endcase
+            if kbrd_focus_eh ne '' then begin
+                if tf_event_obj $
+                    then Call_Method, kbrd_focus_eh, event_obj, event $
+                    else Call_Procedure, kbrd_focus_eh, event
+            endif
         endcase
         
         'WIDGET_CONTEXT': begin
             oRef -> GetProperty, CONTEXT_HANDLER=context_eh
-            case size(context_eh, /TNAME) of
-                'OBJREF': Call_Method, context_eh.method, context_eh.object, event
-                'STRING': if context_eh ne '' then Call_Procedure, context_eh, event
-            endcase
+            if context_eh ne '' then begin
+                if tf_event_obj $
+                    then Call_Method, context_eh, event_obj, event $
+                    else Call_Procedure, context_eh, event
+            endif
         endcase
         
-        ;Call the superclass's event handler
-        else: MrWidgetAtom_Event_Pro, event
+        else: ;Do nothing
     endcase
 end
 
@@ -129,7 +129,8 @@ end
 ;       EVENT:              in, optional, type=structure
 ;                           An event structure returned by the windows manager.
 ;-
-function MrWidgetBase_Event_Func, event
+function MrWidgetBase_Event_Func, event, $
+STATUS=status
     compile_opt strictarr
     
     ;Error handling
@@ -140,45 +141,49 @@ function MrWidgetBase_Event_Func, event
         return, 0
     endif
     
+    if n_elements(status) eq 0 $
+        then result = MrWidgetAtom_Event_Func(event, STATUS=status)
+    case status of
+        -1: return, 0
+         1: return, result
+         else: ;Continue
+    endcase
+    
     ;Type of event that was generated.
     event_name = size(event, /SNAME)
     widget_control, event.id, GET_UVALUE=oRef
     
-;---------------------------------------------------------------------
-;Callback Object /////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;If another object is handling events, forward the event and exit.
-    oRef -> GetProperty, EVENT_HANDLER=event_handler
-    if obj_valid(event_handler) then begin
-        result = Call_Method(event_handler.method, event_handler.object, event)
-        return, result
-    endif
+    ;Forward events to an event handler classes?
+    oRef -> GetProperty, EVENT_OBJ=event_obj
+    tf_event_obj = obj_valid(event_obj)
     
 ;---------------------------------------------------------------------
 ;Callback Func/Method ////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;Forward the event to the event-handling method
     case event_name of
-        'WIDGET_CONTEXT': begin
-            oRef -> GetProperty, CONTEXT_HANDLER=context_eh
-            case size(context_eh, /TNAME) of
-                'OBJREF': result = Call_Method(context_eh.method, context_eh.object, event)
-                'STRING': if context_eh ne '' then result = Call_Function(context_eh, event)
-            endcase
-        endcase
-        
         'WIDGET_KBRD_FOCUS': begin
             oRef -> GetProperty, KBRD_FOCUS_HANDLER=kbrd_focus_eh
-            case size(kbrd_focus_eh, /TNAME) of
-                'OBJREF': result = Call_Method(kbrd_focus_eh.method, kbrd_focus_eh.object, event)
-                'STRING': if kbrd_focus_eh ne '' then result = Call_Function(kbrd_focus_eh, event)
-            endcase
+            if kbrd_focus_eh ne '' then begin
+                if tf_event_obj $
+                    then result = Call_Method(kbrd_focus_eh, event_obj, event) $
+                    else result = Call_Function(kbrd_focus_eh, event)
+            endif
         endcase
         
-        ;Call the superclass's Event_Func
-        else: result = MrWidgetAtom_Event_Func(event)
+        'WIDGET_CONTEXT': begin
+            oRef -> GetProperty, CONTEXT_HANDLER=context_eh
+            if context_eh ne '' then begin
+                if tf_event_obj $
+                    then result = Call_Method(context_eh, event_obj, event) $
+                    else result = Call_Function(context_eh, event)
+            endif
+        endcase
+        
+        else: ;Do nothing
     endcase
     
+    if n_elements(result) eq 0 then result = 0
     return, result
 end
 
@@ -318,8 +323,8 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
 ;Callback Func/Pro/Method/Object /////////////////////////////////////
 ;---------------------------------------------------------------------
-    if arg_present(context_handler)    then context_handler    = *self._context_handler
-    if arg_present(kbrd_focus_handler) then kbrd_focus_handler = *self._kbrd_focus_handler
+    if arg_present(context_handler)    then context_handler    = self._context_handler
+    if arg_present(kbrd_focus_handler) then kbrd_focus_handler = self._kbrd_focus_handler
 end
 
 
@@ -382,33 +387,8 @@ _REF_EXTRA=extra
 ;Callback Functions/Methods/Procedures ///////////////////////////////
 ;---------------------------------------------------------------------
     
-    ;CONTEXT EVENTS
-    if n_elements(context_handler) gt 0 then begin
-        case size(context_handler, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, context_handler, test
-                *self._context_handler = test
-            endcase
-            
-            'STRING': *self._context_handler = context_handler            
-            else: message, 'KEYBOARD_FOCUS_HANDLER must be a string or structure.'
-        endcase
-    endif
-    
-    ;KEYBOARD FOCUS EVENTS
-    if n_elements(kbrd_focus_handler) gt 0 then begin
-        case size(kbrd_focus_handler, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, kbrd_focus_handler, test
-                *self._kbrd_focus_handler = test
-            endcase
-            
-            'STRING': *self._kbrd_focus_handler = kbrd_focus_handler            
-            else: message, 'KEYBOARD_FOCUS_HANDLER must be a string or structure.'
-        endcase
-    endif
+    if n_elements(context_handler)    gt 0 then self._context_handler    = context_handler            
+    if n_elements(kbrd_focus_handler) gt 0 then self._kbrd_focus_handler = kbrd_focus_handler            
 end
 
 
@@ -425,10 +405,6 @@ pro MrWidgetBase::cleanup
         void = cgErrorMsg()
         return
     endif
-    
-    ;Free event handlers (but do not destroy event handling objects)
-    ptr_free, self._context_handler
-    ptr_free, self._kbrd_focus_handler
     
     ;Clean up the superclasses
     self -> MrWidgetAtom::Cleanup
@@ -484,7 +460,7 @@ end
 ;       _REF_EXTRA:             in, optional, type=any
 ;                               Any keyword accepted by MrWidgetAtom::Init is allowed.
 ;-
-function MrWidgetBase::init, parentID, $
+function MrWidgetBase::init, parent, $
     ALIGN_BOTTOM=align_bottom,$
     ALIGN_CENTER=align_center, $
     ALIGN_LEFT=align_left, $
@@ -499,13 +475,12 @@ function MrWidgetBase::init, parentID, $
     CONTEXT_EVENTS=context_events, $
     CONTEXT_MENU=context_menu, $
     EXCLUSIVE=exclusive, $
-    FUNCTION_CALLBACK=function_callback, $
     FRAME=frame, $
     GRID_LAYOUT=grid_layout, $
     KBRD_FOCUS_EVENTS=kbrd_focus_events, $
     MAP=map, $
     NONEXCLUSIVE=nonexclusive, $
-    NOTIFY_REALIZE=notify_string, $
+    NOTIFY_REALIZE=notify_realize, $
     ROW=row, $
     SCR_XSIZE=scr_xsize, $
     SCR_YSIZE=scr_ysize, $
@@ -538,6 +513,10 @@ function MrWidgetBase::init, parentID, $
 ;---------------------------------------------------------------------
 ;Create the Widget ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+    ;Accept MrWidget items as a parent
+    if cgObj_IsA(parent, 'MrWidgetAtom') $
+        then parent -> GetProperty, ID=parentID $
+        else parentID = parent
 
     ;Create the base
     self._id = WIDGET_BASE( parentID, $
@@ -558,7 +537,7 @@ function MrWidgetBase::init, parentID, $
                             GRID_LAYOUT       = grid_layout, $
                             MAP               = map, $
                             NONEXCLUSIVE      = nonexclusive, $
-                            NOTIFY_REALIZE    = notify_string, $
+                            NOTIFY_REALIZE    = notify_realize, $
                             ROW               = row, $
                             SCR_XSIZE         = scr_xsize, $
                             SCR_YSIZE         = scr_ysize, $
@@ -582,13 +561,9 @@ function MrWidgetBase::init, parentID, $
 ;---------------------------------------------------------------------
 
     ;Superclass
-    success = self -> MrWidgetAtom::INIT(_STRICT_EXTRA=extra)
+    success = self -> MrWidgetAtom::INIT(NOTIFY_REALIZE=notify_realize, $
+                                        _STRICT_EXTRA=extra)
     if success eq 0 then message, 'MrWidgetAtom could not be initialized.'
-    
-    ;Set the callback func/pro -- must be done after initializing MrWidgetAtom.
-    if keyword_set(function_callback) $
-        then self -> _Set_Event_Func, 'MrWidgetBase_Event_Func' $
-        else self -> _Set_Event_Pro,  'MrWidgetBase_Event_Pro'
     
     ;Object Properties
     self -> SetProperty, CONTEXT_HANDLER=context_handler, $
@@ -616,7 +591,7 @@ pro MrWidgetBase__define, class
                inherits MrWidgetAtom, $
 
                ;Event Handling Methods
-               _context_handler:    ptr_new(), $
-               _kbrd_focus_handler: ptr_new()  $
+               _context_handler:    '', $
+               _kbrd_focus_handler: ''  $
             }
 end

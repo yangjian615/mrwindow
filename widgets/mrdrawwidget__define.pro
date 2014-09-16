@@ -110,125 +110,128 @@ pro MrDrawWidget_Event_Pro, event
         void = cgErrorMsg()
         return
     endif
+
+    ;First, call MrWidgetAtom in case EVENT_OBJ, EVENT_PRO, or EVENT_FUNC are in use.
+    MrWidgetAtom_Event_Pro, event, STATUS=status
+    if status ne 0 then return
     
     ;Type of event that was generated.
     event_name = size(event, /SNAME)
     widget_control, event.id, GET_UVALUE=oRef
     
-    ;Flag for calling the superclass
-    tf_super = 0B
-
-;---------------------------------------------------------------------
-; Forward All Events? ////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;If an event handler was provided, forward the events then return.
-    ORef -> GetProperty, DRAW_HANDLER=draw_handler
-    case size(draw_handler, /TNAME) of
-        'STRUCT': begin
-            if obj_valid(draw_handler) then begin
-                Call_Method, draw_handler.method, draw_handler.object, event
-                return
-            endif
-        endcase
-        
-        'STRING': begin
-            if draw_handler ne '' then begin
-                Call_Procedure, draw_handler, event
-                return
-            endif
-        endcase
-    endcase
+    ;Forward events to an event handler classes?
+    oRef -> GetProperty, EVENT_HANDLER=event_handler, EVENT_OBJ=event_obj
+    tf_event_handler = obj_valid(event_handler)
+    tf_event_obj     = obj_valid(event_obj)
     
 ;---------------------------------------------------------------------
-; Drop Event /////////////////////////////////////////////////////////
+;Callback Func/Method ////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if size(event, /SNAME) eq 'WIDGET_DROP' then begin
-        oRef -> GetProperty, DROP_HANDLER=drop_eh
-        case size(drop_eh, /TNAME) of
-            'STRUCT': Call_Method, drop_eh.method, drop_eh.object, event
-            'STRING': if drop_eh ne '' then Call_Procedure, drop_eh, event
-        endcase
-        
-        return
-    endif
     
-;---------------------------------------------------------------------
-; Callback Pro/Method ////////////////////////////////////////////////
-;---------------------------------------------------------------------
     ;Types of events
     event_type = ['MOUSE_DOWN', 'MOUSE_UP', 'MOUSE_MOTION', 'VIEWPORT_MOVE', 'EXPOSE', $
                   'KBRD_ASCII', 'KBRD', 'MOUSE_WHEEL']
-    
+
     ;---------------------------------------------------------------------
-    ; Object for Draw Event Callback? ////////////////////////////////////
+    ;Object for Draw Event Callback? /////////////////////////////////////
     ;---------------------------------------------------------------------
-    self -> GetProperty, EVENT_HANDLER=oEH,     MOUSE_DOWN_HANDLER=mDownH, $
-                         MOUSE_UP_HANDLER=mUpH, MOUSE_MOTION_HANDLER=mMotionH, $
-                         KEYBOARD_HANDLER=keyH, SELECTION_CHANGE_HANDLER=selectH, $
-                         MOUSE_WHEEL_HANDLER=mWheelH
-                         
+    if tf_event_handler then begin
+        case event_type[event.type] of
+            'MOUSE_DOWN':   down_resp   = event_handler -> MouseDown(   self, event.x, event.y, event.button, event.modifiers, event.clicks)
+            'MOUSE_UP':     up_resp     = event_handler -> MouseUp(     self, event.x, event.y, event.button)
+            'MOUSE_MOTION': motion_resp = event_handler -> MouseMotion( self, event.x, event.y, event.modifiers)
+            'MOUSE_WHEEL':  wheel_resp  = event_handler -> MouseWheel(  self, event.x, event.y, event.clicks, event.modifiers)
+            'KBRD_ASCII':   ascii_resp  = event_handler -> KeyHandler(  self, 1, event.ch, event.key, event.x, event.y, event.press, event.release, event.modifiers)
+            'KBRD':         kbrd_resp   = event_handler -> KeyHandler(  self, 0, event.ch, event.key, event.x, event.y, event.press, event.release, event.modifiers)
+            else: ;Do nothing
+        endcase
+    endif
+        
+    ;---------------------------------------------------------------------
+    ;Pro/Method Callback? ////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
     case event_type[event.type] of
         'MOUSE_DOWN': begin
-            result = oEH -> MouseDown(self, event.x, event.y, event.button, event.modifiers, event.clicks)
-            if result && mouse_down_h ne '' $
-                then result = Call_Function(mDownH, self, event.x, event.y, event.button, event.modifiers, event.clicks)
+            oTLB -> GetProperty, MOUSE_DOWN_HANDLER=button_eh
+            if button_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && down_resp) $
+                    then Call_Procedure, button_eh, event
+            endif
         endcase
-        
+    
         'MOUSE_UP': begin
-            result = oEH -> MouseUp(self, event.x, event.y, event.button)
-            if result && mouse_down_h ne '' $
-                then result = Call_Function(mUpH, self, event.x, event.y, event.button)
+            oTLB -> GetProperty, MOUSE_UP_HANDLER=button_eh
+            if button_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && down_resp) $
+                    then Call_Procedure, button_eh, event
+            endif
         endcase
-        
+    
         'MOUSE_MOTION': begin
-            result = oEH -> MouseMotion(self, event.x, event.y, event.modifiers)
-            if result && mMotionH ne '' $
-                then result = Call_Function(mMotionH, self, event.x, event.y, event.modifiers)
+            oTLB -> GetProperty, MOUSE_MOTION_HANDLER=motion_eh
+            if motion_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && motion_resp) $
+                    then Call_Procedure, motion_eh, event
+            endif
         endcase
-        
+    
         'MOUSE_WHEEL': begin
-            result = oEH -> MouseWheel(self, event.x, event.y, event.clicks, event.modifiers)
-            if result && mWheelH ne '' $
-                then result = Call_Function(mWheelH, event.x, event.y, event.clicks, event.modifiers)
+            oTLB -> GetProperty, MOUSE_WHEEL_HANDLER=wheel_eh
+            if wheel_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && wheel_resp) $
+                    then Call_Procedure, wheel_eh, event
+            endif
         endcase
-        
+    
         'KBRD_ASCII': begin
-            result = oEH -> KeyHandler(self, 1, event.ch, event.key, event.x, event.y, event.press, event.release, event.modifiers)
-            if result && keyH ne '' $
-                then result = Call_Function(keyH, self, 1, event.ch, event.key, event.x, event.y, event.press, event.release, event.modifiers)
+            oTLB -> GetProperty, KEYBOARD_HANDLER=keyboard_eh
+            if keyboard_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && ascii_resp) $
+                    then Call_Procedure, keyboard_eh, event
+            endif
         endcase
-        
+    
         'KBRD': begin
-            result = oEH -> KeyHandler(self, 0, event.ch, event.key, event.x, event.y, event.press, event.release, event.modifiers)
-            if result && keyH ne '' $
-                then result = Call_Function(keyH, self, 1, event.ch, event.key, event.x, event.y, event.press, event.release, event.modifiers)
+            oTLB -> GetProperty, KEYBOARD_HANDLER=keyboard_eh
+            if keyboard_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && kbrd_resp) $
+                    then Call_Procedure, keyboard_eh, event
+            endif
         endcase
         
-    ;---------------------------------------------------------------------
-    ; More Pro/Method Callback ///////////////////////////////////////////
-    ;---------------------------------------------------------------------
+;---------------------------------------------------------------------
+;More Pro/Method Callback ////////////////////////////////////////////
+;---------------------------------------------------------------------
+        
         'VIEWPORT_MOVE': begin
-            oRef -> GetProperty, VIEWPORT_HANDLER=viewport_eh
-            case size(viewport_en, /TNAME) of
-                'STRUCT': Call_Method, viewport_eh.method, viewport_eh.object, event
-                'STRING': if viewport_en ne '' then Call_Procedure, viewport_en, event
-            endcase
+            oTLB -> GetProperty, VIEWPORT_HANDLER=viewport_eh
+            if viewport_eh ne '' then begin
+                if tf_event_obj $
+                    then Call_Method, viewport_eh, event_obj, event $
+                    else Call_Procedure, viewport_eh, event
+            endif
+        endcase
+        
+        'WIDGET_DROP': begin
+            oTLB -> GetProperty, DROP_HANDLER=drop_handler
+            if drop_handler ne '' then begin
+                if tf_event_obj $
+                    then Call_Method, drop_handler, event_obj, event $
+                    else Call_Procedure, drop_handler, event
+            endif
         endcase
         
         'EXPOSE': begin
-            oRef -> GetProperty, EXPOSE_HANDLER=expose_eh
-            case size(expose_eh, /TNAME) of
-                'STRUCT': Call_Method, expose_eh.method, expose_eh.object, event
-                'STRING': if expose_eh ne '' then Call_Procedure, expose_eh, event
-            endcase
+            oTLB -> GetProperty, EXPOSE_EVENT_HANDLER=expose_eh
+            if expose_eh ne '' then begin
+                if tf_event_obj $
+                    then Call_Method, expose_eh, event_obj, event $
+                    else Call_Procedure, expose_eh, event
+            endif
         endcase
         
-        ;If we get here, there were no matches. Call the supercalss
-        else: tf_super = 1B
+        else: ;Do nothing
     endcase
-    
-    ;Just in case, send the event to MrWidgetAtom as well
-    if tf_super then self -> MrWidgetAtom::Event_Pro, event
 end
 
 
@@ -252,19 +255,22 @@ function MrDrawWidget_Event_Func, event
         return, 0
     endif
     
+    ;First, call MrWidgetAtom in case EVENT_OBJ, EVENT_PRO, or EVENT_FUNC are in use.
+    result = MrWidgetAtom_Event_Func(event, STATUS=status)
+    case status of
+        -1: return, 0
+         1: return, result
+         else: ;Do nothing
+    endcase
+    
     ;Type of event that was generated.
     event_name = size(event, /SNAME)
-    widget_control, event.top, GET_UVALUE=oRef
-    
-;---------------------------------------------------------------------
-;Callback Object /////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;If another object is handling events, forward the event and exit.
-    oRef -> GetProperty, EVENT_HANDLER=event_handler, DRAW_EVENT_HANDLER=draw_event_handler
-    if obj_valid(event_handler) then begin
-        result = Call_Method(event_handler.method, event_handler.object, event)
-        return, result
-    endif
+    widget_control, event.id, GET_UVALUE=oRef
+
+    ;Forward events to an event handler classes?
+    oRef -> GetProperty, EVENT_HANDLER=event_handler, EVENT_OBJ=event_obj
+    tf_event_handler = obj_valid(event_handler)
+    tf_event_obj     = obj_valid(event_obj)
     
 ;---------------------------------------------------------------------
 ;Callback Func/Method ////////////////////////////////////////////////
@@ -277,100 +283,103 @@ function MrDrawWidget_Event_Func, event
     ;---------------------------------------------------------------------
     ;Object for Draw Event Callback? /////////////////////////////////////
     ;---------------------------------------------------------------------
-    if obj_valid(self.draw_event_handler) then begin
+    if tf_event_handler then begin
         case event_type[event.type] of
-            'MOUSE_DOWN':   self.draw_event_handler -> MouseDown,   self, event.x, event.y, event.button, event.modifiers, event.clicks
-            'MOUSE_UP':     self.draw_event_handler -> MouseUp,     self, event.x, event.y, event.button
-            'MOUSE_MOTION': self.draw_event_handler -> MouseMotion, self, event.x, event.y, event.modifiers
-            'MOUSE_WHEEL':  self.draw_event_handler -> MouseWheel,  self, event.x, event.y, event.clicks, event.modifiers
-            'KBRD_ASKII':   self.draw_event_handler -> KeyHandler,  self, 1, event.ch, event.key, event.x, event.y, event.press, event.release, event.modifiers
-            'KBRD':         self.draw_event_handler -> KeyHandler,  self, 0, event.ch, event.key, event.x, event.y, event.press, event.release, event.modifiers
+            'MOUSE_DOWN':   down_resp   = event_handler -> MouseDown(   self, event.x, event.y, event.button, event.modifiers, event.clicks)
+            'MOUSE_UP':     up_resp     = event_handler -> MouseUp(     self, event.x, event.y, event.button)
+            'MOUSE_MOTION': motion_resp = event_handler -> MouseMotion( self, event.x, event.y, event.modifiers)
+            'MOUSE_WHEEL':  wheel_resp  = event_handler -> MouseWheel(  self, event.x, event.y, event.clicks, event.modifiers)
+            'KBRD_ASCII':   ascii_resp  = event_handler -> KeyHandler(  self, 1, event.ch, event.key, event.x, event.y, event.press, event.release, event.modifiers)
+            'KBRD':         kbrd_resp   = event_handler -> KeyHandler(  self, 0, event.ch, event.key, event.x, event.y, event.press, event.release, event.modifiers)
             else: ;Do nothing
         endcase
+    endif
         
     ;---------------------------------------------------------------------
     ;Pro/Method Callback? ////////////////////////////////////////////////
     ;---------------------------------------------------------------------
-    endif else begin
-        case event_type[event.type] of
-            'MOUSE_DOWN': begin
-                oTLB -> GetProperty, BUTTON_EVENT_HANDLER=button_eh
-                case size(button_eh, /TNAME) of
-                    'OBJREF': result = Call_Method(button_eh.method, button_eh.object, event)
-                    'STRING': if button_eh ne '' then result = Call_Function(button_eh, event)
-                endcase
-            endcase
-        
-            'MOUSE_UP': begin
-                oTLB -> GetProperty, BUTTON_EVENT_HANDLER=button_eh
-                case size(button_eh, /TNAME) of
-                    'OBJREF': result = Call_Method(button_eh.method, button_eh.object, event)
-                    'STRING': if button_eh ne '' then result = Call_Function(button_eh, event)
-                endcase
-            endcase
-        
-            'MOUSE_MOTION': begin
-                oTLB -> GetProperty, MOTION_EVENT_HANDLER=motion_eh
-                case size(motion_eh, /TNAME) of
-                    'OBJREF': result = Call_Method(motion_eh.method, motion_eh.object, event)
-                    'STRING': if motion_eh ne '' then result = Call_Function(motion_eh, event)
-                endcase
-            endcase
-        
-            'MOUSE_WHEEL': begin
-                oTLB -> GetProperty, WHEEL_EVENT_HANDLER=wheel_events
-                case size(wheel_events, /TNAME) of
-                    'OBJREF': result = Call_Method(wheel_events.method, wheel_events.object, event)
-                    'STRING': if wheel_events ne '' then result = Call_Function(wheel_events, event)
-                endcase
-            endcase
-        
-            'KBRD_ASCII': begin
-                oTLB -> GetProperty, KEYBOARD_EVENT_HANDLER=keyboard_eh
-                case size(keyboard_eh, /TNAME) of
-                    'OBJREF': result = Call_Method(keyboard_eh.method, keyboard_eh.object, event)
-                    'STRING': if keyboard_eh ne '' then result = Call_Function(keyboard_eh, event)
-                endcase
-            endcase
-        
-            'KBRD': begin
-                oTLB -> GetProperty, KEYBOARD_EVENT_HANDLER=keyboard_eh
-                case size(keyboard_eh, /TNAME) of
-                    'OBJREF': result = Call_Method(keyboard_eh.method, keyboard_eh.object, event)
-                    'STRING': if keyboard_eh ne '' then result = Call_Function(keyboard_eh, event)
-                endcase
-            endcase
-            
-            else: ;Do nothing
+    case event_type[event.type] of
+        'MOUSE_DOWN': begin
+            oTLB -> GetProperty, MOUSE_DOWN_HANDLER=button_eh
+            if button_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && down_resp) $
+                    then result = Call_Function(button_eh, event)
+            endif
         endcase
-    endelse
+    
+        'MOUSE_UP': begin
+            oTLB -> GetProperty, MOUSE_UP_HANDLER=button_eh
+            if button_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && down_resp) $
+                    then result = Call_Function(button_eh, event)
+            endif
+        endcase
+    
+        'MOUSE_MOTION': begin
+            oTLB -> GetProperty, MOUSE_MOTION_HANDLER=motion_eh
+            if motion_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && motion_resp) $
+                    then result = Call_Function(motion_eh, event)
+            endif
+        endcase
+    
+        'MOUSE_WHEEL': begin
+            oTLB -> GetProperty, MOUSE_WHEEL_HANDLER=wheel_eh
+            if wheel_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && wheel_resp) $
+                    then result = Call_Function(wheel_eh, event)
+            endif
+        endcase
+    
+        'KBRD_ASCII': begin
+            oTLB -> GetProperty, KEYBOARD_HANDLER=keyboard_eh
+            if keyboard_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && ascii_resp) $
+                    then result = Call_Function(keyboard_eh, event)
+            endif
+        endcase
+    
+        'KBRD': begin
+            oTLB -> GetProperty, KEYBOARD_HANDLER=keyboard_eh
+            if keyboard_eh ne '' then begin
+                if ~tf_event_handler || (tf_event_handler && kbrd_resp) $
+                    then result = Call_Function(keyboard_eh, event)
+            endif
+        endcase
         
 ;---------------------------------------------------------------------
 ;More Pro/Method Callback ////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    case event_type[event.type] of
         
         'VIEWPORT_MOVE': begin
-            oTLB -> GetProperty, VIEWPORT_EVENT_HANDLER=viewport_eh
-            case size(viewport_eh, /TNAME) of
-                'OBJREF': result = Call_Method(viewport_eh.method, viewport_eh.object, event)
-                'STRING': if viewport_eh ne '' then result = Call_Function(viewport_eh, event)
-            endcase
+            oTLB -> GetProperty, VIEWPORT_HANDLER=viewport_eh
+            if viewport_eh ne '' then begin
+                if tf_event_obj $
+                    then result = Call_Method(viewport_eh, event_obj, event) $
+                    else result = Call_Function(viewport_eh, event)
+            endif
+        endcase
+        
+        'WIDGET_DROP': begin
+            oTLB -> GetProperty, DROP_HANDLER=drop_handler
+            if drop_handler ne '' then begin
+                if tf_event_obj $
+                    then result = Call_Method(drop_handler, event_obj, event) $
+                    else result = Call_Function(drop_handler, event)
+            endif
         endcase
         
         'EXPOSE': begin
-            oTLB -> GetProperty, EXPOSE_EVENT_HANDLER=expose_eh
-            case size(expose_eh, /TNAME) of
-                'OBJREF': result = Call_Method(expose_eh.method, expose_eh.object, event)
-                'STRING': if expose_eh ne '' then result = Call_Function(expose_eh, event)
-            endcase
+            oTLB -> GetProperty, EXPOSE_HANDLER=expose_eh
+            if expose_eh ne '' then begin
+                if tf_event_obj $
+                    then result = Call_Method(expose_eh, event_obj, event) $
+                    else result = Call_Function(expose_eh, event)
+            endif
         endcase
         
         else: ;Do nothing
     endcase
-    
-    ;If no result yet, check MrWidgetAtom
-    if n_elements(result) eq 0 then result = self -> MrWidgetAtom::Event_Func(event)
     
     return, result
 end
@@ -406,11 +415,6 @@ end
 ;       HOURGLASS:          in, optional, type=boolean, default=0
 ;                           If set, the cursor will change to an hourglass during the
 ;                               draw operation.
-;       REQUESTER:          in, optional, type=object
-;                           The object that requests a DRAW of the
-;                               DrawWidget. This is helpful sometimes when DRAWWIDGET_DRAW messages
-;                               are received by other objects. The object reference is passed on as
-;                               the DATA in the DRAWWIDGET_DRAW message.
 ;       TARGET_WINDOW:      in, optional, type=integer
 ;                           Normally the draw widget draws into its own window. But,
 ;                               sometimes you want the draw widget to draw somewhere else.
@@ -430,7 +434,6 @@ PRO MrDrawWidget::Draw, $
  BACKGROUND_COLOR=background_color, $
  NOERASE=noerase, $
  HOURGLASS=hourglass, $
- REQUESTER=requester, $
  TARGET_WINDOW=target_window, $
  TARGETS=targets, $
 _EXTRA=extraKeywords
@@ -452,8 +455,9 @@ _EXTRA=extraKeywords
         message, 'Draw widget does not have a valid window id. Try realizing it.'
 
     ;Defaults
-    noerase      = keyword_set(noerase)
-    hourglass    = keyword_set(hourglass)
+    noerase   = keyword_set(noerase)
+    hourglass = keyword_set(hourglass)
+    _noerase  = n_elements(noerase) eq 0 ? self._noerase : noerase
     if n_elements(background_color) eq 0 then background_color = self._background
 
     ;Enable the hourglass mouse cursor, if needed.
@@ -462,7 +466,7 @@ _EXTRA=extraKeywords
     ;If the device supports windows, switch to the draw window.
     if (!d.flags and 256) ne 0 then begin
         wset, self._winid
-        if ~noerase or ~self._noerase then self -> Erase, background_color
+        if noerase eq 0B then self -> Erase, background_color
     endif
    
     ;Get all objects from the container
@@ -483,7 +487,17 @@ end
 ;                           An event structure returned by the windows manager.
 ;-
 pro MrDrawWidget::Drop_Events, event
-    ;Nothing to do yet.
+   compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    stop
 end
 
 
@@ -528,7 +542,8 @@ WINDOW_TITLE=window_title
 
     ;Create a resizeable, top level base for the window    
     self._oTLB = obj_new('MrTopLevelBase', TITLE=window_title, $
-                         TLB_SIZE_HANDLER={object: self, method: 'TLB_Resize_Events'}, $
+                         EVENT_OBJ        = self, $
+                         TLB_SIZE_HANDLER = 'TLB_Resize_Events', $
                          /TLB_SIZE_EVENTS)
 end
 
@@ -602,7 +617,7 @@ end
 ;+
 ;   The purpose of this method is to erase the draw window.
 ;-
-pro MrDrawWidget::Erase
+pro MrDrawWidget::Erase, color
    compile_opt strictarr
     
     ;Error handling
@@ -618,7 +633,7 @@ pro MrDrawWidget::Erase
     
     ;Erase the window.
     if (!d.flags and 256) ne 0 then wset, self._winID
-    cgErase, color=cgcolor(self._background)
+    cgErase, self._background
 end
 
 
@@ -687,7 +702,6 @@ end
 ;-
 PRO MrDrawWidget::Resize, xsize, ysize, $
  CM=cm, $
- DRAW=draw, $
  INCHES=inches, $
  SCREEN=screen, $
  VIEWPORT=viewport, $
@@ -733,7 +747,7 @@ _EXTRA=extraKeywords
     ENDCASE
 
     ;Redraw
-    IF Keyword_Set(draw) THEN self -> Draw, _Extra=extraKeywords
+    self -> Draw, _Extra=extraKeywords
 END
 
 
@@ -909,6 +923,7 @@ PRO MrDrawWidget::GetProperty, $
  ;Events On or Off?
  BUTTON_EVENTS=button_events, $
  CONTEXT_EVENTS=context_events, $
+ DROP_EVENTS=drop_events, $
  EXPOSE_EVENTS=expose_events, $
  KEYBOARD_EVENTS=keyboard_events, $
  MOTION_EVENTS=motion_events, $
@@ -970,6 +985,7 @@ _REF_EXTRA=extra
     ;Events On or Off?
     if arg_present(button_events)   then button_events   = widget_info(self._id, /DRAW_BUTTON_EVENTS)
     if arg_present(context_events)  then context_events  = widget_info(self._id, /CONTEXT_EVENTS)
+    if arg_present(drop_events)     then drop_events     = widget_info(self._id, /DROP_EVENTS)
     if arg_present(expose_events)   then expose_events   = widget_info(self._id, /DRAW_EXPOSE_EVENTS)
     if arg_present(motion_events)   then motion_events   = widget_info(self._id, /DRAW_MOTION_EVENTS)
     if arg_present(viewport_events) then viewport_events = widget_info(self._id, /DRAW_VIEWPORT_EVENTS)
@@ -978,18 +994,19 @@ _REF_EXTRA=extra
     if arg_present(wheel_events)    then wheel_events    = widget_info(self._id, /DRAW_WHEEL_EVENTS)
    
     ;Method Event Handlers
-    if arg_present(context_handler)      then context_handler      = *self._context_handler
-    if arg_present(drag_notify)          then expose_handler       = *self._drag_notify
-    if arg_present(draw_handler)         then expose_handler       = *self._draw_handler
-    if arg_present(drop_handler)         then expose_handler       = *self._drop_handler
-    if arg_present(event_handler)        then expose_handler       = *self._event_handler
-    if arg_present(expose_handler)       then expose_handler       = *self._expose_handler
-    if arg_present(keyboard_handler)     then keyboard_handler     = *self._keyboard_handler
-    if arg_present(mouse_down_handler)   then mouse_down_handler   = *self._mouse_down_handler
-    if arg_present(mouse_up_handler)     then mouse_up_handler     = *self._mouse_up_handler
-    if arg_present(mouse_motion_handler) then mouse_motion_handler = *self._mouse_motion_handler
-    if arg_present(mouse_wheel_handler)  then mouse_wheel_handler  = *self._mouse_wheel_handler
-    if arg_present(viewport_handler)     then viewport_handler     = *self._viewport_handler
+    if arg_present(event_handler)        then event_handler        =  self._event_handler
+    if arg_present(context_handler)      then context_handler      =  self._context_handler
+    if arg_present(drag_notify)          then drag_notify          = *self._drag_notify
+    if arg_present(draw_handler)         then draw_handler         =  self._draw_handler
+    if arg_present(drop_handler)         then drop_handler         =  self._drop_handler
+    if arg_present(event_handler)        then event_handler        =  self._event_handler
+    if arg_present(expose_handler)       then expose_handler       =  self._expose_handler
+    if arg_present(keyboard_handler)     then keyboard_handler     =  self._keyboard_handler
+    if arg_present(mouse_down_handler)   then mouse_down_handler   =  self._mouse_down_handler
+    if arg_present(mouse_up_handler)     then mouse_up_handler     =  self._mouse_up_handler
+    if arg_present(mouse_motion_handler) then mouse_motion_handler =  self._mouse_motion_handler
+    if arg_present(mouse_wheel_handler)  then mouse_wheel_handler  =  self._mouse_wheel_handler
+    if arg_present(viewport_handler)     then viewport_handler     =  self._viewport_handler
 
     ;Superclass Properties
     if n_elements(extra) gt 0 then self -> MrWidgetAtom::GetProperty, _STRICT_EXTRA=extra
@@ -1099,6 +1116,7 @@ PRO MrDrawWidget::SetProperty, $
  ;Turn Events On or Off
  BUTTON_EVENTS=button_events, $
  CONTEXT_EVENTS=context_events, $
+ DROP_EVENTS=drop_events, $
  EXPOSE_EVENTS=expose_events, $
  KEYBOARD_EVENTS=keyboard_events, $
  MOTION_EVENTS=motion_events, $
@@ -1152,6 +1170,7 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
     IF N_ELEMENTS(button_events)   GT 0 THEN WIDGET_CONTROL, self._id, DRAW_BUTTON_EVENTS   = Keyword_Set(button_events)
     IF N_Elements(context_events)  GT 0 THEN WIDGET_CONTROL, self._id, CONTEXT_EVENTS       = Keyword_Set(context_events)
+    IF N_Elements(drop_events)     GT 0 THEN Widget_Control, self._id, SET_DROP_EVENTS      = Keyword_Set(drop_events)
     IF N_ELEMENTS(expose_events)   GT 0 THEN WIDGET_CONTROL, self._id, DRAW_EXPOSE_EVENTS   = Keyword_Set(expose_events)
     IF N_ELEMENTS(keyboard_events) GT 0 THEN WIDGET_CONTROL, self._id, DRAW_KEYBOARD_EVENTS = Keyword_Set(keyboard_events)
     IF N_ELEMENTS(motion_events)   GT 0 THEN WIDGET_CONTROL, self._id, DRAW_MOTION_EVENTS   = Keyword_Set(motion_events)
@@ -1161,44 +1180,18 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
 ;Callback Function/Procedures/Methods ////////////////////////////////
 ;---------------------------------------------------------------------
-    ;DRAW_HANDLER
-    if n_elements(draw_handler) gt 0 then begin
-        case size(draw_handler, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, draw_handler, test
-                *self._draw_handler = test
-            endcase
-            'STRING': *self._draw_handler = draw_handler
-            else: message, 'DRAW_HANDLER must be a string or structure.', /INFORMATIONAL
-        endcase
-    endif
+    if n_elements(context_handler)  gt 0 then self._context_handler  = context_handler
+    if n_elements(drop_handler)     gt 0 then self._drop_handler     = drop_handler
+    if n_elements(expose_handler)   gt 0 then self._expose_handler   = expose_handler
+    if n_elements(viewport_handler) gt 0 then self._viewport_handler = viewport_handler
     
-    ;EVENT_HANDLER
-    if n_elements(event_handler) gt 0 then begin
-        if size(event_handler, /TNAME) eq 'OBJREF' then begin
-            if obj_valid(event_handler) $
-                then self._event_handler = event_handler $
-                else self._event_handler = obj_new()
-        endif else begin
-            message, 'EVENT_HANDLER must be an object reference.', /INFORMATIONAL
-            help, event_handler
-            help, /tr
-        endelse
-    endif
-
-    ;CONTEXT_HANDLER
-    if n_elements(context_handler) gt 0 then begin
-        case size(context_handler, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, context_handler, test
-                *self._context_handler = test
-            endcase
-            'STRING': *self._context_handler = context_handler            
-            else: message, 'CONTEXT_HANDLER must be a string or structure.', /INFORMATIONAL
-        endcase
-    endif
+    ;MOUSE HANDLERS
+    if n_elements(event_handler)        gt 0 then self._event_handler        = event_handler
+    if n_elements(keyboard_handler)     gt 0 then self._keyboard_handler     = mouse_down_handler
+    if n_elements(mouse_down_handler)   gt 0 then self._mouse_down_handler   = mouse_down_handler
+    if n_elements(mouse_up_handler)     gt 0 then self._mouse_up_handler     = mouse_down_handler
+    if n_elements(mouse_motion_handler) gt 0 then self._mouse_motion_handler = mouse_down_handler
+    if n_elements(mouse_wheel_handler)  gt 0 then self._mouse_wheel_handler  = mouse_down_handler
     
     ;DRAG_NOTIFY
     if n_elements(drag_notify) gt 0 then begin
@@ -1214,52 +1207,6 @@ _REF_EXTRA=extra
                 *self._drag_notify = drag_notify
             endcase
             else: message, 'DRAG_NOTIFY must be a string or structure.', /INFORMATIONAL
-        endcase
-    endif
-
-    ;DROP_HANDLER
-    if n_elements(drop_handler) gt 0 then begin
-        case size(drop_handler, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, drop_handler, test
-                *self._drop_handler = test
-            endcase
-            'STRING': *self._drop_handler = drop_handler            
-            else: message, 'DROP_HANDLER must be a string or structure.', /INFORMATIONAL
-        endcase
-    endif
-    
-    ;EXPOSE_HANDLER
-    if n_elements(expose_handler) gt 0 then begin
-        case size(expose_handler, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, expose_handler, test
-                *self._expose_handler = test
-            endcase
-            'STRING': *self._expose_handler = expose_handler            
-            else: message, 'EXPOSE_HANDLER must be a string or structure.', /INFORMATIONAL
-        endcase
-    endif
-    
-    ;MOUSE HANDLERS
-    if n_elements(keyboard_handler)     gt 0 then self._keyboard_handler     = mouse_down_handler
-    if n_elements(mouse_down_handler)   gt 0 then self._mouse_down_handler   = mouse_down_handler
-    if n_elements(mouse_up_handler)     gt 0 then self._mouse_up_handler     = mouse_down_handler
-    if n_elements(mouse_motion_handler) gt 0 then self._mouse_motion_handler = mouse_down_handler
-    if n_elements(mouse_wheel_handler)  gt 0 then self._mouse_wheel_handler  = mouse_down_handler
-        
-    ;VIEWPORT_HANDLER
-    if n_elements(viewport_handler) gt 0 then begin
-        case size(viewport_handler, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, viewport_handler, test
-                *self._viewport_handler = test
-            endcase
-            'STRING': *self._viewport_handler = viewport_handler            
-            else: message, 'VIEWPORT_HANDLER must be a string or structure.', /INFORMATIONAL
         endcase
     endif
 END
@@ -1297,12 +1244,6 @@ pro MrDrawWidget::cleanup
 
     ;Free event handlers (but do not destroy event handling objects)
     ptr_free, self._drag_notify
-    ptr_free, self._drop_handler
-    ptr_free, self._expose_handler
-    ptr_free, self._viewport_handler
-
-    ;Destroy the pixmap object
-    if obj_valid(self._pixmap) then obj_destroy, self._pixmap
 
     ;Destroy the widget, if it still exists
     if widget_info(self._id, /VALID_ID) then widget_control, self._id, /DESTROY
@@ -1349,7 +1290,7 @@ end
 ;                           describing the procedure method to be used as an event
 ;                           handler::
 ;                               {object: oRef, $
-;                               method: 'callback_method'}
+;                                method: 'callback_method'}
 ;                           For function event handling, set the `FUNC_HANDLERS`
 ;                           keyword. If set, all of the *_HANDLER keywords will be
 ;                           ignored.
@@ -1471,17 +1412,17 @@ end
 function MrDrawWidget::init, parent,   $
 ;MrDrawWidget Keywords
  BACKGROUND=background, $
- FUNC_HANDLERS=func_handlers, $
  NOERASE=noerase, $
  REFRESH=refresh, $
  WINDOW_TITLE=window_title, $
 ;Widget_Draw Keywords
  APP_SCROLL=app_scroll, $
  ASPECT=aspect, $
-; CLASSNAME=classname, $
-; COLOR_MODEL=color_model, $
-; COLORS=colors, $
+ CLASSNAME=classname, $
+ COLOR_MODEL=color_model, $
+ COLORS=colors, $
  FRAME=frame, $
+ GRAPHICS_LEVEL=graphics_level, $
  GROUP_LEADER=group_leader, $
  IGNORE_ACCELERATORS=ignore_accelerators, $
  RENDERER=renderer, $
@@ -1508,7 +1449,6 @@ function MrDrawWidget::init, parent,   $
  WHEEL_EVENTS=wheel_events, $
  ;EVENT HANDLERS
  DRAG_NOTIFY=drag_notify, $
- DRAW_HANDLER=draw_handler, $
  DROP_HANDLER=drop_handler, $
  EVENT_HANDLER=event_handler, $
  EXPOSE_HANDLER=expose_handler, $
@@ -1533,13 +1473,12 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
 ;Defaults ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    func_handlers = keyword_set(func_handlers)
-    noerase       = keyword_set(noerase)
-    refresh       = keyword_set(refresh)
+    noerase = keyword_set(noerase)
+    refresh = keyword_set(refresh)
     if n_elements(background_color) eq 0 then background_color = 'White'
-    if n_elements(retain)           eq 0 then retain=(!version.os_family eq 'windows') ? 1 : 2
-    if n_elements(xsize)            eq 0 then xsize = 640
-    if n_elements(ysize)            eq 0 then ysize = 512
+    if n_elements(retain)           eq 0 then retain           = (!version.os_family eq 'windows') ? 1 : 2
+    if n_elements(xsize)            eq 0 then xsize            = 640
+    if n_elements(ysize)            eq 0 then ysize            = 512
 
     ;Event handlers
     if n_elements(event_handler)        eq 0 then event_handler        = self
@@ -1550,10 +1489,7 @@ _REF_EXTRA=extra
     if n_elements(mouse_wheel_handler)  eq 0 then mouse_wheel_handler  = ''
     
     ;Callback Functions
-    if n_elements(drag_notify)          eq 0 then drag_notify          = {object: self, method: 'Drag_Notify'}
-    if n_elements(drop_handler)         eq 0 then drop_handler         = {object: self, method: 'Drop_Events'}
-    if n_elements(expose_handler)       eq 0 then expose_handler       = {object: self, method: 'Expose_Events'}
-    if n_elements(viewport_handler)     eq 0 then viewport_handler     = {object: self, method: 'Viewport_Events'}
+    if n_elements(drag_notify) eq 0 then drag_notify = {object: self, method: 'Drag_Notify'}
     
     ;Aspect ratio
     if n_elements(aspect) gt 0 then begin
@@ -1563,10 +1499,7 @@ _REF_EXTRA=extra
     endif
     
     ;Allocate heap
-    self._drag_notify          = ptr_new(/ALLOCATE_HEAP)
-    self._drop_handler         = ptr_new(/ALLOCATE_HEAP)
-    self._expose_handler       = ptr_new(/ALLOCATE_HEAP)
-    self._viewport_handler     = ptr_new(/ALLOCATE_HEAP)
+    self._drag_notify = ptr_new(/ALLOCATE_HEAP)
 
 ;---------------------------------------------------------------------
 ; Parent /////////////////////////////////////////////////////////////
@@ -1630,13 +1563,20 @@ _REF_EXTRA=extra
 
     ;Superclass
     success = self -> MrWidgetAtom::INIT(NOTIFY_REALIZE=notify_realize, $
-                                         EVENT_HANDLER=draw_handler, $
                                         _STRICT_EXTRA=extra)
     if success eq 0 then message, 'MrWidgetAtom could not be initialized.'
     
     ;Event handlers
-    self -> SetProperty, EVENT_HANDLER=event_handler,  $
-                         FUNC_HANDLERS=func_handlers, $
+    self -> SetProperty, $;Events On/Off
+                         BUTTON_EVENTS=button_events, $
+                         DROP_EVENTS=drop_events, $
+                         EXPOSE_EVENTS=expose_events, $
+                         KEYBOARD_EVENTS=keyboard_events, $
+                         MOTION_EVENTS=motion_events, $
+                         VIEWPORT_EVENTS=viewport_events, $
+                         WHEEL_EVENTS=wheel_events, $
+                         ;Event Handlers
+                         EVENT_HANDLER=event_handler, $
                          DRAG_NOTIFY=drag_notify, $
                          DROP_HANDLER=drop_handler, $
                          EXPOSE_HANDLER=expose_handler, $
@@ -1650,18 +1590,16 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
 ; Return Step ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-        
-    ;Set the user value of the widget as the TLB object reference.
-    widget_control, self._id, SET_UVALUE=self
 
     ;If we created a new tlb, realize it now and register it with XManager.
     if n_elements(parent) eq 0 and obj_valid(self._oTLB) then begin
         self._oTLB -> XManager
+        self._refresh = 1B
     endif
 
+    self -> Draw
     return, 1
 end
-
 
 
 ;+
@@ -1682,6 +1620,7 @@ pro MrDrawWidget__define, class
              _winID:      0L, $             ;The window ID of the draw window.
              _background: '', $             ;Background color of the display.
              _noerase:    0B, $             ;Prevents the widget from being erased.
+             _pixmap:     obj_new(), $      ;Pixmap window.
              _refresh:    0B, $             ;Refresh the graphics window
              
              ;Draw Event Handlers
@@ -1693,10 +1632,9 @@ pro MrDrawWidget__define, class
              _mouse_wheel_handler:  '', $
              
              ;Method Event Handlers
-             _draw_handler:     ptr_new(), $
              _drag_notify:      ptr_new(), $
-             _drop_handler:     ptr_new(), $
-             _expose_handler:   ptr_new(), $
-             _viewport_handler: ptr_new() $
+             _drop_handler:     '', $
+             _expose_handler:   '', $
+             _viewport_handler: '' $
            }
 end

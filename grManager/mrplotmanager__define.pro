@@ -1358,6 +1358,7 @@ function MrPlotManager::WhatAmI, objRef
         'MRCOLORFILL':  ImA = 'COLORFILL'
         'MRCONTOUR':    ImA = 'CONTOUR'
         'MRIMAGE':      ImA = 'IMAGE'
+        'MRIMAGE2':     ImA = 'IMAGE'
         'MRLEGEND':     ImA = 'LEGEND'
         'MRPLOT':       ImA = 'PLOT'
         'MRPLOTS':      ImA = 'PLOTS'
@@ -1398,7 +1399,7 @@ pro MrPlotManager::Config
               axis: ['MRAXIS'], $
               colorbar: ['WECOLORBAR'], $
               contour: ['MRCONTOUR'], $
-              image: ['MRIMAGE'], $
+              image: ['MRIMAGE', 'MRIMAGE2'], $
               legend: ['WELEGENDITEM', 'MRLEGEND'], $
               overplot: ['WEOVERPLOT'], $
               plot: ['MRPLOT'], $
@@ -1407,7 +1408,7 @@ pro MrPlotManager::Config
               text: ['MRTEXT'], $
               vector: ['MRVECTOR'], $
               ImAData: ['PLOT', 'IMAGE', 'CONTOUR', 'VECTOR'], $     ;TO BE USED WITH ::WHATAMI
-              data: ['MRPLOT', 'MRIMAGE', 'MRCONTOUR', 'MRVECTOR'], $
+              data: ['MRPLOT', 'MRIMAGE', 'MRIMAGE2', 'MRCONTOUR', 'MRVECTOR'], $
               annotate: ['WECOLORBAR', 'MRAXIS', 'WELEGENDITEM', 'WEARROW', 'MRTEXT', $
                          'MRPLOTS', 'WEOVERPLOT', 'MRCOLORFILL', 'MRLEGEND'], $
               files: ['CDF_PLOT'] $

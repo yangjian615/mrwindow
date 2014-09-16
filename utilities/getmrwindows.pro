@@ -36,9 +36,9 @@
 ;   The purpose of this program is to return available MrWindow objects.
 ;
 ; :Params:
-;       NAME:           in, optional, type=string
-;                       Name of the window to be retrieved. The first window by this
-;                           name will be returned.
+;       WINID:          in, optional, type=string
+;                       Either the name or the index of the window to be retrieved. The
+;                           first window by this name will be returned.
 ;
 ; :Keywords:
 ;       CURRENT:        in, optional, type=boolean, default=0
@@ -64,7 +64,7 @@
 ;       2014/02/10  -   !MR_WINDOWS was turned into a container. Updated program. Added
 ;                           the PRINT keyword. - MRA
 ;-
-function GetMrWindows, name, $
+function GetMrWindows, winID, $
 CURRENT=current, $
 NAMES=names, $
 PRINT=print
@@ -94,13 +94,20 @@ PRINT=print
 ;-----------------------------------------------------
     endif else if keyword_set(current) then begin
         result = !MR_WINDOWS -> Get()
-        names = result -> GetName()
+        name   = result -> GetName()
 
 ;-----------------------------------------------------
 ;By Name \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
-    endif else if arg_present(name) then begin
-        result = !MR_WINDOWS -> FindByName(name, COUNT=count)
+    endif else if MrIsA(winID, 'STRING') then begin
+        result = !MR_WINDOWS -> FindByName(winID, COUNT=count)
+        if count gt 1 then result = result[0]
+
+;-----------------------------------------------------
+;By Index \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
+    endif else if MrIsA(winID, /INTEGER) then begin
+        result = !MR_WINDOWS -> Get(POSITION=winID, COUNT=count)
         if count gt 1 then result = result[0]
         
 ;-----------------------------------------------------
@@ -109,8 +116,8 @@ PRINT=print
     endif else begin
         result = !MR_WINDOWS -> Get(/ALL)
         if arg_present(names) then begin
-            names = strarr(nWin)
-            for i = 0, nWin - 1 do names[i] = result[i] -> GetName()
+            winID = strarr(nWin)
+            for i = 0, nWin - 1 do winID[i] = result[i] -> GetName()
         endif
     endelse
 

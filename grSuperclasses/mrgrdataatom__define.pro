@@ -309,7 +309,7 @@ DISABLE=disable
         if obj_valid(target) eq 0 then target = self.window -> GetSelect()
 
         ;Ensure we can overplot on top of the target graphic
-        oplottable = ['MrPlot', 'MrImage', 'MrContour', 'MrVector']
+        oplottable = ['MrPlot', 'MrImage', 'MrImage2', 'MrContour', 'MrVector']
         if min(IsMember(oplottable, MrObj_Class(target), /FOLD_CASE)) eq 0 || $
            min(obj_valid(target)) eq 0 $
         then message, 'TARGET must be valid and of class ' + strjoin(oplottable, ' ')
