@@ -1,10 +1,10 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;   MrColorFill__Define
+;   MrCircle__Define
 ;
 ;*****************************************************************************************
-;   Copyright (c) 2013, Matthew Argall                                                   ;
+;   Copyright (c) 2014, Matthew Argall                                                   ;
 ;   All rights reserved.                                                                 ;
 ;                                                                                        ;
 ;   Redistribution and use in source and binary forms, with or without modification,     ;
@@ -33,8 +33,7 @@
 ;
 ; PURPOSE:
 ;+
-;   The purpose of this program is to create an polyfill object object that can drawn on a
-;   data plot.
+;   Create and draw circles.
 ;
 ; :Categories:
 ;    Graphics
@@ -49,221 +48,36 @@
 ;
 ; :History:
 ;     Change History::
-;       2014/01/11  -   Written by Matthew Argall
-;       2014/01/12  -   Added the doColorFillMulti method. Required changing some object
-;                           properties to pointers. - MRA
-;       2014/03/12  -   Automatically pick a TARGET if one has not been given. Superclass
-;                           properties can now be set/get. - MRA
+;       2014/09/22  -   Written by Matthew Argall
 ;-
 ;*****************************************************************************************
 ;+
-;   The purpose of this method is to draw the ColorFill object to the display window.
-;-
-PRO MrColorFill::Draw, $
-NOERASE=noerase
-    Compile_Opt strictarr
-    
-    ; Catch the error.
-    Catch, theError
-    IF theError NE 0 THEN BEGIN
-        Catch, /CANCEL
-        void = cgErrorMsg()
-        RETURN
-    ENDIF
-
-    ;Return if we are hiding.
-    IF self.hide THEN RETURN
-    
-    ;If data coordinates were chosen, then restore the target's coordinate system.
-    if self.data eq 1B then self.target -> RestoreCoords
-    
-    ;Number of parameters to pass.
-    nparams = 0
-    if n_elements(*self.xcoords) gt 0 then nparams += 1
-    if n_elements(*self.ycoords) gt 0 then nparams += 1
-    if n_elements(*self.zcoords) gt 0 then nparams += 1
-    
-    ;Are multiple colorfills being performed?
-;    if nparas gt 1 and size(*self.xcoords, /N_DIMENSIONS) gt 1 then doMulti = 1 else doMulti = 0
-    doMulti = 0
-    
-    ;Color fill
-    if doMulti $
-        then self -> doColorFillMulti, nparams $
-        else self -> doColorFill, nparams
-END
-
-
-;+
-; This method draws the axis object.
-;-
-PRO MrColorFill::doColorFill, nparams
-    Compile_Opt strictarr
-    
-    ; Catch the error.
-    Catch, theError
-    IF theError NE 0 THEN BEGIN
-        Catch, /CANCEL
-        void = cgErrorMsg()
-        RETURN
-    ENDIF
-    
-    ;Fill the region.
-    case nparams of
-        1: cgColorFill, *self.xcoords, $
-                        CLIP         =  self.clip, $
-                        COLOR        = *self.color, $
-                        DATA         =  self.data, $
-                        DEVICE       =  self.device, $
-                        IMAGE_COORD  = *self.image_coord, $
-                        IMAGE_INTERP =  self.image_interp, $
-                        LINE_FILL    =  self.line_fill, $
-                        LINESTYLE    = *self.linestyle, $
-                        NOCLIP       =  self.noclip, $
-                        NORMAL       =  self.normal, $
-                        ORIENTATION  = *self.orientation, $
-                        PATTERN      = *self.pattern, $
-                        POSITION     = *self.position, $
-                        SPACING      = *self.spacing, $
-                        T3D          =  self.t3d, $
-                        THICK        = *self.thick, $
-                        TRANSPARENT  =  self.transparent, $
-                        Z            = *self.z
-                        
-        2: cgColorFill, *self.xcoords, *self.ycoords, $
-                        CLIP         =  self.clip, $
-                        COLOR        = *self.color, $
-                        DATA         =  self.data, $
-                        DEVICE       =  self.device, $
-                        IMAGE_COORD  = *self.image_coord, $
-                        IMAGE_INTERP =  self.image_interp, $
-                        LINE_FILL    =  self.line_fill, $
-                        LINESTYLE    = *self.linestyle, $
-                        NOCLIP       =  self.noclip, $
-                        NORMAL       =  self.normal, $
-                        ORIENTATION  = *self.orientation, $
-                        PATTERN      = *self.pattern, $
-                        POSITION     = *self.position, $
-                        SPACING      = *self.spacing, $
-                        T3D          =  self.t3d, $
-                        THICK        = *self.thick, $
-                        TRANSPARENT  =  self.transparent, $
-                        Z            = *self.z
-                        
-        3: cgColorFill, *self.xcoords, *self.ycoords, *self.zcoords, $
-                        CLIP         =  self.clip, $
-                        COLOR        = *self.color, $
-                        DATA         =  self.data, $
-                        DEVICE       =  self.device, $
-                        IMAGE_COORD  = *self.image_coord, $
-                        IMAGE_INTERP =  self.image_interp, $
-                        LINE_FILL    =  self.line_fill, $
-                        LINESTYLE    = *self.linestyle, $
-                        NOCLIP       =  self.noclip, $
-                        NORMAL       =  self.normal, $
-                        ORIENTATION  = *self.orientation, $
-                        PATTERN      = *self.pattern, $
-                        POSITION     = *self.position, $
-                        SPACING      = *self.spacing, $
-                        T3D          =  self.t3d, $
-                        THICK        = *self.thick, $
-                        TRANSPARENT  =  self.transparent, $
-                        Z            = *self.z
-    endcase
-END
-
-
-;+
-; This method draws the axis object.
-;-
-PRO MrColorFill::doColorFillMulti, nparams
-    Compile_Opt strictarr
-    
-    ; Catch the error.
-    Catch, theError
-    IF theError NE 0 THEN BEGIN
-        Catch, /CANCEL
-        void = cgErrorMsg()
-        RETURN
-    ENDIF
-    
-    ;Number of ColorFills to perform.
-    n = n_elements((*self.xcoords)[0,*])
-    
-    ;How many elements are present? Repeat them cyclicly
-    nColors = n_elements(self.color)
-;    nLineFill = n_elements(self.line_fill)
-    nLinestyle = n_elements(self.linestyle)
-    norientation = n_elements(self.orientation)
-    nspacing = n_elements(self.spacing)
-    nthick = n_elements(self.thick)
-    
-    ;Fill the region.
-    case nparams of
-        2: for i = 0, n - 1 do $
-            cgColorFill, (*self.xcoords)[*,i], (*self.ycoords)[*,i], $
-                         CLIP         =   self.clip, $
-                         COLOR        = (*self.color)[i mod nColors], $
-                         DATA         =   self.data, $
-                         DEVICE       =   self.device, $
-                         IMAGE_COORD  =  *self.image_coord, $
-                         IMAGE_INTERP =   self.image_interp, $
-                         LINE_FILL    =  *self.line_fill, $
-                         LINESTYLE    = (*self.linestyle)[i mod nLinestyle], $
-                         NOCLIP       =   self.noclip, $
-                         NORMAL       =   self.normal, $
-                         ORIENTATION  = (*self.orientation)[i mod nOrientation], $
-                         PATTERN      =  *self.pattern, $
-                         POSITION     =  *self.position, $
-                         SPACING      = (*self.spacing)[i mod nSpacing], $
-                         T3D          =   self.t3d, $
-                         THICK        = (*self.thick)[i mod nThick], $
-                         TRANSPARENT  =   self.transparent, $
-                         Z            =  *self.z
-                        
-        3: for i = 0, n - 1 do $
-            cgColorFill, (*self.xcoords)[*,i], (*self.ycoords)[*,i], (*self.zcoords)[*,i], $
-                         CLIP         =   self.clip, $
-                         COLOR        = (*self.color)[i mod nColors], $
-                         DATA         =   self.data, $
-                         DEVICE       =   self.device, $
-                         IMAGE_COORD  =  *self.image_coord, $
-                         IMAGE_INTERP =   self.image_interp, $
-                         LINE_FILL    =  *self.line_fill, $
-                         LINESTYLE    = (*self.linestyle)[i mod nLinestyle], $
-                         NOCLIP       =   self.noclip, $
-                         NORMAL       =   self.normal, $
-                         ORIENTATION  = (*self.orientation)[i mod nOrientation], $
-                         PATTERN      =  *self.pattern, $
-                         POSITION     =  *self.position, $
-                         SPACING      = (*self.spacing)[i mod nSpacing], $
-                         T3D          =   self.t3d, $
-                         THICK        = (*self.thick)[i mod nThick], $
-                         TRANSPARENT  =   self.transparent, $
-                         Z            =  *self.z
-    endcase
-END
-
-
-;+
-;   This method serves as a wrapper for the PolyFillV function.
+;   Set the polygon vertex locations.
 ;
 ; :Params:
-;       X:              in, required, type=intarr
-;                       X subscripts of the vertices that define the polygon.
-;       Y:              in, required, type=intarr
-;                       Y subscripts of the vertices that define the polygon.
-;       SX:             in, required, type=integer
-;                       The number of columns in the array surrounding the polygon.
-;       SY:             in, required, type=integer
-;                       The number of rows in the array surrounding the polygon.
-;       RUN_LENGTH:     in, optional, type=boolean, default=0
-;                       If set, return a vector of run lengths, rather than subscripts.
-;                           When run-length encoded, each element with an even subscript
-;                           result contains the length of the run, and the following
-;                           element contains the starting index of the run.
+;       X:              in, required, type=numeric
+;                       A vector argument providing the X coordinates of the points to be
+;                           connected. The vector must contain at least three elements. If
+;                           only one argument is specified, X must be an array of either two
+;                           or three vectors (i.e., (2,*) or (3,*)). In this special case,
+;                           the vector X[0,*] specifies the X values, X[1,*] specifies Y,
+;                           and X[2,*] contain the Z values.
+;       Y:              in, optional, type=numeric
+;                       A vector argument providing the Y coordinates of the points to be
+;                           connected. Y must contain at least three elements.
+;       Z:              in, optional, type=number
+;                       An optional vector argument providing the Z coordinates of the
+;                           points to be connected. Z must contain at least three elements.
+;
+; :Keywords:
+;       POSITION:       in, optional, type=float
+;                       Set to the normal four-element normalized position array for locating 
+;                           a rectangular region in a graphics window. If this keyword is used,
+;                           the x and y parameters are constructed from this position.
 ;-
-function MrColorFill::PolyFillV, x, y, Sx, Sy, run_length
+FUNCTION MrCircle::Create_Circles, r, x_center, y_center, $
+CONNECTIVITY=connectivity, $
+NVERTICES=nVertices
     Compile_Opt strictarr
     
     ; Catch the error.
@@ -274,13 +88,63 @@ function MrColorFill::PolyFillV, x, y, Sx, Sy, run_length
         RETURN, -1
     ENDIF
     
-    ;Default
-    run_length = keyword_set(run_length)
+    ;Defaults
+    IF N_Elements(nVertices) EQ 0 THEN nVertices = 100
+    IF N_Elements(x_center)  EQ 0 THEN x_center  = 0
+    IF N_Elements(y_center)  EQ 0 THEN y_center  = 0
     
-    ;Call PolyFillV
-    result = polyfillv(x, y, Sx, Sy, run_length)
+    ;Create a circle with unit radius
+    x = cos(2*!pi*FIndGen(nVertices)/(nVertices-1))
+    y = sin(2*!pi*FIndGen(nVertices)/(nVertices-1))
 
-    return, result
+    ;Create the circles
+    nCircles = N_Elements(r)
+    r_temp   = Rebin(1#r, nVertices, nCircles)
+    x        = Rebin(x,   nVertices, nCircles) * r_temp
+    y        = Rebin(y,   nVertices, nCircles) * temporary(r_temp)
+    
+    ;Shift the centers
+    x = x + Rebin(1#x_center, nVertices, nCircles)
+    y = y + Rebin(1#y_center, nVertices, nCircles)
+    
+    ;Determine the connectivity
+    ;   - [# of vertices, Index of each vertex]
+    ;   - Repeat pattern for each circle.
+    connectivity = Rebin([nVertices, LIndGen(nVertices)], nVertices+1, nCircles)
+    connectivity[1:nVertices,*] += Rebin(LIndgen(1,nCircles)*nVertices, nVertices, nCircles)
+    connectivity = Reform(connectivity, (nVertices+1)*nCircles)
+    
+    ;Return the circles
+    circles = Transpose([[Reform(Temporary(x), nVertices*nCircles)], $
+                        [Reform(Temporary(y), nVertices*nCircles)]])
+               
+    return, circles
+END
+
+
+;+
+;   Set the polygon vertex locations.
+;
+; :Params:
+;       R:              out, required, type=numeric
+;                       A vector argument providing the X coordinates of the points to be
+;                           connected. The vector must contain at least three elements.
+;       X_CENTER:       out, optional, type=numeric
+;                       A vector argument providing the Y coordinates of the points to be
+;                           connected. Y must contain at least three elements.
+;       Y_CENTER:       out, optional, type=number
+;                       An optional vector argument providing the Z coordinates of the
+;                           points to be connected. Z must contain at least three elements.
+;-
+PRO MrCircle::GetData, r, x_center, y_center
+    Compile_Opt StrictArr
+    On_Error, 2
+    
+    SWITCH N_Params() OF
+        3: y_center = *self._y_center
+        2: x_center = *self._x_center
+        1: r        = *self._radius
+    ENDSWITCH
 END
 
 
@@ -288,19 +152,6 @@ END
 ;   This method obtains the current properties of the object. 
 ; 
 ; :Keywords:
-;       XCOORDS:        out, required, type=numeric
-;                       A vector argument providing the X coordinates of the points to be
-;                           connected. The vector must contain at least three elements. If
-;                           only one argument is specified, X must be an array of either two
-;                           or three vectors (i.e., (2,*) or (3,*)). In this special case,
-;                           the vector X[0,*] specifies the X values, X[1,*] specifies Y,
-;                           and X[2,*] contain the Z values.
-;       YCOORDS:        out, optional, type=numeric
-;                       A vector argument providing the Y coordinates of the points to be
-;                           connected. Y must contain at least three elements.
-;       ZCOORDS:        out, optional, type=number
-;                       An optional vector argument providing the Z coordinates of the
-;                           points to be connected. Z must contain at least three elements.
 ;       CLIP:           out, optional, type=fltarr(4)
 ;                       The coordinates of a rectangle used to clip the graphics output.
 ;                           Coordinates are specified in data units unless `NORMAL` or
@@ -347,10 +198,6 @@ END
 ;                           size; if it is smaller than the filled area the pattern array
 ;                           is cyclically repeated. Postscript output requires
 ;                           Device, Language_Level=2.
-;       POSITION:       out, optional, type=float
-;                       Set to the normal four-element normalized position array for locating 
-;                           a rectangular region in a graphics window. If this keyword is used,
-;                           the x and y parameters are constructed from this position.
 ;       SPACING:        out, optional, type=numeric
 ;                       The spacing, in centimeters, between the parallel lines used to
 ;                           fill polygons.
@@ -369,29 +216,25 @@ END
 ;                       Any keyword accepted by MrGrAtom::GetProperty is also accepted
 ;                           via keyword inheritance.
 ;-
-PRO MrColorFill::GetProperty, $ 
-XCOORDS=xcoords, $
-YCOORDS=ycoords, $
-ZCOORDS=zcoords, $
+PRO MrCircle::GetProperty, $
 CLIP=clip, $
 COLOR=color, $
 DATA=data, $
 DEVICE=device, $
-IMAGE_COORD=image_coord, $
-IMAGE_INTERP=image_interp, $
+FILL_BACKGROUND=fill_background, $
+FILL_COLOR=fill_color, $
+FILL_LINESTYLE=fill_linestyle, $
 LINE_FILL=line_fill, $
 LINESTYLE=linestyle, $
 NOCLIP=noclip, $
 NORMAL=normal, $
 ORIENTATION=orientation, $
-PATTERN=pattern, $
-POSITION=position, $
+RELATIVE=relative, $
 SPACING=spacing, $
 T3D=t3d, $
 TARGET=target, $
 THICK=thick, $
-TRANSPARENT=transparent, $
-Z=zValue, $
+ZVALUE=zValue, $
 _REF_EXTRA=extra
     Compile_Opt strictarr
     
@@ -404,27 +247,24 @@ _REF_EXTRA=extra
     ENDIF
     
     ;Object Properties
-    IF arg_present(xcoords)      GT 0 THEN xcoords      = *self.xcoords
-    IF arg_present(ycoords)      GT 0 THEN ycoords      = *self.ycoords
-    IF arg_present(zcoords)      GT 0 THEN zcoords      = *self.zcoords
-    IF arg_present(clip)         GT 0 THEN clip         =  self.clip
-    IF arg_present(color)        GT 0 THEN color        = *self.color
-    IF arg_present(data)         GT 0 THEN data         =  self.data
-    IF arg_present(device)       GT 0 THEN device       =  self.device
-    IF arg_present(image_coord)  GT 0 THEN image_coord  = *self.image_coord
-    IF arg_present(image_interp) GT 0 THEN image_interp =  self.image_interp
-    IF arg_present(line_fill)    GT 0 THEN line_fill    =  self.line_fill
-    IF arg_present(linestyle)    GT 0 THEN linestyle    = *self.linestyle
-    IF arg_present(noclip)       GT 0 THEN noclip       =  self.noclip
-    IF arg_present(normal)       GT 0 THEN normal       =  self.normal
-    IF arg_present(orientation)  GT 0 THEN orientation  = *self.orientation
-    IF arg_present(pattern)      GT 0 THEN pattern      = *self.pattern
-    IF arg_present(position)     GT 0 THEN position     = *self.position
-    IF arg_present(spacing)      GT 0 THEN spacing      = *self.spacing
-    IF arg_present(t3d)          GT 0 THEN t3d          =  self.t3d
-    IF arg_present(thick)        GT 0 THEN thick        = *self.thick
-    IF arg_present(transparent)  GT 0 THEN transparent  =  self.transparent
-    IF arg_present(zValue)       GT 0 THEN zValue       = *self.z
+    IF Arg_Present(clip)            GT 0 THEN clip            =  self.clip
+    IF Arg_Present(color)           GT 0 THEN color           = *self.color
+    IF Arg_Present(data)            GT 0 THEN data            =  self.data
+    IF Arg_Present(device)          GT 0 THEN device          =  self.device
+    IF Arg_Present(fill_background) GT 0 THEN fill_background =  self.fill_background
+    IF Arg_Present(fill_color)      GT 0 THEN fill_color      = *self.fill_color
+    IF Arg_Present(fill_linestyle)  GT 0 THEN fill_linestyle  = *self.fill_linestyle
+    IF Arg_Present(line_fill)       GT 0 THEN line_fill       =  self.line_fill
+    IF Arg_Present(linestyle)       GT 0 THEN linestyle       = *self.linestyle
+    IF Arg_Present(noclip)          GT 0 THEN noclip          =  self.noclip
+    IF Arg_Present(normal)          GT 0 THEN normal          =  self.normal
+    IF Arg_Present(orientation)     GT 0 THEN orientation     = *self.orientation
+    IF Arg_Present(pattern)         GT 0 THEN pattern         = *self.pattern
+    IF Arg_Present(relative)        GT 0 THEN relative        =  self.relative
+    IF Arg_Present(spacing)         GT 0 THEN spacing         = *self.spacing
+    IF Arg_Present(t3d)             GT 0 THEN t3d             =  self.t3d
+    IF Arg_Present(thick)           GT 0 THEN thick           =  self.thick
+    IF Arg_Present(zValue)          GT 0 THEN zValue          = *self.z
 
     ;Target
     IF Arg_Present(target) GT 0 THEN IF Obj_Valid(self.target) GT 0 $
@@ -437,22 +277,61 @@ END
 
 
 ;+
-;   This method sets the properties of the object.
+;   Set the polygon vertex locations.
 ;
-; :Keywords:
-;       XCOORDS:        in, required, type=numeric
+; :Params:
+;       X:              in, required, type=numeric
 ;                       A vector argument providing the X coordinates of the points to be
 ;                           connected. The vector must contain at least three elements. If
 ;                           only one argument is specified, X must be an array of either two
 ;                           or three vectors (i.e., (2,*) or (3,*)). In this special case,
 ;                           the vector X[0,*] specifies the X values, X[1,*] specifies Y,
 ;                           and X[2,*] contain the Z values.
-;       YCOORDS:        in, optional, type=numeric
+;       Y:              in, optional, type=numeric
 ;                       A vector argument providing the Y coordinates of the points to be
 ;                           connected. Y must contain at least three elements.
-;       ZCOORDS:        in, optional, type=number
+;       Z:              in, optional, type=number
 ;                       An optional vector argument providing the Z coordinates of the
 ;                           points to be connected. Z must contain at least three elements.
+;
+; :Keywords:
+;       POSITION:       in, optional, type=float
+;                       Set to the normal four-element normalized position array for locating 
+;                           a rectangular region in a graphics window. If this keyword is used,
+;                           the x and y parameters are constructed from this position.
+;-
+PRO MrCircle::SetData, r, x_center, y_center, $
+CONNECTIVITY=connectivity, $
+NVERTICES=nVertices, $
+POSITION=position
+    Compile_Opt strictarr
+    
+    ; Catch the error.
+    Catch, theError
+    IF theError NE 0 THEN BEGIN
+        Catch, /CANCEL
+        void = cgErrorMsg()
+        RETURN
+    ENDIF
+    
+    ;Create the circles
+    circles = self -> Create_Circles(r, x_center, y_center, $
+                                     NVERTICES=nVertices, CONNECTIVITY=connectivity)
+    
+    ;Set the data
+    self -> MrPolygon::SetData, circles, CONNECTIVITY=connectivity
+    
+    ;Set object properties
+    *self._radius   = r
+    *self._x_center = x_center
+    *self._y_center = y_center
+END
+
+
+;+
+;   This method sets the properties of the object.
+;
+; :Keywords:
 ;       CLIP:           in, optional, type=fltarr(4)
 ;                       The coordinates of a rectangle used to clip the graphics output.
 ;                           Coordinates are specified in data units unless `NORMAL` or
@@ -499,10 +378,6 @@ END
 ;                           size; if it is smaller than the filled area the pattern array
 ;                           is cyclically repeated. Postscript output requires
 ;                           Device, Language_Level=2.
-;       POSITION:       in, optional, type=float
-;                       Set to the normal four-element normalized position array for locating 
-;                           a rectangular region in a graphics window. If this keyword is used,
-;                           the x and y parameters are constructed from this position.
 ;       SPACING:        in, optional, type=numeric
 ;                       The spacing, in centimeters, between the parallel lines used to
 ;                           fill polygons.
@@ -521,28 +396,24 @@ END
 ;                       Any keyword accepted by MrGrAtom::SetProperty is also accepted
 ;                           via keyword inheritance.
 ;-
-PRO MrColorFill::SetProperty, $ 
-XCOORDS=xcoords, $
-YCOORDS=ycoords, $
-ZCOORDS=zcoords, $
+PRO MrCircle::SetProperty, $
 CLIP=clip, $
 COLOR=color, $
 DATA=data, $
 DEVICE=device, $
-IMAGE_COORD=image_coord, $
-IMAGE_INTERP=image_interp, $
+FILL_BACKGROUND=fill_background, $
+FILL_COLOR=fill_color, $
+FILL_LINESTYLE=fill_linestyle, $
 LINE_FILL=line_fill, $
 LINESTYLE=linestyle, $
 NOCLIP=noclip, $
 NORMAL=normal, $
 ORIENTATION=orientation, $
-PATTERN=pattern, $
-POSITION=position, $
+RELATIVE=relative, $
 SPACING=spacing, $
 T3D=t3d, $
 TARGET=target, $
 THICK=thick, $
-TRANSPARENT=transparent, $
 ZVALUE=zValue, $
 _REF_EXTRA=extra
     Compile_Opt strictarr
@@ -556,24 +427,33 @@ _REF_EXTRA=extra
     ENDIF
     
     ;Object Properties
-    IF N_Elements(xcoords)      GT 0 THEN *self.xcoords      = xcoords
-    IF N_Elements(ycoords)      GT 0 THEN *self.ycoords      = ycoords
-    IF N_Elements(zcoords)      GT 0 THEN *self.zcoords      = zcoords
-    IF N_Elements(clip)         GT 0 THEN  self.clip         = clip
-    IF N_Elements(color)        GT 0 THEN *self.color        = color
-    IF N_Elements(image_coord)  GT 0 THEN *self.image_coord  = image_coord
-    IF N_Elements(image_interp) GT 0 THEN  self.image_interp = image_interp
-    IF N_Elements(line_fill)    GT 0 THEN  self.line_fill    = line_fill
-    IF N_Elements(linestyle)    GT 0 THEN *self.linestyle    = linestyle
-    IF N_Elements(noclip)       GT 0 THEN  self.noclip       = noclip
-    IF N_Elements(orientation)  GT 0 THEN *self.orientation  = orientation
-    IF N_Elements(pattern)      GT 0 THEN *self.pattern      = pattern
-    IF N_Elements(position)     GT 0 THEN *self.position     = position
-    IF N_Elements(spacing)      GT 0 THEN *self.spacing      = spacing
-    IF N_Elements(t3d)          GT 0 THEN  self.t3d          = t3d
-    IF N_Elements(thick)        GT 0 THEN *self.thick        = thick
-    IF N_Elements(transparent)  GT 0 THEN  self.transparent  = transparent
-    IF N_Elements(zValue)       GT 0 THEN *self.z            = zValue
+    IF N_Elements(clip)            GT 0 THEN  self.clip            = clip
+    IF N_Elements(color)           GT 0 THEN *self.color           = color
+    IF N_Elements(fill_background) GT 0 THEN  self.fill_background = keyword_set(fill_background)
+    IF N_Elements(fill_color)      GT 0 THEN *self.fill_color      = fill_color
+    IF N_Elements(fill_linestyle)  GT 0 THEN *self.fill_linestyle  = fill_linestyle
+    IF N_Elements(linestyle)       GT 0 THEN *self.linestyle       = linestyle
+    IF N_Elements(noclip)          GT 0 THEN  self.noclip          = noclip
+    IF N_Elements(spacing)         GT 0 THEN *self.spacing         = spacing
+    IF N_Elements(t3d)             GT 0 THEN  self.t3d             = t3d
+    IF N_Elements(thick)           GT 0 THEN  self.thick           = thick
+    IF N_Elements(zValue)          GT 0 THEN *self.z               = zValue
+
+    ;ORIENTATION
+    ;   - Automatically sets LINE_FILL=1.
+    if n_elements(orientation) gt 0 then begin
+        *self.orientation = orientation
+        line_fill = 1
+    endif
+    
+    ;LINE_FILL
+    ;   = 1 sets FILL_BACKGROUND
+    ;   = 0 must also cause ORIENTATION to be undefined.
+    if n_elements(line_fill) gt 0 then begin
+        self.line_fill = keyword_set(line_fill)
+        if self.line_fill eq 1 then self.fill_background = 1
+        if self.line_fill eq 0 then void = temporary(*self.orientation)
+    endif
 
     IF N_Elements(target) GT 0 THEN IF Obj_Valid(target) $
         THEN self.target = target $
@@ -582,37 +462,47 @@ _REF_EXTRA=extra
     IF N_Elements(extra) GT 0 THEN self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra
 
 ;-----------------------------------------------------
-;Data, Device, Normal \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;Data, Device, Normal, Relative \\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
     ;They depend on one another.
-    if n_elements(data) gt 0 then begin
-        data = keyword_set(data)
-        if data then begin
-            self.normal = 0B
-            self.device = 0B
+    ;   - In order of precedence.
+    if n_elements(relative) gt 0 then begin
+        self.relative = keyword_set(relative)
+        
+        ;Can only use relative coordinates if a target was given.
+        if self.relative && obj_valid(self.target) eq 0 then begin
+            message, 'TARGET not valid. Cannot set RELATIVE.', /INFORMATIONAL
+            self.relative = 0
         endif
         
-        self.data = data
+        ;Must set DATA.
+        if self.relative then data = 1
     endif
     
-    if n_elements(device) gt 0 then begin
-        device = keyword_set(device)
-        if device then begin
-            self.data = 0B
-            self.normal = 0B
+    if n_elements(data) gt 0 then begin
+        self.data = keyword_set(data)
+        if self.data then begin
+            normal = 0B
+            device = 0B
         endif
-        
-        self.device = device
     endif
     
     if n_elements(normal) gt 0 then begin
-        normal = keyword_set(normal)
-        if normal then begin
-            self.data = 0B
-            self.device = 0B
+        self.normal = keyword_set(normal)
+        if self.normal then begin
+            device        = 0B
+            self.data     = 0B
+            self.relative = 0B
         endif
-        
-        self.normal = normal
+    endif
+    
+    if n_elements(device) gt 0 then begin
+        self.device = keyword_set(device)
+        if self.device then begin
+            self.data     = 0B
+            self.normal   = 0B
+            self.relative = 0B
+        endif
     endif
     
     if self.data + self.device + self.normal eq 0 then self.data = 1B
@@ -627,30 +517,24 @@ END
 ;+
 ; The clean-up routine for the object. Destroy pointers, etc.
 ;-
-pro MrColorFill::cleanup
+pro MrCircle::cleanup
     compile_opt idl2
     
     ; catch the error.
     catch, theerror
     if theerror ne 0 then begin
-        catch, /cancel
+        catch, /CANCEL
         void = cgerrormsg()
         return
     endif
     
     ;free pointers
-    ptr_free, self.xcoords
-    ptr_free, self.ycoords
-    ptr_free, self.zcoords
-    ptr_free, self.color
-    ptr_free, self.image_coord
-    ptr_free, self.linestyle
-    ptr_free, self.orientation
-    ptr_free, self.pattern
-    ptr_free, self.position
-    ptr_free, self.spacing
-    ptr_free, self.thick
-    ptr_free, self.z
+    ptr_free, self._radius
+    ptr_free, self._x_center
+    ptr_free, self._y_center
+    
+    ;Superclass
+    self -> MrPolygon::Cleanup
 end
 
 
@@ -676,14 +560,25 @@ end
 ;                           Coordinates are specified in data units unless `NORMAL` or
 ;                           `DEVICE` is specified.
 ;       COLOR:          in, optional, type=string/byte/integer/long, default='rose'
-;                       The name of the fill color. Color names are those used with cgColor. 
-;                           This value can also be a long integer or an index into the
-;                           current color table.
+;                       A color name, color triple, 24-bit color, or indexed color of the
+;                           line around the polygon perimeter. Color names, 24-bit color,
+;                           and color-indices can be arrays, coloring the segments between
+;                           vertices different colors. If fewer colors exist than vertices,
+;                           the colors are repeated cyclicly.
 ;       DATA:           in, optional, type=boolean, default=1
 ;                       Indicate that polygon vertices are in data coordinates. This is
 ;                           the default.
 ;       DEVICE:         in, optional, type=boolean, default=0
 ;                       Set to indicate the polygon vertices are in device coordinates.
+;       FILL_BACKGROUND: in, optional, type=boolean, default=0
+;                       If set, the polygon will be filled. FILL_BACKGROUND takes
+;                           precedence over `LINE_FILL`.
+;       FILL_COLOR:     in, optional, type=string/byte/longarr(3), default='opposite'
+;                       A color name, color triple, or indexed color of the interior of
+;                           the polygon. Used with `FILL_BACKGROUND` and `LINE_FILL`.
+;       FILL_LINESTYLE: in, optional, type=string/integer, default='-'
+;                       Linestyle used with line-filling the interior of the polygon. Used
+;                           with `LINE_FILL`. See `LINESTYLE` for options.
 ;       IMAGE_COORD:    in, optional, type=2xN numeric
 ;                       The fill pattern array subscripts of each of the n polygon
 ;                           vertices. Use this keyword in conjunction with the `PATTERN`
@@ -702,7 +597,14 @@ end
 ;                           thickness, linestyle, orientation, and spacing of the lines
 ;                           may be specified with keywords.
 ;       LINESYTLE:      in, optiona, type=integer, default=0
-;                       Line style used to draw lines when `LINE_FILL` is set.
+;                       Line style used to draw the perimeter of the polygon. Options are::
+;                           0, '-'      Solid
+;                           1, '.'      Dotted
+;                           2, '--'     Dashed
+;                           3, '-.'     Dash-dot
+;                           4, '-:'     Dash-dot-dot
+;                           5, '--'     Long dash
+;                           6, ' '      None
 ;       NOCLIP:         in, optional, type=boolean, default=0
 ;                       If set, suppresses clipping of the polygons.
 ;       NORMAL:         in, optional, type=boolean, default=0
@@ -718,17 +620,38 @@ end
 ;                           is cyclically repeated. Postscript output requires
 ;                           Device, Language_Level=2.
 ;       POSITION:       in, optional, type=float
-;                       Set to the normal four-element normalized position array for locating 
-;                           a rectangular region in a graphics window. If this keyword is used,
-;                           the x and y parameters are constructed from this position.
-;       SPACING:        in, optional, type=numeric
+;                       Set to the normal four-element position array for locating 
+;                           a rectangular region in a graphics window. If this keyword is
+;                           used, the x and y parameters are constructed from this position.
+;       PSYM:           in, optional, type=integer/string, default='None'
+;                       The symbol to make each polygon vertex. Any symbol recognized by
+;                           cgSymCat is accepted.
+;       RELATIVE:       in, optional, type=boolean, default=0
+;                       Set to indicate that the polygon vertices are normalized to the
+;                           dataspace of `TARGET`. Setting this keyword sets `DATA`=1.
+;       SPACING:        in, optional, type=numeric, default=0.0
 ;                       The spacing, in centimeters, between the parallel lines used to
 ;                           fill polygons.
+;       SYMCOLOR:       in, optional, type=float/fltarr, default=`FILL_COLOR`
+;                       Color of each symbol that comprize the polygon vertices. If an
+;                           array is provided, each symbol will be colored differently. If
+;                           there are fewer elements than vertices in the polygon, symbol
+;                           colors are repeated cyclically.
+;       SYMSIZE:        in, optional, type=float/fltarr, default=1.0
+;                       A scale factor for the size of each symbol. If an array is
+;                           provided, each symbol will be sized differently. If there are
+;                           fewer elements than vertices in the polygon, symbol sizes are
+;                           repeated cyclically.
+;       SYMTHICK:       in, optional, type=float/fltarr, default=`FILL_COLOR`
+;                       Thickness of each symbol that comprize the polygon vertices. If an
+;                           array is provided, each symbol will have a different thickness.
+;                           If there are fewer elements than vertices in the polygon,
+;                           symbol thicknesses are repeated cyclically.
 ;       TARGET:         in, optional, type=object
-;                       If coordinates are given in data units, set this to the graphic
-;                           object that defines the data space. If no target is given, the
-;                           first selected object is used. If not objects are selected,
-;                           the highest ordered graphic is used.
+;                       If coordinates are given in `DATA` or `RELATIVE` units, set this
+;                           to the graphic object that defines the data space. If no
+;                           target is given, the first selected object is used. If not
+;                           objects are selected, the highest ordered graphic is used.
 ;       T3D:            in, optional, type=boolean, default=0
 ;                       If set, the generalized transformation matrix in !P.T will be used.
 ;       THICK:          in, optional, type=float, default=1.0
@@ -744,26 +667,28 @@ end
 ;                       Any keyword accepted by MrGrAtom::SetProperty is also accepted
 ;                           via keyword inheritance.
 ;-
-FUNCTION MrColorFill::init, xcoords, ycoords, zcoords, $
-CURRENT=current, $
+FUNCTION MrCircle::init, r, x_center, y_center, $
+;MrCircle
+NVERTICES=nVertices, $
+;MrPolygon
 CLIP=clip, $
 COLOR=color, $
+CONNECTIVITY=connectivity, $
 DATA=data, $
 DEVICE=device, $
-IMAGE_COORD=image_coord, $
-IMAGE_INTERP=image_interp, $
+FILL_BACKGROUND=fill_background, $
+FILL_COLOR=fill_color, $
+FILL_LINESTYLE=fill_linestyle, $
 LINE_FILL=line_fill, $
 LINESTYLE=linestyle, $
 NOCLIP=noclip, $
 NORMAL=normal, $
 ORIENTATION=orientation, $
-PATTERN=pattern, $
-POSITION=position, $
+RELATIVE=relative, $
 SPACING=spacing, $
 T3D=t3d, $
 TARGET=target, $
 THICK=thick, $
-TRANSPARENT=transparent, $
 ZVALUE=zValue, $
 _REF_EXTRA=extra
     Compile_Opt strictarr
@@ -776,82 +701,51 @@ _REF_EXTRA=extra
         RETURN, 0
     ENDIF
     
-;-----------------------------------------------------
-;Target \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-;-----------------------------------------------------
-    ;Find a single target.
-    if n_elements(target) eq 0 then begin
-        target = self -> _GetTarget(/ANY, COUNT=nTargets)
-        if nTargets eq 0 then message, 'Insert MrColorFill failed. No targets available.'
-        if nTargets gt 1 then begin
-            message, 'More than one target available. Choosing first target.', /INFORMATIONAL
-            target = target[0]
-        endif
-    endif
+    ;Allocate heap
+    self._radius   = Ptr_New(/ALLOCATE_HEAP)
+    self._x_center = Ptr_New(/ALLOCATE_HEAP)
+    self._y_center = Ptr_New(/ALLOCATE_HEAP)
 
-;---------------------------------------------------------------------
-;Superclass & Window /////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Window is obtained by MrGrAtom
-    if self -> MrGrAtom::INIT(TARGET=target) eq 0 then $
-        message, 'Unable to initialize MrGrAtom'
-    
-    ;Refresh the window?
-    self.window -> GetProperty, REFRESH=refreshIn
-    if refreshIn then self.window -> Refresh, /DISABLE
+    ;Default to not filling the background (opposite MrPolyFill)
+    fill_background = keyword_set(fill_background)
 
-;---------------------------------------------------------------------
-;Defaults and Allocate Heap to Pointers //////////////////////////////
-;---------------------------------------------------------------------
+    ;Initialize the object
+    ;   - The [xyz]coords parameters have been repurposed
+    ;   - The ::SetData method, when called, will take care of the translation.
+    success = self -> MrPolygon::Init( r, x_center, y_center, $
+                                       CLIP            = clip, $
+                                       COLOR           = color, $
+                                       DATA            = data, $
+                                       DEVICE          = device, $
+                                       FILL_BACKGROUND = fill_background, $
+                                       FILL_COLOR      = fill_color, $
+                                       FILL_LINESTYLE  = fill_linestyle, $
+                                       LINE_FILL       = line_fill, $
+                                       LINESTYLE       = linestyle, $
+                                       NOCLIP          = noclip, $
+                                       NORMAL          = normal, $
+                                       ORIENTATION     = orientation, $
+                                       RELATIVE        = relative, $
+                                       SPACING         = spacing, $
+                                       TARGET          = target, $
+                                       T3D             = t3d, $
+                                       THICK           = thick, $
+                                       ZVALUE          = zValue $
+ ;                                      IMAGE_COORD     = image_coord, $
+ ;                                      IMAGE_INTERP    = image_interp, $
+ ;                                      PATTERN         = pattern, $
+ ;                                      POSITION        = position, $
+ ;                                      PSYM            = psym, $
+ ;                                      SYMCOLOR        = symcolor, $
+ ;                                      SYMSIZE         = simsize, $
+ ;                                      SYMTHICK        = simthick, $
+ ;                                      TRANSPARENT     = transparent, $
+                                     )
+    IF success EQ 0 THEN RETURN, 0
     
-    ;Defaults
-    setDefaultValue, color, 'rose'
-    setDefaultValue, thick, 1.0
+    ;Superclass
+    IF N_Elements(extra) GT 0 THEN self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra
     
-    ;Make pointers valid
-    self.xcoords     = Ptr_New(/ALLOCATE_HEAP)
-    self.ycoords     = Ptr_New(/ALLOCATE_HEAP)
-    self.zcoords     = Ptr_New(/ALLOCATE_HEAP)
-    self.color       = Ptr_New(/ALLOCATE_HEAP)
-    self.image_coord = Ptr_New(/ALLOCATE_HEAP)
-    self.linestyle   = Ptr_New(/ALLOCATE_HEAP)
-    self.orientation = Ptr_New(/ALLOCATE_HEAP)
-    self.pattern     = Ptr_New(/ALLOCATE_HEAP)
-    self.position    = Ptr_New(/ALLOCATE_HEAP)
-    self.spacing     = Ptr_New(/ALLOCATE_HEAP)
-    self.thick       = Ptr_New(/ALLOCATE_HEAP)
-    self.z           = Ptr_New(/ALLOCATE_HEAP)
-
-;---------------------------------------------------------------------
-;Set Properties //////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    self -> SetProperty, XCOORDS=xcoords, $
-                         YCOORDS=ycoords, $
-                         ZCOORDS=zcoords, $
-                         CLIP=clip, $
-                         COLOR=color, $
-                         DATA=data, $
-                         DEVICE=device, $
-                         IMAGE_COORD=image_coord, $
-                         IMAGE_INTERP=image_interp, $
-                         LINE_FILL=line_fill, $
-                         LINESTYLE=linestyle, $
-                         NOCLIP=noclip, $
-                         NORMAL=normal, $
-                         ORIENTATION=orientation, $
-                         PATTERN=pattern, $
-                         POSITION=position, $
-                         SPACING=spacing, $
-                         T3D=t3d, $
-                         TARGET=target, $
-                         THICK=thick, $
-                         TRANSPARENT=transparent, $
-                         ZVALUE=zValue, $
-                         _EXTRA=extra
-    
-    ;Refersh the graphics window
-    if refreshIn then self.window -> Refresh
-                         
     Return, 1
 END
 
@@ -863,32 +757,12 @@ END
 ;     class: out, optional, type=struct
 ;        The class definition as a structure variable. Occasionally useful.
 ;-
-PRO MrColorFill__define, class
+PRO MrCircle__define, class
     
-    class = { MrColorFill, $
-              inherits MrGrAtom, $
-              
-              xcoords: ptr_new(), $
-              ycoords: ptr_new(), $
-              zcoords: ptr_new(), $
-              clip: fltarr(4), $
-              color: ptr_new(), $           ;'', $
-              data: 0B, $
-              device: 0B, $
-              image_coord: ptr_new(), $
-              image_interp: 0B, $
-              line_fill: 0B, $
-              linestyle: ptr_new(), $       ;0B, $
-              noclip: 0B, $
-              normal: 0B, $
-              orientation: ptr_new(), $
-              pattern: ptr_new(), $
-              position: ptr_new(), $
-              spacing: ptr_new(), $
-              target: obj_new(), $
-              t3d: 0B, $
-              thick: ptr_new(), $           ;0.0, $
-              transparent: 0B, $
-              z: ptr_new() $
+    class = { MrCircle, $
+              inherits MrPolygon, $
+              _radius:   ptr_new(), $
+              _x_center: ptr_new(), $
+              _y_center: ptr_new() $
             }
 END

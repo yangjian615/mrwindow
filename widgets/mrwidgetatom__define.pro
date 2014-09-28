@@ -437,6 +437,44 @@ end
 
 
 ;+
+;   Event handling function for Func_Get_Value.
+;
+; :Private:
+;
+; :Params:
+;       UNAME:              in, optional, type=string/strarr
+;                           User-names of the widgets for which the widget ID is to be
+;                               returned.
+;
+; :Returns:
+;       WIDS:               The widget IDs of the widgets with name `UNAME`. Returns zero
+;                               if the UNAME is not found.
+;-
+function MrWidgetAtom::Find_By_UName, uname
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, 0
+    endif
+    
+    ;Return a single name?
+    nNames = n_elements(uname)
+    if nNames eq 1 then return, widget_info(self._id, FIND_BY_UNAME=uname)
+    
+    ;Multiple names
+    ids = lonarr(nNames)
+    for i = 0, nNames - 1 do ids[i] = widget_info(self._id, FIND_BY_UNAME=uname[i])
+    
+    ;Return the results.
+    return, ids
+end
+
+
+;+
 ;   Get object properties. Complementary to retrieving object properties, most of the
 ;   options accessible via Widget_Control and Widget_Info are accessible through this
 ;   method.
@@ -564,7 +602,6 @@ pro MrWidgetAtom::GetProperty, $
  ALL_CHILDREN=all_children, $
  CHILD=child, $
  DISPLAY=display, $
- FIND_BY_UNAME=find_by_uname, $
  FONT_NAME=font_name, $
  GEOMETRY=geometry, $
  MANAGED=managed, $
@@ -638,7 +675,6 @@ pro MrWidgetAtom::GetProperty, $
     if arg_present(all_children)   gt 0 then all_children  = widget_info(self._id, /ALL_CHILDREN)
     if arg_present(child)          gt 0 then child         = widget_info(self._id, /CHILD)
     if arg_present(display)        gt 0 then display       = widget_info(self._id, /DISPLAY)
-    if n_elements(find_by_uname)   gt 0 then find_by_uname = widget_info(self._id,  FIND_BY_UNAME=find_by_uname)
     if arg_present(font_name)      gt 0 then font_name     = widget_info(self._id, /FONT_NAME)
     if arg_present(geometry)       gt 0 then geometry      = widget_info(self._id, /GEOMETRY)
     if arg_present(managed)        gt 0 then managed       = widget_info(self._id, /MANAGED)
@@ -981,7 +1017,7 @@ pro MrWidgetAtom::SetProperty, $
     if n_elements(event_pro)        gt 0 then self -> _Set_Event_Pro, event_pro
     if n_elements(event_obj)        gt 0 then self._event_obj        = event_obj
     if n_elements(tracking_handler) gt 0 then self._tracking_handler = tracking_handler  
-    
+
     ;FUNC_GET_VALUE
     if n_elements(func_get_value) gt 0 then begin
         case size(func_get_value, /TNAME) of
@@ -1065,15 +1101,15 @@ end
 pro MrWidgetAtom::_Set_Event_Pro, event_pro
     compile_opt strictarr
     on_error, 2
-    
+
     ;Set the Callback Procedure
     if event_pro eq '' $
         then widget_control, self._id, EVENT_PRO='' $
         else widget_control, self._id, EVENT_PRO=obj_class(self) + '_Event_Pro'
-    self._event_pro = event_pro
     
-    ;Make sure the event function is not being called
-    if event_pro ne '' then self -> _Set_Event_Func, ''
+    ;Setting EVENT_PRO will automatically set EVENT_FUNC=''
+    self._event_pro = event_pro
+    self._event_func = ''
 end
 
 
@@ -1095,10 +1131,10 @@ pro MrWidgetAtom::_Set_Event_Func, event_func
     if event_func eq '' $
         then widget_control, self._id, EVENT_FUNC='' $
         else widget_control, self._id, EVENT_FUNC=obj_class(self) + '_Event_Func'
-    self._event_func = event_func
     
-    ;Make sure the event procedure is not being called
-    if event_func ne '' then self -> _Set_Event_Pro, ''
+    ;Setting EVENT_FUNC will automatically set EVENT_PRO=''
+    self._event_func = event_func
+    self._event_pro = ''
 end
 
 
@@ -1120,15 +1156,16 @@ pro MrWidgetAtom::Cleanup
     
     ;Free the user value
     ptr_free, self.uvalue
+
+    ;If the widget is still valid, destroy it.
+    ;   - We need the Kill_Notify event handler.
+    if widget_info(self._id, /VALID_ID) then widget_control, self._id, /DESTROY
     
     ;Free event handlers (but do not destroy callback objects)
     ptr_free, self._func_get_value
     ptr_free, self._kill_notify
     ptr_free, self._notify_realize
     ptr_free, self._pro_set_value
-
-    ;If the widget is still valid, destroy it.
-    if widget_info(self._ID, /VALID_ID) then widget_control, self._id, /DESTROY
 end
 
 
@@ -1200,6 +1237,7 @@ end
 ;                               the Get/SetProperty methods to access the object's UVALUE.
 ;-
 function MrWidgetAtom::init, parent, $
+ ID        = id, $
  NO_COPY   = no_copy, $
  SENSITIVE = sensitive, $
  UNAME     = uname, $
@@ -1256,9 +1294,10 @@ function MrWidgetAtom::init, parent, $
                          PRO_SET_VALUE=pro_set_value, $
                          TRACKING_EVENTS=tracking_events, $
                          TRACKING_HANDLER=tracking_handler
-    
+
     ;Store the object as the uservalue
     Widget_Control, self._id, SET_UVALUE=self
+    if arg_present(id) then id = self._id    
     
     return, 1
 end
@@ -1288,7 +1327,7 @@ pro MrWidgetAtom__define, class
               _id:               0L, $
               _event_func:       '', $
               _event_pro:        '', $
-              _event_obj:        obj_valid(), $
+              _event_obj:        obj_new(), $
               _func_get_value:   ptr_new(), $
               _kill_notify:      ptr_new(), $
               _notify_realize:   ptr_new(), $

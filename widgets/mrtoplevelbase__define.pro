@@ -148,7 +148,7 @@ pro MrTopLevelBase_Event_Pro, event
         void = cgErrorMsg()
         return
     endif
-    
+
     MrWidgetAtom_Event_Pro, event, STATUS=status
     if status ne 0 then return
     
@@ -203,7 +203,7 @@ pro MrTopLevelBase_Event_Pro, event
         endcase
                 
         'WIDGET_KILL_REQUEST': begin
-            oRef -> GetProperty, TLB_KILL_REQUEST_HANLDER=kill_request_handler
+            oRef -> GetProperty, TLB_KILL_REQUEST_HANDLER=kill_request_handler
             if kill_request_handler ne '' then begin
                 if tf_event_obj $
                     then Call_Method, kill_request_handler, event_obj, event $
@@ -626,7 +626,7 @@ YOFFSET=yoffset
     ;Event Handler
     if n_elements(event_handler) eq 0 then begin
          if self._event_pro ne '' $
-            then event_handler = self._event_pro $
+            then event_handler = widget_info(self._id, /EVENT_PRO) $
             else event_handler = 'MrTopLevelBase_Event_Pro'
     endif
 

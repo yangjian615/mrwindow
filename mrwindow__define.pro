@@ -805,7 +805,7 @@ pro MrWindow::Focus, event
     ;---------------------------------------------------------------------
         ;Get all of the objects that are selectable
         newSelect = self -> HitTest(event.x, event.y, COUNT=nHits, $
-                                    ISA=['MRPLOT', 'MRIMAGE', 'MRIMAGE2', 'MRCOLORBAR', 'MRCONTOUR'])
+                                    ISA=['MRPLOT', 'MRIMAGE', 'MRCOLORBAR', 'MRCONTOUR'])
         if nHits eq 0 then return
 
         ;Were modifiers pressed?

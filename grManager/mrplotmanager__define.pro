@@ -1355,10 +1355,10 @@ function MrPlotManager::WhatAmI, objRef
     className = typename(objRef)
     case className of
         'MRAXIS':       ImA = 'AXIS'
-        'MRCOLORFILL':  ImA = 'COLORFILL'
+        'MRPOLYGON':    ImA = 'COLORFILL'
+        'MRCIRCLE':     ImA = 'COLORFILL'
         'MRCONTOUR':    ImA = 'CONTOUR'
         'MRIMAGE':      ImA = 'IMAGE'
-        'MRIMAGE2':     ImA = 'IMAGE'
         'MRLEGEND':     ImA = 'LEGEND'
         'MRPLOT':       ImA = 'PLOT'
         'MRPLOTS':      ImA = 'PLOTS'
@@ -1399,18 +1399,18 @@ pro MrPlotManager::Config
               axis: ['MRAXIS'], $
               colorbar: ['WECOLORBAR'], $
               contour: ['MRCONTOUR'], $
-              image: ['MRIMAGE', 'MRIMAGE2'], $
+              image: ['MRIMAGE'], $
               legend: ['WELEGENDITEM', 'MRLEGEND'], $
               overplot: ['WEOVERPLOT'], $
               plot: ['MRPLOT'], $
               plots: ['MRPLOTS'], $
-              polyfill: ['MRCOLORFILL'], $
+              polyfill: ['MRPOLYGON', 'MRCIRCLE'], $
               text: ['MRTEXT'], $
               vector: ['MRVECTOR'], $
               ImAData: ['PLOT', 'IMAGE', 'CONTOUR', 'VECTOR'], $     ;TO BE USED WITH ::WHATAMI
-              data: ['MRPLOT', 'MRIMAGE', 'MRIMAGE2', 'MRCONTOUR', 'MRVECTOR'], $
+              data: ['MRPLOT', 'MRIMAGE', 'MRCONTOUR', 'MRVECTOR'], $
               annotate: ['WECOLORBAR', 'MRAXIS', 'WELEGENDITEM', 'WEARROW', 'MRTEXT', $
-                         'MRPLOTS', 'WEOVERPLOT', 'MRCOLORFILL', 'MRLEGEND'], $
+                         'MRPLOTS', 'WEOVERPLOT', 'MRPOLYGON', 'MRLEGEND', 'MRCIRCLE'], $
               files: ['CDF_PLOT'] $
             }
     

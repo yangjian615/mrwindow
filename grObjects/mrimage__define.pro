@@ -63,6 +63,7 @@
 ;       2014/09/15  -   Removed the RLOG property. ::PrepImage scales the image correctly.
 ;                           Out-of-range pixels determined before change from polar to
 ;                           cartesian coordinates. Added the doPolarAxes method. - MRA
+;       2014/09/17  -   MISSING_INDEX is only loaded when necessary. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -374,7 +375,7 @@ NOERASE=noerase
               XLOG          =       xlog, $
               XMINOR        = *self.xminor, $
               XRANGE        =       xrange, $
-              XSTYLE        =       xstyle, $
+              XSTYLE        = *self.xstyle, $
               XTICK_GET     = *self.xtick_get, $
               XTICKFORMAT   = *self.xtickformat, $
               XTICKINTERVAL = *self.xtickinterval, $
@@ -391,7 +392,7 @@ NOERASE=noerase
               YLOG          =       ylog, $
               YMINOR        = *self.yminor, $
               YRANGE        =       yrange, $
-              YSTYLE        =       ystyle, $
+              YSTYLE        = *self.ystyle, $
               YTICK_GET     = *self.ytick_get, $
               YTICKFORMAT   = *self.ytickformat, $
               YTICKINTERVAL = *self.ytickinterval, $
@@ -411,7 +412,7 @@ NOERASE=noerase
 ;              LINESTYLE:     Ptr_New(), $
 
     endif
-    
+
     ;Polar axes?
     if self.axes && self.polar then self -> DoPolarAxes, XRANGE=xrange, YRANGE=yrange
     
@@ -446,7 +447,6 @@ pro MrImage::doImage
 ;---------------------------------------------------------------------
 ; Position Within Axes ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    
     ;Was a data position explicitly given?
     ;   - Make sure it is always within the data range
     if n_elements(*self.data_pos) gt 0 && $
@@ -457,9 +457,18 @@ pro MrImage::doImage
         data_pos[1] >= (*self.yrange)[0]
         data_pos[2] <= (*self.xrange)[1]
         data_pos[3] <= (*self.yrange)[1]
+        
+        ;Find the index range of the data position
+        ixrange = getIndexRange(*self.indep, data_pos[[0,2]])
+        iyrange = getIndexRange(*self.dep,   data_pos[[1,3]])
     
     ;If not, the data position is the data range
     endif else begin
+        ;Get the index range into the data
+        ixrange = getIndexRange(*self.indep, *self.xrange)
+        iyrange = getIndexRange(*self.dep,   *self.yrange)
+        
+        ;Set the data position
         data_pos        = dblarr(4)
         data_pos[[0,2]] = (*self.indep)[ixrange]
         data_pos[[1,3]] = (*self.dep)[iyrange]
@@ -482,7 +491,6 @@ pro MrImage::doImage
 ;---------------------------------------------------------------------
     ;Position of the image
     ;   - Convert to device coordinates
-    position = self.layout -> GetPosition()
     if self.normal then begin
         position[[0,2]] = floor(position[[0,2]] * !d.x_vsize)
         position[[1,3]] = floor(position[[1,3]] * !d.y_vsize)
@@ -504,10 +512,8 @@ pro MrImage::doImage
 ;---------------------------------------------------------------------
     
     ;Include only those pixels that are inside the data range.
-    ixrange = getIndexRange(*self.indep, *self.xrange)
-    iyrange = getIndexRange(*self.dep,   *self.yrange)
     iData   = [ixrange[0], iyrange[0], ixrange[1], iyrange[1]]
-    
+
     ;size the image differently, depending out the output window
     if !D.Name eq 'PS' then begin
         tv, (*self.img_out)[iData[0]:iData[2], iData[1]:iData[3]], $
@@ -1157,6 +1163,8 @@ pro MrImage::PrepImage
         
         ;Check for infinities
         iInf = where(finite(img_out, /INFINITY), nInf)
+        
+        ;Swap infinities for NaNs so that they are removed.
         if nInf gt 0 then begin
             img_out[iInf] = !values.f_nan
             self.nan      = 1
@@ -1167,6 +1175,16 @@ pro MrImage::PrepImage
 ; Prepare a Mask of Missing Values ///////////////////////////////////
 ;---------------------------------------------------------------------
     if n_elements(*self.missing_value) gt 0 || self.nan then begin
+        ;Convert to float
+        ;   - All missing values are converted to NaNs temporarily.
+        ;   - Allows setting /NAN keyword in, e.g. BytScl.
+        imgType = size(img_out, /TNAME) 
+        case imgType of
+            'FLOAT':  ;Do nothing
+            'DOUBLE': ;Do nothing
+            else:     img_out = float(img_out)
+        endcase
+    
         ;Create a mask. 1=display, 0=hide (mask)
         mask = bytarr(size(img_out, /DIMENSIONS)) + 1B
         
@@ -1182,10 +1200,15 @@ pro MrImage::PrepImage
         if nNaN     gt 0 then mask[iNaN]     = 0B
         if nMissing gt 0 then mask[iMissing] = 0B
 
-        ;The missing color index is TOP+1. Set missing values equal to the missing
-        ;color index.
+        ;Find missing values
         ikeep = where(mask eq 1, nkeep, COMPLEMENT=iMask, NCOMPLEMENT=nmask)
-        if nmask gt 0 then img_out[iMask] = self.missing_index
+        
+        ;Set them equal to NaN
+        if nMask gt 0 then begin
+            if imgType eq 'DOUBLE' $
+                then img_out[iMask] = !values.d_nan $
+                else img_out[iMask] = !values.f_nan
+        endif
     endif
 
 ;---------------------------------------------------------------------
@@ -1194,18 +1217,20 @@ pro MrImage::PrepImage
 	if self.scale then begin
 	    range = self.log ? MrLog(self.range) : self.range
 
-        ;Scale non-missing values
-        iScale = where(img_out ne self.missing_index, nScale)
-        if nScale gt 0 then begin
-            img_out[iScale] = bytscl(img_out[iScale], $
-                                     MIN=range[0], MAX=range[1], $
-                                     TOP=self.top-self.bottom, $
-                                     NAN=self.nan)
-        endif
+        ;Scale the image
+        ;   - Set the NaN flag
+        img_out = bytscl(img_out, $
+                         MIN=range[0], MAX=range[1], $
+                         TOP=self.top-self.bottom, $
+                         /NAN)
         
         ;BYTSCL scales between 0 and TOP. Bump everything up by BOTTOM.
         if self.bottom ne 0 then img_out += self.bottom
 	endif
+	
+	;Replace missing values with missing index
+	if n_elements(nMask) gt 0 $
+        then if nMask gt 0 then img_out[iMask] = self.missing_index
 	
 	;Store the result
 	*self.img_out = img_out
@@ -1238,24 +1263,34 @@ TOP = top
     
     ;Get the initial color palette
     tvlct, r_start, g_start, b_start, /GET
-    scale_flag = 0
 
     ;Defaults
     if n_elements(ctindex) eq 0 then $
-        if n_elements(*self.ctindex) gt 0 then ctindex = *self.ctindex
-    if n_elements(missing_color) eq 0 then missing_color = self.missing_color
-    if n_elements(missing_index) eq 0 then missing_index = self.missing_index
-    if n_elements(palette)       eq 0 then palette       = self.palette
+        if n_elements(*self.ctindex) gt 0 then ctindex   = *self.ctindex
+    if n_elements(missing_color) eq 0 then missing_color =  self.missing_color
+    if n_elements(missing_index) eq 0 then missing_index =  self.missing_index
+    if n_elements(palette)       eq 0 then palette       =  self.palette
+
+    ;Rescale
+    scale_flag = 0
 
 ;---------------------------------------------------------------------
 ;Load a Color Table Index? ///////////////////////////////////////////
 ;---------------------------------------------------------------------    
     if n_elements(ctindex) gt 0 then begin
-        bottom  = n_elements(bottom)  gt 0 ? 0B > bottom < 255B   : self.bottom
-        brewer  = n_elements(brewer)  gt 0 ? keyword_set(brewer)  : self.brewer
-        nColors = n_elements(nColors) gt 0 ? 1 > nColors < 256    : self.top - bottom + 1
-        reverse = n_elements(reverse) gt 0 ? keyword_set(reverse) : self.reverse
-        top     = n_elements(top)     gt 0 ? 0B > top < 255B      : self.top
+        bottom  = n_elements(bottom)  gt 0 ? 0B > bottom < 255B         : self.bottom
+        brewer  = n_elements(brewer)  gt 0 ? keyword_set(brewer)        : self.brewer
+        nColors = n_elements(nColors) gt 0 ? 1 > nColors < 256          : self.top - bottom + 1
+        reverse = n_elements(reverse) gt 0 ? keyword_set(reverse)       : self.reverse
+        top     = n_elements(top)     gt 0 ? 0B > top < !d.table_size-1 : self.top
+    
+        ;Missing index
+        ;   - If the missing index is at the top/bottom of the color table,
+        ;       adjust the top/bottom to hide it.
+        if missing_color ne '' then begin
+            if missing_index eq !d.table_size-1 then top    = top    < !d.table_size-2
+            if missing_index eq 0B              then bottom = bottom > 1B
+        endif
         
         ;Number of colors being loaded
         nColors = top - bottom + 1
@@ -1268,7 +1303,7 @@ TOP = top
         ;Did the number of colors change?
         if (ncolors ne self.top - self.bottom + 1) || (bottom ne self.bottom) then begin
             top = bottom + ncolors - 1
-            if ncolors ne 256 then scale_flag = 1
+            scale_flag = 1
         endif
         
     ;If a palette was given, clear the color table.
@@ -1292,11 +1327,11 @@ TOP = top
     tvlct, palette, /GET
     
     if ctindex ge 0 then begin
-        self.bottom = bottom
-        self.brewer = brewer
+         self.bottom  = bottom
+         self.brewer  = brewer
         *self.ctindex = ctindex
-        self.reverse = reverse
-        self.top = top
+         self.reverse = reverse
+         self.top     = top
     endif
     self.palette       = palette
     self.missing_color = missing_color
@@ -1306,10 +1341,7 @@ TOP = top
     tvlct, r_start, g_start, b_start
     
     ;Does the image now need to be scaled?
-    if scale_flag eq 1 then begin
-        self.scale = 1
-        self -> PrepImage
-    endif
+    if scale_flag then if self.scale then self -> PrepImage
     
     ;Redraw
     self.window -> Draw
@@ -1716,21 +1748,37 @@ _REF_EXTRA = extra
         return
     endif
 
+    reprep_flag = 0B
+
     ;MrImage Keywords
     if n_elements(iDisplay)    ne 0 then self.iDisplay = iDisplay
     if n_elements(TV)          ne 0 then self.tv = keyword_set(tv)
 
     ;mraImage.pro Properties
-    if n_elements(axes)           ne 0 then  self.axes           = keyword_set(axes)
+    if n_elements(axes)           gt 0 then  self.axes           = keyword_set(axes)
     if n_elements(data_pos)       gt 0 then *self.data_pos       = data_pos
     if n_elements(noclip)         ne 0 then *self.noclip         = keyword_set(noclip)
-    if n_elements(range)          ne 0 then  self.range          = range
     if n_elements(pol_axstyle)    gt 0 then  self.pol_axstyle    = pol_axstyle
     if n_elements(pol_thick)      gt 0 then  self.pol_thick      = pol_thick
     if n_elements(pol_rcolor)     gt 0 then  self.pol_rcolor     = pol_rcolor
     if n_elements(pol_rlinestyle) gt 0 then  self.pol_rlinestyle = pol_rlinestyle
     if n_elements(pol_tcolor)     gt 0 then  self.pol_tcolor     = pol_tcolor
     if n_elements(pol_tlinestyle) gt 0 then  self.pol_tlinestyle = pol_tlinestyle
+    
+    ;SCALE
+    ;   - RANGE is set.
+    nRange = n_elements(range)
+    if nRange gt 0 then begin
+        ;User-defined range?
+        if range[0] ne range[1] then begin
+            self.range = range
+            if self.scale eq 0 then scale = 1
+            
+        ;Automatic range
+        endif else begin
+            self.range = [min(*self.image, MAX=maxIm, /NAN), maxIm]
+        endelse
+    endif
     
     ;PREP-IMAGE
     ;   - These keywords require the image to be re-prepped
@@ -1744,8 +1792,7 @@ _REF_EXTRA = extra
         if nNaN     gt 0 then  self.nan           = keyword_set(nan)
         if nMissing gt 0 then *self.missing_value = missing_value
         if nLog     gt 0 then  self.log           = keyword_set(log)
-        if nRange   gt 0 then  self.range         = range
-        self -> PrepImage
+        reprep_flag = 1B
     endif
     
     ;PAINT
@@ -1771,6 +1818,9 @@ _REF_EXTRA = extra
     ;Superclass properties
     if n_elements(extra) gt 0 $
         then self -> MrGrDataAtom::SetProperty, _EXTRA=extra
+
+    ;Prep the image?
+    if reprep_flag then self -> PrepImage
 
     ;Refresh the window
     self.window -> Draw
@@ -2035,28 +2085,14 @@ _REF_EXTRA = extra
     self.xMin          = ptr_new(/ALLOCATE_HEAP)
     self.yMax          = ptr_new(/ALLOCATE_HEAP)
     self.yMin          = ptr_new(/ALLOCATE_HEAP)
-
-;---------------------------------------------------------------------
-; Set Data ///////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Must be set before calling ::SetData
-    self.log   = keyword_set(log)
-    self.polar = keyword_set(polar)
-    self.tv    = keyword_set(tv)
-    self.top   = n_elements(top) eq 0 ? 255 : top
-	if n_elements(missing_value) gt 0 then *self.missing_value = missing_value
-
-    ;Must set TV first.
-    ;   - Setting the data will also set the ranges.
-    ;   - Set care of user-supplied ranges below.
-    self -> SetData, theImage, x, y, x0, y0, x1, y1
         
 ;---------------------------------------------------------------------
 ; Color Palette //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+    
     ;Colors
-	;   - Foreground, Background, and Missing Color.
-	;   - Default to putting the missing color at the top of the color table.
+	;   - Foreground, Background, and Missing Index.
+	;   - Default to putting the missing value at the top of the color table.
 	;   - Use as much of the color table as possible.
 	;   - Make sure a color table or color palette was given.
 	brewer  = keyword_set(brewer)
@@ -2066,20 +2102,13 @@ _REF_EXTRA = extra
 	if n_elements(pol_rcolor)    eq 0 then pol_rcolor    = color
 	if n_elements(pol_tcolor)    eq 0 then pol_tcolor    = color
     if n_elements(background)    eq 0 then background    = 'white'
-    if n_elements(missing_color) eq 0 then missing_color = background
-    if n_elements(missing_index) eq 0 then missing_index = 255B
-	if n_elements(bottom)        eq 0 then bottom = 0B
-	if n_elements(top) eq 0 then begin
-	    if n_elements(missing_value) eq 0 and keyword_set(nan) eq 0 $
-	        then top = !d.table_size-1 $
-	        else top = !d.table_size-2
-	endif else begin
-	    if top eq !d.table_size-1 and (n_elements(missing_value) ne 0 or keyword_set(NaN)) $
-	        then top = !d.table_size-2
-	endelse
+    if n_elements(missing_color) eq 0 then missing_color = ''
+    if n_elements(missing_index) eq 0 then missing_index = !d.table_size - 1
+    if n_elements(top)           eq 0 then top           = !d.table_size - 1
 	if n_elements(palette) eq 0 && n_elements(ctindex) eq 0 then ctindex = 13
 
 	;Set the palette
+	;   - Do not set the SCALE property before now.
 	self -> SetPalette, BOTTOM        = bottom, $
                         BREWER        = brewer, $
                         CTINDEX       = ctindex, $
@@ -2091,11 +2120,40 @@ _REF_EXTRA = extra
                         TOP           = top
 
 ;---------------------------------------------------------------------
+; Set Data ///////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;
+    ; Set properties needed for ::PrepImage and ::SetPixelLocations
+    ; before either of them are called in ::SetData
+    ;
+    
+    ;Pixel-related properties
+    ;   - Those not set in the colors section above.
+    self.log   = keyword_set(log)
+    self.polar = keyword_set(polar)
+    self.tv    = keyword_set(tv)
+    
+    ;Image output-related properties
+    ;   - Scale the image if range[0] ne range[1] (user-given range)
+    if n_elements(range) eq 0 then range = [0,0]
+    if range[0] ne range[1]   then scale = 1B
+    self.scale = keyword_set(scale)
+	self.nan   = keyword_set(nan)
+    if n_elements(missing_value) gt 0 then *self.missing_value = missing_value
+
+    ;Set the data
+    self -> SetData, theImage, x, y, x0, y0, x1, y1
+    
+;---------------------------------------------------------------------
 ;Check/Set Keywords //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
+    ;RANGE
+    ;   - Automatic range has been set in ::SetData.
+    if range[0] ne range[1] then self.range = range
+
     ;Set the object properties
-    ;   [-XY]RANGE must be set after the data is set.
+    ;   - [XY]RANGE must be set after the data is set.
     self -> SetProperty, AXES           = axes, $
                          AXISCOLOR      = axiscolor, $
                          CENTER         = center, $
@@ -2104,7 +2162,6 @@ _REF_EXTRA = extra
                          IDISPLAY       = iDisplay, $
                          MAX_VALUE      = max_value, $
                          MIN_VALUE      = min_value, $
-                         NAN            = nan, $
                          NOCLIP         = noclip, $
                          NORMAL         = normal, $
                          POL_AXSTYLE    = pol_axstyle, $
@@ -2113,8 +2170,6 @@ _REF_EXTRA = extra
                          POL_TCOLOR     = pol_tcolor, $
                          POL_TLINESTYLE = pol_tlinestyle, $
                          POL_THICK      = pol_thick, $
-                         RANGE          = range, $
-                         SCALE          = scale, $
                          TITLE          = title, $
                          XLOG           = xlog, $
                          XRANGE         = xrange, $
@@ -2138,7 +2193,7 @@ _REF_EXTRA = extra
     if n_elements(*self.ystyle) eq 0 $
         then *self.ystyle = 1 $
         else *self.ystyle += ~(*self.ystyle and 1)
-        
+            
     ;Set the initial x- and y-range
     self.init_xrange = *self.xrange
     self.init_yrange = *self.yrange

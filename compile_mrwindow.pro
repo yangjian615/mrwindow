@@ -44,7 +44,8 @@
 
 ;Graphic Objects
 .comp ./grObjects/mraxis__define.pro
-.comp ./grObjects/mrcolorfill__define.pro
+.comp ./grObjects/mrpolygon__define.pro
+.comp ./grObjects/mrcircle__define.pro
 .comp ./grObjects/mrcontour__define.pro
 .comp ./grObjects/mrimage__define.pro
 .comp ./grObjects/mrlegend__define.pro
