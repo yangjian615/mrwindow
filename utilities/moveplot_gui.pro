@@ -1,1 +1,1 @@
-/Users/argall/Documents/Work/Programs/MyLibraryIDL/guis/moveplot_gui.pro
+/Users/argall/Documents/IDL/IDLlib/guis/moveplot_gui.pro

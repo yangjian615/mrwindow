@@ -1,1 +1,1 @@
-/Users/argall/Documents/Work/Programs/MyLibraryIDL/plot_utils/mrpixeldeltas.pro
+/Users/argall/Documents/IDL/IDLlib/plot_utils/mrpixeldeltas.pro

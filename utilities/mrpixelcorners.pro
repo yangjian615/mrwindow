@@ -1,1 +1,1 @@
-/Users/argall/Documents/Work/Programs/MyLibraryIDL/plot_utils/mrpixelcorners.pro
+/Users/argall/Documents/IDL/IDLlib/plot_utils/mrpixelcorners.pro
