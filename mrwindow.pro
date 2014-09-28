@@ -98,15 +98,6 @@
 ;       2014/01/22  -   Removed unused TEXT, PLOTOBJECTS, and ARROWS keywords - MRA
 ;-
 function MrWindow, parent, $
-;MrWindow Keywords
-DRAW = draw, $
-NAME = name, $
-NOGUI = noGUI, $
-BUFFER = buffer, $
-REFRESH = refresh, $
-SAVEDIR = savedir, $
-XSIZE = xsize, $
-YSIZE = ysize, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -119,15 +110,7 @@ _REF_EXTRA = extra
     endif
     
     ;Create a MrWindow object reference.
-    oMrWindow = obj_new('MrWindow', parent, $
-                                    DRAW = draw, $
-                                    NOGUI = noGUI, $
-                                    BUFFER = buffer, $
-                                    REFRESH = refresh, $
-                                    SAVEDIR = savedir, $
-                                    XSIZE = xsize, $
-                                    YSIZE = ysize, $
-                                    _EXTRA = extra)
+    oMrWindow = obj_new('MrWindow', parent, _EXTRA = extra)
                                     
     return, oMrWindow
 end

@@ -39,11 +39,11 @@
 ;                           If set, the plot will be added to the current MrWindow
 ;                               graphics window.
 ;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by weLegendItem__define.
+;                           Any keyword accepted by MrLegend__define.
 ;
 ; :Returns:
 ;       THELEGEND:          out, required, type=object
-;                           A weLegendItem object reference.
+;                           A MrLegend object reference.
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -59,6 +59,7 @@
 ; :History:
 ;	Modification History::
 ;       2013/11/27  -   Written by Matthew Argall.
+;       2014/06/10  -   Use the MrLegend object instead of weLegendItem. - MRA
 ;-
 function MrLegend, $
  CURRENT=current, $
@@ -77,7 +78,7 @@ _REF_EXTRA = extra
     current = keyword_set(current)
 
     ;Create the legend
-    theLegend = obj_new('weLegendItem', CURRENT=current, _STRICT_EXTRA=extra)
+    theLegend = obj_new('MrLegend', CURRENT=current, _STRICT_EXTRA=extra)
     
     return, theLegend
 end

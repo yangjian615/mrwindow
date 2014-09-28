@@ -4,7 +4,7 @@
 ;       MrImage__Define
 ;
 ;*****************************************************************************************
-;   Copyright (c) 2013, Matthew Argall                                                   ;
+;   Copyright (c) 2014, Matthew Argall                                                   ;
 ;   All rights reserved.                                                                 ;
 ;                                                                                        ;
 ;   Redistribution and use in source and binary forms, with or without modification,     ;
@@ -35,10 +35,16 @@
 ;   The purpose of this method is to create an image object with set, get, and draw
 ;   methods.
 ;
+; :Examples:
+;   See MrImage_Examples.pro for a series of examples::
+;       IDL> void = MrImage_Examples()
+;       IDL> win  = MrImage_Examples(14)
+;
 ; :Uses:
 ;   Uses the following external programs::
-;       setDefaultValue.pro (Coyote Graphics)
+;       cgDemoData.pro (Coyote Graphics)
 ;       cgErrorMsg.pro (Coyote Graphics)
+;       setDefaultValue.pro (Coyote Graphics)
 ;       MrGrDataAtom__define.pro
 ;       linspace.pro
 ;       logspace.pro
@@ -53,57 +59,11 @@
 ;
 ; :History:
 ;	Modification History::
-;       04/22/2013  -   Written by Matthew Argall
-;       05/04/2013  -   Do not allow zooming outside of the data range. - MRA
-;       05/10/2013  -   Inherit MrAbstractColorBar. - MRA
-;       05/12/2013  -   Inherit MrAbstractAxes. Repurposed AXES keyword for adding
-;                           MrAbstractAxes objects. Added IMAXES to draw a set of axes
-;                           around the image. - MRA
-;       06/13/2013  -   Renamed from MrImagePlot__define.pro to MrImage__define.pro.
-;                           Removed all gui-window related keywords. Do not inherit
-;                           MrPlotLayout or MrDrawWindow. Renamed IMRANGE to RANGE to be
-;                           consistent across the various different types of objects. - MRA
-;       07/10/2013  -   Added the iDisplay property to handle >2D image data. Disinherit
-;                           MrAbstractAxes, MrAbstractColorbar, MrAbstractLegend. Change
-;                           the IMAXES keyword back to AXES. - MRA
-;       08/01/2013  -   Added the ConvertCoord method. - MRA
-;       08/03/2013  -   Added the PALETTE property. - MRA
-;       08/12/2013  -   Added the LOG property. - MRA
-;       08/13/2013  -   Removed the LOG property because it causes a discrpency between
-;                           the image data and the data being plotted. This causes the
-;                           automatic zooming to go awry. - MRA
-;       08/23/2013  -   Added the LAYOUT keyword, removed the COLORBARS and ADDCOLORBAR
-;                           keywords. Inherit MrIDL_Container. - MRA
-;       09/21/2013  -   NAN keyword was not checked when finding default RANGE. Fixed.
-;                           RANGE is now exclusively an input. - MRA
-;       09/23/2013  -   Draw all objects in the container. Position and layout properties
-;                           moved to MrGraphicAtom. - MRA
-;       09/29/2013  -   Ensure that the layout is updated only when a layout keyword is
-;                           passed in. - MRA
-;       2013/10/25  -   The position of the image is now always defined via the DPOSITION
-;                           keyword to IMAGE_PLOTS. This makes zooming simpler. - MRA
-;       2013/11/17  -   Added the _TF_Paint and SetPixelLocations methods. Use MrImage.pro
-;                           instead of Image_Plots.pro to allow for [XY]LOG-scaling of
-;                           images and ability to draw image pixels in different sizes. - MRA
-;       2013/11/20  -   MrIDL_Container and MrGraphicAtom is disinherited. Inherit instead
-;                           MrGrAtom and MrLayout. - MRA
-;       2013/11/22  -   Renamed DRAW to REFRESH. Refreshing is now done automatically.
-;                           Call the Refresh method with the DISABLE keyword set to
-;                           temporarily turn of Refresh. - MRA
-;       2013/12/30  -   CTIndex takes precedence over PALETTE when both were present. Now,
-;                           if PALETTE is set, CTINDEX is cleared, and vice versa. - MRA
-;       2014/01/24  -   Added the _OverloadImpliedPrint and _OverloadPrint methods. - MRA
-;       2014/02/28  -   Find ranges using MIN() and MAX(). - MRA
-;       2014/03/10  -   Disinherit MrLayout, but keep it as an object property. Added
-;                           the GetLayout method. Picking an initial window is no longer
-;                           an obscure process. - MRA
-;       2014/03/26  -   Rewrote the SetData method to deal with the different number
-;                           of parameters. Remove all determination of ranges and
-;                           in/dependent variable data from the INIT method. PAINT is
-;                           now an internal property only. [XY]LOG successfully update
-;                           the pixel locations when 3 parameters are given. Inherit
-;                           MrGrDataAtom and removed duplicate properties and methods. - MRA
-;                           
+;       2014/09/09  -   Written by Matthew Argall
+;       2014/09/15  -   Removed the RLOG property. ::PrepImage scales the image correctly.
+;                           Out-of-range pixels determined before change from polar to
+;                           cartesian coordinates. Added the doPolarAxes method. - MRA
+;       2014/09/17  -   MISSING_INDEX is only loaded when necessary. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -217,15 +177,21 @@ end
 ;   Clear data from interal storage
 ;-
 pro MrImage::ClearData, $
+ALL=all, $
 CENTERS=centers, $
 CORNERS=corners, $
+OCORNERS=oCorners, $
 DELTAS=deltas, $
 INDEP=indep, $
 DEP=dep, $
+X0=x0, $
+X1=x1, $
 XDELTA_PLUS=xdelta_plus, $
 XDELTA_MINUS=xdelta_minus, $
 XMAX=xmax, $
 XMIN=xmin, $
+Y0=y0, $
+Y1=y1, $
 YDELTA_PLUS=ydelta_plus, $
 YDELTA_MINUS=ydelta_minus, $
 YMAX=ymax, $
@@ -241,25 +207,41 @@ YMIN=ymin
     endif
     
     ;Individual quantities
+    all          = keyword_set(all)
+    centers      = keyword_set(centers)
+    deltas       = keyword_set(deltas)
+    corners      = keyword_set(corners)
+    oCorners     = keyword_set(ocornsers)
     indep        = keyword_set(indep)
     dep          = keyword_set(dep)
+    x0           = keyword_set(x0)
+    x1           = keyword_set(x1)
     xdelta_plus  = keyword_set(xdelta_plus)
     xdelta_minus = keyword_set(xdelta_minus)
     xmax         = keyword_set(xmax)
     xmin         = keyword_set(xmin)
+    y0           = keyword_set(y0)
+    y1           = keyword_set(y1)
     ydelta_plus  = keyword_set(ydelta_plus)
     ydelta_minus = keyword_set(ydelta_minus)
     ymax         = keyword_set(ymax)
     ymin         = keyword_set(ymin)
     
+    ;All?
+    if all then begin
+        centers = 1
+        deltas  = 1
+        corners = 1
+    endif
+    
     ;Centers?
-    if keyword_set(centers) then begin
+    if centers then begin
         indep = 1
         dep   = 1
     endif
     
     ;Deltas?
-    if keyword_set(deltas) then begin
+    if deltas then begin
         xdelta_plus  = 1
         xdelta_minus = 1
         ydelta_plus  = 1
@@ -267,58 +249,42 @@ YMIN=ymin
     endif
     
     ;Corners?
-    if keyword_set(corners) then begin
+    if corners then begin
         xmax = 1
         xmin = 1
         ymax = 1
         ymin = 1
     endif
+    
+    ;Output Corners?
+    if oCorners then begin
+        x0 = 1
+        x1 = 1
+        y0 = 1
+        y1 = 1
+    endif
             
-    ;Pixel Centers.
-    if dep then if n_elements(*self.dep) gt 0 then begin
-        ptr_free, self.dep
-        self.dep = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if indep then if n_elements(*self.indep) gt 0 then begin
-        ptr_free, self.indep
-        self.indep = ptr_new(/ALLOCATE_HEAP)
-    endif
+    ;Pixel Centers
+    if dep   then if n_elements(*self.dep)   gt 0 then void = temporary(*self.dep)
+    if indep then if n_elements(*self.indep) gt 0 then void = temporary(*self.indep)
     
     ;Pixel Corners
-    if xmin then if n_elements(*self.xmin) gt 0 then begin
-        ptr_free, self.xmin
-        self.xmin = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if xmax then if n_elements(*self.xmax) gt 0 then begin
-        ptr_free, self.xmax
-        self.xmax = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if ymin then if n_elements(*self.ymin) gt 0 then begin
-        ptr_free, self.ymin
-        self.ymin = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if ymax then if n_elements(*self.ymax) gt 0 then begin
-        ptr_free, self.ymax
-        self.ymax = ptr_new(/ALLOCATE_HEAP)
-    endif
+    if xmin then if n_elements(*self.xmin) gt 0 then void = temporary(*self.xMin)
+    if xmax then if n_elements(*self.xmax) gt 0 then void = temporary(*self.xMax)
+    if ymin then if n_elements(*self.ymin) gt 0 then void = temporary(*self.yMin)
+    if ymax then if n_elements(*self.ymax) gt 0 then void = temporary(*self.yMax)
+    
+    ;Pixel Corners -- Output
+    if x0 then if n_elements(*self.x0) gt 0 then void = temporary(*self.x0)
+    if x1 then if n_elements(*self.x1) gt 0 then void = temporary(*self.x1)
+    if y0 then if n_elements(*self.y0) gt 0 then void = temporary(*self.y0)
+    if y1 then if n_elements(*self.y1) gt 0 then void = temporary(*self.y1)
     
     ;Pixel Deltas
-    if xdelta_minus then if n_elements(*self.xdelta_minus) gt 0 then begin
-        ptr_free, self.xdelta_minus
-        self.xdelta_minus = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if xdelta_plus then if n_elements(*self.xdelta_plus) gt 0 then begin
-        ptr_free, self.xdelta_plus
-        self.xdelta_plus = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if ydelta_minus then if n_elements(*self.ydelta_minus) gt 0 then begin
-        ptr_free, self.ydelta_minus
-        self.ydelta_minus = ptr_new(/ALLOCATE_HEAP)
-    endif
-    if ydelta_plus then if n_elements(*self.ydelta_plus) gt 0 then begin
-        ptr_free, self.ydelta_plus
-        self.ydelta_plus = ptr_new(/ALLOCATE_HEAP)
-    endif
+    if xdelta_minus then if n_elements(*self.xdelta_minus) gt 0 then void = temporary(*self.xdelta_minus)
+    if xdelta_plus  then if n_elements(*self.xdelta_plus)  gt 0 then void = temporary(*self.xdelta_plus)
+    if ydelta_minus then if n_elements(*self.ydelta_minus) gt 0 then void = temporary(*self.ydelta_minus)
+    if ydelta_plus  then if n_elements(*self.ydelta_plus)  gt 0 then void = temporary(*self.ydelta_plus)
 end
 
 
@@ -334,16 +300,138 @@ NOERASE=noerase
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
-        catch, /cancel
+        catch, /CANCEL
+        if n_elements(r)           gt 0 then tvlct, r, g, b
+	    if n_elements(init_decomp) gt 0 then cgSetColorState, init_decomp
+	    if n_elements(p_current)   gt 0 then !P = p_current
+	    if n_elements(x_current)   gt 0 then !X = x_current
+	    if n_elements(y_current)   gt 0 then !Y = y_current
         void = cgErrorMsg()
         return
     endif
     
     if self.hide then return
     
+	;Change color states
+	;   - Save the initial color table
+	tvlct, r, g, b, /GET
+	cgSetColorState, 0, CURRENTSTATE=init_decomp
+
+    ;Store the current system variables
+    p_current = !P
+    x_current = !X
+    y_current = !Y
+        
+;---------------------------------------------------------------------
+; Display the Image //////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Erase?
+    if n_elements(noerase)  eq 0 then noerase = self.noerase
+    if keyword_set(noerase) eq 0 then cgErase, self.background
+    
+    ;Load the palette
+    tvlct, self.palette
+
     ;Now display the image
-    self -> doImage, NOERASE=noerase
+    case 1 of
+        self.paint: self -> doPaint, XLOG=xlog, XRANGE=xrange, $
+                                     YLOG=ylog, YRANGE=yrange
+        self.tv:    self -> doTV
+        else:       self -> doImage
+    endcase
+    
+;---------------------------------------------------------------------
+; Draw Axes //////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+	;Box-style axes.
+	if self.axes && ( (self.polar eq 0) || ((self.pol_axstyle and 1) gt 0) ) then begin
+	    if self.paint eq 0 then begin
+	        xrange = *self.xrange
+	        yrange = *self.yrange
+	        xlog   =  self.xlog
+	        ylog   =  self.ylog
+	    endif
+
+	    self.layout -> GetProperty, POSITION=position, CHARSIZE=charsize
+        plot, [0], [0], $
+              /NODATA, $
+              /NOERASE, $
+              BACKGROUND    =  cgColor(*self.background), $
+              CHARSIZE      =       charsize, $
+              CHARTHICK     = *self.charthick, $
+              COLOR         =  cgColor(*self.axiscolor), $
+              DEVICE        =  self.device, $
+              FONT          = *self.font, $
+              NORMAL        =  self.normal, $
+              POSITION      =       position, $
+              SUBTITLE      = *self.subtitle, $
+              THICK         = *self.thick, $
+              TICKLEN       = *self.ticklen, $
+              TITLE         =  cgCheckForSymbols(*self.title), $
+              
+              XCHARSIZE     = *self.xcharsize, $
+              XGRIDSTYLE    = *self.xgridstyle, $
+              XLOG          =       xlog, $
+              XMINOR        = *self.xminor, $
+              XRANGE        =       xrange, $
+              XSTYLE        = *self.xstyle, $
+              XTICK_GET     = *self.xtick_get, $
+              XTICKFORMAT   = *self.xtickformat, $
+              XTICKINTERVAL = *self.xtickinterval, $
+              XTICKLAYOUT   = *self.xticklayout, $
+              XTICKLEN      = *self.xticklen, $
+              XTICKNAME     = *self.xtickname, $
+              XTICKS        = *self.xticks, $
+              XTICKUNITS    = *self.xtickunits, $
+              XTICKV        = *self.xtickv, $
+              XTITLE        =  cgCheckForSymbols(*self.xtitle), $
+              
+              YCHARSIZE     = *self.ycharsize, $
+              YGRIDSTYLE    = *self.ygridstyle, $
+              YLOG          =       ylog, $
+              YMINOR        = *self.yminor, $
+              YRANGE        =       yrange, $
+              YSTYLE        = *self.ystyle, $
+              YTICK_GET     = *self.ytick_get, $
+              YTICKFORMAT   = *self.ytickformat, $
+              YTICKINTERVAL = *self.ytickinterval, $
+              YTICKLAYOUT   = *self.yticklayout, $
+              YTICKLEN      = *self.yticklen, $
+              YTICKNAME     = *self.ytickname, $
+              YTICKS        = *self.yticks, $
+              YTICKUNITS    = *self.ytickunits, $
+              YTICKV        = *self.ytickv, $
+              YTITLE        =  cgCheckForSymbols(*self.ytitle)
+
+              ;Graphics keywords that are not used
+              ; - CLIP --> DATA_POS
+;              AXISCOLOR:     Ptr_New(), $
+;              CLIP:          Ptr_New(), $
+;              DATA:          0B, $
+;              LINESTYLE:     Ptr_New(), $
+
+    endif
+
+    ;Polar axes?
+    if self.axes && self.polar then self -> DoPolarAxes, XRANGE=xrange, YRANGE=yrange
+    
+    ;No axes
+    if self.axes eq 0 then begin
+        !P = p_current
+        !X = x_current
+        !Y = y_current
+    endif
+
+    ;Save the coordinate system
     self -> SaveCoords
+
+;---------------------------------------------------------------------
+;RESET COLOR TABLE AND DEVICE ////////////////////////////////////////
+;---------------------------------------------------------------------
+
+	tvlct, r, g, b
+	cgSetColorState, init_decomp
 end
 
 
@@ -352,322 +440,456 @@ end
 ;
 ; :Private:
 ;-
-pro MrImage::doImage, $
-NOERASE=noerase
+pro MrImage::doImage
     compile_opt strictarr
+    on_error, 2
     
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-
-    ;Plot TV-style
-    if self.tv then begin
-        case self.nparams of
-            1: mraImage, *self.image, /TV, NOERASE=noerase
-            2: mraImage, *self.image, *self.indep, /TV, NOERASE=noerase
-            3: mraImage, *self.image, *self.indep, *self.dep, /TV, NOERASE=noerase
-            else: message, 'Incorrect number of parameters for the TV command.'
-        endcase
-        return
-    endif
-
-    if n_elements(noerase) eq 0 then noerase = *self.noerase
-
 ;---------------------------------------------------------------------
-;PAINT PIXEL-BY-PIXEL? ///////////////////////////////////////////////
+; Position Within Axes ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if self.paint then begin
-        ;Find all finite values
-        ixFinite = where(finite(*self.Xmin) eq 1 and finite(*self.Xmax) eq 1, nxFinite)
-        iyFinite = where(finite(*self.Ymin) eq 1 and finite(*self.Ymax) eq 1, nyFinite)
-
-        ;Find all finite values that lie within [XY]RANGE
-        ix = where((*self.Xmin)[ixFinite] ge (*self.xrange)[0] and (*self.Xmax)[ixFinite] lt (*self.xrange)[1], nx)
-        iy = where((*self.Ymin)[iyFinite] ge (*self.yrange)[0] and (*self.Ymax)[iyFinite] lt (*self.yrange)[1], ny)
-
-        ;Find all values that do not match the above requirements
-        if nx eq 0 then begin
-            nxRemove = n_elements(*self.Xmin)
-            ixRemove = lindgen(nxRemove)
-        endif else ixRemove = where(histogram(ixFinite[ix], MIN=0, MAX=product(size(*self.Xmin, /DIMENSIONS))) eq 0, nxRemove)
-            
-        if ny eq 0 then begin
-            nyRemove = n_elements(*self.Ymin)
-            iyRemove = lindgen(nyRemove)
-        endif else iyRemove = where(histogram(iyFinite[iy], MIN=0, MAX=product(size(*self.Ymin, /DIMENSIONS))) eq 0, nyRemove)
+    ;Was a data position explicitly given?
+    ;   - Make sure it is always within the data range
+    if n_elements(*self.data_pos) gt 0 && $
+       array_equal((*self.data_pos)[[0,1]], (*self.data_pos)[[2,3]]) eq 0 $
+    then begin
+        data_pos = *self.data_pos
+        data_pos[0] >= (*self.xrange)[0]
+        data_pos[1] >= (*self.yrange)[0]
+        data_pos[2] <= (*self.xrange)[1]
+        data_pos[3] <= (*self.yrange)[1]
         
-        ;Copy the pixel locations
-        Xmin = *self.Xmin
-        Xmax = *self.Xmax
-        Ymin = *self.Ymin
-        Ymax = *self.Ymax
-        
-        ;Set out-of-bounds values to !NaN
-        if nxRemove gt 0 then begin
-            Xmin[ixRemove] = !values.f_nan
-            Xmax[ixRemove] = !values.f_nan
-        endif
-        
-        ;Set out-of-bounds values to !NaN
-        if nyRemove gt 0 then begin
-            Ymin[iyRemove] = !values.f_nan
-            Ymax[iyRemove] = !values.f_nan
-        endif
-        
-;---------------------------------------------------------------------
-;DATA POSITION? //////////////////////////////////////////////////////
-;---------------------------------------------------------------------
+        ;Find the index range of the data position
+        ixrange = getIndexRange(*self.indep, data_pos[[0,2]])
+        iyrange = getIndexRange(*self.dep,   data_pos[[1,3]])
+    
+    ;If not, the data position is the data range
     endif else begin
-        nDep = n_elements(*self.dep)
-        nIndep = n_elements(*self.indep)
-        data_pos = fltarr(4) + !values.f_nan
-        idata = intarr(4)
-        
-        ;If XRANGE and YRANGE are bigger than the actual range of DEP and INDEP, then use DATAPOS
-        if (*self.xrange)[0] lt (*self.indep)[0] then begin
-            data_pos[0] = (*self.indep)[0]
-            idata[0] = 0
-        endif
-    
-        if (*self.xrange)[1] gt (*self.indep)[nIndep-1] then begin
-            data_pos[2] = (*self.indep)[nIndep-1]
-            idata[2] = nIndep-1
-        endif
-    
-        if (*self.yrange)[0] lt (*self.dep)[0] then begin
-            data_pos[1] = (*self.dep)[0]
-            idata[1] = 0
-        endif
-    
-         if (*self.yrange)[1] gt (*self.dep)[nDep-1] then begin
-            data_pos[3] = (*self.dep)[nDep-1]
-            idata[3] = nDep-1
-         endif
-
-    ;---------------------------------------------------------------------
-    ;RANGE Must Match Data Values ////////////////////////////////////////
-    ;---------------------------------------------------------------------
+        ;Get the index range into the data
         ixrange = getIndexRange(*self.indep, *self.xrange)
         iyrange = getIndexRange(*self.dep,   *self.yrange)
-
-        ;If XRANGE is not being used for a data position, then make sure it matches
-        ;exact values of INDEP
-        if finite(data_pos[0]) eq 0 then begin
-            data_pos[0] = (*self.indep)[ixrange[0]]
-            iData[0] = ixrange[0]
-        endif
-    
-        if finite(data_pos[2]) eq 0 then begin
-            data_pos[2] = (*self.indep)[ixrange[1]]
-            iData[2] = ixrange[1]
-        endif
-    
-        if finite(data_pos[1]) eq 0 then begin
-            data_pos[1] = (*self.dep)[iyrange[0]]
-            iData[1] = iyrange[0]
-        endif
-    
-        if finite(data_pos[3]) eq 0 then begin
-            data_pos[3] = (*self.dep)[iyrange[1]]
-            iData[3] = iyrange[1]
-        endif
-
-        *self.data_pos = data_pos
+        
+        ;Set the data position
+        data_pos        = dblarr(4)
+        data_pos[[0,2]] = (*self.indep)[ixrange]
+        data_pos[[1,3]] = (*self.dep)[iyrange]
     endelse
+                
+    ;We need to set the !P, !X, and !Y system variables in order for CONVERT_COORD
+    ;to be able to convert from DATA to DEVICE coordinates. The only way to do that
+    ;is to create an invisible plot.
+    position = self.layout -> GetPosition()
+    plot, [0,0], /NODATA, /NOERASE, XLOG=self.xlog, YLOG=self.ylog, $
+                 XRANGE=*self.xrange, YRANGE=*self.yrange, XSTYLE=5, YSTYLE=5, $
+                 POSITION=position, DEVICE=self.device, NORMAL=self.normal
 
-    ;Get layout properties.
-    self.layout -> GetProperty, POSITION=position, CHARSIZE=charsize
+    ;Convert from data to device coordinates.
+    data_pos = convert_coord(data_pos[[0,2]], data_pos[[1,3]], /DATA, /TO_DEVICE)
+    data_pos = reform(data_pos[0:1,0:1], 4, 1)
 
 ;---------------------------------------------------------------------
-;DATA POSITION? //////////////////////////////////////////////////////
+; Position of Axes ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if self.paint eq 0 then begin
-        MraImage, (*self.image)[iData[0]:iData[2], iData[1]:iData[3], self.iDisplay], $
-                  (*self.indep)[iData[0]:iData[2]], (*self.dep)[iData[1]:iData[3]], $
-                
-                  ;IMAGE_PLOTS Keywords
-                  AXES          = *self.axes, $
-                  BOTTOM        = *self.bottom, $
-                  CTINDEX       = *self.ctindex, $
-                  DPOSITION     = *self.data_pos, $
-                  NAN           = *self.nan, $
-                  SCALE         = *self.scale, $
-                  RANGE         = *self.range, $
-                  MISSING_VALUE = *self.missing_value, $
-                  MISSING_COLOR = *self.missing_color, $
-                  PALETTE       = *self.palette, $
-                  TOP           = *self.top, $
-                
-                  ;MrLayout Keywords
-                  POSITION      =       position, $
-                  CHARSIZE      =       charsize, $
-                
-                  ;Graphics Keywords
-                  MAX_VALUE     =       max_value, $
-                  MIN_VALUE     =       min_value, $
-                
-                  ;MrGraphicsKeywords
- ;                 AXISCOLOR     = *self.axiscolor, $
-                  BACKGROUND    = *self.background, $
-                  CHARTHICK     = *self.charthick, $
-                  CLIP          = *self.clip, $
-                  COLOR         = *self.color, $
-                  DATA          =  self.data, $
-                  DEVICE        =  self.device, $
-                  NORMAL        =  self.normal, $
-                  FONT          = *self.font, $
-                  NOCLIP        = *self.noclip, $
-                  NODATA        = *self.nodata, $
-                  NOERASE       =       noerase, $
-                  PSYM          = *self.psym, $
-                  SUBTITLE      = *self.subtitle, $
-                  SYMSIZE       = *self.symsize, $
-                  T3D           = *self.t3d, $
-                  THICK         = *self.thick, $
-                  TICKLEN       = *self.ticklen, $
-                  TITLE         = *self.title, $
-                
-                  XCHARSIZE     = *self.xcharsize, $
-                  XGRIDSTYLE    = *self.xgridstyle, $
-                  XMINOR        = *self.xminor, $
-                  XRANGE        = *self.xrange, $
-                  XSTYLE        = *self.xstyle, $
-                  XTHICK        = *self.xthick, $
-                  XTICK_GET     = *self.xtick_get, $
-                  XTICKFORMAT   = *self.xtickformat, $
-                  XTICKINTERVAL = *self.xtickinterval, $
-                  XTICKLAYOUT   = *self.xticklayout, $
-                  XTICKLEN      = *self.xticklen, $
-                  XTICKNAME     = *self.xtickname, $
-                  XTICKS        = *self.xticks, $
-                  XTICKUNITS    = *self.xtickunits, $
-                  XTICKV        = *self.xtickv, $
-                  XTITLE        = *self.xtitle, $
-                
-                  YCHARSIZE     = *self.ycharsize, $
-                  YGRIDSTYLE    = *self.ygridstyle, $
-  ;                YMINOR        = *self.yminor, $
-                  YRANGE        = *self.yrange, $
-                  YSTYLE        = *self.ystyle, $
-                  YTHICK        = *self.ythick, $
-                  YTICK_GET     = *self.ytick_get, $
-                  YTICKFORMAT   = *self.ytickformat, $
-                  YTICKINTERVAL = *self.ytickinterval, $
-                  YTICKLAYOUT   = *self.yticklayout, $
-                  YTICKLEN      = *self.yticklen, $
-                  YTICKNAME     = *self.ytickname, $
-                  YTICKS        = *self.yticks, $
-                  YTICKUNITS    = *self.ytickunits, $
-                  YTICKV        = *self.ytickv, $
-                  YTITLE        = *self.ytitle;, $
-                
- ;                ZCHARSIZE=*self.zcharsize, $
- ;                ZGRIDSTYLE=*self.zgridstyle, $
- ;                ZMARGIN=*self.zmargin, $
- ;                ZMINOR=*self.zminor, $
- ;                ZRANGE=*self.zrange, $
- ;                ZSTYLE=*self.zstyle, $
- ;                ZTHICK=*self.zthick, $
- ;                ZTICK_GET=*self.ztick_get, $
- ;                ZTICKFORMAT=*self.ztickformat, $
- ;                ZTICKINTERVAL=*self.ztickinterval, $
- ;                ZTICKLAYOUT=*self.zticklayout, $
- ;                ZTICKLEN=*self.zticklen, $
- ;                ZTICKNAME=*self.ztickname, $
- ;                ZTICKS=*self.zticks, $
- ;                ZTICKUNITS=*self.ztickunits, $
- ;                ZTICKV=*self.ztickv, $
- ;                ZTITLE=*self.ztitle, $
- ;                ZVALUE=*self.zvalue
- 
+    ;Position of the image
+    ;   - Convert to device coordinates
+    if self.normal then begin
+        position[[0,2]] = floor(position[[0,2]] * !d.x_vsize)
+        position[[1,3]] = floor(position[[1,3]] * !d.y_vsize)
+    endif
+    
+    ;If a data position was provided, switch to that now.
+    if n_elements(data_pos) gt 0 $
+        then image_position = data_pos $
+        else image_position = position
+
+    ;adjust the image position a little to fit inside the axes, not on top of them
+    xsize = (image_position[2] - image_position[0])  - 1
+    ysize = (image_position[3] - image_position[1])  - 1
+    xstart = image_position[0] + 1
+    ystart = image_position[1] + 1
+
 ;---------------------------------------------------------------------
-;PAINT ///////////////////////////////////////////////////////////////
+; Display the Image //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+    
+    ;Include only those pixels that are inside the data range.
+    iData   = [ixrange[0], iyrange[0], ixrange[1], iyrange[1]]
+
+    ;size the image differently, depending out the output window
+    if !D.Name eq 'PS' then begin
+        tv, (*self.img_out)[iData[0]:iData[2], iData[1]:iData[3]], $
+            xstart, ystart, $
+            XSIZE=xsize, YSIZE=ysize
     endif else begin
-        MraImage, *self.image, Xmin, Ymin, Xmax, Ymax, $
-                
-                  ;IMAGE_PLOTS Keywords
-                  AXES          = *self.axes, $
-                  BOTTOM        = *self.bottom, $
-                  CTINDEX       = *self.ctindex, $
-                  DPOSITION     = *self.data_pos, $
-                  NAN           = *self.nan, $
-                  SCALE         = *self.scale, $
-                  RANGE         = *self.range, $
-                  MISSING_VALUE = *self.missing_value, $
-                  MISSING_COLOR = *self.missing_color, $
-                  PALETTE       = *self.palette, $
-                  TOP           = *self.top, $
-                
-                  ;MrGraphicAtom Keywords
-                  POSITION      =       position, $
-                  CHARSIZE      =       charsize, $
-                
-                  ;Graphics Keywords
-                  MAX_VALUE     = max_value, $
-                  MIN_VALUE     = min_value, $
-                  XLOG          = self.xlog, $
-                  YLOG          = self.ylog, $
-                
-                  ;MrGraphicsKeywords
- ;                 AXISCOLOR     = *self.axiscolor, $
-                  BACKGROUND    = *self.background, $
-                  CHARTHICK     = *self.charthick, $
-                  CLIP          = *self.clip, $
-                  COLOR         = *self.color, $
-                  DATA          =  self.data, $
-                  DEVICE        =  self.device, $
-                  NORMAL        =  self.normal, $
-                  FONT          = *self.font, $
-                  NOCLIP        = *self.noclip, $
-                  NODATA        = *self.nodata, $
-                  NOERASE       =       noerase, $
-                  PSYM          = *self.psym, $
-                  SUBTITLE      = *self.subtitle, $
-                  SYMSIZE       = *self.symsize, $
-                  T3D           = *self.t3d, $
-                  THICK         = *self.thick, $
-                  TICKLEN       = *self.ticklen, $
-                  TITLE         = *self.title, $
-                
-                  XCHARSIZE     = *self.xcharsize, $
-                  XGRIDSTYLE    = *self.xgridstyle, $
-                  XMINOR        = *self.xminor, $
-                  XRANGE        = *self.xrange, $
-                  XSTYLE        = *self.xstyle, $
-                  XTHICK        = *self.xthick, $
-                  XTICK_GET     = *self.xtick_get, $
-                  XTICKFORMAT   = *self.xtickformat, $
-                  XTICKINTERVAL = *self.xtickinterval, $
-                  XTICKLAYOUT   = *self.xticklayout, $
-                  XTICKLEN      = *self.xticklen, $
-                  XTICKNAME     = *self.xtickname, $
-                  XTICKS        = *self.xticks, $
-                  XTICKUNITS    = *self.xtickunits, $
-                  XTICKV        = *self.xtickv, $
-                  XTITLE        = *self.xtitle, $
-                
-                  YCHARSIZE     = *self.ycharsize, $
-                  YGRIDSTYLE    = *self.ygridstyle, $
-  ;                YMINOR        = *self.yminor, $
-                  YRANGE        = *self.yrange, $
-                  YSTYLE        = *self.ystyle, $
-                  YTHICK        = *self.ythick, $
-                  YTICK_GET     = *self.ytick_get, $
-                  YTICKFORMAT   = *self.ytickformat, $
-                  YTICKINTERVAL = *self.ytickinterval, $
-                  YTICKLAYOUT   = *self.yticklayout, $
-                  YTICKLEN      = *self.yticklen, $
-                  YTICKNAME     = *self.ytickname, $
-                  YTICKS        = *self.yticks, $
-                  YTICKUNITS    = *self.ytickunits, $
-                  YTICKV        = *self.ytickv, $
-                  YTITLE        = *self.ytitle
+        tv, congrid((*self.img_out)[iData[0]:iData[2], iData[1]:iData[3]], xsize, ysize), $
+            xstart, ystart
     endelse
+end
+
+
+;+
+;   Paint the image pixel-by-pixel.
+;
+; :Keywords:
+;       POSITION:       in, optional, type=fltarr(4)
+;                       Position of the image: [x0, y0, x1, y1].
+;       XLOG:           out, optional, type=boolean
+;                       Indicates whether the x-axis should be drawn in a log- or linear-
+;                           scale (0 and 1, respectively). For polar plots, the radius
+;                           cannot be negative, so we take the log of the radius and plot
+;                           in a linear scale.
+;       XRANGE:         out, optional, type=fltarr(4)
+;                       Range spanned by the x-axis. For polar plots, it may be necessary
+;                           to change the axis range in order to display the data
+;                           (see `XLOG`). Also, polar ranges must be converted to
+;                           cartesian ranges.
+;       YLOG:           out, optional, type=boolean
+;                       Indicates whether the y-axis should be drawn in a log- or linear-
+;                           scale (0 and 1, respectively). For polar plots, the radius
+;                           cannot be negative, so we take the log of the radius and plot
+;                           in a linear scale.
+;       YRANGE:         out, optional, type=fltarr(4)
+;                       Range spanned by the y-axis. For polar plots, it may be necessary
+;                           to change the axis range in order to display the data
+;                           (see `XLOG`). Also, polar ranges must be converted to
+;                           cartesian ranges.
+;-
+pro MrImage::doPaint, $
+XLOG=xlog, $
+XRANGE=xrange, $
+YLOG=ylog, $
+YRANGE=yrange
+    compile_opt strictarr
+    on_error, 2
+    
+    ;For ease of referencing
+    xrange = *self.xrange
+    yrange = *self.yrange
+    img    =  self.img_out
+    x0     = self.x0
+    x1     = self.x1
+    y0     = self.y0
+    y1     = self.y1
+    xlog   = self.xlog
+    ylog   = self.ylog
+
+;---------------------------------------------------------------------
+; Pixels Inside Data Range ///////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Pick all pixels with at least one corner inside the image.
+    ;   - Skip pixels that are entirely outside the data range.
+    ;   - This is independent of NOCLIP.
+    ;   - Do before any conversion from polar to cartesian.
+    inds = where(*x1 gt xrange[0] and $
+                 *x0 lt xrange[1] and $
+                 *y1 gt yrange[0] and $
+                 *y0 lt yrange[1], nInds)
+             
+    ;If no points exist within the range, then return
+    if nInds eq 0 then return
+
+    ;Get the 2D indices so that the image is not passed as a 1D array.
+    dims = size(*img, /DIMENSIONS)
+    inds = array_indices(dims, inds, /DIMENSIONS)
+    iCol = reform(inds[0,*])
+    iRow = reform((temporary(inds))[1,*])
+
+;---------------------------------------------------------------------
+; Polar Considerations ///////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Do not log-scale for polar plots, even if RLOG is set.
+    ;   - The log of a negative radius is NaN and will cause error.
+    ;   - Instead, display ALog10(radius) on a linear scale.
+    if self.polar then begin
+        if self.xlog then begin
+            xlog   = 0
+            xrange = MrLog(xrange) > 1e-3
+            x0     = ptr_new(MrLog(*x0))    ;Do not overwrite original pointer.
+            x1     = ptr_new(MrLog(*x1))    ;Do not overwrite original pointer.
+        endif
+        
+        ;Check the range.
+        ;   - 90 and 270 degrees give the max and min values of y.
+        _xrange = xrange
+        _yrange = yrange
+        if (yrange[0] lt   !pi/2) and (yrange[1] gt   !pi/2) then _yrange[1] =   !pi/2
+        if (yrange[0] lt 3*!pi/2) and (yrange[1] gt 3*!pi/2) then _yrange[0] = 3*!pi/2
+        _yrange = _yrange[sort(_yrange)]
+        
+        ;Convert from polar to cartesian
+        xrange = [min( [_xrange[0] * cos( yrange[0]), $
+                        _xrange[0] * cos( yrange[1]), $
+                        _xrange[1] * cos( yrange[0]), $
+                        _xrange[1] * cos( yrange[1])], MAX=maxX, NAN=self.nan), maxX]
+        yrange = [min( [_xrange[0] * sin(_yrange[0]), $
+                        _xrange[0] * sin(_yrange[1]), $
+                        _xrange[1] * sin(_yrange[0]), $
+                        _xrange[1] * sin(_yrange[1])], MAX=maxY, NAN=self.nan ), maxY]
+    endif
+
+;---------------------------------------------------------------------
+; Establish Coordinate System ////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;A data coordinate system must be established.
+    ;   - Draw invisible axes.
+    position = self.layout -> GetPosition()
+    plot, [0], [0], /NODATA, /NOERASE, XLOG=xlog, YLOG=ylog, $
+                    XRANGE=xrange, YRANGE=yrange, XSTYLE=5, YSTYLE=5, $
+                    POSITION=position, DEVICE=self.device, NORMAL=self.normal
+
+;---------------------------------------------------------------------
+; Draw Pixels ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Draw each pixel
+    ;   - Use only the pixels that are within the axis ranges.
+    for i = 0, nInds - 1 do begin
+        j = iCol[i]
+        k = iRow[i]
+
+        ;Skip pixels with invalid locations
+        if total(finite([(*x0)[j,k], (*x1)[j,k], (*y0)[j,k], (*y1)[j,k]])) ne 4 $
+            then continue
+            
+        ;Polar image
+        ;   - Convert to cartesian coordinates.
+        if self.polar then begin
+            xx1 = (*x0)[j,k] * cos((*y0)[j,k])
+            xx2 = (*x1)[j,k] * cos((*y0)[j,k])
+            xx3 = (*x1)[j,k] * cos((*y1)[j,k])
+            xx4 = (*x0)[j,k] * cos((*y1)[j,k])
+            
+            yy1 = (*x0)[j,k] * sin((*y0)[j,k])
+            yy2 = (*x1)[j,k] * sin((*y0)[j,k])
+            yy3 = (*x1)[j,k] * sin((*y1)[j,k])
+            yy4 = (*x0)[j,k] * sin((*y1)[j,k])
+            
+            xpoly = [xx1, xx2, xx3, xx4, xx1]
+            ypoly = [yy1, yy2, yy3, yy4, yy1]
+        endif else begin
+            xpoly = [(*x0)[j,k], (*x1)[j,k], (*x1)[j,k], (*x0)[j,k], (*x0)[j,k]]
+            ypoly = [(*y0)[j,k], (*y0)[j,k], (*y1)[j,k], (*y1)[j,k], (*y0)[j,k]]
+        endelse
+        
+        ;Clip pixels that straddle the axis range
+        if *self.noclip eq 0 then begin
+            if (xpoly[0] lt xrange[0]) && (xpoly[1] gt xrange[0]) then xpoly[[0,3,4]] = xrange[0]
+            if (xpoly[0] lt xrange[1]) && (xpoly[1] gt xrange[1]) then xpoly[[1,2]]   = xrange[1]
+            if (ypoly[0] lt yrange[0]) && (ypoly[1] gt yrange[0]) then ypoly[[0,1,4]] = yrange[0]
+            if (ypoly[0] lt yrange[1]) && (ypoly[1] gt yrange[1]) then ypoly[[2,3]]   = yrange[1]
+
+            ;Skip pixels that are outside of the axis range.
+            ;   - Must do this after converting to cartesian coordinates.
+            if (xpoly[0] lt xrange[0]) || (xpoly[1] gt xrange[1]) || $
+               (ypoly[0] lt yrange[0]) || (ypoly[1] gt yrange[1]) $
+            then continue
+        endif
+
+        ;Paint the image
+        polyfill, xpoly, ypoly, COLOR=(*img)[j,k]
+    endfor
+end
+
+
+;+
+;   The purpose of this method is to do the actual plotting.
+;
+; :Private:
+;-
+pro MrImage::doPolarAxes, $
+XRANGE=xrange, $
+YRANGE=yrange
+    compile_opt strictarr
+    on_error, 2
+
+    self.layout -> GetProperty, CHARSIZE=charsize
+
+;---------------------------------------------------------------------
+; Horizontal Axis ////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if (self.pol_axstyle and 2) gt 0 then begin
+        axis, 0, 0, XAXIS=0, $
+                    /DATA, $
+                    /NOERASE, $
+                    /SAVE, $
+                    CHARSIZE      =  charsize, $
+                    CHARTHICK     = *self.charthick, $
+                    COLOR         =  cgColor(*self.axiscolor), $
+                    FONT          = *self.font, $
+                    SUBTITLE      = *self.subtitle, $
+                    TICKLEN       = *self.ticklen, $
+                    XCHARSIZE     = *self.xcharsize, $
+                    XGRIDSTYLE    = *self.xgridstyle, $
+                    XLOG          =  xlog, $
+                    XMINOR        = *self.xminor, $
+                    XRANGE        =  xrange, $
+                    XSTYLE        = *self.xstyle, $
+                    XTICK_GET     = *self.xtick_get, $
+                    XTICKFORMAT   = *self.xtickformat, $
+                    XTICKINTERVAL = *self.xtickinterval, $
+                    XTICKLAYOUT   = *self.xticklayout, $
+                    XTICKLEN      = *self.xticklen, $
+                    XTICKNAME     = *self.xtickname, $
+                    XTICKS        = *self.xticks, $
+                    XTICKUNITS    = *self.xtickunits, $
+                    XTICKV        = *self.xtickv;, $
+                    ;XTITLE        =  cgCheckForSymbols(*self.xtitle)
+    endif
+
+;---------------------------------------------------------------------
+; Vertical Axis //////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Since, this is the radius, use the x-axis properties
+    if (self.pol_axstyle and 4) gt 0 then begin
+        axis, 0, 0, YAXIS=0, $
+                    /DATA, $
+                    /NOERASE, $
+                    /SAVE, $
+                    CHARSIZE      =  charsize, $
+                    CHARTHICK     = *self.charthick, $
+                    COLOR         =  cgColor(*self.axiscolor), $
+                    FONT          = *self.font, $
+                    SUBTITLE      = *self.subtitle, $
+                    TICKLEN       = *self.ticklen, $
+                    YCHARSIZE     = *self.xcharsize, $
+                    YGRIDSTYLE    = *self.xgridstyle, $
+                    YLOG          =  xlog, $
+                    YMINOR        = *self.xminor, $
+                    YRANGE        =  yrange, $
+                    YSTYLE        = *self.xstyle, $
+                    YTICK_GET     =  ytick_get, $
+                    YTICKFORMAT   = *self.xtickformat, $
+                    YTICKINTERVAL = *self.xtickinterval, $
+                    YTICKLAYOUT   = *self.xticklayout, $
+                    YTICKLEN      = *self.xticklen, $
+                    YTICKNAME     = *self.xtickname, $
+                    YTICKS        = *self.xticks, $
+                    YTICKUNITS    = *self.xtickunits, $
+                    YTICKV        = *self.xtickv;, $
+                    ;YTITLE        =  cgCheckForSymbols(*self.xtitle)
+    endif
+
+    ;Take positive tickmarks
+    ;   - If none are positive, take the absolute value
+    xtick_get = *self.xtick_get
+    ipos = where(xtick_get gt 0, npos)
+    if npos gt 0 $
+        then xtick_get = xtick_get[ipos] $
+        else xtick_get = abs(xtick_get)
+
+    ;Pick the most tickmarks.
+    if n_elements(ytick_get) eq 0 then ytick_get = *self.ytick_get
+    if n_elements(ytick_get) gt npos $
+        then xtick_get = ytick_get $
+        else xtick_get = *self.xtick_get
+    
+;---------------------------------------------------------------------
+; Concentric Circles /////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Minimum and maximum radius and polar angle
+    _yrange = [min(*self.y0), max(*self.y1)]
+    _xrange = [min(*self.x0), max(*self.x0)]
+    if self.xlog then _xrange = MrLog(_xrange) > 1e-3
+    
+    ;Create a circle of unit radius
+    xcenter = 0
+    ycenter = 0
+    radius  = 1.0
+    points  = linspace(_yrange[0], _yrange[1], 100)
+    x = xcenter + radius * cos(points)
+    y = ycenter + radius * sin(points)
+    
+    ;Draw concentric circles
+    ring_loc = n_elements(*self.xtickv) gt 0 ? *self.xtickv : xtick_get
+    nRings   = n_elements(ring_loc)
+    for i = 0, nRings - 1 do begin
+        plots, x*ring_loc[i], y*ring_loc[i], $
+               /DATA, $
+               COLOR     = cgColor(self.pol_rcolor), $
+               LINESTYLE = self.pol_rlinestyle, $
+               THICK     = self.pol_thick
+;               NOCLIP    =  noclip, $
+;               PSYM      =  psym, $
+;               SYMSIZE   =  symsize, $
+;               Z         =  zvalue
+    endfor
+    
+;---------------------------------------------------------------------
+; Radial Lines ///////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;If no tick information is given, create something.
+    if n_elements(*self.ytickv) + n_elements(*self.yticks) + n_elements(*self.ytickinterval) eq 0 then begin
+        _yint = (_yrange[1] - _yrange[0]) * !radeg
+        case 1 of
+            _yint ge 90: ytickinterval = 45 * !dtor
+            _yint ge 45: ytickinterval = 15 * !dtor
+            _yint ge 20: ytickinterval = 10 * !dtor
+            _yint ge 10: ytickinterval =  5 * !dtor
+            _yint ge  4: ytickinterval =  2 * !dtor
+            _yint ge  2: ytickinterval =  1 * !dtor
+            else: ;Do nothing
+        endcase
+    endif else begin
+        ytickinterval = *self.ytickinterval
+    endelse
+
+    ;Let IDL determine the best tickmarks by creating an invisible axis.
+    axis, YAXIS         =  0, $
+          YRANGE        =  yrange, $
+          YSTYLE        =  5, $
+          YTICK_GET     = *self.ytick_get, $
+          YTICKV        = *self.ytickv, $
+          YTICKS        = *self.yticks, $
+          YTICKINTERVAL =  ytickinterval
+          
+    ;Get the tickmarks
+    if n_elements(*self.ytickv) gt 0 $
+        then ytickmarks = *self.ytickv $
+        else ytickmarks = *self.ytick_get
+    nmarks = n_elements(ytickmarks)
+
+    ;Draw the radial marks
+    for i = 0, nmarks - 1 do begin
+        ;Location of the tickmark on the outer circle
+        x1 = _xrange[1]*cos(ytickmarks[i])
+        y1 = _xrange[1]*sin(ytickmarks[i])
+        
+        ;Extend to box-axis
+        x = xrange[1]
+        y = (y1/x1)*x
+        if y gt yrange[1] || y lt yrange[0] then begin
+            y = yrange[1]
+            x = (x1/y1)*y
+        endif
+    
+        ;Draw the radial lines
+        plots, [0, x], [0, y] , $
+               /DATA, $
+               COLOR     = cgColor(self.pol_tcolor), $
+               LINESTYLE = self.pol_tlinestyle, $
+               THICK     = self.pol_thick
+;               NOCLIP    =  noclip, $
+;               PSYM      =  psym, $
+;               SYMSIZE   =  symsize, $
+;               Z         =  zvalue
+    endfor
+    
+end
+
+
+;+
+;   Paint the image pixel-by-pixel.
+;-
+pro MrImage::doTV
+    compile_opt strictarr
+    on_error, 2
+
+    ;Use the TV procedure.
+    case self.nparams of
+        1: tv, *self.img_out
+        2: tv, *self.img_out, *self.indep
+        3: tv, *self.img_out, *self.indep, *self.dep
+        else: message, 'TV unavailable.'
+    endcase
 end
 
 
@@ -776,6 +998,9 @@ end
 ;       PALETTE:            out, optional, type=bytarr(3\,256)
 ;                           An [r,g,b] Color table to be loaded before the image is displayed.
 ;                               This takes precedence over `CTINDEX`.
+;       POLAR:              in, optional, type=boolean, default=0
+;                           If set, the image will be plotted in polar coordinates, with
+;                               `X` and `Y` being the radius and polar angle, respectively.
 ;       RANGE:              out, optional, type=fltarr(2)
 ;                           The [minimum, maximum] values of the image to be displayed.
 ;                               Setting this will cause the color bars to saturated at
@@ -816,18 +1041,30 @@ XMAX = xmax, $
 YMIN = ymin, $
 YMAX = ymax, $
 
+;POLAR Plot Options
+POLAR = polar, $
+POL_AXSTYLE = pol_axstyle, $
+POL_RCOLOR = pol_rcolor, $
+POL_RLINESTYLE = pol_rlinestyle, $
+POL_TCOLOR = pol_tcolor, $
+POL_TLINESTYLE = pol_tlinestyle, $
+POL_THICK = pol_thick, $
+
 ;MrImage.pro Keywords
 AXES = axes, $
 BOTTOM = bottom, $
 CENTER = center, $
 CTINDEX = ctindex, $
 DATA_POS = data_pos, $
+LOG = log, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
 NAN = nan, $
+NOCLIP = noclip, $
 PAINT = paint, $
 PALETTE = palette, $
 RANGE = range, $
+RLOG = rlog, $
 SCALE = scale, $
 TOP = top, $
 
@@ -853,39 +1090,261 @@ _REF_EXTRA = extra
     if arg_present(INIT_XRANGE) then init_xrange =  self.init_xrange
     if arg_present(INIT_YRANGE) then init_yrange =  self.init_yrange
     if arg_present(layout)      then layout      =  self.layout -> GetLayout()
+    if arg_present(log)         then log         =  self.log
     if arg_present(position)    then position    =  self.layout -> GetPosition()
+    if arg_present(rlog)        then rlog        =  self.rlog
     if arg_present(xmin) then if n_elements(*self.Xmin) gt 0 then xmin = *self.Xmin
     if arg_present(xmax) then if n_elements(*self.Xmax) gt 0 then xmax = *self.Xmax
     if arg_present(ymin) then if n_elements(*self.Ymin) gt 0 then ymin = *self.Ymin
     if arg_present(ymax) then if n_elements(*self.Ymax) gt 0 then ymax = *self.Ymax
-        
+    
+    ;Polar options
+    if arg_present(pol_axstyle)    gt 0 then pol_axstyle    = self.pol_axstyle
+    if arg_present(pol_thick)      gt 0 then pol_thick      = self.pol_thick
+    if arg_present(pol_rcolor)     gt 0 then pol_rcolor     = self.pol_rcolor
+    if arg_present(pol_rlinestyle) gt 0 then pol_rlinestyle = self.pol_rlinestyle
+    if arg_present(pol_tcolor)     gt 0 then pol_tcolor     = self.pol_tcolor
+    if arg_present(pol_tlinestyle) gt 0 then pol_tlinestyle = self.pol_tlinestyle
+    
     ;Graphics Properties
     if arg_present(MAX_VALUE) and n_elements(*self.MAX_VALUE) ne 0 then max_value = *self.max_value
     if arg_present(MIN_VALUE) and n_elements(*self.MIN_VALUE) ne 0 then min_value = *self.min_value
     if arg_present(XLOG)     then xlog = self.xlog
     if arg_present(YLOG)     then ylog = self.ylog
 
-    ;IMAGE_PLOTS.PRO Properties
-    if arg_present(AXES)          && n_elements(*self.AXES)          gt 0 then axes          = *self.axes
-    if arg_present(BOTTOM)        && n_elements(*self.BOTTOM)        gt 0 then bottom        = *self.bottom
-    if arg_present(CTINDEX)       && n_elements(*self.CTINDEX)       gt 0 then ctindex       = *self.ctindex
-    if arg_present(data_pos)      && n_elements(*self.data_pos)      gt 0 then data_pos      = *self.data_pos
-    if arg_present(RANGE)         && n_elements(*self.RANGE)         gt 0 then range         = *self.range
-    if arg_present(MISSING_VALUE) && n_elements(*self.MISSING_VALUE) gt 0 then missing_value = *self.missing_value
-    if arg_present(MISSING_COLOR) && n_elements(*self.MISSING_COLOR) gt 0 then missing_color = *self.missing_color
-    if arg_present(PALETTE)       && n_elements(*self.palette)       gt 0 then palette       = *self.palette
-    if arg_present(NAN)           && n_elements(*self.NAN)           gt 0 then nan           = *self.nan
-    if arg_present(SCALE)         && n_elements(*self.SCALE)         gt 0 then scale         = *self.scale
-    if arg_present(TOP)           && n_elements(*self.TOP)           gt 0 then top           = *self.top
+    ;mraImage.pro Properties
+    if arg_present(AXES)           then axes          =  self.axes
+    if arg_present(BOTTOM)         then bottom        =  self.bottom
+    if arg_present(RANGE)          then range         =  self.range
+    if arg_present(MISSING_COLOR)  then missing_color =  self.missing_color
+    if arg_present(PALETTE)        then palette       =  self.palette
+    if arg_present(NAN)            then nan           =  self.nan
+    if arg_present(SCALE)          then scale         =  self.scale
+    if arg_present(TOP)            then top           =  self.top
+    if arg_present(noclip)         && n_elements(*self.noclip)        gt 0 then noclip        =  self.noclip
+    if arg_present(CTINDEX)        && n_elements(*self.ctindex)       gt 0 then ctindex       = *self.ctindex
+    if arg_present(data_pos)       && n_elements(*self.data_pos)      gt 0 then data_pos      = *self.data_pos
+    if arg_present(MISSING_VALUE)  && n_elements(*self.missing_value) gt 0 then missing_value = *self.missing_value
     
     if arg_present(center) then center = self.center
-    if arg_present(paint)  then paint  =  self.paint
+    if arg_present(paint)  then paint  = self.paint
+    if arg_present(polar)  then polar  = self.polar
     
     ;MrGraphicsKeywords Properties
     if n_elements(EXTRA) ne 0 then begin
         self -> MrGrAtom::GetProperty, _EXTRA=extra
         self -> MrGraphicsKeywords::GetProperty, _EXTRA=extra
     endif
+end
+
+
+;+
+;   Prepare the image to be displayed.
+;-
+pro MrImage::PrepImage
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Editable copy
+    img_out = *self.image
+
+;---------------------------------------------------------------------
+; Log-Scale //////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if self.log then begin
+        img_out = MrLog(img_out)
+        
+        ;Check for infinities
+        iInf = where(finite(img_out, /INFINITY), nInf)
+        
+        ;Swap infinities for NaNs so that they are removed.
+        if nInf gt 0 then begin
+            img_out[iInf] = !values.f_nan
+            self.nan      = 1
+        endif
+    endif
+
+;---------------------------------------------------------------------
+; Prepare a Mask of Missing Values ///////////////////////////////////
+;---------------------------------------------------------------------
+    if n_elements(*self.missing_value) gt 0 || self.nan then begin
+        ;Convert to float
+        ;   - All missing values are converted to NaNs temporarily.
+        ;   - Allows setting /NAN keyword in, e.g. BytScl.
+        imgType = size(img_out, /TNAME) 
+        case imgType of
+            'FLOAT':  ;Do nothing
+            'DOUBLE': ;Do nothing
+            else:     img_out = float(img_out)
+        endcase
+    
+        ;Create a mask. 1=display, 0=hide (mask)
+        mask = bytarr(size(img_out, /DIMENSIONS)) + 1B
+        
+        ;look for NaN's and missing values
+        if self.nan $
+            then iNaN = where(finite(img_out, /NAN), nNaN) $
+            else nNaN = 0
+        if n_elements(*self.missing_value) gt 0 $
+            then iMissing = where(img_out eq *self.missing_value, nMissing) $
+            else nMissing = 0
+        
+        ;Mask non-data values
+        if nNaN     gt 0 then mask[iNaN]     = 0B
+        if nMissing gt 0 then mask[iMissing] = 0B
+
+        ;Find missing values
+        ikeep = where(mask eq 1, nkeep, COMPLEMENT=iMask, NCOMPLEMENT=nmask)
+        
+        ;Set them equal to NaN
+        if nMask gt 0 then begin
+            if imgType eq 'DOUBLE' $
+                then img_out[iMask] = !values.d_nan $
+                else img_out[iMask] = !values.f_nan
+        endif
+    endif
+
+;---------------------------------------------------------------------
+; Scale the Image ////////////////////////////////////////////////////
+;---------------------------------------------------------------------	
+	if self.scale then begin
+	    range = self.log ? MrLog(self.range) : self.range
+
+        ;Scale the image
+        ;   - Set the NaN flag
+        img_out = bytscl(img_out, $
+                         MIN=range[0], MAX=range[1], $
+                         TOP=self.top-self.bottom, $
+                         /NAN)
+        
+        ;BYTSCL scales between 0 and TOP. Bump everything up by BOTTOM.
+        if self.bottom ne 0 then img_out += self.bottom
+	endif
+	
+	;Replace missing values with missing index
+	if n_elements(nMask) gt 0 $
+        then if nMask gt 0 then img_out[iMask] = self.missing_index
+	
+	;Store the result
+	*self.img_out = img_out
+end
+
+
+;+
+;   Set the color palette.
+;-
+pro MrImage::SetPalette, $
+BOTTOM = bottom, $
+BREWER = brewer, $
+CTINDEX = ctindex, $
+MISSING_COLOR = missing_color, $
+MISSING_INDEX = missing_index, $
+NCOLORS = ncolors, $
+PALETTE = palette, $
+REVERSE = reverse, $
+TOP = top
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        if n_elements(r_start) gt 0 then tvlct, r_start, g_start, b_start
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Get the initial color palette
+    tvlct, r_start, g_start, b_start, /GET
+
+    ;Defaults
+    if n_elements(ctindex) eq 0 then $
+        if n_elements(*self.ctindex) gt 0 then ctindex   = *self.ctindex
+    if n_elements(missing_color) eq 0 then missing_color =  self.missing_color
+    if n_elements(missing_index) eq 0 then missing_index =  self.missing_index
+    if n_elements(palette)       eq 0 then palette       =  self.palette
+
+    ;Rescale
+    scale_flag = 0
+
+;---------------------------------------------------------------------
+;Load a Color Table Index? ///////////////////////////////////////////
+;---------------------------------------------------------------------    
+    if n_elements(ctindex) gt 0 then begin
+        bottom  = n_elements(bottom)  gt 0 ? 0B > bottom < 255B         : self.bottom
+        brewer  = n_elements(brewer)  gt 0 ? keyword_set(brewer)        : self.brewer
+        nColors = n_elements(nColors) gt 0 ? 1 > nColors < 256          : self.top - bottom + 1
+        reverse = n_elements(reverse) gt 0 ? keyword_set(reverse)       : self.reverse
+        top     = n_elements(top)     gt 0 ? 0B > top < !d.table_size-1 : self.top
+    
+        ;Missing index
+        ;   - If the missing index is at the top/bottom of the color table,
+        ;       adjust the top/bottom to hide it.
+        if missing_color ne '' then begin
+            if missing_index eq !d.table_size-1 then top    = top    < !d.table_size-2
+            if missing_index eq 0B              then bottom = bottom > 1B
+        endif
+        
+        ;Number of colors being loaded
+        nColors = top - bottom + 1
+
+        ;Load the color table if one was given
+        cgLoadCT, ctindex, BOTTOM=bottom, NCOLORS=ncolors, $
+                           REVERSE=reverse, BREWER=brewer, $
+                           RGB_TABLE=palette
+         
+        ;Did the number of colors change?
+        if (ncolors ne self.top - self.bottom + 1) || (bottom ne self.bottom) then begin
+            top = bottom + ncolors - 1
+            scale_flag = 1
+        endif
+        
+    ;If a palette was given, clear the color table.
+    endif else begin
+        if n_elements(palette) gt 0 then void = temporary(*self.ctindex)
+    endelse
+
+;---------------------------------------------------------------------
+;Load a Color Palette? ///////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if n_elements(palette) gt 0 then tvlct, palette
+
+;---------------------------------------------------------------------
+;Load a Missing Color? ///////////////////////////////////////////////
+;---------------------------------------------------------------------
+    if missing_color ne '' then tvlct, cgColor(missing_color, /TRIPLE), missing_index
+
+;---------------------------------------------------------------------
+;Update the Color Palette ////////////////////////////////////////////
+;---------------------------------------------------------------------
+    tvlct, palette, /GET
+    
+    if ctindex ge 0 then begin
+         self.bottom  = bottom
+         self.brewer  = brewer
+        *self.ctindex = ctindex
+         self.reverse = reverse
+         self.top     = top
+    endif
+    self.palette       = palette
+    self.missing_color = missing_color
+    self.missing_index = missing_index
+    
+    ;Load the initial color table
+    tvlct, r_start, g_start, b_start
+    
+    ;Does the image now need to be scaled?
+    if scale_flag then if self.scale then self -> PrepImage
+    
+    ;Redraw
+    self.window -> Draw
 end
 
 
@@ -927,17 +1386,27 @@ YLOG=ylog
 ;---------------------------------------------------------------------
 ;Check Inputs ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if n_elements(xlog) gt 0 $
-        then self.xlog = keyword_set(self.xlog) $
-        else xlog = self.xlog
-        
-    if n_elements(ylog) gt 0 $
-        then self.ylog = keyword_set(self.ylog) $
-        else ylog = self.ylog
-        
-    if n_elements(center) gt 0 $
-        then self.center = keyword_set(self.center) $
-        else center = self.center
+    xlog   = n_elements(xlog)   eq 0 ? self.xlog   : keyword_set(xlog)
+    ylog   = n_elements(ylog)   eq 0 ? self.ylog   : keyword_set(ylog)
+    center = n_elements(center) eq 0 ? self.center : keyword_set(center)
+
+    ;Polar plots cannot have YLOG set.
+    if self.polar && ylog then begin
+        message, 'YLOG cannot be set for polar plots. Setting YLOG=0', /INFORMATIONAL
+        ylog = 0
+    endif 
+
+    ;Paint the image?
+    ;   - SetData will set PAINT=1 if more than just X and Y were given. Leave as is.
+    ;   - If only X and Y were given, we need to decide if the image needs to be pained.
+    if n_params() eq 2 then begin
+        if xlog + ylog + center + self.polar gt 0 $
+            then self.paint = 1 $
+            else self.paint = 0
+    endif
+
+    ;If we are not painting, then pixel locations do not need to be determined.
+    if self.paint eq 0 then return
     
 ;---------------------------------------------------------------------
 ;Pixel Locations /////////////////////////////////////////////////////
@@ -945,29 +1414,34 @@ YLOG=ylog
     dims = size(*self.image, /DIMENSIONS)
     dims = dims[0:1]
     
+    ;Determine the corners of each pixel
+    ;   - Valid for cartesian and polar plots.
+    ;   - Additional work for /RLOG (see SetProperty method).
     case n_params() of
-        2: MrPixelPoints,  dims, x, y, Xmin, Ymin, Xmax, Ymax, CENTER=self.center, /DIMENSIONS, XLOG=xlog, YLOG=ylog
-        4: MrPixelCorners, dims, x, y, x0, y0, Xmin, Ymin, Xmax, Ymax, /DIMENSIONS
+        2: MrPixelPoints,  dims, x, y,                 Xmin, Ymin, Xmax, Ymax, /DIMENSIONS, CENTER=center, XLOG=xlog, YLOG=ylog
+        4: MrPixelCorners, dims, x, y, x0, y0,         Xmin, Ymin, Xmax, Ymax, /DIMENSIONS
         6: MrPixelDeltas,  dims, x, y, x0, y0, x1, y1, Xmin, Ymin, Xmax, Ymax, /DIMENSIONS
         else: message, 'Incorrect number of parameters.'
     endcase
-    
-    *self.Xmin = Xmin
-    *self.Xmax = Xmax
-    *self.Ymin = Ymin
-    *self.Ymax = Ymax
-    if n_params() eq 2 then begin
-        if xlog + ylog gt 0 $
-            then self.paint = 1 $
-            else self.paint = 0
-    endif
+
+    ;Set object properties
+     self.xlog   = xlog
+     self.ylog   = ylog
+     self.center = center
+    *self.x0     = xMin
+    *self.x1     = xMax
+    *self.y0     = yMin
+    *self.y1     = yMax
     
     self.window -> Draw
 end
 
 
 ;+
-;   The purpose of this method is to retrieve data
+;   Set data. Once data is set, the data range will be determined. The NAN property will
+;   be set if any NaNs are present in the image. The SCALE property will be set if the
+;   image is outside the range of [0,255].
+;
 ;
 ; Calling Sequence::
 ;       myGraphic -> GetData, image
@@ -1008,9 +1482,21 @@ TV=tv
     imDims = size(theImage, /DIMENSIONS)
     nDims  = size(theImage, /N_DIMENSIONS)
     if n_elements(tv) gt 0 then self.tv = keyword_set(tv)
+    
+    ;Check number of parameters given
+    ;   - n_params() reports the number of arg_present(param).
+    ;   - No not count undefined inputs.
+    nParams = n_elements(theImage)  eq 0 ? 0 $
+                : n_elements(x)  eq 0 ? 1 $
+                : n_elements(y)  eq 0 ? 2 $
+                : n_elements(x0) eq 0 ? 3 $
+                : n_elements(y0) eq 0 ? 4 $
+                : n_elements(x1) eq 0 ? 5 $
+                : n_elements(y1) eq 0 ? 6 $
+                : 7
 
     ;Retrieve the data
-    case n_params() of
+    case nParams of
     ;---------------------------------------------------------------------
     ; Change the Image ///////////////////////////////////////////////////
     ;---------------------------------------------------------------------
@@ -1027,11 +1513,11 @@ TV=tv
             if n_elements(x) ne 1 then message, 'X must be a scalar.'
             
             ;Clear the data
-            self -> ClearData, /DELTAS, /CORNERS
+            self -> ClearData, /ALL
             
             ;Set the data
-            *self.indep = x
-            *self.image = theImage
+            *self.indep  = x
+            *self.image  = theImage
             self.nparams = 2B
         endcase
     
@@ -1045,12 +1531,12 @@ TV=tv
             endif
             
             ;Clear data
-            self -> ClearData, /DELTAS, /CORNERS
+            self -> ClearData, /ALL
             
             ;Store the data
             *self.image = theImage
             *self.indep = x
-            *self.dep = y
+            *self.dep   = y
             
             ;Find the pixel locations
             if self.tv eq 0 then self -> SetPixelLocations, x, y
@@ -1062,15 +1548,20 @@ TV=tv
     ;---------------------------------------------------------------------
         5: begin
             ;Clear data
-            self -> ClearData, /DELTAS, /CENTERS
+            self -> ClearData, /ALL
+            
+            ;Paint each pixel
+            ;   - Must be done before calling ::SetPixelLocations.
+            self.paint   = 1B
+            self.nparams = 5B
         
             ;Set the data
             *self.image = theImage
+            *self.xMin = x
+            *self.xMax = x0
+            *self.yMin = y
+            *self.yMax = y0
             self -> SetPixelLocations, x, y, x0, y0
-            
-            ;Paint each pixel
-            self.paint = 1B
-            self.nparams = 5B
         endcase
         
     ;---------------------------------------------------------------------
@@ -1078,47 +1569,88 @@ TV=tv
     ;---------------------------------------------------------------------
         7: begin
             ;Clear data
-            self -> ClearData, /DELTAS
+            self -> ClearData, /ALL
+            
+            ;Paint the pixels
+            ;   - Must be set before calling ::SetPixelLocations
+            self.paint   = 1B
+            self.nparams = 7B
             
             ;Store the data
-            *self.image = theImage
-            *self.indep = x
-            *self.dep   = y
+            *self.image        = theImage
+            *self.indep        = x
+            *self.dep          = y
             *self.xdelta_minus = x0
             *self.xdelta_plus  = x1
             *self.ydelta_minus = y0
             *self.ydelta_plus  = y1
             self -> SetPixelLocations, x, y, x0, y0, x1, y1
-            
-            ;Paint the pixels
-            self.paint = 1B
-            self.nparams = 7B
         endcase
         else: message, 'Incorrect number of parameters.'
     endcase
-            
-    ;Get the new ranges
-    *self.range = [min(theImage, /NAN, MAX=imMax), imMax]
-    if n_elements(*self.xmin) eq 0 $
-        then *self.xrange = [self.xlog, imDims[0]-1] $
-        else *self.xrange = [min(*self.xmin), max(*self.xmax)]
-    if n_elements(*self.ymin) eq 0 $
-        then *self.yrange = [self.ylog, imDims[1]-1] $
-        else *self.yrange = [min(*self.ymin), max(*self.ymax)]
-
-    ;To make the image zoomable, we need to know the data location of each pixel.
-    ;These are the pixel centers. If no pixel centers were given, then create them
+        
+;---------------------------------------------------------------------
+; Dataspace Ranges ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;XRANGE
+    case 1 of
+        n_elements(*self.x0)    gt 0: *self.xrange = [min(*self.x0, /NAN), max(*self.x1, /NAN)]
+        n_elements(*self.indep) gt 0: *self.xrange = [min(*self.indep, MAX=xMax, /NAN), xmax]
+        else:                         *self.xrange = [self.xlog, imDims[0]-1]
+    endcase
+    
+    ;YRANGE
+    case 1 of
+        n_elements(*self.y0)   gt 0: *self.yrange = [min(*self.y0, /NAN), max(*self.y1, /NAN)]
+        n_elements(*self.dep)  gt 0: *self.yrange = [min(*self.dep, MAX=yMax, /NAN), yMax]
+        else:                        *self.yrange = [self.ylog, imDims[1]-1]
+    endcase
+        
+;---------------------------------------------------------------------
+; Define Dataspace ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;X & Y
+    ;   - To make the image zoomable, we need to know the data location of each pixel.
+    ;   - These are the pixel centers. If no pixel locations were given, then create them.
     if n_elements(*self.indep) eq 0 then begin
         if self.xlog $
             then *self.indep = logspace(alog10((*self.xrange)[0]), alog10((*self.xrange)[1]), imDims[0]) $
             else *self.indep = linspace((*self.xrange)[0], (*self.xrange)[1], imDims[0])
     endif
-    
     if n_elements(*self.dep) eq 0 then begin
         if self.ylog $
             then *self.dep = logspace(alog10((*self.yrange)[0]), alog10((*self.yrange)[1]), imDims[1]) $
             else *self.dep = linspace((*self.yrange)[0], (*self.yrange)[1], imDims[1])
     endif
+        
+;---------------------------------------------------------------------
+; Scale, NaN, Range //////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;NAN
+    iNotFinite = where(finite(*self.image) eq 0, nNotFinite)
+    if nNotFinite gt 0 then self.nan = 1B
+    
+    ;SCALE
+    ;   - Determine the min and max values.
+    ;   - Avoid missing values.
+    if n_elements(*self.missing_value) gt 0 then begin
+        iNotMissing = where(*self.image ne *self.missing_value, nNotMissing)
+        if nNotMissing gt 0 $
+            then imMin = min((*self.image)[iNotMissing], NAN=self.nan, MAX=imMax) $
+            else imMin = min((*self.image), NAN=self.nan, MAX=imMax)
+    endif else begin
+        imMin = min((*self.image), NAN=self.nan, MAX=imMax)
+    endelse
+    if imMin lt 0 || imMax gt 255 then self.scale = 1B
+
+    ;RANGE
+    self.range = [imMin, imMax]
+        
+;---------------------------------------------------------------------
+; Prep the Image /////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    self -> PrepImage
     
     self.window -> draw
 end
@@ -1154,6 +1686,9 @@ end
 ;                               data.
 ;       PALETTE:            in, optional, type=bytarr(3\,256)
 ;                           Color table to be loaded before the image is displayed.
+;       POLAR:              in, optional, type=boolean, default=0
+;                           If set, the image will be plotted in polar coordinates, with
+;                               `X` and `Y` being the radius and polar angle, respectively.
 ;       RANGE:              in, optional, type=fltarr(2)
 ;                           The [minimum, maximum] values of the image to be displayed.
 ;                               Setting this will cause the color bars to saturated at
@@ -1179,18 +1714,25 @@ pro MrImage::SetProperty, $
 IDISPLAY = iDisplay, $
 TV = tv, $
       
-;IMAGE_PLOTS Keywords
+;mraImage Keywords
 AXES = axes, $
-BOTTOM = bottom, $
-CTINDEX = ctindex, $
+CENTER = center, $
 DATA_POS = data_pos, $
+LOG = log, $
 MISSING_VALUE = missing_value, $
-MISSING_COLOR = missing_color, $
 NAN = nan, $
-PALETTE = palette, $
+NOCLIP = noclip, $
 RANGE = range, $
 SCALE = scale, $
-TOP = top, $
+
+;POLAR Plot Options
+POLAR = polar, $
+POL_AXSTYLE = pol_axstyle, $
+POL_RCOLOR = pol_rcolor, $
+POL_RLINESTYLE = pol_rlinestyle, $
+POL_TCOLOR = pol_tcolor, $
+POL_TLINESTYLE = pol_tlinestyle, $
+POL_THICK = pol_thick, $
 
 ;Graphics Keywords
 XLOG = xlog, $
@@ -1206,35 +1748,69 @@ _REF_EXTRA = extra
         return
     endif
 
+    reprep_flag = 0B
+
     ;MrImage Keywords
     if n_elements(iDisplay)    ne 0 then self.iDisplay = iDisplay
     if n_elements(TV)          ne 0 then self.tv = keyword_set(tv)
 
-    ;IMAGE_PLOTS.PRO Properties
-    if n_elements(AXES)          ne 0 then *self.axes = keyword_set(axes)
-    if n_elements(BOTTOM)        ne 0 then *self.bottom = bottom
-    if n_elements(CTINDEX)       ne 0 then *self.ctindex = ctindex
-    if n_elements(data_pos)      gt 0 then *self.data_pos = data_pos
-    if n_elements(MISSING_VALUE) ne 0 then *self.missing_value = missing_value
-    if n_elements(MISSING_COLOR) ne 0 then *self.missing_color = missing_color
-    if n_elements(NAN)           ne 0 then *self.nan = keyword_set(nan)
-    if n_elements(RANGE)         ne 0 then *self.range = range
-    if n_elements(SCALE)         ne 0 then *self.scale = keyword_set(scale)
-    if n_elements(TOP)           ne 0 then *self.top = top
+    ;mraImage.pro Properties
+    if n_elements(axes)           gt 0 then  self.axes           = keyword_set(axes)
+    if n_elements(data_pos)       gt 0 then *self.data_pos       = data_pos
+    if n_elements(noclip)         ne 0 then *self.noclip         = keyword_set(noclip)
+    if n_elements(pol_axstyle)    gt 0 then  self.pol_axstyle    = pol_axstyle
+    if n_elements(pol_thick)      gt 0 then  self.pol_thick      = pol_thick
+    if n_elements(pol_rcolor)     gt 0 then  self.pol_rcolor     = pol_rcolor
+    if n_elements(pol_rlinestyle) gt 0 then  self.pol_rlinestyle = pol_rlinestyle
+    if n_elements(pol_tcolor)     gt 0 then  self.pol_tcolor     = pol_tcolor
+    if n_elements(pol_tlinestyle) gt 0 then  self.pol_tlinestyle = pol_tlinestyle
     
-    ;CTIndex takes precedence over PALETTE, so it must be reset.
-    if n_elements(PALETTE) gt 0 then begin
-        *self.palette = palette
-        ptr_free, self.ctIndex
-        self.ctIndex = ptr_new(/ALLOCATE_HEAP)
+    ;SCALE
+    ;   - RANGE is set.
+    nRange = n_elements(range)
+    if nRange gt 0 then begin
+        ;User-defined range?
+        if range[0] ne range[1] then begin
+            self.range = range
+            if self.scale eq 0 then scale = 1
+            
+        ;Automatic range
+        endif else begin
+            self.range = [min(*self.image, MAX=maxIm, /NAN), maxIm]
+        endelse
     endif
     
-    ;Log-scale the axes?
-    if n_elements(xlog) gt 0 || n_elements(ylog) gt 0 then begin
-        self.xlog = keyword_set(xlog)
-        self.ylog = keyword_set(ylog)
-        
-        ;If only the pixel centers were given, calculate the new sizes of each pixel.
+    ;PREP-IMAGE
+    ;   - These keywords require the image to be re-prepped
+    nScale   = n_elements(scale)
+    nNaN     = n_elements(nan)
+    nMissing = n_elements(missing_value)
+    nLog     = n_elements(log)
+    nRange   = n_elements(range)
+    if nScale + nNaN + nMissing + nLog + nRange gt 0 then begin
+        if nScale   gt 0 then  self.scale         = keyword_set(scale)
+        if nNaN     gt 0 then  self.nan           = keyword_set(nan)
+        if nMissing gt 0 then *self.missing_value = missing_value
+        if nLog     gt 0 then  self.log           = keyword_set(log)
+        reprep_flag = 1B
+    endif
+    
+    ;PAINT
+    ;   - Parameters used to determine if image is painted or pasted.
+    ;   - It is set automatically in ::SetData and ::SetPixelLocations.
+    ;   - It can only be toggled with the CENTER, POLAR, and [XYR]LOG keywords
+    ;   - It takes priority over DPOSITION. If PAINT is set, DPOSITION is ignored in ::Draw.
+    nxlog   = n_elements(xlog)
+    nylog   = n_elements(ylog)
+    nCenter = n_elements(center)
+    nPolar  = n_elements(polar)
+    if nxlog + nylog + nCenter + nPolar gt 0 then begin
+        if nPolar  gt 0 then self.polar  = keyword_set(polar)
+        if nxlog   gt 0 then self.xlog   = keyword_set(xlog)
+        if nylog   gt 0 then self.ylog   = keyword_set(ylog)
+        if nCenter gt 0 then self.center = keyword_set(center)
+
+        ;If only X and Y were given, pixel locations must be recalculated
         if self.nparams eq 3 && self.tv eq 0 $
             then self -> SetPixelLocations, *self.indep, *self.dep
     endif
@@ -1242,7 +1818,10 @@ _REF_EXTRA = extra
     ;Superclass properties
     if n_elements(extra) gt 0 $
         then self -> MrGrDataAtom::SetProperty, _EXTRA=extra
-    
+
+    ;Prep the image?
+    if reprep_flag then self -> PrepImage
+
     ;Refresh the window
     self.window -> Draw
 end
@@ -1264,19 +1843,16 @@ pro MrImage::cleanup
     
     ;free all pointers
     ptr_free, self.image
+    ptr_free, self.img_out
     ptr_free, self.dep
     ptr_free, self.indep
-    ptr_free, self.axes
-    ptr_free, self.bottom
+    ptr_free, self.x0
+    ptr_free, self.x1
+    ptr_free, self.y0
+    ptr_free, self.y1
     ptr_free, self.ctindex
     ptr_free, self.data_pos
-    ptr_free, self.missing_color
     ptr_free, self.missing_value
-    ptr_free, self.nan
-    ptr_free, self.palette
-    ptr_free, self.range
-    ptr_free, self.scale
-    ptr_free, self.top
     ptr_free, self.xdelta_minus
     ptr_free, self.xdelta_plus
     ptr_free, self.Xmin
@@ -1356,6 +1932,12 @@ end
 ;                               data.
 ;       PALETTE:            in, optional, type=bytarr(3\,256)
 ;                           Color table to be loaded before the image is displayed.
+;       POL_AXSTYLE:        in, optional, type=integer, default=1
+;                           A bit-wise mask determining how axes should be drawn when
+;                               the `POLAR` keyword is set. Options are::
+;                                   1   -   Box axes
+;                                   2   -   Horizontal axis through r = 0
+;                                   4   -   Vertical axis through r = 0
 ;       RANGE:              in, optional, type=fltarr(2)
 ;                           The [minimum, maximum] values of the image to be displayed.
 ;                               Setting this will cause the color bars to saturated at
@@ -1390,15 +1972,27 @@ LAYOUT = layout, $
 NAME = name, $
 POSITION = position, $
 TV = tv, $
-      
+
+;POLAR Plot Options
+POLAR = polar, $
+POL_AXSTYLE = pol_axstyle, $
+POL_RCOLOR = pol_rcolor, $
+POL_RLINESTYLE = pol_rlinestyle, $
+POL_TCOLOR = pol_tcolor, $
+POL_TLINESTYLE = pol_tlinestyle, $
+POL_THICK = pol_thick, $
+
 ;IMAGE_PLOTS Keywords
 AXES = axes, $
+AXISCOLOR = axiscolor, $
 BOTTOM = bottom, $
 CENTER = center, $
 CTINDEX = ctindex, $
 DATA_POS = data_pos, $
+LOG = log, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
+MISSING_INDEX = missing_index, $
 NAN = nan, $
 PAINT = paint, $
 PALETTE = palette, $
@@ -1407,12 +2001,15 @@ SCALE = scale, $
 TOP = top, $
 
 ;Graphics Keywords
-MAX_VALUE = max_value, $
-MIN_VALUE = min_value, $
+TITLE = title, $
 XLOG = xlog, $
 XRANGE = xrange, $
+XTICKLEN = xticklen, $
+XTITLE = xtitle, $
 YLOG = ylog, $
 YRANGE = yrange, $
+YTICKLEN = yticklen, $
+YTITLE = ytitle, $
 _REF_EXTRA = extra
     compile_opt strictarr
 
@@ -1431,99 +2028,158 @@ _REF_EXTRA = extra
     ;Sets up window -- Must be done before calling any method that subsequently
     ;                  calls the draw method.
     success = self -> MrGrDataAtom::Init(CURRENT=current, HIDE=hide, LAYOUT=layout, $
-                      NAME=name, OVERPLOT=overplot, POSITION=position, REFRESH=refresh, $
-                      WINDOW_TITLE=window_title, _EXTRA=extra)
+                                         NAME=name, OVERPLOT=overplot, POSITION=position, $
+                                         REFRESH=refresh, WINDOW_TITLE=window_title, $
+                                         _EXTRA=extra)
     if success eq 0 then message, 'Unable to initialize superclass MrGrDataAtom.'
 
 ;---------------------------------------------------------------------
 ; Defaults ///////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    imDims = size(theImage, /DIMENSIONS)
-    nDims = size(theImage, /N_DIMENSIONS)
-    if nDims ne 2 and nDims ne 3 then message, 'IMAGE must be a 2D or 3D array.'
+    ;PAINT-related keywords
+;    if n_elements(xFillVal) eq 0 then xFillVal = !values.f_nan
+;    if n_elements(yFillVal) eq 0 then yFillVal = !values.f_nan
     
-    ;Defaults
-    setDefaultValue, gui, 1, /BOOLEAN
-    setDefaultValue, tv, 0, /BOOLEAN
-    setDefaultValue, iDisplay, 0
-    setDefaultValue, xsize, 600
-    setDefaultValue, xlog, 0, /BOOLEAN
-    setDefaultValue, ylog, 0, /BOOLEAN
-    setDefaultValue, center, 0, /BOOLEAN
-    setDefaultValue, ysize, 340
-    setDefaultValue, paint, 0, /BOOLEAN
-        
+    ;Coordinates
+	;   - Default to normal coordinates
+	normal = keyword_set(normal)
+	device = keyword_set(device)
+	if normal + device eq 0 then normal = 1
+	if normal + device gt 1 then $
+	    message, 'DEVICE and NORMAL are mutually exclusive.'
+	
+	;Polar options
+	if n_elements(pol_thick)      eq 0 then pol_thick      = 1
+	if n_elements(pol_axstyle)    eq 0 then pol_axstyle    = 1
+	if n_elements(pol_rlinestyle) eq 0 then pol_rlinestyle = 1
+	if n_elements(pol_tlinestyle) eq 0 then pol_tlinestyle = 1
+    
+    ;Make sure the titles are defined so we can use cgCheckForSymbols in ::Draw.
+    if n_elements(title)  eq 0 then  title = ''
+    if n_elements(xtitle) eq 0 then xtitle = ''
+    if n_elements(ytitle) eq 0 then ytitle = ''
+    
+    ;Have tickmarks pointing outward instead of inward.
+    if n_elements(xticklen) eq 0 then xticklen = -0.02
+    if n_elements(yticklen) eq 0 then yticklen = -0.02
+    
 ;---------------------------------------------------------------------
 ;Allocate Heap to Pointers ///////////////////////////////////////////
 ;---------------------------------------------------------------------
     self.image         = ptr_new(/ALLOCATE_HEAP)
+    self.img_out       = ptr_new(/ALLOCATE_HEAP)
     self.indep         = ptr_new(/ALLOCATE_HEAP)
     self.dep           = ptr_new(/ALLOCATE_HEAP)
-    self.axes          = ptr_new(/ALLOCATE_HEAP)
-    self.bottom        = ptr_new(/ALLOCATE_HEAP)
+    self.x0            = ptr_new(/ALLOCATE_HEAP)
+    self.x1            = ptr_new(/ALLOCATE_HEAP)
+    self.y0            = ptr_new(/ALLOCATE_HEAP)
+    self.y1            = ptr_new(/ALLOCATE_HEAP)
     self.ctindex       = ptr_new(/ALLOCATE_HEAP)
     self.data_pos      = ptr_new(/ALLOCATE_HEAP)
-    self.max_value     = ptr_new(/ALLOCATE_HEAP)
-    self.min_value     = ptr_new(/ALLOCATE_HEAP)
     self.missing_value = ptr_new(/ALLOCATE_HEAP)
-    self.missing_color = ptr_new(/ALLOCATE_HEAP)
-    self.nan           = ptr_new(/ALLOCATE_HEAP)
-    self.palette       = ptr_new(/ALLOCATE_HEAP)
-    self.range         = ptr_new(/ALLOCATE_HEAP)
-    self.scale         = ptr_new(/ALLOCATE_HEAP)
-    self.top           = ptr_new(/ALLOCATE_HEAP)
     self.xdelta_minus  = ptr_new(/ALLOCATE_HEAP)
     self.xdelta_plus   = ptr_new(/ALLOCATE_HEAP)
     self.ydelta_minus  = ptr_new(/ALLOCATE_HEAP)
     self.ydelta_plus   = ptr_new(/ALLOCATE_HEAP)
-    self.Xmax          = ptr_new(/ALLOCATE_HEAP)
-    self.Xmin          = ptr_new(/ALLOCATE_HEAP)
-    self.Ymax          = ptr_new(/ALLOCATE_HEAP)
-    self.Ymin          = ptr_new(/ALLOCATE_HEAP)
+    self.xMax          = ptr_new(/ALLOCATE_HEAP)
+    self.xMin          = ptr_new(/ALLOCATE_HEAP)
+    self.yMax          = ptr_new(/ALLOCATE_HEAP)
+    self.yMin          = ptr_new(/ALLOCATE_HEAP)
+        
+;---------------------------------------------------------------------
+; Color Palette //////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Colors
+	;   - Foreground, Background, and Missing Index.
+	;   - Default to putting the missing value at the top of the color table.
+	;   - Use as much of the color table as possible.
+	;   - Make sure a color table or color palette was given.
+	brewer  = keyword_set(brewer)
+	reverse = keyword_set(reverse)
+	if n_elements(color)         eq 0 then color         = 'black'
+	if n_elements(axiscolor)     eq 0 then axiscolor     = color
+	if n_elements(pol_rcolor)    eq 0 then pol_rcolor    = color
+	if n_elements(pol_tcolor)    eq 0 then pol_tcolor    = color
+    if n_elements(background)    eq 0 then background    = 'white'
+    if n_elements(missing_color) eq 0 then missing_color = ''
+    if n_elements(missing_index) eq 0 then missing_index = !d.table_size - 1
+    if n_elements(top)           eq 0 then top           = !d.table_size - 1
+	if n_elements(palette) eq 0 && n_elements(ctindex) eq 0 then ctindex = 13
+
+	;Set the palette
+	;   - Do not set the SCALE property before now.
+	self -> SetPalette, BOTTOM        = bottom, $
+                        BREWER        = brewer, $
+                        CTINDEX       = ctindex, $
+                        MISSING_COLOR = missing_color, $
+                        MISSING_INDEX = missing_index, $
+                        NCOLORS       = ncolors, $
+                        PALETTE       = palette, $
+                        REVERSE       = reverse, $
+                        TOP           = top
 
 ;---------------------------------------------------------------------
 ; Set Data ///////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+    ;
+    ; Set properties needed for ::PrepImage and ::SetPixelLocations
+    ; before either of them are called in ::SetData
+    ;
     
-    self.tv = keyword_set(tv)
+    ;Pixel-related properties
+    ;   - Those not set in the colors section above.
+    self.log   = keyword_set(log)
+    self.polar = keyword_set(polar)
+    self.tv    = keyword_set(tv)
     
-    ;Must set TV first.
-    ;   Setting the data will also set the ranges. Take care of user-supplied
-    ;   ranges below.
-    case n_params() of
-        1: self -> SetData, theImage
-        2: self -> SetData, theImage, x
-        3: self -> SetData, theImage, x, y
-        5: self -> SetData, theImage, x, y, x0, y0
-        7: self -> SetData, theImage, x, y, x0, y0, x1, y1
-        else: message, 'Incorrect number of elements.'
-    endcase
-        
+    ;Image output-related properties
+    ;   - Scale the image if range[0] ne range[1] (user-given range)
+    if n_elements(range) eq 0 then range = [0,0]
+    if range[0] ne range[1]   then scale = 1B
+    self.scale = keyword_set(scale)
+	self.nan   = keyword_set(nan)
+    if n_elements(missing_value) gt 0 then *self.missing_value = missing_value
+
+    ;Set the data
+    self -> SetData, theImage, x, y, x0, y0, x1, y1
+    
 ;---------------------------------------------------------------------
 ;Check/Set Keywords //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
+    ;RANGE
+    ;   - Automatic range has been set in ::SetData.
+    if range[0] ne range[1] then self.range = range
+
     ;Set the object properties
-    self -> SetProperty, AXES = axes, $
-                         BOTTOM = bottom, $
-                         CTINDEX = ctindex, $
-                         DATA_POS = data_pos, $
-                         IDISPLAY = iDisplay, $
-                         MAX_VALUE = max_value, $
-                         MIN_VALUE = min_value, $
-                         MISSING_VALUE = missing_value, $
-                         MISSING_COLOR = missing_color, $
-                         NAN = nan, $
-                         PALETTE = palette, $
-                         RANGE = imRange, $
-                         SCALE = scale, $
-                         TOP = top, $
-                         TV = tv, $
-                         XLOG = xlog, $
-                         XRANGE = xrange, $
-                         YLOG = ylog, $
-                         YRANGE = yrange
-    
+    ;   - [XY]RANGE must be set after the data is set.
+    self -> SetProperty, AXES           = axes, $
+                         AXISCOLOR      = axiscolor, $
+                         CENTER         = center, $
+                         DATA_POS       = data_pos, $
+                         DEVICE         = device, $
+                         IDISPLAY       = iDisplay, $
+                         MAX_VALUE      = max_value, $
+                         MIN_VALUE      = min_value, $
+                         NOCLIP         = noclip, $
+                         NORMAL         = normal, $
+                         POL_AXSTYLE    = pol_axstyle, $
+                         POL_RCOLOR     = pol_rcolor, $
+                         POL_RLINESTYLE = pol_rlinestyle, $
+                         POL_TCOLOR     = pol_tcolor, $
+                         POL_TLINESTYLE = pol_tlinestyle, $
+                         POL_THICK      = pol_thick, $
+                         TITLE          = title, $
+                         XLOG           = xlog, $
+                         XRANGE         = xrange, $
+                         XTICKLEN       = xticklen, $
+                         XTITLE         = xtitle, $
+                         YLOG           = ylog, $
+                         YRANGE         = yrange, $
+                         YTICKLEN       = yticklen, $
+                         YTITLE         = ytitle
+
 ;---------------------------------------------------------------------
 ;Styles and Ranges ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1537,11 +2193,11 @@ _REF_EXTRA = extra
     if n_elements(*self.ystyle) eq 0 $
         then *self.ystyle = 1 $
         else *self.ystyle += ~(*self.ystyle and 1)
-        
+            
     ;Set the initial x- and y-range
     self.init_xrange = *self.xrange
     self.init_yrange = *self.yrange
-    self.init_range  = *self.range
+    self.init_range  =  self.range
 
     ;Refresh the graphics?
     if refresh then self -> Refresh
@@ -1560,9 +2216,14 @@ pro MrImage__define
                inherits MrGrDataAtom, $
               
                ;Data
-               indep: ptr_new(), $               ;independent variable
-               dep:   ptr_new(), $               ;dependent variable
-               image: ptr_new(), $               ;image to be displayed
+               indep:   ptr_new(), $             ;independent variable
+               dep:     ptr_new(), $             ;dependent variable
+               image:   ptr_new(), $             ;image to be displayed
+               img_out: ptr_new(), $
+               x0:      ptr_new(), $
+               x1:      ptr_new(), $
+               y0:      ptr_new(), $
+               y1:      ptr_new(), $
                tv: 0B, $                         ;indicate that a TV position was given
                
                ;Type of data given
@@ -1573,28 +2234,41 @@ pro MrImage__define
                init_range:  dblarr(2), $         ;Initial image range
                init_xrange: dblarr(2), $         ;Initial x-range
                init_yrange: dblarr(2), $         ;Initial y-range
-              
+               
+               ;POLAR options
+               polar:          0B, $            ;Create a polar image?
+               pol_axstyle:    0S, $
+               pol_rcolor:     '', $
+               pol_rlinestyle: 0S, $
+               pol_tcolor:     '', $
+               pol_tlinestyle: 0S, $
+               pol_thick:      0S, $
+               
                ;mraImage Keywords
-               axes: ptr_new(), $                ;Draw axes around the image?
-               bottom: ptr_new(), $              ;If scaled, minimum scaled value
-               center: 0B, $                     ;Center of pixel locations was given?
-               ctindex: ptr_new(), $             ;Color index to load
-               data_pos: ptr_new(), $            ;A data position for the image
-               missing_value: ptr_new(), $       ;Value to be treated as missing
-               missing_color: ptr_new(), $       ;Color of missing value
-               nan: ptr_new(), $                 ;Search for NaN's when scaling?
-               paint: 0B, $                      ;Paint the image pixel-by-pixel?
-               palette: ptr_new(), $             ;Color table to be loaded
-               range: ptr_new(), $               ;Range at which the color table saturates
-               scale: ptr_new(), $               ;Byte-scale the image
-               top: ptr_new(), $                 ;If scaled, maximum scaled value
-               xdelta_minus: ptr_new(), $
-               xdelta_plus:  ptr_new(), $
-               Xmin: ptr_new(), $                ;X-location of bottom-left corner of pixels
-               Xmax: ptr_new(), $                ;X-location of upper-right corner of pixels
-               ydelta_minus: ptr_new(), $
-               ydelta_plus:  ptr_new(), $
-               Ymin: ptr_new(), $                ;Y-location of bottom-left corner of pixels
-               Ymax: ptr_new() $                 ;Y-location of upper-right corner of pixels
+               axes:          0B, $             ;Draw axes around the image?
+               bottom:        0B, $             ;If scaled, minimum scaled value
+               brewer:        0B, $             ;Use a brewer color table?
+               center:        0B, $             ;Center of pixel locations was given?
+               ctindex:       ptr_new(), $      ;Color index to load
+               data_pos:      ptr_new(), $      ;A data position for the image
+               missing_value: ptr_new(), $      ;Value to be treated as missing
+               missing_color: '', $             ;Color of missing value
+               missing_index: 0B, $             ;Color table index of missing color
+               nan:           0B, $             ;Search for NaN's when scaling?
+               log:           0B, $             ;Log-scale the image.
+               paint:         0B, $             ;Paint the image pixel-by-pixel?
+               palette:       bytarr(256,3), $  ;Color table to be loaded
+               range:         dblarr(2), $      ;Range at which the color table saturates
+               reverse:       0B, $             ;Reverse the color table?
+               scale:         0B, $             ;Byte-scale the image
+               top:           0B, $             ;If scaled, maximum scaled value
+               xdelta_minus:  ptr_new(), $      ;Distance from center of pixel to left edge
+               xdelta_plus:   ptr_new(), $      ;Distance from center of pixel to right edge
+               xMin:          ptr_new(), $      ;Left edge of pixels
+               xMax:          ptr_new(), $      ;Right edge of pixels
+               ydelta_minus:  ptr_new(), $      ;Distance from center of pixel to bottom edge
+               ydelta_plus:   ptr_new(), $      ;Distance from center of pixel to top edge
+               Ymin:          ptr_new(), $      ;Bottom of pixels
+               Ymax:          ptr_new() $       ;Top of pixels
              }
 end

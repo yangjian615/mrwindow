@@ -73,6 +73,10 @@
 ;       2014/01/21  -   OFFSET is now a float, not an integer. - MRA
 ;       2014/03/10  -   If TARGET is not give, the currently selected graphic is used.
 ;                           This models the behavior of function graphics. - MRA
+;       2014/06/25  -   cgAxis is always called with the SAVE keyword set. If the save
+;                           property is not set, then the old coordinate space will be
+;                           restored. This allows the ::ConvertCoord method to function.
+;                           Can now retrieve location of axis. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -102,8 +106,23 @@ NOERASE=noerase
     ;   then the position is nullified and determined automatically by cgAxis.
     IF MrIsA(*self.location, 'STRING') THEN self -> SetLocation
     
+    ;Get the current coordinats
+    x_sysvar = !X
+    y_sysvar = !Y
+    z_sysvar = !Z
+    p_sysvar = !P
+    
+    ;Draw the axis and save its coordinate space
     self -> doAxis
     self -> SaveCoords
+
+    ;Restore the old coordinate space
+    IF self.save EQ 0 THEN BEGIN
+        !X = x_sysvar
+        !Y = y_sysvar
+        !Z = z_sysvar
+        !P = p_sysvar
+    ENDIF
 END
 
 
@@ -137,7 +156,7 @@ NOERASE=noerase
 
     ;Call cgAxis with the correct number of parameters.
     CASE nparams OF
-        0: cgAxis, SAVE  =  self.save, $
+        0: cgAxis, SAVE  =  1B, $
                    XAXIS = *self.xaxis, $
                    XLOG  =  self.xlog, $
                    YAXIS = *self.yaxis, $
@@ -222,7 +241,7 @@ NOERASE=noerase
 
         ;Keywords commented out above have been removed
         1: cgAxis, *self.xloc, $
-                   SAVE  =  self.save, $
+                   SAVE  =  1B, $
                    XAXIS = *self.xaxis, $
                    XLOG  =  self.xlog, $
                    YAXIS = *self.yaxis, $
@@ -298,7 +317,7 @@ NOERASE=noerase
                    ZVALUE        = *self.zvalue
                    
         2: cgAxis, *self.xloc, *self.yloc, $
-                   SAVE  =  self.save, $
+                   SAVE  =  1B, $
                    XAXIS = *self.xaxis, $
                    XLOG  =  self.xlog, $
                    YAXIS = *self.yaxis, $
@@ -374,7 +393,7 @@ NOERASE=noerase
                    ZVALUE        = *self.zvalue
                    
         3: cgAxis, *self.xloc, *self.yloc, *self.zloc, $
-                   SAVE  =  self.save, $
+                   SAVE  =  1B, $
                    XAXIS = *self.xaxis, $
                    XLOG  =  self.xlog, $
                    YAXIS = *self.yaxis, $
@@ -577,6 +596,7 @@ OFFSET = offset, $
 SAVE=save, $
 TARGET=target, $
 TICKDIR=tickdir, $
+XYZ_LOC=xyz_loc, $
 
 ;Direct Graphics Keywords
 AXIS_RANGE=axis_range, $
@@ -619,6 +639,13 @@ _REF_EXTRA=extra
         Catch, /CANCEL
         void = cgErrorMsg()
         RETURN
+    ENDIF
+    
+    ;Location
+    IF Arg_Present(xyz_loc) THEN BEGIN
+        IF N_Elements(*self.zloc) GT 0 $
+            THEN xyz_loc = [*self.xloc, *self.yloc] $
+            ELSE xyz_loc = [*self.xloc, *self.yloc, *self.zloc]
     ENDIF
     
     ;Object Properties
@@ -840,17 +867,20 @@ PRO MrAxis::SetLocation, location
         IF nLoc EQ 2 THEN BEGIN
             CASE self.direction OF
                 'X': BEGIN
-                    yloc = location[0]
-                    zloc = location[1]
+                    xloc = location[0]
+                    yloc = location[1]
+                    zloc = 0
                 ENDCASE
                 
                 'Y': BEGIN
                     xloc = location[0]
-                    zloc = location[1]
+                    yloc = location[1]
+                    zloc = 0
                 ENDCASE
                 
                 'Z': BEGIN
-                    xloc = location[0]
+                    xloc = 0
+                    yloc = location[0]
                     zloc = location[1]
                 ENDCASE
             ENDCASE
@@ -890,7 +920,7 @@ PRO MrAxis::SetLocation, location
     
     ;We are using Normal coordinates.
     self.normal = 1B
-    self.data = 0B
+    self.data   = 0B
     self.device = 0B
 END
 
@@ -948,14 +978,8 @@ ZAXIS=zaxis
 ;---------------------------------------------------------------------
     ;Make sure the axes do not interfere with one another
     IF nx GT 0 THEN BEGIN
-        IF N_Elements(*self.yaxis) NE 0 THEN BEGIN
-            Ptr_Free, self.yaxis
-            self.yaxis = Ptr_New(/ALLOCATE_HEAP)
-        ENDIF
-        IF N_Elements(*self.zaxis) NE 0 THEN BEGIN
-            Ptr_Free, self.zaxis
-            self.zaxis = Ptr_New(/ALLOCATE_HEAP)
-        ENDIF
+        IF N_Elements(*self.yaxis) NE 0 THEN void = temporary(*self.yaxis)
+        IF N_Elements(*self.zaxis) NE 0 THEN void = temporary(*self.zaxis)
         *self.xaxis = xaxis
     ENDIF
     
@@ -963,14 +987,8 @@ ZAXIS=zaxis
 ;Z-Axis //////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     IF ny GT 0 THEN BEGIN
-        IF N_Elements(*self.xaxis) NE 0 THEN BEGIN
-            Ptr_Free, self.xaxis
-            self.xaxis = Ptr_New(/ALLOCATE_HEAP)
-        ENDIF
-        IF N_Elements(*self.zaxis) NE 0 THEN BEGIN
-            Ptr_Free, self.zaxis
-            self.zaxis = Ptr_New(/ALLOCATE_HEAP)
-        ENDIF
+        IF N_Elements(*self.xaxis) NE 0 THEN void = temporary(*self.xaxis)
+        IF N_Elements(*self.zaxis) NE 0 THEN void = temporary(*self.zaxis)
         *self.yaxis = yaxis
     ENDIF
     
@@ -978,14 +996,8 @@ ZAXIS=zaxis
 ;Z-Axis //////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     IF nz GT 0 THEN BEGIN
-        IF N_Elements(*self.xaxis) NE 0 THEN BEGIN
-            Ptr_Free, self.xaxis
-            self.xaxis = Ptr_New(/ALLOCATE_HEAP)
-        ENDIF
-        IF N_Elements(*self.yaxis) NE 0 THEN BEGIN
-            Ptr_Free, self.yaxis
-            self.yaxis = Ptr_New(/ALLOCATE_HEAP)
-        ENDIF
+        IF N_Elements(*self.xaxis) NE 0 THEN void = temporary(*self.xaxis)
+        IF N_Elements(*self.yaxis) NE 0 THEN void = temporary(*self.yaxis)
         *self.zaxis = zaxis
     ENDIF
 END
@@ -1176,7 +1188,8 @@ _REF_EXTRA=extra
     
     ;Set the tick direction for the proper axis.
     IF N_Elements(tickdir) GT 0 THEN BEGIN
-        CASE StrUpCase(direction) OF
+        _direction = N_Elements(direction) EQ 0 ? self.direction : direction
+        CASE StrUpCase(_direction) OF
             'X': *self.xaxis = tickdir
             'Y': *self.yaxis = tickdir
             'Z': *self.zaxis = tickdir

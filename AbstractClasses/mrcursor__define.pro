@@ -124,22 +124,34 @@
 ;                           The widget ID of the parent widget.
 ;
 ; :Keywords:
-;       MENU:               in, optional, type=boolean, default=0
-;                           If set, all buttons will be placed under a "Cursor" submenu.
+;       BITMAP:             in, optional, type=boolean, default=0
+;                           If set, then VALUE is taken to be a bitmap file or array.
+;                               Automatically sets `MENU`=1
 ;       CROSS_HAIRS:        in, optional, type=boolean, default=0
 ;                           Create the "Cross Hairs" button.
 ;       GET_POINT:          in, optional, type=boolean, default=0
 ;                           Create the "Get Point" button.
-;       SHOW_XY:            in, optional, type=boolean, default=0
-;                           Create the "Show [X,Y]" button.
+;       MENU:               in, optional, type=boolean, default=0
+;                           If set, all buttons will be placed under a "Cursor" submenu.
 ;       NONE:               in, optional, type=boolean, default=0
 ;                           Create the "None" button.
+;       SHOW_XY:            in, optional, type=boolean, default=0
+;                           Create the "Show [X,Y]" button.
+;       VALUE:              in, optional, type=string/bytarr(3,N)
+;                           String to written on the button, the name of a ".bmp" file
+;                               containing an image or a 3xN byt array of an image that
+;                               is to be used as the button face. If either of the latter
+;                               two are intended, the `BUTTON` keyword must be set.
+;                               Bitmaps can only be used with the `MENU` keyword.
+;-
 pro MrCursor::Create_Cursor_Menu, parent, $
-MENU = menu, $
+BITMAP = bitmap, $
 CROSS_HAIRS = cross_hairs, $
 GET_POINT = get_point, $
+MENU = menu, $
+NONE = none, $
 SHOW_XY = show_xy, $
-NONE = none
+VALUE = value
     compile_opt idl2
     
     ;Error handling
@@ -151,11 +163,17 @@ NONE = none
     endif
     
     ;Defaults
-    setDefaultValue, menu, 0, /BOOLEAN
+    setDefaultValue, bitmap,      0, /BOOLEAN
     setDefaultValue, cross_hairs, 0, /BOOLEAN
-    setDefaultValue, get_point, 0, /BOOLEAN
-    setDefaultValue, show_xy, 0, /BOOLEAN
-    setDefaultValue, none, 0, /BOOLEAN
+    setDefaultValue, get_point,   0, /BOOLEAN
+    setDefaultValue, menu,        0, /BOOLEAN
+    setDefaultValue, none,        0, /BOOLEAN
+    setDefaultValue, show_xy,     0, /BOOLEAN
+    if n_elements(value) eq 0 then begin
+        value = 'Cursor'
+        bitmap = 0
+    endif
+    if bitmap then menu = 1
     
     ;If nothing was selected, create all buttons
     if cross_hairs + get_point + show_xy eq 0 then begin
@@ -168,7 +186,7 @@ NONE = none
     
     ;Create the Menu
     if keyword_set(menu) $
-        then cursorID = widget_button(parent, VALUE='Cursor', /MENU) $
+        then cursorID = widget_button(parent, VALUE=value, /MENU, BITMAP=bitmap) $
         else cursorID = parent
     
     ;Create Buttons

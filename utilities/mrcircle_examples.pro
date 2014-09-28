@@ -1,10 +1,10 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;       MrPlotS
+;       MrPolygon_Examples
 ;
 ;*****************************************************************************************
-;   Copyright (c) 2013, Matthew Argall                                                   ;
+;   Copyright (c) 2014, Matthew Argall                                                   ;
 ;   All rights reserved.                                                                 ;
 ;                                                                                        ;
 ;   Redistribution and use in source and binary forms, with or without modification,     ;
@@ -32,28 +32,19 @@
 ;*****************************************************************************************
 ;
 ;+
-;   Create a MrPlotS object.
+;   Examples of how to use MrPolygon__Define.
+;
+; :Examples:
+;   See MrImage_Examples.pro for a series of examples::
+;       IDL> void = MrPolygon_Examples()
+;       IDL> win  = MrPolygon_Examples(2)
 ;
 ; :Params:
-;       X:                  in, required, type=numeric
-;                           A vector or scalar argument providing the X components of the
-;                               points to be connected. If only one argument is specified,
-;                               X must be an array of either two or three vectors
-;                               (i.e., (2,*) or (3,*)). In this special case, X[0,*] are
-;                               taken as the X values, X[1,*] are taken as the `Y` values,
-;                               and X[2,*] are taken as the `Z` values.
-;       Y:                  in, optional, type=numeric
-;                           Y coordinate(s) of the points to be connected.
-;       Z:                  in, optional, type=numeric
-;                           Z coordinate(s) of the points to be connected.
-;
-; :Keywords:
-;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by MrPlotS__define.
+;       EXAMPLE:        in, required, type=int
+;                       Index number of the example to be excecuted.
 ;
 ; :Returns:
-;       THEPLOTS:           out, required, type=object
-;                           A MrPlotS object reference.
+;       WIN:            A MrWindow object reference.
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -63,30 +54,56 @@
 ;       Durham, NH, 03824
 ;       matthew.argall@wildcats.unh.edu
 ;
-; :Copyright:
-;       Matthew Argall 2013
-;
 ; :History:
 ;	Modification History::
-;       2013/11/27  -   Written by Matthew Argall.
+;       2014/09/22  -   Written by Matthew Argall
 ;-
-function MrPlotS, x, y, z, $
-_REF_EXTRA = extra
-    compile_opt idl2
+function MrCircle_Examples, example
+    compile_opt strictarr
     
-    ;Error handling
     catch, the_error
     if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
+        catch, /CANCEL
+        if obj_valid(p1) then p1 -> Close
+        void = cgErrorMSG()
         return, obj_new()
     endif
-
-    ;Add to the current window?
-    current = keyword_set(current)
-
-    ;Create the plot
-    thePlotS = obj_new('MrPlotS', x, y, z, _STRICT_EXTRA=extra)
     
-    return, thePlotS
+    ;Print a description of each example
+    if n_elements(example) eq 0 then begin
+        print, [['EXAMPLE    DESCRIPTION'], $
+                ['   1       Empty Axes with Three Circles.']]
+        return, -1
+    endif
+
+;---------------------------------------------------------------------
+; Begin Examples /////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    case example of
+    ;---------------------------------------------------------------------
+    ; Exmpty Axes with Three Circles /////////////////////////////////////
+    ;---------------------------------------------------------------------
+        1: begin
+            ;Create an empty set of axes.
+            p1 = MrPlot(0, 0, /NODATA, XRANGE=[0,5], YRANGE=[0,5], $
+                        TITLE='Test', XTITLE='Time', YTITLE='Data')
+
+            ;Create circles
+            r = [2.3, 1.0, 0.45]
+            x_center = [2, 1, 4]
+            y_center = [3, 0.5, 1]
+            cc = MrCircle(r, x_center, y_center, TARGET=p1, /FILL_BACKGROUND, /DATA, $
+                          FILL_COLOR=['Magenta', 'Turquoise', 'Indian Red'])
+            
+            ;Return the window
+            win = p1.window
+        endcase
+
+;---------------------------------------------------------------------
+; No More Examples ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+        else: message, 'EXAMPLE must be between 1 and 1.'
+    endcase
+    
+    return, win
 end

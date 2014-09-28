@@ -1,80 +1,70 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;   MrGraphicsKeywords__Define
+;       MrGraphicsKeywords__Define
+;
+;*****************************************************************************************
+;   Copyright (c) 2014, Matthew Argall                                                   ;
+;   All rights reserved.                                                                 ;
+;                                                                                        ;
+;   Redistribution and use in source and binary forms, with or without modification,     ;
+;   are permitted provided that the following conditions are met:                        ;
+;                                                                                        ;
+;       * Redistributions of source code must retain the above copyright notice,         ;
+;         this list of conditions and the following disclaimer.                          ;
+;       * Redistributions in binary form must reproduce the above copyright notice,      ;
+;         this list of conditions and the following disclaimer in the documentation      ;
+;         and/or other materials provided with the distribution.                         ;
+;       * Neither the name of the <ORGANIZATION> nor the names of its contributors may   ;
+;         be used to endorse or promote products derived from this software without      ;
+;         specific prior written permission.                                             ;
+;                                                                                        ;
+;   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY  ;
+;   EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES ;
+;   OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT  ;
+;   SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,       ;
+;   INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED ;
+;   TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR   ;
+;   BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN     ;
+;   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN   ;
+;   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH  ;
+;   DAMAGE.                                                                              ;
+;*****************************************************************************************
 ;
 ; PURPOSE:
-;   Provides an object interface to handle IDL direct graphics plotting keywords. Basically,
-;   any graphics keyword that is common to IDL plotting routines (e.g. Plot, Contour, 
-;   Surface, etc.) is supported here.
-;
-;   Modifications::
-;       Does not contain CHARSIZE, POSITION, XMARGIN or YMARGIN keywords. - MRA
-;       2014/01/21  -   DATA, NORMAL, and DEVICE are no longer pointers. - MRA
-;       2014/01/23  -   Added the _OverloadPrint method. Renamed to MrGraphicsKeywords__Define - MRA
-;
-;******************************************************************************************;
-;                                                                                          ;
-;  Copyright (c) 2012, by Fanning Software Consulting, Inc. All rights reserved.           ;
-;                                                                                          ;
-;  Redistribution and use in source and binary forms, with or without                      ;
-;  modification, are permitted provided that the following conditions are met:             ;
-;                                                                                          ;
-;      * Redistributions of source code must retain the above copyright                    ;
-;        notice, this list of conditions and the following disclaimer.                     ;
-;      * Redistributions in binary form must reproduce the above copyright                 ;
-;        notice, this list of conditions and the following disclaimer in the               ;
-;        documentation and/or other materials provided with the distribution.              ;
-;      * Neither the name of Fanning Software Consulting, Inc. nor the names of its        ;
-;        contributors may be used to endorse or promote products derived from this         ;
-;        software without specific prior written permission.                               ;
-;                                                                                          ;
-;  THIS SOFTWARE IS PROVIDED BY FANNING SOFTWARE CONSULTING, INC. ''AS IS'' AND ANY        ;
-;  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES    ;
-;  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT     ;
-;  SHALL FANNING SOFTWARE CONSULTING, INC. BE LIABLE FOR ANY DIRECT, INDIRECT,             ;
-;  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED    ;
-;  TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;         ;
-;  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND             ;
-;  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT              ;
-;  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS           ;
-;  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                            ;
-;******************************************************************************************;
 ;+
 ; Provides an object interface to handle IDL direct graphics plotting keywords. Basically,
 ; any graphics keyword that is common to IDL plotting routines (e.g. Plot, Contour, 
 ; Surface, etc.) is supported here. See the IDL documentation for "Graphics Keywords for
 ; a complete list.
-; 
-; The program requires the `Coyote Library <http://www.idlcoyote.com/documents/programs.php>`
-; to be installed on your machine.
+;
+; NOTES:
+;   - Object properties are left as pointers so that the ![PXYZ] system variables can
+;     take effect when the user does not define a particular plot property.
 ;
 ; :Categories:
 ;    Graphics
-;           
+;
 ; :Author:
-;       FANNING SOFTWARE CONSULTING::
-;           David W. Fanning 
-;           1645 Sheely Drive
-;           Fort Collins, CO 80526 USA
-;           Phone: 970-221-0438
-;           E-mail: david@idlcoyote.com
-;           Coyote's Guide to IDL Programming: http://www.idlcoyote.com
+;   Matthew Argall::
+;       University of New Hampshire
+;       Morse Hall, Room 113
+;       8 College Rd.
+;       Durham, NH, 03824
+;       matthew.argall@wildcats.unh.edu
 ;
 ; :History:
-;     Change History::
-;        Written, 16 May 2012, by David W. Fanning.
-;        Added missing LINESTYLE keyword. 22 May 2012. DWF.
-;        BIG problem in the way I was handling the PSYM keyword solved! 18 July 2012. DWF.
-;        04/26/2013 -   Removed XMARGIN and YMARGIN keywords because they were conflicting
-;                           causing duplicate definitions in a class of mine. - Matthew R Argall
-;        09/27/2013 -   Removed the POSITION keyword. - MRA
-;        2013/11/23 -   Removed the CHARSIZE keyword. - MRA
-;        2014/01/21 -   DATA, NORMAL, and DEVICE are no longer pointers. - MRA
-;
-; :Copyright:
-;     Copyright (c) 2012, Fanning Software Consulting, Inc.
+;   Change History::
+;       03/25/2013  -   Written by Matthew Argall. Adapted from cgGraphicsKeywords__Define
+;                           from the coyote library.
+;       04/26/2013  -   Removed XMARGIN and YMARGIN keywords because they were conflicting
+;                           causing duplicate definitions in a class of mine. - MRA
+;       09/27/2013  -   Removed the POSITION keyword. - MRA
+;       2013/11/23  -   Removed the CHARSIZE keyword. - MRA
+;       2014/01/21  -   DATA, NORMAL, and DEVICE are no longer pointers. - MRA
+;       2014/04/30  -   Forgot to allocate memory to the ZValue property. Fixed. - MRA
 ;-
+;*****************************************************************************************
 ;+
 ;   Provide output with the PRINT procedure is used.
 ;-
@@ -405,13 +395,13 @@ FUNCTION MrGraphicsKeywords::INIT, $
 ;---------------------------------------------------------------------
 ;Default Values //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    IF N_Elements(background) EQ 0 THEN background = 'white'
-    IF N_Elements(axiscolor) EQ 0 THEN axiscolor = 'opposite' 
-    IF N_Elements(color) EQ 0 THEN color = 'opposite'
-    IF N_Elements(charsize) EQ 0 THEN charsize = cgDefCharSize(FONT=!P.Font)
     device = keyword_set(device)
     normal = keyword_set(normal)
-    data = keyword_set(data)
+    data   = keyword_set(data)
+    IF N_Elements(background) EQ 0 THEN background = 'white'
+    IF N_Elements(axiscolor)  EQ 0 THEN axiscolor  = 'opposite' 
+    IF N_Elements(color)      EQ 0 THEN color      = 'opposite'
+    IF N_Elements(charsize)   EQ 0 THEN charsize   = cgDefCharSize(FONT=!P.Font)
     
     ;For all direct graphics types, DATA is either ignored (in which case NORMAL is the
     ;default) or it is the default coordinate system.
@@ -420,83 +410,84 @@ FUNCTION MrGraphicsKeywords::INIT, $
 ;---------------------------------------------------------------------
 ;Allocate Heap ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    self.axiscolor = Ptr_New(/Allocate_Heap)
+    self.axiscolor  = Ptr_New(/Allocate_Heap)
     self.background = Ptr_New(/Allocate_Heap)
-;    self.charsize = Ptr_New(/Allocate_Heap)
-    self.charthick = Ptr_New(/Allocate_Heap)
-    self.clip = Ptr_New(/Allocate_Heap)
-    self.color = Ptr_New(/Allocate_Heap)
-;    self.data = Ptr_New(/Allocate_Heap)
-;    self.device = Ptr_New(/Allocate_Heap)
-    self.font = Ptr_New(/Allocate_Heap)
-    self.linestyle = Ptr_New(/Allocate_Heap)
-;    self.normal = Ptr_New(/Allocate_Heap)
-    self.noclip = Ptr_New(/Allocate_Heap)
-    self.nodata = Ptr_New(/Allocate_Heap)
-    self.noerase = Ptr_New(/Allocate_Heap)
-;    self.position = Ptr_New(/Allocate_Heap)
-    self.psym = Ptr_New(/Allocate_Heap)
-    self.subtitle = Ptr_New(/Allocate_Heap)
-    self.symsize = Ptr_New(/Allocate_Heap)
-    self.t3d = Ptr_New(/Allocate_Heap)
-    self.thick = Ptr_New(/Allocate_Heap)
-    self.ticklen = Ptr_New(/Allocate_Heap)
-    self.title = Ptr_New(/Allocate_Heap)
+;    self.charsize  = Ptr_New(/Allocate_Heap)
+    self.charthick  = Ptr_New(/Allocate_Heap)
+    self.clip       = Ptr_New(/Allocate_Heap)
+    self.color      = Ptr_New(/Allocate_Heap)
+;    self.data      = Ptr_New(/Allocate_Heap)
+;    self.device    = Ptr_New(/Allocate_Heap)
+    self.font       = Ptr_New(/Allocate_Heap)
+    self.linestyle  = Ptr_New(/Allocate_Heap)
+;    self.normal    = Ptr_New(/Allocate_Heap)
+    self.noclip     = Ptr_New(/Allocate_Heap)
+    self.nodata     = Ptr_New(/Allocate_Heap)
+    self.noerase    = Ptr_New(/Allocate_Heap)
+;    self.position  = Ptr_New(/Allocate_Heap)
+    self.psym       = Ptr_New(/Allocate_Heap)
+    self.subtitle   = Ptr_New(/Allocate_Heap)
+    self.symsize    = Ptr_New(/Allocate_Heap)
+    self.t3d        = Ptr_New(/Allocate_Heap)
+    self.thick      = Ptr_New(/Allocate_Heap)
+    self.ticklen    = Ptr_New(/Allocate_Heap)
+    self.title      = Ptr_New(/Allocate_Heap)
     
-    self.xcharsize = Ptr_New(/Allocate_Heap)
-    self.xgridstyle = Ptr_New(/Allocate_Heap)
-;    self.xmargin = Ptr_New(/Allocate_Heap)
-    self.xminor = Ptr_New(/Allocate_Heap)
-    self.xrange = Ptr_New(/Allocate_Heap)
-    self.xstyle = Ptr_New(/Allocate_Heap)
-    self.xthick = Ptr_New(/Allocate_Heap)
-    self.xtick_get = Ptr_New(/Allocate_Heap)
-    self.xtickformat = Ptr_New(/Allocate_Heap)
+    self.xcharsize     = Ptr_New(/Allocate_Heap)
+    self.xgridstyle    = Ptr_New(/Allocate_Heap)
+;    self.xmargin      = Ptr_New(/Allocate_Heap)
+    self.xminor        = Ptr_New(/Allocate_Heap)
+    self.xrange        = Ptr_New(/Allocate_Heap)
+    self.xstyle        = Ptr_New(/Allocate_Heap)
+    self.xthick        = Ptr_New(/Allocate_Heap)
+    self.xtick_get     = Ptr_New(/Allocate_Heap)
+    self.xtickformat   = Ptr_New(/Allocate_Heap)
     self.xtickinterval = Ptr_New(/Allocate_Heap)
-    self.xticklayout = Ptr_New(/Allocate_Heap)
-    self.xticklen = Ptr_New(/Allocate_Heap)
-    self.xtickname = Ptr_New(/Allocate_Heap)
-    self.xticks = Ptr_New(/Allocate_Heap)
-    self.xtickunits = Ptr_New(/Allocate_Heap)
-    self.xtickv = Ptr_New(/Allocate_Heap)
-    self.xtitle = Ptr_New(/Allocate_Heap)
+    self.xticklayout   = Ptr_New(/Allocate_Heap)
+    self.xticklen      = Ptr_New(/Allocate_Heap)
+    self.xtickname     = Ptr_New(/Allocate_Heap)
+    self.xticks        = Ptr_New(/Allocate_Heap)
+    self.xtickunits    = Ptr_New(/Allocate_Heap)
+    self.xtickv        = Ptr_New(/Allocate_Heap)
+    self.xtitle        = Ptr_New(/Allocate_Heap)
     
-    self.ycharsize = Ptr_New(/Allocate_Heap)
-    self.ygridstyle = Ptr_New(/Allocate_Heap)
-;    self.ymargin = Ptr_New(/Allocate_Heap)
-    self.yminor = Ptr_New(/Allocate_Heap)
-    self.yrange = Ptr_New(/Allocate_Heap)
-    self.ystyle = Ptr_New(/Allocate_Heap)
-    self.ythick = Ptr_New(/Allocate_Heap)
-    self.ytick_get = Ptr_New(/Allocate_Heap)
-    self.ytickformat = Ptr_New(/Allocate_Heap)
+    self.ycharsize     = Ptr_New(/Allocate_Heap)
+    self.ygridstyle    = Ptr_New(/Allocate_Heap)
+;    self.ymargin      = Ptr_New(/Allocate_Heap)
+    self.yminor        = Ptr_New(/Allocate_Heap)
+    self.yrange        = Ptr_New(/Allocate_Heap)
+    self.ystyle        = Ptr_New(/Allocate_Heap)
+    self.ythick        = Ptr_New(/Allocate_Heap)
+    self.ytick_get     = Ptr_New(/Allocate_Heap)
+    self.ytickformat   = Ptr_New(/Allocate_Heap)
     self.ytickinterval = Ptr_New(/Allocate_Heap)
-    self.yticklayout = Ptr_New(/Allocate_Heap)
-    self.yticklen = Ptr_New(/Allocate_Heap)
-    self.ytickname = Ptr_New(/Allocate_Heap)
-    self.yticks = Ptr_New(/Allocate_Heap)
-    self.ytickunits = Ptr_New(/Allocate_Heap)
-    self.ytickv = Ptr_New(/Allocate_Heap)
-    self.ytitle = Ptr_New(/Allocate_Heap)
-       
-    self.zcharsize = Ptr_New(/Allocate_Heap)
-    self.zgridstyle = Ptr_New(/Allocate_Heap)
-    self.zmargin = Ptr_New(/Allocate_Heap)
-    self.zminor = Ptr_New(/Allocate_Heap)
-    self.zrange = Ptr_New(/Allocate_Heap)
-    self.zstyle = Ptr_New(/Allocate_Heap)
-    self.zthick = Ptr_New(/Allocate_Heap)
-    self.ztick_get = Ptr_New(/Allocate_Heap)
-    self.ztickformat = Ptr_New(/Allocate_Heap)
+    self.yticklayout   = Ptr_New(/Allocate_Heap)
+    self.yticklen      = Ptr_New(/Allocate_Heap)
+    self.ytickname     = Ptr_New(/Allocate_Heap)
+    self.yticks        = Ptr_New(/Allocate_Heap)
+    self.ytickunits    = Ptr_New(/Allocate_Heap)
+    self.ytickv        = Ptr_New(/Allocate_Heap)
+    self.ytitle        = Ptr_New(/Allocate_Heap)
+    
+    self.zcharsize     = Ptr_New(/Allocate_Heap)
+    self.zgridstyle    = Ptr_New(/Allocate_Heap)
+    self.zmargin       = Ptr_New(/Allocate_Heap)
+    self.zminor        = Ptr_New(/Allocate_Heap)
+    self.zrange        = Ptr_New(/Allocate_Heap)
+    self.zstyle        = Ptr_New(/Allocate_Heap)
+    self.zthick        = Ptr_New(/Allocate_Heap)
+    self.ztick_get     = Ptr_New(/Allocate_Heap)
+    self.ztickformat   = Ptr_New(/Allocate_Heap)
     self.ztickinterval = Ptr_New(/Allocate_Heap)
-    self.zticklayout = Ptr_New(/Allocate_Heap)
-    self.zticklen = Ptr_New(/Allocate_Heap)
-    self.ztickname = Ptr_New(/Allocate_Heap)
-    self.zticks = Ptr_New(/Allocate_Heap)
-    self.ztickunits = Ptr_New(/Allocate_Heap)
-    self.ztickv = Ptr_New(/Allocate_Heap)
-    self.ztitle = Ptr_New(/Allocate_Heap)
-    self.zvalue = Ptr_New(/Allocate_Heap)
+    self.zticklayout   = Ptr_New(/Allocate_Heap)
+    self.zticklen      = Ptr_New(/Allocate_Heap)
+    self.ztickname     = Ptr_New(/Allocate_Heap)
+    self.zticks        = Ptr_New(/Allocate_Heap)
+    self.ztickunits    = Ptr_New(/Allocate_Heap)
+    self.ztickv        = Ptr_New(/Allocate_Heap)
+    self.ztitle        = Ptr_New(/Allocate_Heap)
+    
+    self.zvalue        = Ptr_New(/Allocate_Heap)
     
         
 ;---------------------------------------------------------------------
@@ -933,39 +924,31 @@ PRO MrGraphicsKeywords::SetProperty, $
 ;---------------------------------------------------------------------
 ;General /////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    IF N_Elements(axiscolor) NE 0 THEN *self.axiscolor = axiscolor
+    IF N_Elements(axiscolor)  NE 0 THEN *self.axiscolor  = axiscolor
     IF N_Elements(background) NE 0 THEN *self.background = background
-;    IF N_Elements(charsize) NE 0 THEN *self.charsize = charsize
-    IF N_Elements(charthick) NE 0 THEN *self.charthick = charthick
-    IF N_Elements(clip) NE 0 THEN *self.clip = clip 
-    IF N_Elements(color) NE 0 THEN *self.color = color
-    IF N_Elements(font) NE 0 THEN *self.font = font 
-    IF N_Elements(linestyle) NE 0 THEN *self.linestyle = linestyle 
-    IF N_Elements(noclip) NE 0 THEN *self.noclip = Keyword_Set(noclip)
-    IF N_Elements(nodata) NE 0 THEN *self.nodata = Keyword_Set(nodata)
-    IF N_Elements(noerase) NE 0 THEN *self.noerase = Keyword_Set(noerase)
-;    IF N_Elements(position) NE 0 THEN *self.position = position 
-    IF N_Elements(psym) NE 0 THEN *self.psym = psym
-    IF N_Elements(subtitle) NE 0 THEN *self.subtitle = subtitle
-    IF N_Elements(symsize) NE 0 THEN *self.symsize = symsize
-    IF N_Elements(t3d) NE 0 THEN *self.t3d = Keyword_Set(t3d)
-    IF N_Elements(thick) NE 0 THEN *self.thick = thick
-    IF N_Elements(ticklen) NE 0 THEN *self.ticklen = ticklen
-    IF N_Elements(title) NE 0 THEN *self.title = title
+;    IF N_Elements(charsize)   NE 0 THEN *self.charsize = charsize
+    IF N_Elements(charthick)  NE 0 THEN *self.charthick  = charthick
+    IF N_Elements(clip)       NE 0 THEN *self.clip       = clip 
+    IF N_Elements(color)      NE 0 THEN *self.color      = color
+    IF N_Elements(font)       NE 0 THEN *self.font       = font 
+    IF N_Elements(linestyle)  NE 0 THEN *self.linestyle  = linestyle 
+    IF N_Elements(noclip)     NE 0 THEN *self.noclip     = Keyword_Set(noclip)
+    IF N_Elements(nodata)     NE 0 THEN *self.nodata     = Keyword_Set(nodata)
+    IF N_Elements(noerase)    NE 0 THEN *self.noerase    = Keyword_Set(noerase)
+;    IF N_Elements(position)   NE 0 THEN *self.position = position 
+    IF N_Elements(psym)       NE 0 THEN *self.psym       = psym
+    IF N_Elements(subtitle)   NE 0 THEN *self.subtitle   = subtitle
+    IF N_Elements(symsize)    NE 0 THEN *self.symsize    = symsize
+    IF N_Elements(t3d)        NE 0 THEN *self.t3d        = Keyword_Set(t3d)
+    IF N_Elements(thick)      NE 0 THEN *self.thick      = thick
+    IF N_Elements(ticklen)    NE 0 THEN *self.ticklen    = ticklen
+    IF N_Elements(title)      NE 0 THEN *self.title      = title
     
     IF N_Elements(data) GT 0 THEN BEGIN
         self.data = Keyword_Set(data)
         IF self.data EQ 1B THEN BEGIN
-            self.device = 0
-            self.normal = 0
-        ENDIF
-    ENDIF
-    
-    IF N_Elements(device) GT 0 THEN BEGIN
-        self.device = Keyword_Set(device)
-        IF self.device EQ 1B THEN BEGIN
-            self.data   = B
-            self.normal = 0B
+            device = 0
+            normal = 0
         ENDIF
     ENDIF
     
@@ -977,8 +960,16 @@ PRO MrGraphicsKeywords::SetProperty, $
         ENDIF
     ENDIF
     
+    IF N_Elements(device) GT 0 THEN BEGIN
+        self.device = Keyword_Set(device)
+        IF self.device EQ 1B THEN BEGIN
+            self.data   = 0B
+            normal      = 0B
+        ENDIF
+    ENDIF
+
 ;---------------------------------------------------------------------
-;X ///////////////////////////////////////////////////////////////////
+; X //////////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     IF N_Elements(xcharsize)     NE 0 THEN *self.xcharsize     = xcharsize
     IF N_Elements(xgridstyle)    NE 0 THEN *self.xgridstyle    = xgridstyle
@@ -998,7 +989,7 @@ PRO MrGraphicsKeywords::SetProperty, $
     IF N_Elements(xtitle)        NE 0 THEN *self.xtitle        = xtitle
     
 ;---------------------------------------------------------------------
-;Y ///////////////////////////////////////////////////////////////////
+; Y //////////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     IF N_Elements(ycharsize)     NE 0 THEN *self.ycharsize     = ycharsize
     IF N_Elements(ygridstyle)    NE 0 THEN *self.ygridstyle    = ygridstyle
@@ -1018,11 +1009,11 @@ PRO MrGraphicsKeywords::SetProperty, $
     IF N_Elements(ytitle)        NE 0 THEN *self.ytitle        = ytitle
     
 ;---------------------------------------------------------------------
-;Z ///////////////////////////////////////////////////////////////////
+; Z //////////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     IF N_Elements(zcharsize)     NE 0 THEN *self.zcharsize     = zcharsize
     IF N_Elements(zgridstyle)    NE 0 THEN *self.zgridstyle    = zgridstyle
-    IF N_Elements(zmargin)      NE 0 THEN *self.zmargin       = zmargin
+    IF N_Elements(zmargin)       NE 0 THEN *self.zmargin       = zmargin
     IF N_Elements(zminor)        NE 0 THEN *self.zminor        = zminor
     IF N_Elements(zrange)        NE 0 THEN *self.zrange        = zrange
     IF N_Elements(zstyle)        NE 0 THEN *self.zstyle        = zstyle

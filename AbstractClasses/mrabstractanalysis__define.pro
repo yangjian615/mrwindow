@@ -503,10 +503,22 @@ IRANGE = iRange
     if n_elements(index) eq 0 $
         then theObj = self -> GetSelect() $
         else theObj = self -> Get(POSITION=index)
+
+    dimension = 0
+    theClass = obj_class(theObj)
+    case obj_class(theObj) of
+        'MRPLOT': begin
+            theObj -> GetData, indep, dep
+            theObj -> GetProperty, DIMENSION=dimension
+            if n_elements(dimension) eq 0 then dimension = 0
+        endcase
         
-    theObj -> GetData, indep, dep
-    theObj -> GetProperty, DIMENSION=dimension
-    if n_elements(dimension) eq 0 then dimension = 0
+        'MRIMAGE': begin
+            theObj -> GetData, img, indep, dep
+        endcase
+        
+        else: message, 'Cannot get data range for object class "' + theClass + '".'
+    endcase
     
     ;Find the closest data point
     !Null = min(abs(indep - xrange[0]), sIndex)
@@ -869,7 +881,7 @@ TAIL=tail
         
     ;print the results of MVAB to the command window
     nlm = ['N', 'M', 'L']
-    print, '________________________________________________________________'
+    print, '================================================================'
     print, 'MVAB eigenvalues and eigenvectors'
 
     print, 'Start time: ' + ssm_to_hms(xy_data[0])

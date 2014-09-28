@@ -149,7 +149,7 @@ function MrPlot::_OverloadPrint
     if n_elements(*self.max_value) eq 0 then max_value += default else max_value += string(*self.max_value, FORMAT='(f0)')
     if n_elements(*self.min_value) eq 0 then min_value += default else min_value += string(*self.min_value, FORMAT='(f0)')
     if n_elements(*self.symcolor)  eq 0 then symcolor += "''"     else symcolor  += strjoin(string(*self.symcolor, FORMAT='(a0)'), joinStr)
-    if n_elements(*self.target) eq 0 then target += undefObj else target += strjoin(MrObj_Class(*self.target), joinStr)
+    if n_elements(*self.target)    eq 0 then target += undefObj else target += strjoin(MrObj_Class(*self.target), joinStr)
     
     ;Put MrPlot properties together
     selfStr = obj_class(self) + '  <' + strtrim(obj_valid(self, /GET_HEAP_IDENTIFIER), 2) + '>'
@@ -805,8 +805,9 @@ _REF_EXTRA = extra
     ;Sets up window -- Must be done before calling any method that subsequently
     ;                  calls the draw method.
     success = self -> MrGrDataAtom::Init(CURRENT=current, HIDE=hide, LAYOUT=layout, $
-                      NAME=name, OVERPLOT=overplot, POSITION=position, REFRESH=refresh, $
-                      WINDOW_TITLE=window_title, _EXTRA=extra)
+                                         NAME=name, OVERPLOT=overplot, POSITION=position, $
+                                         REFRESH=refresh, WINDOW_TITLE=window_title, $
+                                         _EXTRA=extra)
     if success eq 0 then message, 'Unable to initialize superclass MrGrDataAtom.'
 
 ;---------------------------------------------------------------------
@@ -834,10 +835,13 @@ _REF_EXTRA = extra
     endcase
         
     ;Number of defaults to use.
+    ;   - There are at most two dimensions.
+    ;   -   dimension=2
+    
     depDims = size(*self.dep, /DIMENSIONS)
     if self.dimension eq 0 $
         then nDefaults = 1 $
-        else nDefaults = depDims[self.dimension-1]
+        else nDefaults = depDims[2-self.dimension]
     
 ;---------------------------------------------------------------------
 ;Normal Plot? ////////////////////////////////////////////////////////
@@ -848,7 +852,6 @@ _REF_EXTRA = extra
     if nDefaults gt 5 then default_colors = [default_colors, replicate('opposite', nDefaults-5)]
     if nDefaults eq 1 then d_color = default_colors[0] else d_color = default_colors[1:nDefaults]
     SetDefaultValue, color, d_color
-
 
     ;Set the object properties
     self -> SetProperty, COLOR = color, $

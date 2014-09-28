@@ -843,7 +843,6 @@ pro MrContour::SetData, z, x, y
     case n_params() of
         1: begin
             *self.c_data = z
-            if self.nparams eq 0 then self.nparams = 1
         endcase
         3: begin
             *self.c_data = z

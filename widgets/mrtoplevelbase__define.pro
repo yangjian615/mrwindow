@@ -148,23 +148,20 @@ pro MrTopLevelBase_Event_Pro, event
         void = cgErrorMsg()
         return
     endif
+
+    MrWidgetAtom_Event_Pro, event, STATUS=status
+    if status ne 0 then return
     
     ;Type of event that was generated.
     event_name = size(event, /SNAME)
     widget_control, event.id, GET_UVALUE=oRef
     
+    ;Forward events to an event handler classes?
+    oRef -> GetProperty, EVENT_OBJ=event_obj
+    tf_event_obj = obj_valid(event_obj)
+        
 ;---------------------------------------------------------------------
-;Callback Object /////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;If another object is handling events, forward the event and exit.
-    oRef -> GetProperty, EVENT_HANDLER=event_handler
-    if obj_valid(event_handler) then begin
-        Call_Method, event_handler.method, event_handler.object, event
-        return
-    endif
-    
-;---------------------------------------------------------------------
-;Callback Pro/Method /////////////////////////////////////////////////
+;Callback Func/Method ////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;
     ; From the IDL HELP page:
@@ -180,37 +177,41 @@ pro MrTopLevelBase_Event_Pro, event
     case event_name of
         'WIDGET_BASE': begin
             oRef -> GetProperty, TLB_SIZE_HANDLER=size_handler
-            case size(size_handler, /TNAME) of
-                'STRUCT': Call_Method, size_handler.method, size_handler.object, event
-                'STRING': if size_handler ne '' then Call_Procedure, size_handler, event
-            endcase
+            if size_handler ne '' then begin
+                if tf_event_obj $
+                    then Call_Method, size_handler, event_obj, event $
+                    else Call_Procedure, size_handler, event
+            endif
         endcase
         
         'WIDGET_TLB_ICONIFY': begin
             oRef -> GetProperty, TLB_ICONIFY_HANDLER=iconify_handler
-            case size(iconify_handler, /TNAME) of
-                'STRUCT': Call_Method, iconify_handler.method, iconify_handler.object, event
-                'STRING': if iconify_handler ne '' then Call_Procedure, iconify_handler, event
-            endcase
+            if iconify_handler ne '' then begin
+                if tf_event_obj $
+                    then Call_Method, iconify_handler, event_obj, event $
+                    else Call_Procedure, iconify_handler, event
+            endif
         endcase
         
         'WIDGET_TLB_MOVE': begin
             oRef -> GetProperty, TLB_MOVE_HANDLER=move_handler
-            case size(move_handler, /TNAME) of
-                'STRUCT': Call_Method, move_handler.method, move_handler.object, event
-                'STRING': if move_handler ne '' then Call_Procedure, move_handler, event
-            endcase
+            if move_handler ne '' then begin
+                if tf_event_obj $
+                    then Call_Method, move_handler, event_obj, event $
+                    else Call_Procedure, move_handler, event
+            endif
         endcase
                 
         'WIDGET_KILL_REQUEST': begin
             oRef -> GetProperty, TLB_KILL_REQUEST_HANDLER=kill_request_handler
-            case size(kill_request_handler, /TNAME) of
-                'STRUCT': Call_Method, kill_request_handler.method, kill_request_handler.object, event
-                'STRING': if kill_request_handler ne '' then Call_Procedure, kill_request_handler, event
-            endcase
+            if kill_request_handler ne '' then begin
+                if tf_event_obj $
+                    then Call_Method, kill_request_handler, event_obj, event $
+                    else Call_Procedure, kill_request_handler, event
+            endif
         endcase
             
-        else: MrWidgetBase_Event_Pro, event
+        else: MrWidgetBase_Event_Pro, event, STATUS=status
     endcase
 end
 
@@ -235,20 +236,21 @@ function MrTopLevelBase_Event_Func, event
         return, 0
     endif
     
+    result = MrWidgetAtom_Event_Func(event, STATUS=status)
+    case status of
+        -1: return, 0
+         1: return, result
+         else: ;Continue
+    endcase
+    
     ;Type of event that was generated.
     event_name = size(event, /SNAME)
     widget_control, event.id, GET_UVALUE=oRef
     
-;---------------------------------------------------------------------
-;Callback Object /////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;If another object is handling events, forward the event and exit.
-    oRef -> GetProperty, EVENT_HANDLER=event_handler
-    if obj_valid(event_handler) then begin
-        result = Call_Method(event_handler.method, event_handler.object, event)
-        return, result
-    endif
-    
+    ;Forward events to an event handler classes?
+    oRef -> GetProperty, EVENT_OBJ=event_obj
+    tf_event_obj = obj_valid(event_obj)
+        
 ;---------------------------------------------------------------------
 ;Callback Func/Method ////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -266,39 +268,44 @@ function MrTopLevelBase_Event_Func, event
     case event_name of
         'WIDGET_BASE': begin
             oRef -> GetProperty, SIZE_EVENT_HANDLER=size_handler
-            case size(size_handler, /TNAME) of
-                'OBJREF': result = Call_Method(size_handler.method, size_handler.object, event)
-                'STRING': if size_handler ne '' then result = Call_Function(size_handler, event)
-            endcase
+            if size_handler ne '' then begin
+                if tf_event_obj $
+                    then result = Call_Method(size_handler, event_obj, event) $
+                    else result = Call_Function(size_handler, event)
+            endif
         endcase
         
         'WIDGET_TLB_ICONIFY': begin
             oRef -> GetProperty, ICONIFY_EVENT_HANDLER=iconify_handler
-            case size(iconify_handler, /TNAME) of
-                'OBJREF': result = Call_Method(iconify_handler.method, context_eh.object, event)
-                'STRING': if iconify_handler ne '' then result = Call_Function(iconify_handler, event)
-            endcase
+            if iconify_handler ne '' then begin
+                if tf_event_obj $
+                    then result = Call_Method(iconify_handler, event_obj, event) $
+                    else result = Call_Function(iconify_handler, event)
+            endif
         endcase
         
         'WIDGET_TLB_MOVE': begin
             oRef -> GetProperty, MOVE_EVENT_HANDLER=move_handler
-            case size(move_handler, /TNAME) of
-                'OBJREF': result = Call_Method(move_handler.method, move_handler.object, event)
-                'STRING': if move_handler ne '' then result = Call_Function(move_handler, event)
-            endcase
+            if move_handler ne '' then begin
+                if tf_event_obj $
+                    then result = Call_Method(move_handler, event_obj, event) $
+                    else result = Call_Function(move_handler, event)
+            endif
         endcase
                 
         'WIDGET_KILL_REQUEST': begin
             oRef -> GetProperty, KILL_REQUEST_EVENT_HANDLER=kill_request_handler
-            case size(kill_request_handler, /TNAME) of
-                'OBJREF': result = Call_Method(kill_request_handler.method, kill_request_handler.object, event)
-                'STRING': if kill_request_handler ne '' then result = Call_Function(kill_request_handler, event)
-            endcase
+            if kill_request_handler ne '' then begin
+                if tf_event_obj $
+                    then result = Call_Method(kill_request_handler, event_obj, event) $
+                    else result = Call_Function(kill_request_handler, event)
+            endif
         endcase
             
-        else: result = MrWidgetBase_Event_Func(event)
+        else: result = MrWidgetBase_Event_Func(event, STATUS=status)
     endcase
     
+    if n_elements(result) eq 0 then result = 0
     return, result
 end
 
@@ -394,10 +401,10 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
 ;Callback Func/Pro/Method/Object /////////////////////////////////////
 ;---------------------------------------------------------------------
-    if arg_present(tlb_iconify_handler)      then tlb_iconify_handler      = *self._tlb_iconify_handler
-    if arg_present(tlb_kill_request_handler) then tlb_kill_request_handler = *self._tlb_kill_request_handler
-    if arg_present(tlb_move_handler)         then tlb_move_handler         = *self._tlb_move_handler
-    if arg_present(tlb_size_handler)         then tlb_size_handler         = *self._tlb_size_handler
+    if arg_present(tlb_iconify_handler)      then tlb_iconify_handler      = self._tlb_iconify_handler
+    if arg_present(tlb_kill_request_handler) then tlb_kill_request_handler = self._tlb_kill_request_handler
+    if arg_present(tlb_move_handler)         then tlb_move_handler         = self._tlb_move_handler
+    if arg_present(tlb_size_handler)         then tlb_size_handler         = self._tlb_size_handler
     
 end
 
@@ -560,60 +567,10 @@ _REF_EXTRA=extra
 ;Callback Functions/Methods/Procedures ///////////////////////////////
 ;---------------------------------------------------------------------
     ;TLB_ICONIFY_HANDLER
-    if n_elements(tlb_iconify_handler) gt 0 then begin
-        case size(tlb_iconify_handler, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, tlb_iconify_handler, test
-                *self._tlb_iconify_handler = test
-            endcase
-            
-            'STRING': *self._tlb_iconify_handler = tlb_iconify_handler            
-            else: message, 'TLB_ICONIFY_HANDLER must be a string or structure.'
-        endcase
-    endif
-    
-    ;TLB_KILL_REQUEST_HANDLER
-    if n_elements(tlb_kill_request_handler) gt 0 then begin
-        case size(tlb_kill_request_handler, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, tlb_kill_request_handler, test
-                *self._tlb_kill_request_handler = test
-            endcase
-            
-            'STRING': *self._tlb_kill_request_handler = tlb_kill_request_handler            
-            else: message, 'TLB_KILL_REQUEST_HANDLER must be a string or structure.'
-        endcase
-    endif
-    
-    ;TLB_MOVE_HANDLER
-    if n_elements(tlb_move_handler) gt 0 then begin
-        case size(tlb_move_handler, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, tlb_move_handler, test
-                *self._tlb_move_handler = test
-            endcase
-            
-            'STRING': *self._tlb_move_handler = tlb_move_handler            
-            else: message, 'TLB_MOVE_HANDLER must be a string or structure.'
-        endcase
-    endif
-    
-    ;TLB_SIZE_HANDLER
-    if n_elements(tlb_size_handler) gt 0 then begin
-        case size(tlb_size_handler, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, tlb_size_handler, test
-                *self._tlb_size_handler = test
-            endcase
-            
-            'STRING': *self._tlb_size_handler = tlb_size_handler            
-            else: message, 'TLB_SIZE_HANDLER must be a string or structure.'
-        endcase
-    endif
+    if n_elements(tlb_iconify_handler)      gt 0 then self._tlb_iconify_handler      = tlb_iconify_handler            
+    if n_elements(tlb_kill_request_handler) gt 0 then self._tlb_kill_request_handler = tlb_kill_request_handler            
+    if n_elements(tlb_move_handler)         gt 0 then self._tlb_move_handler         = tlb_move_handler            
+    if n_elements(tlb_size_handler)         gt 0 then self._tlb_size_handler         = tlb_size_handler            
 END
 
 
@@ -669,7 +626,7 @@ YOFFSET=yoffset
     ;Event Handler
     if n_elements(event_handler) eq 0 then begin
          if self._event_pro ne '' $
-            then event_handler = self._event_pro $
+            then event_handler = widget_info(self._id, /EVENT_PRO) $
             else event_handler = 'MrTopLevelBase_Event_Pro'
     endif
 
@@ -691,11 +648,12 @@ YOFFSET=yoffset
 
     ;Start xmanager
     if keyword_set(just_register) then begin
-        xmanager, self._register_name, self._id, JUST_REG=1, /NO_BLOCK, $
+        xmanager, self._register_name, self._id, GROUP_LEADER=group_leader, $
+                  /JUST_REG, /NO_BLOCK, $
                   EVENT_HANDLER=event_handler, CLEANUP=cleanup
     endif else begin
         xmanager, self._register_name, self._id, GROUP_LEADER=group_leader, $
-                  NO_BLOCK=1-keyword_set(block), EVENT_HANDLER=event_handler
+                  NO_BLOCK=~keyword_set(block), EVENT_HANDLER=event_handler
     endelse
 end
 
@@ -713,12 +671,6 @@ pro MrTopLevelBase::CLEANUP
         void = cgErrorMsg()
         return
     endif
-    
-    ;Free event handlers (but do not destroy event handling objects)
-    ptr_free, self._tlb_iconify_handler
-    ptr_free, self._tlb_kill_request_handler
-    ptr_free, self._tlb_move_handler
-    ptr_free, self._tlb_size_handler
     
     ;Clean up the superclasses
     self -> MrWidgetBase::Cleanup
@@ -863,18 +815,6 @@ _REF_EXTRA=extra
     
     ;Defaults
     if n_elements(title) eq 0 then title = 'MrTopLevelBase'
-    
-    ;Default handlers
-    if n_elements(tlb_iconify_handler)      eq 0 then tlb_iconify_handler      = {obj: self, method: 'Iconify_Events'}
-    if n_elements(tlb_kill_request_handler) eq 0 then tlb_kill_request_handler = {obj: self, method: 'Kill_Request_Events'}
-    if n_elements(tlb_move_handler)         eq 0 then tlb_move_handler         = {obj: self, method: 'Move_Events'}
-    if n_elements(tlb_size_handler)         eq 0 then tlb_size_handler         = {obj: self, method: 'Size_Events'}
-
-    ;Allocate Heap
-    self._tlb_iconify_handler      = ptr_new(/ALLOCATE_HEAP)
-    self._tlb_kill_request_handler = ptr_new(/ALLOCATE_HEAP)
-    self._tlb_move_handler         = ptr_new(/ALLOCATE_HEAP)
-    self._tlb_size_handler         = ptr_new(/ALLOCATE_HEAP)
 
 ;---------------------------------------------------------------------
 ;Allow Only One Instance? ////////////////////////////////////////////
@@ -905,7 +845,7 @@ _REF_EXTRA=extra
     if keyword_set(modal) then begin
         ;Can never have menu bars, ever.
         if (menu eq 1) then begin
-            message, 'Modal widgets cannot have menubars. Setting MENU=0', /INFORMATIONAL
+            message, 'Modal widgets cannot have menu bars. Setting MENU=0', /INFORMATIONAL
             menu = 0
         endif
         
@@ -1039,11 +979,6 @@ _REF_EXTRA=extra
     success = self -> MrWidgetAtom::INIT(NOTIFY_REALIZE=notify_realize, _STRICT_EXTRA=extra)
     if success eq 0 then message, 'MrWidgetAtom could not be initialized.'
     
-    ;Set the callback func/pro -- must be after MrWidgetAtom is initialized.
-    if keyword_set(function_callback) $
-        then self -> _Set_Event_Func, 'MrTopLevelBase_Event_Func' $
-        else self -> _Set_Event_Pro,  'MrTopLevelBase_Event_Pro'
-    
     self -> SetProperty, TITLE=title, $
                          CENTER=center, $
                          CONTEXT_HANDLER=context_handler, $
@@ -1086,10 +1021,10 @@ pro MrTopLevelBase__define, class
                inherits MrWidgetBase, $
 
                ;Event Handling Methods
-               _tlb_iconify_handler:      ptr_new(), $
-               _tlb_kill_request_handler: ptr_new(), $
-               _tlb_move_handler:         ptr_new(), $
-               _tlb_size_handler:         ptr_new(), $
+               _tlb_iconify_handler:      '', $
+               _tlb_kill_request_handler: '', $
+               _tlb_move_handler:         '', $
+               _tlb_size_handler:         '', $
                _centerTLB:                0L, $
                _register_name:            "" $
             }

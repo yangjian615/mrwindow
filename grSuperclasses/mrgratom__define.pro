@@ -355,7 +355,7 @@ POLYY=polyY
         xpoints = x
         ypoints = y
     endelse
-    
+
     ;Test if the given points are inside the graphic
     tf_hit = inside(xpoints, ypoints, polyX, polyY)
     

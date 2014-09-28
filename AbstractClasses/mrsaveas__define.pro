@@ -117,6 +117,10 @@
 ;                           to point a new object to the last saved location. Double
 ;                           directory structures are no longer added to postscript
 ;                           filenames. - MRA
+;       2014/05/16  -   Choosing non-ImageMagick options from the SaveAs menu now uses
+;                           cgSnapShot instead of ImageMagick when IM is installed. - MRA
+;       2014/08/18  -   File extension '.eps' now generates and encapsulated postscript
+;                           file without having to set keywords beforehand. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -174,6 +178,8 @@ END
 ;                           The widget ID of the parent widget for the new SaveAs Menu.
 ;
 ; :Keywords:
+;       BITMAP:             in, optional, type=boolean, default=0
+;                           If set, `VALUE` will be interpreted as a bitmap.
 ;       MENU:               in, optional, type=boolean, default=0
 ;                           If set, all buttons will be placed under a "SaveAs" submenu.
 ;       PS_PDF:             in, optional, type=boolean, default=0
@@ -184,19 +190,24 @@ END
 ;                               Saving is performed with MrScreenCapture.
 ;       cgRaster:           in, optional, type=boolean, default=0
 ;                           If set, JPEG, PNG, TIFF, and GIF buttons will be created.
-;                               Saving is performed either with cgSnapShot or via
-;                               ImageMagick and post-script intermediary files (see PS_PDF).
+;                               Saving is performed with cgSnapShot.
 ;       imRaster:           in, optional, type=boolean, default=0
 ;                           If set, JPEG, PNG, TIFF, and GIF buttons will be created.
 ;                               Saving is performed via ImageMagick and post-script
 ;                               intermediary files (see PS_PDF).
+;       VALUE:              in, optional, type=string/bytarr, default='SaveAs'
+;                           A .bmp file, an image array, or the name of the primary save
+;                               button. In the former two cases, `BITMAP` must be set.
+;                               This keyword is ignored if `MENU`=0.
 ;-
 pro MrSaveAs::Create_SaveAs_Menu, parent, $
+BITMAP=bitmap, $
 MENU=menu, $
 PS_PDF=ps_pdf, $
 MRRASTER=MrRaster, $
 CGRASTER=cgRaster, $
-IMRASTER=imRaster
+IMRASTER=imRaster, $
+VALUE=value
 	Compile_Opt strictarr
 	
 	catch, theError
@@ -207,87 +218,110 @@ IMRASTER=imRaster
 	ENDIF
 	
 	;Defaults
-	menu = keyword_set(menu)
+	menu     = keyword_set(menu)
 	MrRaster = keyword_set(MrRaster)
 	cgRaster = keyword_set(cgRaster)
 	imRaster = keyword_set(imRaster)
 	ps_pdf   = keyword_set(ps_pdf)
+	if n_elements(value) eq 0 then begin
+	    value = 'SaveAs'
+	    bitmap = 0
+	endif
 	
+	;If nothing was set, set everything.
 	IF MrRaster + cgRaster + imRaster + ps_pdf EQ 0 THEN BEGIN
 	    MrRaster = 1
 	    cgRaster = 1
 	    imRaster = 1
 	    ps_pdf   = 1
 	ENDIF
-
-;---------------------------------------------------------------------
-;MrRaster ////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Create a "SaveAs" menu bar button?
-    IF menu $
-        THEN saveID = widget_button(parent, VALUE='SaveAs', /MENU) $
-        ELSE saveID = parent
-	
-	;MrSaveAs options
-    IF MrRaster EQ 1 THEN BEGIN
-        button = widget_button(saveID, VALUE='JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
-        button = widget_button(saveID, VALUE='TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
-        button = widget_button(saveID, VALUE='PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
-        button = widget_button(saveID, VALUE='GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
-    ENDIF
-
-;---------------------------------------------------------------------
-;PS & PDF ////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-    ;Create the "cgSaveAs" menu button
-    IF menu AND ps_pdf + cgRaster + imRaster GT 0 $
-        THEN cgSaveAsID = widget_button(saveID, VALUE='cgSaveAs', MENU=menu) $
-        ELSE cgSaveAsID = saveID
-
-    ;Put in the PS and PDF options.
-    IF ps_pdf THEN BEGIN
-        button = Widget_Button(cgSaveAsID, Value='PostScript File', UNAME='PS',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(cgSaveAsID, Value='PDF File',        UNAME='PDF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-    ENDIF
     
+    ;Check if ImageMagick is present.	
+	has_IM = cgHasImageMagick()
+	    
 ;---------------------------------------------------------------------
-;cgRaster ////////////////////////////////////////////////////////////
+; Menu ///////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+	IF menu THEN BEGIN
+	    ;Create a SaveAs button
+	    saveID = widget_button(parent, VALUE=value, /MENU, BITMAP=bitmap)
 
-    IF cgRaster THEN BEGIN
-        ;cgRaster submenu
-        IF menu $
-            THEN cgRasterID = Widget_Button(cgSaveAsID, Value='Raster File', MENU=menu) $
-            ELSE cgRasterID = cgSaveAsID
-    
-        ;cgRaster options
-        button = Widget_Button(cgRasterID, Value='BMP',  UNAME='RASTER_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(cgRasterID, Value='GIF',  UNAME='RASTER_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(cgRasterID, Value='JPEG', UNAME='RASTER_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(cgRasterID, Value='PNG',  UNAME='RASTER_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(cgRasterID, Value='TIFF', UNAME='RASTER_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-    ENDIF ELSE cgRasterID = cgSaveAsID
+        ;Create MrRaster buttons
+        IF MrRaster THEN BEGIN
+            button = widget_button(saveID, VALUE='JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+        ENDIF
         
-;---------------------------------------------------------------------
-;imRaster ////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
+        ;cgSaveAs button
+        IF ps_pdf + cgRaster + (imRaster AND has_IM) GT 0 THEN BEGIN
+            cgSaveAsID = widget_button(saveID, VALUE='cgSaveAs', MENU=menu)
+        
+            ;PS/PDF
+            IF ps_pdf THEN BEGIN
+                button = Widget_Button(cgSaveAsID, Value='PostScript File', UNAME='PS',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(cgSaveAsID, Value='PDF File',        UNAME='PDF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            ENDIF
+        
+            ;cgRaster
+            IF cgRaster THEN BEGIN
+                cgRasterID = Widget_Button(cgSaveAsID, Value='Raster File', MENU=menu)
+                button = Widget_Button(cgRasterID, Value='BMP',  UNAME='RASTER_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(cgRasterID, Value='GIF',  UNAME='RASTER_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(cgRasterID, Value='JPEG', UNAME='RASTER_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(cgRasterID, Value='PNG',  UNAME='RASTER_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(cgRasterID, Value='TIFF', UNAME='RASTER_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            ENDIF
     
-    ; If you can find ImageMagick on this machine, you can convert to better
-    ; looking raster files.
-    IF imRaster and cgHasImageMagick() EQ 1 THEN BEGIN
-        ;ImageMagick submenu
-        IF menu $
-            THEN imRasterID = Widget_Button(cgSaveAsID, Value='Raster File via ImageMagick', MENU=menu) $
-            ELSE imRasterID = cgSaveAsID
+            ;imRaster
+            IF imRaster AND has_IM THEN BEGIN
+                imRasterID = Widget_Button(cgSaveAsID, Value='Raster File via ImageMagick', MENU=menu)
+                button = Widget_Button(imRasterID, Value='BMP',  UNAME='IMAGEMAGICK_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(imRasterID, Value='GIF',  UNAME='IMAGEMAGICK_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(imRasterID, Value='JPEG', UNAME='IMAGEMAGICK_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(imRasterID, Value='PNG',  UNAME='IMAGEMAGICK_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+                button = Widget_Button(imRasterID, Value='TIFF', UNAME='IMAGEMAGICK_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            ENDIF
+        ENDIF
+	    
+;---------------------------------------------------------------------
+; Base ///////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ENDIF ELSE BEGIN
 
-        ;ImageMagick options
-        button = Widget_Button(imRasterID, Value='BMP',  UNAME='IMAGEMAGICK_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(imRasterID, Value='GIF',  UNAME='IMAGEMAGICK_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(imRasterID, Value='JPEG', UNAME='IMAGEMAGICK_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(imRasterID, Value='PNG',  UNAME='IMAGEMAGICK_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-        button = Widget_Button(imRasterID, Value='TIFF', UNAME='IMAGEMAGICK_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
-    ENDIF
+        ;MrRaster
+        IF MrRaster EQ 1 THEN BEGIN
+            button = widget_button(saveID, VALUE='JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+            button = widget_button(saveID, VALUE='GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'Screen_Capture'})
+        ENDIF
+
+        ;PS/PSF.
+        IF ps_pdf THEN BEGIN
+            button = Widget_Button(saveID, Value='PostScript File', UNAME='PS',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(saveID, Value='PDF File',        UNAME='PDF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        ENDIF
+
+        ;cgRaster
+        IF cgRaster THEN BEGIN
+            button = Widget_Button(cgRasterID, Value='BMP',  UNAME='RASTER_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(cgRasterID, Value='GIF',  UNAME='RASTER_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(cgRasterID, Value='JPEG', UNAME='RASTER_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(cgRasterID, Value='PNG',  UNAME='RASTER_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(cgRasterID, Value='TIFF', UNAME='RASTER_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        ENDIF
+        
+        ;ImageMagick
+        IF imRaster and has_IM EQ 1 THEN BEGIN
+            button = Widget_Button(imRasterID, Value='BMP',  UNAME='IMAGEMAGICK_BMP',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(imRasterID, Value='GIF',  UNAME='IMAGEMAGICK_GIF',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(imRasterID, Value='JPEG', UNAME='IMAGEMAGICK_JPEG', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(imRasterID, Value='PNG',  UNAME='IMAGEMAGICK_PNG',  EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+            button = Widget_Button(imRasterID, Value='TIFF', UNAME='IMAGEMAGICK_TIFF', EVENT_PRO='MrSaveAs_SaveAs_Events', UVALUE={object: self, method: 'SaveAsEvents'})
+        ENDIF
+    ENDELSE
 end
 
 
@@ -451,7 +485,8 @@ END
 PRO MrSaveAs::Save, filename, $
 FILETYPE=fileType, $
 MATCH=match, $
-PICK_FILE=pick_file
+PICK_FILE=pick_file, $
+RESIZE=resize
     Compile_Opt idl2
     
     ; Error handling.
@@ -470,7 +505,6 @@ PICK_FILE=pick_file
         
         RETURN
     ENDIF
-    
     ;Defaults
     pick_file = Keyword_Set(pick_file)
     match     = (N_Elements(match) EQ 0) ? 1 : keyword_set(match)
@@ -486,7 +520,7 @@ PICK_FILE=pick_file
 ;---------------------------------------------------------------------
     IF pick_file EQ 0 THEN BEGIN
         IF filename EQ '' THEN filename = FilePath(self.saveFile, ROOT_DIR=self.saveDir)
-        outName = cgRootName(filename, DIRECTORY=outDir, EXTENSION=ext)
+        baseName = cgRootName(filename, DIRECTORY=outDir, EXTENSION=ext)
         IF fileType EQ '' $
             THEN typeOut = StrUpCase(ext) $
             ELSE typeOut = StrUpCase(fileType)
@@ -495,6 +529,7 @@ PICK_FILE=pick_file
 ; Pick a File ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ENDIF ELSE BEGIN
+        ;Default file type
         IF fileType EQ '' THEN void = cgRootName(self.saveFile, EXTENSION=fileType)
         typeOut = StrUpCase(fileType)
         
@@ -520,20 +555,25 @@ PICK_FILE=pick_file
 
 ;---------------------------------------------------------------------
 ; Save to File ///////////////////////////////////////////////////////
-;---------------------------------------------------------------------  
+;---------------------------------------------------------------------
+    encapsulated = self.ps_encapsulated
+    
     ;Make sure a valid file type was given
     CASE typeOut OF
-       'PS':   raster = 0B
-       'EPS':  raster = 0B
-       'PDF':  raster = 0B
-       'BMP':  raster = 1B
-       'GIF':  raster = 1B
-       'JPG':  raster = 1B
-       'JPEG': raster = 1B
-       'PNG':  raster = 1B
-       'TIF':  raster = 1B
-       'TIFF': raster = 1B
-       ELSE: Message, 'Unknown file type: "' + typeOut + '".'
+        'BMP':  raster = 1B
+        'GIF':  raster = 1B
+        'JPG':  raster = 1B
+        'JPEG': raster = 1B
+        'PNG':  raster = 1B
+        'TIF':  raster = 1B
+        'TIFF': raster = 1B
+        'PS':   raster = 0B
+        'PDF':  raster = 0B
+        'EPS': BEGIN
+            raster       = 0B
+            encapsulated = 1B
+        ENDCASE
+        ELSE: Message, 'Unknown file type: "' + typeOut + '".'
     ENDCASE
 
     ;Save the file name and directory
@@ -547,7 +587,7 @@ PICK_FILE=pick_file
 ;---------------------------------------------------------------------
 ; Postscript Device? /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    IF (typeOut EQ 'PDF') OR (typeOut EQ 'PS') OR self.im_raster THEN BEGIN
+    IF Max(typeOut EQ ['PDF', 'PS', 'EPS']) OR self.im_raster THEN BEGIN
 
     ;---------------------------------------------------------------------
     ; Open Postscript File ///////////////////////////////////////////////
@@ -556,26 +596,28 @@ PICK_FILE=pick_file
         ;is given to cgPS_Open, the intermediary file is deleted automatically
         ;when the file is closed. I want to control this behavior, so I ask to
         ;create a postscript file first.
-        fname_temp = baseName + '.ps'
+        fname_temp = FilePath(baseName + '.ps', ROOT_DIR=outDir)
         
         ;Get the configuration keywords
         ps_keys  = self.ps_config -> GetKeywords()
+        IF typeOut NE 'EPS' THEN encapsulated = ps_keys.encapsulated
         isolatin = ps_keys.isolatin1
         fontsize = ps_keys.font_size
         ps_keys  = remove_tags(ps_keys, ['language_level', 'font_size', 'portrait', $
-                                         'tt_font',        'isolatin1'])
+                                         'tt_font',        'isolatin1', 'encapsulated'])
         ps_keys  = create_struct(ps_keys, 'fontsize', fontsize, 'isolatin', isolatin)
 
         ;Open the file.
         cgPS_Open, CHARSIZE     =  self.ps_charsize, $
+                   ENCAPSULATED =       encapsulated, $
                    FILENAME     =       fname_temp, $
                    GROUP_LEADER = *self._group_leader, $
-                   KEYWORDS     =  ps_keywords, $
-                   MATCH        =  match, $
-                   QUIET        =  1B, $
+                   KEYWORDS     =       ps_keywords, $
+                   MATCH        =       match, $
+                   QUIET        =       1B, $
                    SCALE_FACTOR =  self.ps_scale_factor, $
                    TT_FONT      =  self.ps_tt_font, $
-                  _EXTRA        =  ps_keys
+                   _EXTRA       =  ps_keys
 
         ;Set the device
         ps_keywords = remove_tags(ps_keywords, ['pagetype', 'fonttype'])
@@ -602,6 +644,18 @@ PICK_FILE=pick_file
                 ;Close the file.
                 cgPS_Close, OUTFILENAME=fOut
                 outName = n_elements(fOut) gt 0 ? fOut : outName + '.ps'
+            ENDCASE
+            
+        ;---------------------------------------------------------------------
+        ; EPS ////////////////////////////////////////////////////////////////
+        ;---------------------------------------------------------------------
+            'EPS': BEGIN
+                ;Write to the file.
+                self -> Draw
+    
+                ;Close the file.
+                cgPS_Close, OUTFILENAME=fOut
+                outName = n_elements(fOut) gt 0 ? fOut : outName + '.eps'
             ENDCASE
             
         ;---------------------------------------------------------------------
@@ -687,6 +741,7 @@ PRO MrSaveAs::SaveAsEvents, event
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
+        if n_elements(thisIM) gt 0 then self.im_raster = thisIM
         void = cgErrorMsg()
         RETURN
     ENDIF
@@ -701,9 +756,21 @@ PRO MrSaveAs::SaveAsEvents, event
     ;Extract the file type from the user name
     fileType = StregEx(uName, '(RASTER_|IMAGEMAGICK_)?([A-Z]+)', /SUBEXP, /EXTRACT)
     fileType = fileType[2]
+    
+    ;ImageMagick or cgSnapshot for raster files?
+    IF StregEx(uName, 'IMAGEMAGICK', /BOOLEAN) $
+        THEN tf_imagemagick = 1 $
+        ELSE tf_imagemagick = 0
+
+    ;Toggle IM?
+    thisIM = self.im_raster
+    self.im_raster = tf_imagemagick
 
     ;Save the file
     self -> Save, FILETYPE=fileType, /PICK_FILE
+    
+    ;Toggle IM back.
+    self.im_raster = thisIM
 END
 
 
@@ -1157,7 +1224,7 @@ PS_TT_FONT=ps_tt_font
     self.im_density     = n_elements(im_density)     gt 0 ? im_density        : d_im_density
     self.im_options     = n_elements(im_options)     gt 0 ? im_options        : d_im_options
     self.im_raster      = n_elements(im_raster)      gt 0 ? im_raster         : d_im_raster
-    self.im_resize      = n_elements(im_resize)      gt 0 ? im_resize         : d_im_resize
+    self.im_resize      = n_elements(im_resize)      gt 0 ? im_resize         : 100
     self.im_width       = n_elements(im_width)       gt 0 ? ptr_new(im_width) : ptr_new(d_im_width)
 
     self.pdf_unix_convert_cmd = n_elements(pdf_unix_convert_cmd) gt 0 ? pdf_unix_convert_cmd : d_pdf_unix_convert_cmd

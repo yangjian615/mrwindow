@@ -4,10 +4,6 @@
 
 ;Abstract Classes
 .comp ./AbstractClasses/mrabstractanalysis__define.pro
-.comp ./AbstractClasses/mrabstractarrow__define.pro
-.comp ./AbstractClasses/mrabstractcdf__define.pro
-.comp ./AbstractClasses/mrabstracttext__define.pro
-.comp ./AbstractClasses/mrmanipulate__define.pro
 .comp ./AbstractClasses/mrcursor__define.pro
 .comp ./AbstractClasses/mrsaveas__define.pro
 .comp ./AbstractClasses/mrzoom__define.pro
@@ -48,9 +44,11 @@
 
 ;Graphic Objects
 .comp ./grObjects/mraxis__define.pro
-.comp ./grObjects/mrcolorfill__define.pro
+.comp ./grObjects/mrpolygon__define.pro
+.comp ./grObjects/mrcircle__define.pro
 .comp ./grObjects/mrcontour__define.pro
 .comp ./grObjects/mrimage__define.pro
+.comp ./grObjects/mrlegend__define.pro
 .comp ./grObjects/mrplot__define.pro
 .comp ./grObjects/mrplots__define.pro
 .comp ./grObjects/wearrow__define.pro

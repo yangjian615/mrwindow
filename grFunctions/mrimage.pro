@@ -90,10 +90,10 @@
 ;
 ; :History:
 ;	Modification History::
-;       2013/11/27  -   Written by Matthew Argall.
+;       2013/11/27  -   Written by Matthew Argall
+;       2014/09/15  -   Removed n_params case statement due to changes in MrImage__define. - MRA
 ;-
-function MrImage, image, x, y, x0, y0, x1, y1, $
- CURRENT=current, $
+function MrImage, img, x, y, x0, y0, x1, y1, $
 _REF_EXTRA = extra
     compile_opt strictarr
     
@@ -106,14 +106,7 @@ _REF_EXTRA = extra
     endif
 
     ;Create the color bar
-    case n_params() of
-        1: theImage = obj_new('MrImage', image, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
-        2: theImage = obj_new('MrImage', image, x, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
-        3: theImage = obj_new('MrImage', image, x, y, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
-        5: theImage = obj_new('MrImage', image, x, y, x0, y0, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
-        7: theImage = obj_new('MrImage', image, x, y, x0, y0, x1, y1, CURRENT=keyword_set(current), _STRICT_EXTRA=extra)
-        else: message, 'Incorrect number of parameters.'
-    endcase
+    theImage = obj_new('MrImage', img, x, y, x0, y0, x1, y1, _STRICT_EXTRA=extra)
     
     return, theImage
 end
