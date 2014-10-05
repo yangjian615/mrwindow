@@ -711,27 +711,28 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
     
     ;Set the object properties
-    self -> setProperty, XCOORDS=xcoords, $
-                         YCOORDS=ycoords, $
-                         ZCOORDS=zcoords, $
+    self -> setProperty, XCOORDS    = xcoords, $
+                         YCOORDS    = ycoords, $
+                         ZCOORDS    = zcoords, $
                          ;cgPlotS Properties
-                         COLOR=color, $
-                         MAP_OBJECT=map_object, $
-                         PSYM=psym, $
-                         SYMCOLOR=symcolor, $
-                         SYMSIZE=symsize, $
+                         COLOR      = color, $
+                         MAP_OBJECT = map_object, $
+                         PSYM       = psym, $
+                         SYMCOLOR   = symcolor, $
+                         SYMSIZE    = symsize, $
                          ;PlotS Properties
-                         CLIP=clip, $
-                         DATA=data, $
-                         DEVICE=device, $
-                         NORMAL=normal, $
-                         LINESTYLE=linestyle, $
-                         NOCLIP=noclip, $
-                         T3D=t3d, $
-                         TARGET=target, $
-                         THICK=thick, $
-                         ZVALUE=zvalue, $
-                         _EXTRA=extra
+                         CLIP       = clip, $
+                         DATA       = data, $
+                         DEVICE     = device, $
+                         NORMAL     = normal, $
+                         LINESTYLE  = linestyle, $
+                         NOCLIP     = noclip, $
+                         RELATIVE   = relative, $
+                         T3D        = t3d, $
+                         TARGET     = target, $
+                         THICK      = thick, $
+                         ZVALUE     = zvalue, $
+                         _EXTRA     = extra
 
     ;Draw?
     if n_elements(target) eq 0 $

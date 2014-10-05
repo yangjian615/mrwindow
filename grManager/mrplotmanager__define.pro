@@ -139,6 +139,7 @@
 ;       2014/03/26  -   Added MrVector to the list of known graphics. - MRA
 ;       2014/06/09  -   Removing graphics at fixed locations was not updating plot
 ;                           indices of other graphics. Fixed. - MRA
+;       2014/10/04  -   Fixed typo when filling holes with fixed graphics present. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -569,7 +570,7 @@ DRAW=draw
         ;       want to change the plot index, keeping everything else the same.
         new_pIndex = -(indgen(nFixed)+1)
         for i = 0, nFixed - 1 do begin
-            if new_pIndex ne pIndex[i] $
+            if new_pIndex[i] ne pIndex[i] $
                 then allDataObjs[iFixed[i]] -> SetLayout, [self.GrLayout, new_pIndex[i]], UPDATE_LAYOUT=0
         endfor
         

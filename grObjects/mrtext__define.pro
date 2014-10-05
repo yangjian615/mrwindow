@@ -503,7 +503,7 @@ _REF_EXTRA=extra
     
     IF Arg_Present(position) THEN position = self -> GetPosition()
     
-    IF N_Elements(extra) GT 0 THEN self -> GetProperty, _STRICT_EXTRA=extra
+    IF N_Elements(extra) GT 0 THEN self -> MrGrAtom::GetProperty, _STRICT_EXTRA=extra
 END
 
 

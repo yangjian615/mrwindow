@@ -64,6 +64,9 @@
 ;                           Out-of-range pixels determined before change from polar to
 ;                           cartesian coordinates. Added the doPolarAxes method. - MRA
 ;       2014/09/17  -   MISSING_INDEX is only loaded when necessary. - MRA
+;       2014/10/05  -   SetPalette sets quantities independent of whether a color table or
+;                           color table index is used. Allows proper scaling of image.
+;                           Missing color is loaded at time of draw. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -332,6 +335,9 @@ NOERASE=noerase
     
     ;Load the palette
     tvlct, self.palette
+    
+    ;Load the missing color
+    if self.missing_color ne '' then tvlct, cgColor(self.missing_color, /TRIPLE), self.missing_index
 
     ;Now display the image
     case 1 of
@@ -1256,89 +1262,73 @@ TOP = top
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        if n_elements(r_start) gt 0 then tvlct, r_start, g_start, b_start
         void = cgErrorMsg()
         return
     endif
+
+;---------------------------------------------------------------------
+; Set Properties /////////////////////////////////////////////////////
+;--------------------------------------------------------------------- 
+    if n_elements(brewer)        gt 0 then self.brewer        = keyword_set(brewer)
+    if n_elements(missing_color) gt 0 then self.missing_color = missing_color
+    if n_elements(missing_index) gt 0 then self.missing_index = missing_index
+    if n_elements(reverse)       gt 0 then self.reverse       = keyword_set(reverse)
     
-    ;Get the initial color palette
-    tvlct, r_start, g_start, b_start, /GET
+    ;PALETTE takes precedence over CTINDEX.
+    if n_elements(ctindex) gt 0 then *self.ctindex = ctindex
+    if n_elements(palette) gt 0 then begin
+        self.palette = palette
+        void = temporary(*self.ctindex)
+    endif
 
-    ;Defaults
-    if n_elements(ctindex) eq 0 then $
-        if n_elements(*self.ctindex) gt 0 then ctindex   = *self.ctindex
-    if n_elements(missing_color) eq 0 then missing_color =  self.missing_color
-    if n_elements(missing_index) eq 0 then missing_index =  self.missing_index
-    if n_elements(palette)       eq 0 then palette       =  self.palette
-
-    ;Rescale
+    ;Rescale?
+    ;   - If the SCALE property is set, ::PrepImage will make use of TOP and BOTTOM
+    ;       when byte-scaling the image.
+    ;   - If they change, must rescale.
+    ;   - NCOLORS takes precedence over TOP
+    nCol       = n_elements(nColors)
+    nBottom    = n_elements(bottom)
+    nTop       = n_elements(top)
     scale_flag = 0
+    if nBottom + nTop + nCol gt 0 then begin
+        scale_flag = 1
+        if nBottom gt 0 then self.bottom = 0B > bottom < 255B
+        if nTop    gt 0 then self.top    = 0B > top    < 255B
+        if nCol    gt 0 then self.top    = 0B > self.bottom + nColors - 1 < 255B
+    endif
+    nColors = self.top - self.bottom + 1
+
+;---------------------------------------------------------------------
+; Hide Missing Color? ////////////////////////////////////////////////
+;---------------------------------------------------------------------  
+    ;Missing index
+    ;   - Check if the missing index is at the top/bottom of the color table.
+    ;       o Adjust the top/bottom to hide it.
+    ;   - The missing color is loaded into the color table at time of draw.
+    ;       o Prevent color palette contamination
+    ;       o Facilitate change of missing color.
+    if self.missing_color ne '' then begin
+        if self.missing_index eq !d.table_size-1 then self.top    = self.top    < !d.table_size-2
+        if self.missing_index eq 0B              then self.bottom = self.bottom > 1B
+    endif
 
 ;---------------------------------------------------------------------
 ;Load a Color Table Index? ///////////////////////////////////////////
 ;---------------------------------------------------------------------    
-    if n_elements(ctindex) gt 0 then begin
-        bottom  = n_elements(bottom)  gt 0 ? 0B > bottom < 255B         : self.bottom
-        brewer  = n_elements(brewer)  gt 0 ? keyword_set(brewer)        : self.brewer
-        nColors = n_elements(nColors) gt 0 ? 1 > nColors < 256          : self.top - bottom + 1
-        reverse = n_elements(reverse) gt 0 ? keyword_set(reverse)       : self.reverse
-        top     = n_elements(top)     gt 0 ? 0B > top < !d.table_size-1 : self.top
-    
-        ;Missing index
-        ;   - If the missing index is at the top/bottom of the color table,
-        ;       adjust the top/bottom to hide it.
-        if missing_color ne '' then begin
-            if missing_index eq !d.table_size-1 then top    = top    < !d.table_size-2
-            if missing_index eq 0B              then bottom = bottom > 1B
-        endif
-        
-        ;Number of colors being loaded
-        nColors = top - bottom + 1
-
-        ;Load the color table if one was given
-        cgLoadCT, ctindex, BOTTOM=bottom, NCOLORS=ncolors, $
-                           REVERSE=reverse, BREWER=brewer, $
-                           RGB_TABLE=palette
-         
-        ;Did the number of colors change?
-        if (ncolors ne self.top - self.bottom + 1) || (bottom ne self.bottom) then begin
-            top = bottom + ncolors - 1
-            scale_flag = 1
-        endif
-        
-    ;If a palette was given, clear the color table.
-    endif else begin
-        if n_elements(palette) gt 0 then void = temporary(*self.ctindex)
-    endelse
-
-;---------------------------------------------------------------------
-;Load a Color Palette? ///////////////////////////////////////////////
-;---------------------------------------------------------------------
-    if n_elements(palette) gt 0 then tvlct, palette
-
-;---------------------------------------------------------------------
-;Load a Missing Color? ///////////////////////////////////////////////
-;---------------------------------------------------------------------
-    if missing_color ne '' then tvlct, cgColor(missing_color, /TRIPLE), missing_index
-
-;---------------------------------------------------------------------
-;Update the Color Palette ////////////////////////////////////////////
-;---------------------------------------------------------------------
-    tvlct, palette, /GET
-    
-    if ctindex ge 0 then begin
-         self.bottom  = bottom
-         self.brewer  = brewer
-        *self.ctindex = ctindex
-         self.reverse = reverse
-         self.top     = top
+    if n_elements(*self.ctindex) gt 0 then begin
+        ;Load the color table
+        cgLoadCT, *self.ctindex, $
+                  BOTTOM    =  self.bottom, $
+                  NCOLORS   =       nColors, $
+                  REVERSE   =  self.reverse, $
+                  BREWER    =  self.brewer, $
+                  RGB_TABLE =       tempPalette
+        self.palette = temporary(tempPalette)
     endif
-    self.palette       = palette
-    self.missing_color = missing_color
-    self.missing_index = missing_index
-    
-    ;Load the initial color table
-    tvlct, r_start, g_start, b_start
+
+;---------------------------------------------------------------------
+; Cleanup ////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
     
     ;Does the image now need to be scaled?
     if scale_flag then if self.scale then self -> PrepImage
