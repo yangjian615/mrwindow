@@ -606,7 +606,7 @@ pro MrDrawWidget::Copy, window_id, $
             else message, 'No window to copy into.'
 
         ;Copy window
-        device, COPY=[origin[0], origin[1], extent[0], extent[1], dest[0], dest[1], self._winID]
+        device, COPY=[origin[0], origin[1], extent[0], extent[1], destination[0], destination[1], self._winID]
     endelse
     
     ;Return to the current window
@@ -1010,6 +1010,17 @@ _REF_EXTRA=extra
 
     ;Superclass Properties
     if n_elements(extra) gt 0 then self -> MrWidgetAtom::GetProperty, _STRICT_EXTRA=extra
+end
+
+
+;+
+;   Return the window ID of the draw widget window.
+;
+; :Returns:
+;       WINID:          Window ID of the draw widget window.
+;-
+function MrDrawWidget::GetWinID
+    return, self._winID
 end
 
 

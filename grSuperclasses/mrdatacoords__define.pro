@@ -323,19 +323,19 @@ ZLOG = zlog
     
     ;Defaults
     if n_elements(position) eq 0 then position = [0,0,1,1]
-    if n_elements(xrange)   eq 0 then xrange = [0, 1]
-    if n_elements(yrange)   eq 0 then yrange = [0, 1]
+    if n_elements(xrange)   eq 0 then xrange   = [0, 1]
+    if n_elements(yrange)   eq 0 then yrange   = [0, 1]
 
     ;Set up the data coordinates.
-    self -> ApplyCoords, POSITION=position, $
-                         CLIP=clip, $
-                         T3D=t3d, $
-                         XRANGE=xrange, $
-                         XLOG=xlog, $
-                         YRANGE=yrange, $
-                         YLOG=ylog, $
-                         ZRANGE=zrange, $
-                         ZLOG=zlog
+    self -> ApplyCoords, POSITION = position, $
+                         CLIP     = clip, $
+                         T3D      = t3d, $
+                         XRANGE   = xrange, $
+                         XLOG     = xlog, $
+                         YRANGE   = yrange, $
+                         YLOG     = ylog, $
+                         ZRANGE   = zrange, $
+                         ZLOG     = zlog
 
     ;Does not need to be initialized
     return, 1
@@ -377,25 +377,25 @@ pro MrDataCoords__define, class
     
     define = { MrDataCoords, $
                _data_saved: 0B, $
-               _d_x_vsize: 0L, $
-               _d_y_vsize: 0L, $
-               _p_clip: [0L, 0L, 0L, 0L, 0L, 0L], $
-               _p_T: dblarr(4,4), $
-               _p_T3D: 0L, $
-               _x_crange: [0D, 0D], $
-               _x_region: [0.0, 0.0], $
-               _x_s: [0D, 0D], $
-               _x_type: 0L, $
-               _x_window: [0.0, 0.0], $
-               _y_crange: [0D, 0D], $
-               _y_region: [0.0, 0.0], $
-               _y_s: [0D, 0D], $
-               _y_type: 0L, $
-               _y_window: [0.0, 0.0], $
-               _z_crange: [0D, 0D], $
-               _z_region: [0.0, 0.0], $
-               _z_s: [0D, 0D], $
-               _z_type: 0L, $
-               _z_window: [0.0, 0.0] $
+               _d_x_vsize:  0L, $
+               _d_y_vsize:  0L, $
+               _p_clip:     [0L, 0L, 0L, 0L, 0L, 0L], $
+               _p_T:        dblarr(4,4), $
+               _p_T3D:      0L, $
+               _x_crange:   [0D, 0D], $
+               _x_region:   [0.0, 0.0], $
+               _x_s:        [0D, 0D], $
+               _x_type:     0L, $
+               _x_window:   [0.0, 0.0], $
+               _y_crange:   [0D, 0D], $
+               _y_region:   [0.0, 0.0], $
+               _y_s:        [0D, 0D], $
+               _y_type:     0L, $
+               _y_window:   [0.0, 0.0], $
+               _z_crange:   [0D, 0D], $
+               _z_region:   [0.0, 0.0], $
+               _z_s:        [0D, 0D], $
+               _z_type:     0L, $
+               _z_window:   [0.0, 0.0] $
              }
 end

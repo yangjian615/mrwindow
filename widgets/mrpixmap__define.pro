@@ -76,7 +76,7 @@ _REF_EXTRA=extra
     if arg_present(visible) then visible = widget_info(self._id, /MAP)
     
     ;Window sizes
-    if n_elements(extra) gt 0 then self -> MrWidgetDraw::GetProperty, _EXTRA=extra
+    if n_elements(extra) gt 0 then self -> MrDrawWidget::GetProperty, _EXTRA=extra
 end
 
 
@@ -108,7 +108,7 @@ _REF_EXTRA=extra
     if n_elements(extra) gt 0 then self -> MrDrawWidget::SetProperty, _EXTRA=extra
 
     ;Set properties
-    if n_elements(visible) gt 0 then widget_control, self._tlb, MAP=keyword_set(visible)
+    if n_elements(visible) gt 0 then widget_control, self._tlbID, MAP=keyword_set(visible)
 END
 
 
@@ -193,13 +193,12 @@ YSIZE=ysize
     ;Create the parent
     ;   - Make the parent invisible, not just the draw widget.
     ;   - Ensure new base does not flash on the screen before becoming invisible
+    ;   - Event management is not needed.
     if n_elements(parent) eq 0 then begin
-        parent =  obj_new('MrTopLevelBase', MAP=0, $
-                                            GROUP_LEADER=group_leader, $
-                                            /TLB_SIZE_EVENTS, $
-                                            TLB_SIZE_HANDLER={object: self, method: 'TLB_RESIZE_EVENTS'}, $
-                                            WINDOW_TITLE='MrPixmap Window')
-        parent -> GetProperty, ID=parentID
+        parent =  obj_new('MrTopLevelBase', /TLB_SIZE_EVENTS, $
+                                            MAP              = 0, $
+                                            GROUP_LEADER     = group_leader, $
+                                            TITLE            = 'MrPixmap Window')
         
     ;Unmap the parent
     ;   - Widget or object base?
@@ -220,13 +219,14 @@ YSIZE=ysize
                                          SCR_XSIZE=scr_xsize, $
                                          SCR_YSIZE=scr_ysize, $
                                          UNITS=units, $
-                                         VISIBLE=visible, $
                                          X_SCROLL_SIZE=x_scroll_size, $
                                          XSIZE=xsize, $
                                          Y_SCROLL_SIZE=y_scroll_size, $
                                          YSIZE=ysize)
     if success eq 0 then return, 0
     
+    ;Realize the widget
+    if obj_valid(self._oTLB) then self._oTLB -> Realize
     
     ;Make visible?
     if mapIt then widget_control, self._tlb, /MAP

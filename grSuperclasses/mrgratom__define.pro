@@ -189,16 +189,20 @@ WINDOW_TITLE=window_title
         return, obj_new()
     endif
 
-    ;Get a window -- from the target, the curent window, or a new window.
+    ;Get a window from the target.
     if n_elements(target) gt 0 then begin
         if n_elements(target) eq 1 $
             then target    -> GetProperty, WINDOW=theWindow $
             else target[0] -> GetProperty, WINDOW=theWindow
+    
+    ;Get the current window.
     endif else if keyword_set(current) then begin
         theWindow = GetMrWindows(/CURRENT)
-        if obj_valid(theWindow) eq 0 then theWindow = obj_new('MrWindow', REFRESH=0)
+        if obj_valid(theWindow) eq 0 then theWindow = obj_new('Mr_Window', REFRESH=0)
+    
+    ;Create a new window.
     endif else begin
-        theWindow = obj_new('MrWindow', WINDOW_TITLE=window_title, BUFFER=buffer, REFRESH=0)
+        theWindow = obj_new('Mr_Window', WINDOW_TITLE=window_title, BUFFER=buffer, REFRESH=0)
     endelse
 
     return, theWindow
@@ -217,14 +221,7 @@ end
 ;-
 pro MrGrAtom::_SetWindow, theWindow
     compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
+    on_error, 2
 
     self.window = theWindow
 end
@@ -286,8 +283,8 @@ WINDOW=window
     endif
     
     ;Set GraphicAtom properties
-    if arg_present(hide) then hide = self.hide
-    if arg_present(name) then name = self.name
+    if arg_present(hide)   then hide = self.hide
+    if arg_present(name)   then name = self.name
     if arg_present(window) then window = self.window
 end
 
@@ -629,9 +626,9 @@ end
 ;-
 function MrGrAtom::init, $
 CURRENT=current, $
-HIDE = hide, $
-NAME = name, $
-WINREFRESH = winRefresh, $
+HIDE=hide, $
+NAME=name, $
+WINREFRESH=winRefresh, $
 TARGET=target, $
 WINDOW_TITLE=window_title
     compile_opt strictarr

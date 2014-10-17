@@ -475,6 +475,24 @@ end
 
 
 ;+
+;   Return the widget ID of the object.
+;
+; :Keywords:
+;       VALID:          out, optional, type=boolean
+;                       Returns 1 (one) if the widget ID is valid, 0 otherwise.
+;
+; :Returns:
+;       ID:             Widget ID of the object.
+;-
+function MrWidgetAtom::GetID, $
+VALID=valid
+
+    if arg_present(valid) then valid = widget_info(self._id, /VALID_ID)
+    return, self._id
+end
+
+
+;+
 ;   Get object properties. Complementary to retrieving object properties, most of the
 ;   options accessible via Widget_Control and Widget_Info are accessible through this
 ;   method.

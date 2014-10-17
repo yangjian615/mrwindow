@@ -54,6 +54,7 @@
 ; :History:
 ;   Modification History::
 ;       2014/03/26  -   Written by Matthew Argall
+;       2014/10/17  -   Removed automatic positioning by window object. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -72,9 +73,9 @@ function MrGrDataAtom::_OverloadPrint
     endif
     
     undefined = '<undefined>'
-    undefObj = '<NullObject>'
-    default = '<IDL_Default>'
-    joinStr = '   '
+    undefObj  = '<NullObject>'
+    default   = '<IDL_Default>'
+    joinStr   = '   '
     
     ;First, get the results from the superclasses
     atomKeys = self -> MrGrAtom::_OverloadPrint()
@@ -281,7 +282,9 @@ end
 ;                               at the next available layout location.
 ;-
 pro MrGrDataAtom::Overplot, target, $
-DISABLE=disable
+DISABLE=disable, $
+POSITION=position, $
+LAYOUT=layout
     compile_opt strictarr
     
     ;Error handling
@@ -299,9 +302,8 @@ DISABLE=disable
     
     ;Disable overplotting
     if keyword_set(disable) then begin
-        self.window -> Make_Location, location
-        self.window -> SetPosition, self.layout[2], location
         self.overplot = 0B
+        self -> SetLayout, LAYOUT=layout, POSITION=position
 
     ;Enable overplotting        
     endif else begin
@@ -316,15 +318,7 @@ DISABLE=disable
 
         ;Get a position
         target[0] -> GetProperty, POSITION=position
-
-        ;Remove SELF from layout.
-        self.layout -> GetProperty, LAYOUT=layout
-        self.window -> SetPosition, layout[2], position
-        self.overplot = 1B
-        self.target = target
-        
-        ;Fill and trim holes
-        if layout[2] gt 0 then self.window -> TrimLayout
+        self      -> SetProperty, POSITION=position
     endelse
     
     ;Re-enable refreshing
@@ -355,59 +349,22 @@ end
 ;                               (or dot-referencing in IDL 8.0+). This is only meant
 ;                               for use by MrGrDataAtomManager__Define for synchronizing layout
 ;                               properties with the window.
-;       UPDATE_LAYOUT:      in, optional, type=boolean, default=1
-;                           Indicate that the layout is to be updated. All graphics within
-;                               the graphics window will be adjusted. This keyword is
-;                               used by MrGrDataAtomManager__Define when applying the layout
-;                               grid to each plot. It is not meant to be used elsewhere.
 ;       _REF_EXTRA:         in, optional, type=any
 ;                           Any keyword accepted by MrLayout::SetProperty is also accepted
 ;                               for keyword inheritance.
 ;-
 pro MrGrDataAtom::SetLayout, layout, $
 POSITION=position, $
-UPDATE_LAYOUT=update_layout, $
 _REF_EXTRA=extra
     compile_opt strictarr
+    on_error, 2
     
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        if n_elements(init_refresh) gt 0 $
-            then self.window -> Refresh, DISABLE=~init_refresh
-        return
-    endif
-    
-    ;Default to updating the layout
-    update_layout = n_elements(update_layout) eq 0 ? 1 : keyword_set(update_layout) 
-    
-    ;Turn refresh off.
-    self.window -> GetProperty, REFRESH=init_refresh
-    self.window -> Refresh, /DISABLE
-    
-    ;If we are updating the layout, let the window take care of things.
-    if update_layout then begin
-        ;Get the current layout
-        curLayout = self.layout -> GetLayout()
+    ;Set the layout
+    self.layout -> SetProperty, LAYOUT       = layout, $
+                                POSITION     = position, $
+                               _STRICT_EXTRA = extra
 
-        ;Update the layout
-        if n_elements(position) gt 0 $
-            then self.window -> SetPosition, curLayout[2], position $
-            else self.window -> SetPosition, curLayout[2], layout
-        
-        ;Adjust other aspects of the layout.
-        if n_elements(extra) gt 0 then self.window -> SetProperty, _EXTRA=extra
-    
-    ;If we are not updating the layout...
-    endif else begin
-        self.layout -> SetProperty, LAYOUT=layout, POSITION=position, UPDATE_LAYOUT=0, $
-                                   _STRICT_EXTRA=extra
-    endelse
-    
-    ;Reset the refresh state.
-    self.window -> Refresh, DISABLE=~init_refresh
+    self.window -> Draw
 end
 
 
@@ -563,7 +520,7 @@ CURRENT = current, $
 HIDE = hide, $
 LAYOUT = layout, $
 NAME = name, $
-OVERPLOT = target, $
+OVERPLOT = overplot, $
 POSITION = position, $
 REFRESH = refresh, $
 WINDOW_TITLE = window_title, $
@@ -598,8 +555,8 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 
     ;Defaults
-    self.xlog    = keyword_set(xlog)
-    self.ylog    = keyword_set(ylog)
+    self.xlog = keyword_set(xlog)
+    self.ylog = keyword_set(ylog)
     
     ;Allocate Heap
     self.min_value = ptr_new(/ALLOCATE_HEAP)
@@ -611,32 +568,29 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ;Window and Layout ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    ;If a target was given, get its position
-    ;   - This will prevent MrGrAtom from adding the graphic to the automatically
-    ;     updating grid-layout
-    if obj_valid(target) then target -> GetProperty, POSITION=position
-  
-    ;Layout -- Must be done before initializing MrGrAtom
-    self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
     
     ;Was the /OVERPLOT keyword set instead of giving a target
-    if MrIsA(target, /SCALAR, 'INT') $
-        then if keyword_set(target) then target = self -> _GetTarget()
+    if MrIsA(overplot, /SCALAR, 'INT') $
+        then if keyword_set(overplot) then target = self -> _GetTarget()
 
     ;Superclass.
     if self -> MrGrAtom::INIT(CURRENT=current, NAME=name, HIDE=hide, TARGET=target, $
                               WINREFRESH=winRefresh, WINDOW_TITLE=window_title) eq 0 $
        then message, 'Unable to initialize MrGrAtom'
+  
+    ;Layout
+    ;   - Do after window is chosen/open
+    self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
 
 ;---------------------------------------------------------------------
 ;Overplot & Refresh //////////////////////////////////////////////////
 ;--------------------------------------------------------------------- 
     ;Overplot?
-    if n_elements(target) gt 0 then self -> Overplot, target
+    if n_elements(overplot) gt 0 then self -> Overplot, overplot
 
     ;Refresh the graphics?
     refresh = 0B
-    if keyword_set(current) eq 0 && n_elements(target) eq 0 $
+    if keyword_set(current) eq 0 && n_elements(overplot) eq 0 $
         then refresh = 1B $
         else if winRefresh then refresh = 1B
 

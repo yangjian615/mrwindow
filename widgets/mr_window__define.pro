@@ -56,90 +56,6 @@
 ;-
 ;*****************************************************************************************
 ;+
-;   The purpose of this method is to add a Mr_Window object to the !MrWindows system
-;   variable. If the system variable does not exist, it will be created.
-;
-; :Private:
-;-
-pro MrWindow::_SysVAdd, object
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Was a MrWindow object given?
-    if obj_class(object) ne 'MR_WINDOW' then $
-        message, 'Only MrWindow objects can be added to !MR_WINDOWS.'
-
-    ;Does the system variable exist?
-    if self -> SysVExists() eq 0 $
-        then defsysv, '!MR_WINDOWS', obj_new('MrWindow_Container')
-    
-    ;Add the window to the beginning of the container
-    !MR_WINDOWS -> Add, self, POSITION=0
-end
-
-
-;+
-;   The purpose of this method is to check if the !MrWindows system variable exists.
-;
-; :Private:
-;
-; :Returns:
-;       EXISTS:             True (1) if !MrWindows exists. False (0) if not.
-;-
-function MrWindow::_SysVExists
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return, 0
-    endif
-    
-    ;Check if it exists.
-    defsysv, '!MR_WINDOWS', EXISTS=exists
-    return, exists
-end
-
-
-;+
-;   The purpose of this method is to remove a MrWindow object from the !MrWindows
-;   system variable.
-;
-; :Private:
-;-
-pro MrWindow::_SysVRemove, object
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Make sure MrWindow object was given
-    if obj_class(object) ne 'MR_WINDOW' then $
-        message, 'Only Mr_Window objects can be removed from !MR_WINDOWS.'
-        
-    ;Check if the system variable exists
-    if self -> SysVExists() eq 0 then return
-    
-    ;Remove the window
-    !MR_WINDOWS -> Remove, self
-end
-
-
-;+
 ;   The purpose of this method is to create a resizable base in which to place the
 ;   draw widget.
 ;
@@ -153,7 +69,7 @@ end
 ;       WINDOW_TITLE:       in, optional, type=string, default='Mr_Window'
 ;                           Name to be placed on the window's title bar.
 ;-
-pro Mr_Window::BuildWindow, $
+pro Mr_Window::_BuildWindow, $
 WINDOW_TITLE=window_title, $
 XSIZE = xsize, $
 YSIZE = ysize
@@ -219,6 +135,168 @@ YSIZE = ysize
                                  
     ;REALIZE
 ;    oTLB -> XManager
+end
+
+
+;+
+;   Change selection state of graphics objects.
+;
+; :Params:
+;       OBJECT:         in, optional, type=objref
+;                       The MrGraphics object for which the selection is to be changed.
+;
+; :Keywords:
+;       ADD:            in, optional, type=boolean, default=0
+;                       If set, `OBJECT` will be added to the current selection.
+;       ALL:            in, optional, type=boolean, default=0
+;                       If set, all graphics in the window will selected.
+;       CLEAR:          in, optional, type=boolean, default=0
+;                       If set, selected items will be deselected.
+;       TOGGLE:         in, optional, type=boolean, default=0
+;                       If set, then if `OBJECT ` is selected it will be unselected and
+;                           vice versa.
+;       UNSELECT:       in, optional, type=boolean, default=0
+;                       If set, `OBJECT` will be unselected.
+;-
+pro Mr_Window::_SetSelect, object, $
+ADD=add, $
+ALL=all, $
+CLEAR=clear, $
+TOGGLE=toggle, $
+UNSELECT=unselect
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Add the object to the selection?
+    if keyword_set(add) then begin
+        self._selection -> Add, object
+        return
+    endif
+    
+    ;Add all objects to the selection?
+    if keyword_set(all) then begin
+        allObjs = self -> Get(/ALL)
+        self._selection -> Remove, /ALL
+        self._selection -> Add, allObjs
+        return
+    endif
+    
+    ;Clear all selections?
+    if keyword_set(clear) then begin
+        self._selection -> Remove, /ALL
+        return
+    endif
+    
+    ;Toggle the object?
+    if keyword_set(toggle) then begin
+        tf_contained = self._selection -> IsContained(object)
+        if tf_contained eq 1 $
+            then self._selection -> Remove, object $
+            else self._selection -> Add, object
+        return
+    endif
+    
+    ;Unselect the object?
+    if keyword_set(unselect) then begin
+        self._selection -> Remove, object
+        return
+    endif
+    
+    ;Clear the selection and add the object?
+    self._selection -> Remove, /ALL
+    self._selection -> Add, object
+end
+
+
+;+
+;   The purpose of this method is to add a Mr_Window object to the !MrWindows system
+;   variable. If the system variable does not exist, it will be created.
+;
+; :Private:
+;-
+pro Mr_Window::_SysVAdd, object
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Was a MrWindow object given?
+    if obj_class(object) ne 'MR_WINDOW' then $
+        message, 'Only MrWindow objects can be added to !MR_WINDOWS.'
+
+    ;Does the system variable exist?
+    if self -> _SysVExists() eq 0 $
+        then defsysv, '!MR_WINDOWS', obj_new('MrWindow_Container')
+    
+    ;Add the window to the beginning of the container
+    !MR_WINDOWS -> Add, self, POSITION=0
+end
+
+
+;+
+;   The purpose of this method is to check if the !MrWindows system variable exists.
+;
+; :Private:
+;
+; :Returns:
+;       EXISTS:             True (1) if !MrWindows exists. False (0) if not.
+;-
+function Mr_Window::_SysVExists
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, 0
+    endif
+    
+    ;Check if it exists.
+    defsysv, '!MR_WINDOWS', EXISTS=exists
+    return, exists
+end
+
+
+;+
+;   The purpose of this method is to remove a MrWindow object from the !MrWindows
+;   system variable.
+;
+; :Private:
+;-
+pro Mr_Window::_SysVRemove, object
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Make sure MrWindow object was given
+    if obj_class(object) ne 'MR_WINDOW' then $
+        message, 'Only Mr_Window objects can be removed from !MR_WINDOWS.'
+        
+    ;Check if the system variable exists
+    if self -> _SysVExists() eq 0 then return
+    
+    ;Remove the window
+    !MR_WINDOWS -> Remove, self
 end
 
 
@@ -400,7 +478,7 @@ _EXTRA=extraKeywords
     if self._refresh eq 0 then return
 
     ;Make sure the window is valid
-    if (WindowAvailable(self._winID) eq 0) then $
+    if (WindowAvailable(self._oDraw -> GetWinID()) eq 0) then $
         message, 'Draw widget does not have a valid window id. Try realizing it.'
 
     ;Defaults
@@ -418,11 +496,9 @@ _EXTRA=extraKeywords
         self._oPixmap -> SetCurrent
         if noerase eq 0B then self -> Erase, bg_color
     endif
-   
-    ;Get all objects from the container
+
+    ;Draw all of the objects in the container.
     allObj = self -> Get(/ALL, COUNT=nObj)
-    
-    ;Draw all of the objects.
     for i = 0, nObj - 1 do allObj[i] -> Draw, /NOERASE
     
     ;Copy from the pixmap to the draw window
@@ -464,6 +540,123 @@ pro Mr_Window::Event_Handler, event
         'WIDGET_BASE':         self -> TLB_Resize, event
         else: print, 'Event from "' + sName + '" passed through.'
     endcase
+end
+
+
+;+
+;   Find a graphic by its [col,row] location.
+;
+; :Params:
+;       COLROW:         in, required, type=intarr(2)
+;                       The [column, row] in which the desired graphic is located.
+;
+; :Returns:
+;       OBJECT:         The graphics located at `COLROW`.
+;-
+function Mr_Window::FindByColRow, colrow, $
+COUNT=count
+    compile_opt strictarr
+
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        Count = 0
+        return, obj_new()
+    endif
+
+    ;Convert COLROW to a plot index
+    pIndex = self._oLayout -> ConvertLocation(ColRow, /COLROW, /TO_PINDEX)
+
+    ;Call FindByPIndex
+    object = self -> FindByPIndex(pIndex, COUNT=count)
+
+    return, object
+end
+
+
+;+
+;   Find a graphic by its [col,row] location.
+;
+; :Params:
+;       PINDEX:         in, required, type=intarr(2)
+;                       The plot index, starting with 1 and increasing left to right then
+;                           top to bottom,  in which the desired graphic is located.
+;
+; :Returns:
+;       OBJECT:         The graphics located at `PINDEX`.
+;-
+function Mr_Window::FindByPIndex, pIndex, $
+COUNT=count
+    compile_opt strictarr
+
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        Count = 0
+        return, obj_new()
+    endif
+
+    ;Get all of the objects in the container
+    allObjs = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=count)
+    if count eq 0 then return, obj_new()
+    
+    ;Get all of the plot indices
+    objPIndex = intarr(count)
+    for i = 0, count - 1 do begin
+        allObjs[i] -> GetLayout, LAYOUT=objLayout
+        objPIndex[i] = objLayout[2]
+    endfor
+
+    ;Find a match
+    iMatch = where(objPIndex eq pIndex, count)
+    if count eq 0 then return, obj_new()
+    if count eq 1 then iMatch = iMatch[0]
+    
+    ;Return the matching objects
+    return, allObjs[iMatch]
+end
+
+
+;+
+;   Get the window's refresh state.
+;
+; :Returns:
+;       REFRESH:        Returns true (1) if refresh is enabled, false (0) otherwise.
+;-
+function Mr_Window::GetRefresh
+    return, self._refresh
+end
+
+
+;+
+;   Get a position from the layout grid.
+;
+; :Params:
+;       LOCATION:       in, required, type=integer/intarr(N)/intarr(2,N)
+;                       Either the plot index or the [col, row] location of the plot
+;                           for which the position is to be returned.
+;
+; :Keywords:
+;       COLROW:         in, optional, type=boolean, default=0
+;                       If set, `INDEX` is take to be a [col,row] location. 2xN arrays
+;                           are accepted.
+;
+; :Returns:
+;       POSITION:       Position within the current layout to `PINDEX`. If `PINDEX`
+;                           is a scalar, the output is a 4-element array. Otherise a 4xN
+;                           array is returned, where N is the number of locations given.
+;-
+function Mr_Window::GetPosition, location, $
+COLROW=colrow
+    compile_opt strictarr
+    on_error, 2
+    
+    ;Return the requested position(s)
+    return, self._oLayout -> GetPosition(location, COLROW=colrow)
 end
 
 
@@ -668,6 +861,108 @@ end
 
 
 ;+
+;   Get object references of all celected objects.
+;
+; :Keywords:
+;       COUNT:          out, optional, type=integer
+;                       Name variable to receive the number of object references returned.
+;
+; :Returns:
+;       SELECTION:      All currently selected graphics objects.
+;-
+function Mr_Window::GetSelect, $
+COUNT=count
+    return, self._selection -> Get(/ALL, COUNT=count)
+end
+
+
+;+
+;   Determine if a point is inside of a graphics object.
+;
+; :Params:
+;       X:              in, required, type=float
+;                       x-coordinate of a point in the graphics window.
+;       Y:              in, required, type=float
+;                       y-coordinate of a point in the graphics window.
+;
+; :Keywords:
+;       DIMENSIONS:     in, optional, type=intarr(2)
+;                       The [X,Y] dimensions of a box centered on `X` and `Y` to use
+;                           for the hit test. Device coordinates.
+;       ISA:            in, optional, type=string/strarr
+;                       Name or names of object classes to be tested.
+;       COUNT:          out, optional, type=integer
+;                       Number of objects into which the point (`X`,`Y`) falls.
+;
+; :Returns:
+;       HITOBJS:        Objects inside of which which the point (`X`,`Y`) resides.
+;-
+function Mr_Window::HitTest, x, y, $
+DIMENSIONS=dimensions, $
+ISA=isa, $
+COUNT=count
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = cgErrorMsg()
+        return, obj_new()
+    endif
+    
+    ;Get all of the objects
+    allObjs = self -> Get(/ALL, ISA=isa, COUNT=nObjs)
+
+    ;Figure out which ones were it
+    hitObjs = objarr(nObjs)
+    count = 0
+    for i = 0, nObjs - 1 do begin
+        tf_hit = allObjs[i] -> HitTest(x, y, DIMENSIONS=dimensions)
+        if tf_hit eq 1 then begin
+            hitObjs[count] = allObjs[i]
+            count += 1
+        endif
+    endfor
+    
+    ;Did we hit something?
+    if count eq 0 then return, obj_new()
+    
+    ;Trim the results and return
+    hitObjs = hitObjs[0:count-1]
+    return, hitObjs
+end
+
+
+;+
+;   Determine if objects are selected.
+;
+; :Params:
+;       OBJECT:         in, required, type=objref/objarr
+;                       Determine if these objects are selected.
+;
+; :Returns:
+;       TF_SELECTED:    Returns true (1) of `OBJECT` is selected and false (0) otherwise.
+;-
+function Mr_Window::IsSelected, object
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Error_Handler
+        void = cgErrorMsg()
+        return, obj_new()
+    endif
+    
+    ;Check of the given object is selected
+    return, self._selection -> IsContained(object)
+end
+
+
+;+
 ;   This method resizes the canvas area of the draw widget.
 ;
 ; :Private:
@@ -845,6 +1140,252 @@ pro Mr_Window::SetCurrent
     
     ;Set the display window
     self._oDraw -> SetCurrent
+end
+
+
+;+
+;   The purpose of this method is to provide a means of changing graphics objects
+;   globally, like setting the ![PXYZ] system variables.
+;-
+pro Mr_Window::SetGlobal, $
+ISA=isa, $
+CHARSIZE = charsize, $
+CHARTHICK = charthick, $
+FONT = font, $
+RANGE = range, $
+TICKLEN = ticklen, $
+TITLE = title, $
+THICK = thick, $
+XCHARSIZE = xcharsize, $
+XGRIDSTYLE = xgridstyle, $
+XLOG = xlog, $
+XMINOR = xminor, $
+XRANGE = xrange, $
+XSTYLE = xstyle, $
+XTHICK = xthick, $
+XTICKFORMAT = xtickformat, $
+XTICKLAYOUT = xticklayout, $
+XTICKLEN = xticklen, $
+XTICKNAME = xtickname, $
+XTICKS = xticks, $
+XTICKUNITS = xtickunits, $
+XTICKV = xtickv, $
+XTITLE = xtitle, $
+YCHARSIZE = ycharsize, $
+YGRIDSTYLE = ygridstyle, $
+YLOG = ylog, $
+YMINOR = yminor, $
+YRANGE = yrange, $
+YSTYLE = ystyle, $
+YTHICK = ythick, $
+YTICKFORMAT = ytickformat, $
+YTICKLAYOUT = yticklayout, $
+YTICKLEN = yticklen, $
+YTICKNAME = ytickname, $
+YTICKS = yticks, $
+YTICKUNITS = ytickunits, $
+YTICKV = ytickv, $
+YTITLE = ytitle, $
+ZCHARSIZE = zcharsize, $
+ZGRIDSTYLE = zgridstyle, $
+ZLOG = zlog, $
+ZMINOR = zminor, $
+ZRANGE = zrange, $
+ZSTYLE = zstyle, $
+ZTHICK = zthick, $
+ZTICKFORMAT = ztickformat, $
+ZTICKLAYOUT = zticklayout, $
+ZTICKLEN = zticklen, $
+ZTICKNAME = ztickname, $
+ZTICKS = zticks, $
+ZTICKUNITS = ztickunits, $
+ZTICKV = ztickv, $
+ZTITLE = ztitle
+    compile_opt idl2
+
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self -> Refresh, DISABLE=~refresh_in
+        void = cgErrorMsg()
+        return
+    endif
+
+    ;Disable refresh
+    self -> GetProperty, REFRESH=refresh_in
+    self -> Refresh, /DISABLE
+    
+    ;If we are changing CHARSIZE, set the character size of the window, too
+    if n_elements(charsize) gt 0 then self -> SetProperty, CHARSIZE=charsize
+
+    ;Get all of the objects
+    allObjs = self -> Get(/ALL, ISA=isa, COUNT=nObjs)
+    if nObjs eq 0 then return
+    
+    ;Step through each object and set the pertinent values
+    for i = 0, nObjs - 1 do begin
+        oClass = obj_class(allObjs[i])
+    
+;---------------------------------------------------------------------
+;Data Objects ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+        if IsMember((*self.gTypes).data, oClass) then begin
+            allObjs[i] -> SetProperty, CHARSIZE    = charsize, $
+                                       CHARTHICK   = charthick, $
+                                       FONT        = font, $
+                                       THICK       = thick, $
+                                       TICKLEN     = ticklen, $
+                                       TITLE       = title, $
+                                       XCHARSIZE   = xcharsize, $
+                                       XGRIDSTYLE  = xgridstyle, $
+                                       XLOG        = xlog, $
+                                       XMINOR      = xminor, $
+                                       XRANGE      = xrange, $
+                                       XSTYLE      = xstyle, $
+                                       XTHICK      = xthick, $
+                                       XTICKFORMAT = xtickformat, $
+                                       XTICKLAYOUT = xticklayout, $
+                                       XTICKLEN    = xticklen, $
+                                       XTICKNAME   = xtickname, $
+                                       XTICKS      = xticks, $
+                                       XTICKUNITS  = xtickunits, $
+                                       XTICKV      = xtickv, $
+                                       XTITLE      = xtitle, $
+                                       YCHARSIZE   = ycharsize, $
+                                       YGRIDSTYLE  = ygridstyle, $
+                                       YLOG        = ylog, $
+                                       YMINOR      = yminor, $
+                                       YRANGE      = yrange, $
+                                       YSTYLE      = ystyle, $
+                                       YTHICK      = ythick, $
+                                       YTICKFORMAT = ytickformat, $
+                                       YTICKLAYOUT = yticklayout, $
+                                       YTICKLEN    = yticklen, $
+                                       YTICKNAME   = ytickname, $
+                                       YTICKS      = yticks, $
+                                       YTICKUNITS  = ytickunits, $
+                                       YTICKV      = ytickv, $
+                                       YTITLE      = ytitle, $
+                                       ZCHARSIZE   = zcharsize, $
+                                       ZGRIDSTYLE  = zgridstyle, $
+;                                       ZLOG        = zlog, $
+                                       ZMINOR      = zminor, $
+                                       ZRANGE      = zrange, $
+                                       ZSTYLE      = zstyle, $
+                                       ZTHICK      = zthick, $
+                                       ZTICKFORMAT = ztickformat, $
+                                       ZTICKLAYOUT = zticklayout, $
+                                       ZTICKLEN    = zticklen, $
+                                       ZTICKNAME   = ztickname, $
+                                       ZTICKS      = zticks, $
+                                       ZTICKUNITS  = ztickunits, $
+                                       ZTICKV      = ztickv, $
+                                       ZTITLE      = ztitle
+        endif
+                                       
+;---------------------------------------------------------------------
+;Axis Objects ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+        if oClass eq 'MRAXIS' then begin
+            allObjs[i] -> GetProperty, DIRECTION=direction
+            
+            case direction of
+                'X': begin
+                    allObjs[i] -> SetProperty, AXIS_RANGE   = xrange, $
+                                               CHARSIZE     = charsize, $
+                                               CHARTHICK    = charthick, $
+                                               COLOR        = color, $
+                                               FONT         = font, $
+                                               GRIDSTYLE    = xgridstyle, $
+                                               LOG          = xlog, $
+                                               MINOR        = xminor, $
+                                               SUBTITLE     = xsubtitle, $
+                                               STYLE        = xsytle, $
+                                               THICK        = xthick, $
+                                               TICKFORMAT   = xtickformat, $
+                                               TICKINTERVAL = xtickinterval, $
+                                               TICKLAYOUT   = xticklayout, $
+                                               TICKLEN      = xticklen, $
+                                               TICKNAME     = xtickname, $
+                                               TICKS        = xticks, $
+                                               TICKUNITS    = xtickunits, $
+                                               TICKVALUES   = xtickvalues, $
+                                               TITLE        = xtitle, $
+                                               XCHARSIZE    = xcharsize
+                endcase
+                
+                'Y': begin
+                    allObjs[i] -> SetProperty, AXIS_RANGE   = yrange, $
+                                               CHARSIZE     = charsize, $
+                                               CHARTHICK    = charthick, $
+                                               COLOR        = color, $
+                                               FONT         = font, $
+                                               GRIDSTYLE    = ygridstyle, $
+                                               LOG          = ylog, $
+                                               MINOR        = yminor, $
+                                               SUBTITLE     = ysubtitle, $
+                                               STYLE        = ysytle, $
+                                               THICK        = ythick, $
+                                               TICKFORMAT   = ytickformat, $
+                                               TICKINTERVAL = ytickinterval, $
+                                               TICKLAYOUT   = yticklayout, $
+                                               TICKLEN      = yticklen, $
+                                               TICKNAME     = ytickname, $
+                                               TICKS        = yticks, $
+                                               TICKUNITS    = ytickunits, $
+                                               TICKVALUES   = ytickvalues, $
+                                               TITLE        = ytitle, $
+                                               XCHARSIZE    = ycharsize
+                
+                endcase
+                
+                'Z': begin
+                    allObjs[i] -> SetProperty, AXIS_RANGE   = zrange, $
+                                               CHARSIZE     = charsize, $
+                                               CHARTHICK    = charthick, $
+                                               COLOR        = color, $
+                                               FONT         = font, $
+                                               GRIDSTYLE    = zgridstyle, $
+                                               LOG          = zlog, $
+                                               MINOR        = zminor, $
+                                               SUBTITLE     = zsubtitle, $
+                                               STYLE        = zsytle, $
+                                               THICK        = zthick, $
+                                               TICKFORMAT   = ztickformat, $
+                                               TICKINTERVAL = ztickinterval, $
+                                               TICKLAYOUT   = zticklayout, $
+                                               TICKLEN      = zticklen, $
+                                               TICKNAME     = ztickname, $
+                                               TICKS        = zticks, $
+                                               TICKUNITS    = ztickunits, $
+                                               TICKVALUES   = ztickvalues, $
+                                               TITLE        = ztitle, $
+                                               XCHARSIZE    = zcharsize
+                endcase
+            endcase
+
+;---------------------------------------------------------------------
+; Images /////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+        endif else if oClass eq 'MRIMAGE' then begin
+            allObjs[i] -> SetProperty, RANGE=range
+            
+        endif else if oClass eq 'WECOLORBAR' then begin
+            allObjs[i] -> SetProperty, RANGE=range, CHARSIZE=charsize, $
+                                       CHARTHICK=charthick, TCHARSIZE=charsize
+            
+;---------------------------------------------------------------------
+;Other Annotation Objects ////////////////////////////////////////////
+;---------------------------------------------------------------------
+        endif else if IsMember(['MRTEXT', 'WELEGENDITEM'], oClass) then begin
+            allObjs[i] -> SetProperty, CHARSIZE = charsize, $
+                                       CHARTHICK = charthick
+        endif
+    endfor
+        
+    ;Reset the refresh state.
+    self -> Refresh, DISABLE=~refresh_in
 end
 
 
@@ -1084,7 +1625,7 @@ pro Mr_Window::TLB_Resize, event
     self._oPixmap -> Resize, xNew, yNew
 
     ;Draw the plot to the new size
-;    self -> Draw
+    self -> Draw
 end
 
 
@@ -1122,6 +1663,7 @@ pro Mr_Window::cleanup
     ;Free event handlers (but do not destroy event handling objects)
     if obj_valid(self._oTLB)    then obj_destroy, self._oTLB
     if obj_valid(self._oDraw)   then obj_destroy, self._oDraw
+    if obj_valid(self._oLayout) then obj_destroy, self._oLayout
     if obj_valid(self._oSaveAs) then obj_destroy, self._oSaveAs
 
     ;Destroy the widget, if it still exists
@@ -1364,15 +1906,16 @@ _REF_EXTRA=extra
         return, 0
     endif
 
-    self._oSaveAs = obj_new('MrSaveAs')
-    self -> BuildWindow
+    ;Build the window first so that Layout can get the dimensions of the window.
+    self._selection = obj_new('MrIDL_Container')
+    self._oSaveAs   = obj_new('MrSaveAs')
+    self -> _BuildWindow
 
     ;Set properties of the draw widget
     self._oDraw -> SetProperty, EVENT_FUNC           = event_func, $
                                 EVENT_HANDLER        = event_handler, $
                                 EVENT_OBJ            = event_obj, $
                                 EVENT_PRO            = event_pro, $
-                                NOTIFY_REALIZE       = notify_realize, $
                                 KEYBOARD_HANDLER     = keyboard_handler, $
                                 MOUSE_UP_HANDLER     = mouse_up_handler, $
                                 MOUSE_DOWN_HANDLER   = mouse_down_handler, $
@@ -1383,9 +1926,15 @@ _REF_EXTRA=extra
                                 YSIZE                = ysize
     
     ;Create a pixmap the same size as the draw widget.
-    self._oPixmap = obj_new('MrPixmap', self._oTLB, $
-                                        XSIZE = xsize, $
+    self._oPixmap = obj_new('MrPixmap', XSIZE = xsize, $
                                         YSIZE = ysize)
+    
+    ;Create layout object
+    ;   - Must set draw widget properties window first to get size.
+    self._oLayout = obj_new('MrLayout', LOCATION=0)
+
+    ;Add to the container of open windows
+    self -> _SysVAdd, self
     
     ;Realize and manage the widget
     self._oTLB -> XManager
@@ -1404,16 +1953,20 @@ end
 pro Mr_Window__define, class
 
    class = { Mr_Window, $
+             inherits IDL_Object, $
              inherits MrGraphicsEventAdapter, $
+             inherits MrIDL_Container, $
              _tlbID:      0L, $             ;Widget ID of the top-level base.
              _oTLB:       obj_new(), $      ;A top-level base widget object, if required.
              _oDraw:      obj_new(), $
+             _oLayout:    obj_new(), $
              _oPixmap:    obj_new(), $
              _oSaveAs:    obj_new(), $
-             _statusID:   0L $
+             _selection:  obj_new(), $
+             _statusID:   0L, $
 
              _background: '', $             ;Background color of the display.
              _noerase:    0B, $             ;Prevents the widget from being erased.
-             _refresh:    0B, $             ;Refresh the graphics window
+             _refresh:    0B $              ;Refresh the graphics window
            }
 end
