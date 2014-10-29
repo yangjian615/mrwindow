@@ -664,6 +664,9 @@ pro MrDrawWidget::Notify_Realize, id
     ;Set the name of the window to include with window number.
     widget_control, id, TLB_SET_TITLE='MrDrawWidget (' + strtrim(winID,2) + ')'
     
+    ;Erase the window to have the proper background color
+    self -> Erase
+    
     ;Draw as soon as the window is visible
     self -> Draw
 end
