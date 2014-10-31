@@ -456,7 +456,7 @@ pro MrImage::doImage
     ;Was a data position explicitly given?
     ;   - Make sure it is always within the data range
     if n_elements(*self.data_pos) gt 0 && $
-       array_equal((*self.data_pos)[[0,1]], (*self.data_pos)[[2,3]]) eq 0 $
+       ~array_equal((*self.data_pos)[[0,1]], (*self.data_pos)[[2,3]]) $
     then begin
         data_pos = *self.data_pos
         data_pos[0] >= (*self.xrange)[0]
@@ -465,14 +465,14 @@ pro MrImage::doImage
         data_pos[3] <= (*self.yrange)[1]
         
         ;Find the index range of the data position
-        ixrange = getIndexRange(*self.indep, data_pos[[0,2]])
-        iyrange = getIndexRange(*self.dep,   data_pos[[1,3]])
+        ixrange = MrIndexRange(*self.indep, data_pos[[0,2]], STRIDE=xstride)
+        iyrange = MrIndexRange(*self.dep,   data_pos[[1,3]], STRIDE=ystride)
     
     ;If not, the data position is the data range
     endif else begin
         ;Get the index range into the data
-        ixrange = getIndexRange(*self.indep, *self.xrange)
-        iyrange = getIndexRange(*self.dep,   *self.yrange)
+        ixrange = MrIndexRange(*self.indep, *self.xrange, STRIDE=xstride)
+        iyrange = MrIndexRange(*self.dep,   *self.yrange, STRIDE=ystride)
         
         ;Set the data position
         data_pos        = dblarr(4)
@@ -516,17 +516,16 @@ pro MrImage::doImage
 ;---------------------------------------------------------------------
 ; Display the Image //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    
+
     ;Include only those pixels that are inside the data range.
     iData   = [ixrange[0], iyrange[0], ixrange[1], iyrange[1]]
-
     ;size the image differently, depending out the output window
     if !D.Name eq 'PS' then begin
-        tv, (*self.img_out)[iData[0]:iData[2], iData[1]:iData[3]], $
+        tv, (*self.img_out)[ixrange[0]:ixrange[1]:xstride, iyrange[0]:iyrange[1]:ystride], $
             xstart, ystart, $
             XSIZE=xsize, YSIZE=ysize
     endif else begin
-        tv, congrid((*self.img_out)[iData[0]:iData[2], iData[1]:iData[3]], xsize, ysize), $
+        tv, congrid((*self.img_out)[ixrange[0]:ixrange[1]:xstride, iyrange[0]:iyrange[1]:ystride], xsize, ysize), $
             xstart, ystart
     endelse
 end

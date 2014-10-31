@@ -841,9 +841,13 @@ TAIL=tail
     plot_index = keyword_set(plot_index)
 
     ;Use the selected plot
-    if n_elements(location) eq 0 $
-        then theObj = self -> GetSelect() $
-        else theObj = self -> Get(LOCATION=location, PLOT_INDEX=plot_index)
+    if n_elements(location) eq 0 then begin
+        theObj = self -> GetSelect()
+    endif else begin
+        if plot_index $
+            then theObj = self -> FindByPIndex(location) $
+            else theObj = self -> FindByColRow(location)
+    endelse
     
 ;---------------------------------------------------------------------
 ;Get Data and Perform MVAB ///////////////////////////////////////////
