@@ -1,7 +1,7 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;       MrPolygon_Examples
+;       Examples_MrPlot
 ;
 ;*****************************************************************************************
 ;   Copyright (c) 2014, Matthew Argall                                                   ;
@@ -32,19 +32,19 @@
 ;*****************************************************************************************
 ;
 ;+
-;   Examples of how to use MrPolygon__Define.
+;   Examples of how to use MrImage__Define.
 ;
 ; :Examples:
 ;   See MrImage_Examples.pro for a series of examples::
-;       IDL> void = MrPolygon_Examples()
-;       IDL> win  = MrPolygon_Examples(2)
+;       IDL> void = Examples_MrImage()
+;       IDL> win  = Examples_MrImage(4)
 ;
 ; :Params:
 ;       EXAMPLE:        in, required, type=int
 ;                       Index number of the example to be excecuted.
 ;
 ; :Returns:
-;       WIN:            A MrWindow object reference.
+;       WIN:            A MrImage object reference.
 ;
 ; :Author:
 ;   Matthew Argall::
@@ -56,15 +56,15 @@
 ;
 ; :History:
 ;	Modification History::
-;       2014/09/21  -   Written by Matthew Argall
+;       2014/11/01  -   Written by Matthew Argall
 ;-
-function MrPolygon_Examples, example
+function Examples_MrPlot, example
     compile_opt strictarr
     
     catch, the_error
     if the_error ne 0 then begin
         catch, /CANCEL
-        if obj_valid(p1) then p1 -> Close
+        if obj_valid(img) then img -> Close
         void = cgErrorMSG()
         return, obj_new()
     endif
@@ -72,102 +72,121 @@ function MrPolygon_Examples, example
     ;Print a description of each example
     if n_elements(example) eq 0 then begin
         print, [['EXAMPLE    DESCRIPTION'], $
-                ['   1       Single polygon fill.'], $
-                ['   2       Multicolored vertices with Line Fill.'], $
-                ['   3       Multiple polygons defined via CONNECTIVITY']]
+                ['   1       Simple plot of x'], $
+                ['   2       Simple plot of y vs. x'], $
+                ['   3       Plot a set of vectors: 3xN'], $
+                ['   4       Time series with error bars'], $
+                ['   5       Overplot']]
         return, -1
     endif
 
 ;---------------------------------------------------------------------
-; Begin Examples /////////////////////////////////////////////////////
+; Display a la TV Procedure //////////////////////////////////////////
 ;---------------------------------------------------------------------
     case example of
     ;---------------------------------------------------------------------
-    ; Single Polygon Gill ////////////////////////////////////////////////
+    ; Simple Plot ////////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
         1: begin
             ;Create the data
-            x      = findgen(100)/99.0
-            y      = sin(2*!pi*x/0.18)
+            data = cgDemoData(1)
             
-            ;Create the polygon vertices
-            dy     = randomu(5, 100)
-            xverts = [x, reverse(x)]
-            yverts = [y+dy, reverse(y)-dy]
-            
-            ;Plot the data and polygon
-            p1 = MrPlot(x, y, TITLE='Test', XTITLE='Time', YTITLE='Data')
-            pf = MrPolygon(xverts, yverts, TARGET=p1, FILL_COLOR='Orange')
-            
-            ;Change properties
-            p1.yrange = [-2, 2]
-            p1 -> Order, /BRING_TO_FRONT
-            
-            ;Return the window
-            win = p1.window
+            ;Create the image
+            plt = MrPlot(data, TITLE='My Data', XTITLE='Time (s)', YTITLE='Measurement')
+            win = plt.window
         endcase
         
     ;---------------------------------------------------------------------
-    ; Multicolored Vertices with Line Fill ///////////////////////////////
+    ; Simple Plot of Y vs. X /////////////////////////////////////////////
     ;---------------------------------------------------------------------
         2: begin
             ;Create the data
-            x      = findgen(101)/100.0
-            y      = cgDemoData(1)
-
-            ;Create the polygon vertices
-            dy     = randomu(5, 101)*5.0
-            xverts = [x, reverse(x)]
-            yverts = [y+dy, reverse(y)-dy]
+            data = cgDemoData(1)
+            time = lindgen(n_elements(data))
             
-            ;Plot the data and polygon
-            p1 = MrPlot(x, y, TITLE='Test', XTITLE='Time', YTITLE='Data')
-            pf = MrPolygon(xverts, yverts, TARGET=p1, /LINE_FILL, $
-                           COLOR=['red', 'orange', 'yellow', 'green', 'blue', 'violet'], $
-                           FILL_LINESTYLE=2, ORIENTATION=135, FILL_COLOR='Brown', $
-                           PSYM='Filled Star', SYMCOLOR=['yellow', 'orange'])
-            
-            ;Return the window
-            win = p1.window
+            ;Create the image
+            plt = MrPlot(time, data, TITLE='My Data', XTITLE='Time (s)', YTITLE='Measurement')
+            win = plt.window
         endcase
         
     ;---------------------------------------------------------------------
-    ; Multiple Polygons Defined via CONNECTIVITY /////////////////////////
+    ; Plot a Set of Vectors //////////////////////////////////////////////
     ;---------------------------------------------------------------------
         3: begin
-            ;Cartesian coordinates defining a circle of radius 1.
-            x = cos(2*!pi*findgen(100)/99.0)
-            y = sin(2*!pi*findgen(100)/99.0)
-
-            ;Radii
-            r1    = 2.3
-            r2    = 1.0
-            r3    = 0.45
+            ;Create the data
+            data = cgDemoData(14)
+            time = lindgen(n_elements(data[0,*]))
             
-            ;Centers
-            p1    = [2,3]
-            p2    = [1,0.5]
-            p3    = [4,1]
+            ;Create the image
+            plt = MrPlot(time, data, $
+                         DIMENSION = 2, $
+                         TITLE     = 'My Data', $
+                         XTITLE    = 'Time (s)', $
+                         YTITLE    = 'Measurement')
+            win = plt.window
+        endcase
+        
+    ;---------------------------------------------------------------------
+    ; Time Series with Error Bars ////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        4: begin
+            ;Create the data
+            data = reform((cgDemoData(14))[0,*])
+            nPts = n_elements(data)
+            time = lindgen(nPts)
+            xerr = replicate(1.0, nPts)
+            yerr = replicate(1.0, nPts)
             
-            ;Connected polygons
-            xpoly = [r1*x+p1[0], r2*x+p2[0], r3*x+p3[0]]
-            ypoly = [r1*y+p1[1], r2*y+p2[1], r3*y+p3[1]]
-            connectivity = [100, lindgen(100), 100, lindgen(100)+100, 100, lindgen(100)+200]
+            ;Create the image
+            plt = MrPlot(time, data, $
+                         ERR_XPLUS  = xerr, $
+                         ERR_XMINUS = xerr, $
+                         ERR_YPLUS  = yerr, $
+                         ERR_YMINUS = yerr, $
+                         TITLE      = 'My Data', $
+                         XTITLE     = 'Time (s)', $
+                         YTITLE     = 'Measurement')
+            win = plt.window
+        endcase
+        
+    ;---------------------------------------------------------------------
+    ; Overplot ///////////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        5: begin
+            ;Create the data
+            data = cgDemoData(14)
+            nPts = n_elements(data[0,*])
+            time = lindgen(nPts)
+            yrange = [min(data, MAX=dMax), dMax]
             
-            ;Plot the data and polygon
-            p1 = MrPlot(0, 0, /NODATA, TITLE='Test', XTITLE='Time', YTITLE='Data', $
-                        XRANGE=[0,5], YRANGE=[0,5])
-            pf = MrPolygon(xpoly, ypoly, CONNECTIVITY=connectivity, TARGET=p1, $
-                           FILL_COLOR=['Magenta', 'Turquoise', 'Indian Red'])
+            ;Create the plot
+            plt1 = MrPlot(time, reform(data[0,*]), $
+                          NAME   = 'Vx', $
+                          TITLE  = 'My Data', $
+                          XTITLE = 'Time (s)', $
+                          YRANGE = yrange, $
+                          YTITLE = 'Measurement')
             
+            ;Overplot the other two components
+            plt2 = MrPlot(time, reform(data[1,*]), $
+                          /CURRENT, $
+                          COLOR    = 'Blue', $
+                          NAME     = 'Vy', $
+                          OVERPLOT = plt1)
+            plt3 = MrPlot(time, reform(data[2,*]), $
+                          /CURRENT, $
+                          COLOR    = 'Red', $
+                          NAME     = 'Vz', $
+                          OVERPLOT = plt1)
+                          
             ;Return the window
-            win = p1.window
+            win = plt1.window
         endcase
 
 ;---------------------------------------------------------------------
 ; No More Examples ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-        else: message, 'EXAMPLE must be between 1 and 3.'
+        else: message, 'EXAMPLE must be between 1 and 5.'
     endcase
     
     return, win

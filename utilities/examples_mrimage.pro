@@ -36,8 +36,8 @@
 ;
 ; :Examples:
 ;   See MrImage_Examples.pro for a series of examples::
-;       IDL> void = MrImage_Examples()
-;       IDL> win  = MrImage_Examples(14)
+;       IDL> void = Examples_MrImage()
+;       IDL> win  = Examples_MrImage(14)
 ;
 ; :Params:
 ;       EXAMPLE:        in, required, type=int
@@ -58,7 +58,7 @@
 ;	Modification History::
 ;       2014/09/09  -   Written by Matthew Argall
 ;-
-function MrImage_Examples, example
+function Examples_MrImage, example
     compile_opt strictarr
     
     catch, the_error

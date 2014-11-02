@@ -36,8 +36,8 @@
 ;
 ; :Examples:
 ;   See MrImage_Examples.pro for a series of examples::
-;       IDL> void = MrPolygon_Examples()
-;       IDL> win  = MrPolygon_Examples(2)
+;       IDL> void = Examples_MrPolygon()
+;       IDL> win  = Examples_MrPolygon(2)
 ;
 ; :Params:
 ;       EXAMPLE:        in, required, type=int
@@ -56,9 +56,9 @@
 ;
 ; :History:
 ;	Modification History::
-;       2014/09/22  -   Written by Matthew Argall
+;       2014/09/21  -   Written by Matthew Argall
 ;-
-function MrCircle_Examples, example
+function Examples_MrPolygon, example
     compile_opt strictarr
     
     catch, the_error
@@ -72,7 +72,9 @@ function MrCircle_Examples, example
     ;Print a description of each example
     if n_elements(example) eq 0 then begin
         print, [['EXAMPLE    DESCRIPTION'], $
-                ['   1       Empty Axes with Three Circles.']]
+                ['   1       Single polygon fill.'], $
+                ['   2       Multicolored vertices with Line Fill.'], $
+                ['   3       Multiple polygons defined via CONNECTIVITY']]
         return, -1
     endif
 
@@ -81,19 +83,82 @@ function MrCircle_Examples, example
 ;---------------------------------------------------------------------
     case example of
     ;---------------------------------------------------------------------
-    ; Exmpty Axes with Three Circles /////////////////////////////////////
+    ; Single Polygon Gill ////////////////////////////////////////////////
     ;---------------------------------------------------------------------
         1: begin
-            ;Create an empty set of axes.
-            p1 = MrPlot(0, 0, /NODATA, XRANGE=[0,5], YRANGE=[0,5], $
-                        TITLE='Test', XTITLE='Time', YTITLE='Data')
+            ;Create the data
+            x      = findgen(100)/99.0
+            y      = sin(2*!pi*x/0.18)
+            
+            ;Create the polygon vertices
+            dy     = randomu(5, 100)
+            xverts = [x, reverse(x)]
+            yverts = [y+dy, reverse(y)-dy]
+            
+            ;Plot the data and polygon
+            p1 = MrPlot(x, y, TITLE='Test', XTITLE='Time', YTITLE='Data')
+            pf = MrPolygon(xverts, yverts, TARGET=p1, FILL_COLOR='Orange')
+            
+            ;Change properties
+            p1.yrange = [-2, 2]
+            p1 -> Order, /BRING_TO_FRONT
+            
+            ;Return the window
+            win = p1.window
+        endcase
+        
+    ;---------------------------------------------------------------------
+    ; Multicolored Vertices with Line Fill ///////////////////////////////
+    ;---------------------------------------------------------------------
+        2: begin
+            ;Create the data
+            x      = findgen(101)/100.0
+            y      = cgDemoData(1)
 
-            ;Create circles
-            r = [2.3, 1.0, 0.45]
-            x_center = [2, 1, 4]
-            y_center = [3, 0.5, 1]
-            cc = MrCircle(r, x_center, y_center, TARGET=p1, /FILL_BACKGROUND, /DATA, $
-                          FILL_COLOR=['Magenta', 'Turquoise', 'Indian Red'])
+            ;Create the polygon vertices
+            dy     = randomu(5, 101)*5.0
+            xverts = [x, reverse(x)]
+            yverts = [y+dy, reverse(y)-dy]
+            
+            ;Plot the data and polygon
+            p1 = MrPlot(x, y, TITLE='Test', XTITLE='Time', YTITLE='Data')
+            pf = MrPolygon(xverts, yverts, TARGET=p1, /LINE_FILL, $
+                           COLOR=['red', 'orange', 'yellow', 'green', 'blue', 'violet'], $
+                           FILL_LINESTYLE=2, ORIENTATION=135, FILL_COLOR='Brown', $
+                           PSYM='Filled Star', SYMCOLOR=['yellow', 'orange'])
+            
+            ;Return the window
+            win = p1.window
+        endcase
+        
+    ;---------------------------------------------------------------------
+    ; Multiple Polygons Defined via CONNECTIVITY /////////////////////////
+    ;---------------------------------------------------------------------
+        3: begin
+            ;Cartesian coordinates defining a circle of radius 1.
+            x = cos(2*!pi*findgen(100)/99.0)
+            y = sin(2*!pi*findgen(100)/99.0)
+
+            ;Radii
+            r1    = 2.3
+            r2    = 1.0
+            r3    = 0.45
+            
+            ;Centers
+            p1    = [2,3]
+            p2    = [1,0.5]
+            p3    = [4,1]
+            
+            ;Connected polygons
+            xpoly = [r1*x+p1[0], r2*x+p2[0], r3*x+p3[0]]
+            ypoly = [r1*y+p1[1], r2*y+p2[1], r3*y+p3[1]]
+            connectivity = [100, lindgen(100), 100, lindgen(100)+100, 100, lindgen(100)+200]
+            
+            ;Plot the data and polygon
+            p1 = MrPlot(0, 0, /NODATA, TITLE='Test', XTITLE='Time', YTITLE='Data', $
+                        XRANGE=[0,5], YRANGE=[0,5])
+            pf = MrPolygon(xpoly, ypoly, CONNECTIVITY=connectivity, TARGET=p1, $
+                           FILL_COLOR=['Magenta', 'Turquoise', 'Indian Red'])
             
             ;Return the window
             win = p1.window
@@ -102,7 +167,7 @@ function MrCircle_Examples, example
 ;---------------------------------------------------------------------
 ; No More Examples ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-        else: message, 'EXAMPLE must be between 1 and 1.'
+        else: message, 'EXAMPLE must be between 1 and 3.'
     endcase
     
     return, win

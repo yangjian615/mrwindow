@@ -128,9 +128,9 @@ COUNT=count
     count = 0
 
     ;Make sure a window has been assigned.
-    if obj_valid(self.window) eq 0 $
-        then theWindow = GetMrWindows(/CURRENT) $
-        else theWindow = self.window
+    if obj_valid(self.window) $
+        then theWindow = self.window $
+        else theWindow = GetMrWindows(/CURRENT)
     
     ;Make sure a window is open
     if obj_valid(theWindow) eq 0 then $
@@ -141,8 +141,7 @@ COUNT=count
     
     ;Get any available graphic?
     if count eq 0 then begin
-        if any then $
-            target = theWindow -> Get(/ALL, ISA=['MRPLOT', 'MRIMAGE', 'MRCONTOUR'], COUNT=count)
+        if any then target = theWindow -> Get(/ALL, ISA=['MRGRDATAATOM'], COUNT=count)
     endif
     
     ;Return a single graphic?

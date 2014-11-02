@@ -292,18 +292,19 @@ LAYOUT=layout
     if the_error ne 0 then begin
         catch, /cancel
         void = cgErrorMsg()
-        if n_elements(init_refresh) gt 0 then self.window -> Refresh, DISABLE=~init_refresh
+        self.window -> Refresh, DISABLE=~init_refresh
         return
     endif
     
     ;Disable refreshing
-    self.window -> GetProperty, REFRESH=init_refresh
-    self.window -> Refresh, /DISABLE
-    
+    init_refresh = self.window -> GetRefresh()
+    if init_refresh then self.window -> Refresh, /DISABLE
+
     ;Disable overplotting
     if keyword_set(disable) then begin
         self.overplot = 0B
-        self -> SetLayout, LAYOUT=layout, POSITION=position
+        if n_elements(position) gt 0 || n_elements(layout) gt 0 $
+            then self -> SetLayout, LAYOUT=layout, POSITION=position
 
     ;Enable overplotting        
     endif else begin
@@ -311,10 +312,12 @@ LAYOUT=layout
         if obj_valid(target) eq 0 then target = self.window -> GetSelect()
 
         ;Ensure we can overplot on top of the target graphic
-        oplottable = ['MrPlot', 'MrImage', 'MrImage2', 'MrContour', 'MrVector']
-        if min(IsMember(oplottable, MrObj_Class(target), /FOLD_CASE)) eq 0 || $
-           min(obj_valid(target)) eq 0 $
-        then message, 'TARGET must be valid and of class ' + strjoin(oplottable, ' ')
+        if ~obj_isa(target, 'MRGRDATAATOM') $
+            then message, 'TARGET of class "' + obj_class(target) + '" is not a valid data object.'
+
+        ;Set the target
+        self.target   = target
+        self.overplot = 1B
 
         ;Get a position
         target[0] -> GetProperty, POSITION=position
@@ -322,7 +325,7 @@ LAYOUT=layout
     endelse
     
     ;Re-enable refreshing
-    self.window -> Refresh, DISABLE=~init_refresh
+    if init_refresh then self.window -> Refresh
 end
 
 
@@ -561,17 +564,17 @@ _REF_EXTRA = extra
     ;Allocate Heap
     self.min_value = ptr_new(/ALLOCATE_HEAP)
     self.max_value = ptr_new(/ALLOCATE_HEAP)
-    
-    ;Objects
-    self.target = obj_new()
 
 ;---------------------------------------------------------------------
 ;Window and Layout ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
     ;Was the /OVERPLOT keyword set instead of giving a target
-    if MrIsA(overplot, /SCALAR, 'INT') $
-        then if keyword_set(overplot) then target = self -> _GetTarget()
+    if MrIsA(overplot, /SCALAR, 'INT') then begin
+        if keyword_set(overplot) then target = self -> _GetTarget()
+    endif else if MrIsA(overplot, /SCALAR, 'OBJREF') then begin
+        target = overplot
+    endif
 
     ;Superclass.
     if self -> MrGrAtom::INIT(CURRENT=current, NAME=name, HIDE=hide, TARGET=target, $
@@ -586,7 +589,7 @@ _REF_EXTRA = extra
 ;Overplot & Refresh //////////////////////////////////////////////////
 ;--------------------------------------------------------------------- 
     ;Overplot?
-    if n_elements(overplot) gt 0 then self -> Overplot, overplot
+    if n_elements(overplot) gt 0 then self -> Overplot, target
 
     ;Refresh the graphics?
     refresh = 0B

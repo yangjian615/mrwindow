@@ -139,6 +139,91 @@ end
 
 
 ;+
+;   The purpose of this method is to provide an array-like means of accessing graphics
+;   objects within the container. Two options are avaible: the object index within the
+;   container or the name of the graphic object.
+;
+; :Private:
+;
+; :Params:
+;       ISRANGE:            in, required, type=intarr
+;                           A vector of 1's and 0's indicating if the corresponding
+;                               subscript parameters `SUBSCRIPT1` are index ranges or
+;                               index values.
+;       SUBSCRIPT1:         in, required, type=intarr/strarr
+;                           Index subscript of the graphics object to be returned, or the
+;                               class names of the objects to return.
+;-
+function Mr_Window::_OverloadBracketsRightSide, isRange, subscript1
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, obj_new()
+    endif
+
+    ;Search for objects by name. Return the first match.
+    if size(subscript1, /TNAME) eq 'STRING' then begin
+        if MrIsA(subscript1, /SCALAR) eq 0 then message, 'String subscripts must be scalars.'
+        upSub1 = strupcase(subscript1)
+
+        ;Get all of the objects
+        allObjs = self -> Get(/ALL, COUNT=nObj)
+        i = 0
+        success = 0
+        
+        ;Search for the 
+        while success eq 0 and i lt nObj do begin
+            if strupcase(allObjs[i] -> GetName()) eq upSub1 then begin
+                success = 1
+                result = allObjs[i]
+            endif
+            i++
+        endwhile
+        
+        if success eq 0 then result = obj_new()
+        
+    ;Call the superclass's method
+    endif else result = self -> MrIDL_Container::_OverloadBracketsRightSide(isRange, subscript1)
+
+    return, result
+end
+
+
+;+
+;   The purpose of this method is to provide output when the PRINT procedure is used.
+;
+; :Private:
+;-
+function Mr_Window::_OverloadPrint
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return, ''
+    endif
+    
+    ;Get the class name and the heap identifier of the object
+    objClass = obj_class(self)
+    heapNum = obj_valid(self, /GET_HEAP_IDENTIFIER)
+    objStr = string(FORMAT='(%"%s  <%i>")', objClass, heapNum)
+    
+    ;Get descriptions
+    self -> WhichObjects, printText
+
+    ;Combine the results
+    outText = [objStr, printText]
+    return, transpose(outText)
+end
+
+
+;+
 ;   Change selection state of graphics objects.
 ;
 ; :Params:
@@ -622,13 +707,13 @@ end
 
 
 ;+
-;   Get the window's refresh state.
+;   A simple way of obtaining the window's name.
 ;
-; :Returns:
-;       REFRESH:        Returns true (1) if refresh is enabled, false (0) otherwise.
+;   :Returns:
+;       NAME:           The name of the window
 ;-
-function Mr_Window::GetRefresh
-    return, self._refresh
+function Mr_Window::GetName
+    return, self.name
 end
 
 
@@ -803,7 +888,8 @@ _REF_EXTRA=extra
     endif
 
     currentWin = !d.window
-    if widget_info(self._id, /VALID_ID) eq 0 then return
+    self._oDraw -> GetProperty, ID=drawID, WINDOWID=winID
+    if widget_info(drawID, /VALID_ID) eq 0 then return
 
     ;Object Properties
     if arg_present(background_color) then background_color = self._background
@@ -813,7 +899,7 @@ _REF_EXTRA=extra
     if arg_present(xsize) || arg_present(ysize) then begin
         if (!d.flags and 256) gt 0 then begin
             ;Set the window
-            wset, self._winID
+            wset, winID
             
             ;Get the window sizes
             xsize = !d.x_size
@@ -827,18 +913,18 @@ _REF_EXTRA=extra
     endif
     
     ;Widget_Control Options
-    if arg_present(windowID)        then widget_control, self._id, GET_VALUE=windowID
+    if arg_present(windowID)        then widget_control, drawID, GET_VALUE=windowID
     
     ;Events On or Off?
-    if arg_present(button_events)   then button_events   = widget_info(self._id, /DRAW_BUTTON_EVENTS)
-    if arg_present(context_events)  then context_events  = widget_info(self._id, /CONTEXT_EVENTS)
-    if arg_present(drop_events)     then drop_events     = widget_info(self._id, /DROP_EVENTS)
-    if arg_present(expose_events)   then expose_events   = widget_info(self._id, /DRAW_EXPOSE_EVENTS)
-    if arg_present(motion_events)   then motion_events   = widget_info(self._id, /DRAW_MOTION_EVENTS)
-    if arg_present(viewport_events) then viewport_events = widget_info(self._id, /DRAW_VIEWPORT_EVENTS)
-    if arg_present(keyboard_events) then keyboard_events = widget_info(self._id, /DRAW_KEYBOARD_EVENTS)
-    if arg_present(tooltip)         then tooltip         = widget_info(self._id, /TOOLTIP)
-    if arg_present(wheel_events)    then wheel_events    = widget_info(self._id, /DRAW_WHEEL_EVENTS)
+    if arg_present(button_events)   then button_events   = widget_info(drawID, /DRAW_BUTTON_EVENTS)
+    if arg_present(context_events)  then context_events  = widget_info(drawID, /CONTEXT_EVENTS)
+    if arg_present(drop_events)     then drop_events     = widget_info(drawID, /DROP_EVENTS)
+    if arg_present(expose_events)   then expose_events   = widget_info(drawID, /DRAW_EXPOSE_EVENTS)
+    if arg_present(motion_events)   then motion_events   = widget_info(drawID, /DRAW_MOTION_EVENTS)
+    if arg_present(viewport_events) then viewport_events = widget_info(drawID, /DRAW_VIEWPORT_EVENTS)
+    if arg_present(keyboard_events) then keyboard_events = widget_info(drawID, /DRAW_KEYBOARD_EVENTS)
+    if arg_present(tooltip)         then tooltip         = widget_info(drawID, /TOOLTIP)
+    if arg_present(wheel_events)    then wheel_events    = widget_info(drawID, /DRAW_WHEEL_EVENTS)
    
     ;Method Event Handlers
     if arg_present(event_handler)        then event_handler        =  self._event_handler
@@ -857,6 +943,17 @@ _REF_EXTRA=extra
 
     ;Superclass Properties
     if n_elements(extra) gt 0 then self -> MrWidgetAtom::GetProperty, _STRICT_EXTRA=extra
+end
+
+
+;+
+;   Get the window's refresh state.
+;
+; :Returns:
+;       REFRESH:        Returns true (1) if refresh is enabled, false (0) otherwise.
+;-
+function Mr_Window::GetRefresh
+    return, self._refresh
 end
 
 
@@ -1645,6 +1742,160 @@ end
 
 
 ;+
+;   Print which data objects are present and the index at which they are stored.
+;
+; :Private:
+;-
+pro Mr_Window::WhichDataObjects, outText
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+        
+;---------------------------------------------------------------------
+;Data Objects ////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Get all of the data objects
+    dataObj = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=nData)
+    
+    ;Description plus header
+    outText = strarr(nData + 1)
+    
+    ;Get the container indices of each object.
+    if nData gt 0 $
+        then index = self -> GetIndex(dataObj) $
+        else outText = ['No Data object in the container']
+        
+    
+    ;The string length of the longest type
+    typeLen = string(max(strlen((*self.gTypes).data)), FORMAT='(i0)')
+    
+    ;Step through each object
+    for i = 0, nData - 1 do begin
+        ;Print a header.
+        if i eq 0 then outText[0] = string('--Index--', '--Type--', '-Location-', '--Name--', $
+                                           FORMAT='(a9, 4x, a' + typeLen + ', 4x, a10, 4x, a8)')
+                              
+        ;Get the object's position and layout
+        dataObj[i] -> GetLayout, LAYOUT=layout
+        colrow = self -> ConvertLocation(layout[2], /PINDEX, /TO_COLROW)
+
+        ;Print the type-name, location, and position
+        sIndex    = string(index[i], FORMAT='(i2)')
+        sLocation = string(colrow, FORMAT='(%"[%3i,%3i]")')
+        sName = dataObj[i] -> GetName()
+
+        outText[i+1] = string(FORMAT='(4x, a2, 7x, a' + typeLen + ', 5x, a0, 5x, a0)', $
+                              sIndex, obj_class(dataObj[i]), sLocation, sName)
+    endfor
+    
+    ;Output the text
+    case n_params() of
+        0: print, transpose(outText)
+        1: outText = transpose(temporary(outText))
+        else: message, 'Incorrect number of parameters.'
+    endcase
+end
+
+
+;+
+;   Print which annotate objects are present and the index at which they are stored.
+;
+; :Private:
+;-
+pro Mr_Window::WhichObjects, outText, $
+DATA=data, $
+ANNOTATE=annotate
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    data     = keyword_set(data)
+    annotate = keyword_set(annotate)
+    all      = data + annotate eq 1 ? 0 : 1
+    
+;---------------------------------------------------------------------
+;Annotation Objects //////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    allObj = self -> Get(/ALL, COUNT=nObj)
+    if nObj eq 0 then begin
+        if n_params() eq 1 $
+            then outText = 'No objects in the container.' $
+            else print, 'No objects in the container.'
+        return
+    endif
+
+    ;Description plus header
+    dataText = strarr(nObj + 1)
+    annText  = strarr(nObj + 1)
+    
+    ;Get the container indices of each object.
+    index = self -> GetIndex(allObj) 
+
+    ;The string length of the longest type
+    classLen = string(max(strlen(MrObj_Class(allObj))) > 8, FORMAT='(i0)')
+    header   = string('--Order--', '--Type--', '--Name--', $
+                      FORMAT='(a9, 4x, a' + classLen + ', 4x, a12)')
+    dataText[0] = header
+    annText[0]  = header
+    
+    ;Step through each annotate object
+    nData     = 0L
+    nAnnotate = 0L
+    for i = 0L, nObj - 1 do begin
+        ;Only data/annotate?
+        isData = obj_isa(allObj[i], 'MRGRDATAATOM')
+        if all eq 0 then begin
+            if data     then if ~isData then continue
+            if annotate then if  isDate then continue
+        endif
+        
+        ;Print the type-name, location, and position
+        sIndex = string(index[i], FORMAT='(i2)')
+        sName  = allObj[i] -> GetName()
+
+        ;Form the output string
+        tempText = string(FORMAT='(4x, a2, 7x, a' + classLen + ', 5x, a0)', $
+                          sIndex, obj_class(allObj[i]), sName)
+        
+        if isData then begin
+            dataText[nData+1] = tempText
+            nData += 1
+        endif else begin
+            annText[nAnnotate+1] = tempText
+            nAnnotate += 1
+        endelse
+    endfor
+    
+    ;Were data/annotate objects found?
+    if nData     eq 0 then dataText[1] = '  No Data objects'
+    if nAnnotate eq 0 then annText[1]  = '  No Annotate objects'
+    
+    ;Form the output
+    case 1 of
+        all:      outText = [dataText[0:nData > 1], annText[0:nAnnotate > 1]]
+        data:     outText = dataText[0:nData > 1]
+        annotate: outText = annText[0:nAnnotate > 1]
+    endcase
+    
+    ;Output the text
+    if n_params() ne 1 then print, transpose(outText)
+end
+
+
+;+
 ;   This is the Mr_Window object class destructor method.
 ;
 ; :Private:
@@ -1965,6 +2216,7 @@ pro Mr_Window__define, class
              _selection:  obj_new(), $
              _statusID:   0L, $
 
+             name:        '', $
              _background: '', $             ;Background color of the display.
              _noerase:    0B, $             ;Prevents the widget from being erased.
              _refresh:    0B $              ;Refresh the graphics window

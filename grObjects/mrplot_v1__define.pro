@@ -211,13 +211,9 @@ NOERASE = noerase
         return
     endif
 
-    ;Leave if we are hiding.
     if self.hide then return
-    
-    ;Get the current color table
-    tvlct, r, g, b, /GET
 
-    ;Overplot?
+    ;Draw the plot
     if self.overplot then begin
         ;Restore target's coordinate system. Make sure that the overplot
         ;is positioned correctly.
@@ -225,19 +221,14 @@ NOERASE = noerase
         position = [!x.window[0], !y.window[0], $
                     !x.window[1], !y.window[1]]
         self.layout -> SetProperty, POSITION=position
-    
-    ;Draw axes
+        
+        ;Overplot
+        self -> doOverplot
+        self -> SaveCoords
     endif else begin
-        self -> doAxes, NOERASE=noerase
+        self -> doPlot, NOERASE=noerase
+        self -> SaveCoords
     endelse
-
-    ;Draw the data and save coordinates.
-    self -> doOverplot
-    self -> doErrorBars
-    self -> SaveCoords
-    
-    ;Restore the color table
-    tvlct, r, g, b
 end
 
 
@@ -247,220 +238,113 @@ end
 ;
 ; :Private:
 ;-
-pro MrPlot::doAxes, $
+pro MrPlot::doPlot, $
 NOERASE=noerase
     compile_opt strictarr
-    on_error, 2
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
 
     if n_elements(noerase) eq 0 then noerase = *self.noerase
     self.layout -> GetProperty, CHARSIZE=charsize, POSITION=position
 
-    ;Colors
-    ;    - If we are in indexed color mode and indices are LONGS, they must be fixed.
-    thisState = cgGetColorState()
-    if thisState eq 0 then begin
-        axiscolor  = size(*self.axiscolor, /TNAME)  eq 'LONG' ? fix(*self.axiscolor)  : *self.axiscolor
-        background = size(*self.background, /TNAME) eq 'LONG' ? fix(*self.background) : *self.background
-    endif
-
-    ;Draw the axes.
-    plot, *self.indep, *self.dep, /NODATA, $
-          ;MrLayout Keywords
-          POSITION  =     position, $
-          CHARSIZE  =     charsize, $
-
-          ;Graphics Keywords
-          MAX_VALUE = *self.max_value, $
-          MIN_VALUE = *self.min_value, $
-;          NSUM      =  self.nsum, $
-          POLAR     =  self.polar, $
-          XLOG      =  self.xlog, $
-          YLOG      =  self.ylog, $
-          YNOZERO   =  self.ynozero, $
+    ;Draw the plot.
+    MraPlot, *self.indep, *self.dep, $
+             DIMENSION =  self.dimension, $
+             OUTPUT    =  output, $
+             LABEL     =  self.label, $
             
-          ;MrGraphicsKeywords
-          COLOR         = cgColor(axiscolor), $
-          BACKGROUND    = cgColor(background), $
-          CHARTHICK     = *self.charthick, $
-;         CLIP          = *self.clip, $
-;         COLOR         = *self.color, $
-          DATA          =  self.data, $
-          DEVICE        =  self.device, $
-          NORMAL        =  self.normal, $
-          FONT          = *self.font, $
-;         NOCLIP        = *self.noclip, $
-;         NODATA        = *self.nodata, $
-          NOERASE       =       noerase, $
-;         PSYM          = *self.psym, $
-          SUBTITLE      = *self.subtitle, $
-;         SYMSIZE       = *self.symsize, $
-;         T3D           = *self.t3d, $
-          THICK         = *self.thick, $
-          TICKLEN       = *self.ticklen, $
-          TITLE         = cgCheckForSymbols(*self.title), $
-          XCHARSIZE     = *self.xcharsize, $
-          XGRIDSTYLE    = *self.xgridstyle, $
-          XMINOR        = *self.xminor, $
-          XRANGE        = *self.xrange, $
-          XSTYLE        = *self.xstyle, $
-          XTHICK        = *self.xthick, $
-          XTICK_GET     = *self.xtick_get, $
-          XTICKFORMAT   = *self.xtickformat, $
-          XTICKINTERVAL = *self.xtickinterval, $
-          XTICKLAYOUT   = *self.xticklayout, $
-          XTICKLEN      = *self.xticklen, $
-          XTICKNAME     = *self.xtickname, $
-          XTICKS        = *self.xticks, $
-          XTICKUNITS    = *self.xtickunits, $
-          XTICKV        = *self.xtickv, $
-          XTITLE        = cgCheckForSymbols(*self.xtitle), $
-          YCHARSIZE     = *self.ycharsize, $
-          YGRIDSTYLE    = *self.ygridstyle, $
-          YMINOR        = *self.yminor, $
-          YRANGE        = *self.yrange, $
-          YSTYLE        = *self.ystyle, $
-          YTHICK        = *self.ythick, $
-          YTICK_GET     = *self.ytick_get, $
-          YTICKFORMAT   = *self.ytickformat, $
-          YTICKINTERVAL = *self.ytickinterval, $
-          YTICKLAYOUT   = *self.yticklayout, $
-          YTICKLEN      = *self.yticklen, $
-          YTICKNAME     = *self.ytickname, $
-          YTICKS        = *self.yticks, $
-          YTICKUNITS    = *self.ytickunits, $
-          YTICKV        = *self.ytickv, $
-          YTITLE        = cgCheckForSymbols(*self.ytitle), $
-          ZCHARSIZE     = *self.zcharsize, $
-          ZGRIDSTYLE    = *self.zgridstyle, $
-          ZMARGIN       = *self.zmargin, $
-          ZMINOR        = *self.zminor, $
-          ZRANGE        = *self.zrange, $
-          ZSTYLE        = *self.zstyle, $
-          ZTHICK        = *self.zthick, $
-          ZTICK_GET     = *self.ztick_get, $
-          ZTICKFORMAT   = *self.ztickformat, $
-          ZTICKINTERVAL = *self.ztickinterval, $
-          ZTICKLAYOUT   = *self.zticklayout, $
-          ZTICKLEN      = *self.zticklen, $
-          ZTICKNAME     = *self.ztickname, $
-          ZTICKS        = *self.zticks, $
-          ZTICKUNITS    = *self.ztickunits, $
-          ZTICKV        = *self.ztickv, $
-          ZTITLE        = cgCheckForSymbols(*self.ztitle), $
-          ZVALUE        = *self.zvalue
-end
+             ;cgPlot Keywords
+             SYMCOLOR  = *self.symcolor, $
+                   
+             ;MrLayout Keywords
+             POSITION  =     position, $
+             CHARSIZE  =     charsize, $
 
-
-;+
-;   The purpose of this method is to do the actual plotting. Basically, having this here
-;   merely to saves space in the Draw method.
-;
-; :Private:
-;-
-pro MrPlot::doErrorBars
-    compile_opt strictarr
-    on_error, 2
-
-    ;Number of elements
-    nXPlus  = n_elements(*self.err_xplus)
-    nXMinus = n_elements(*self.err_xminus)
-    nYPlus  = n_elements(*self.err_yplus)
-    nYMinus = n_elements(*self.err_yminus)
-
-;---------------------------------------------------------------------
-; X Error ////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    if nXPlus gt 0 || nXMinus gt 0 then begin
-        width     = self.err_width / 2 * (!y.window[1] - !y.window[0])
-        err_width = convert_coord([0, 0], [-width, width], /NORMAL, /TO_DATA)
-        err_width = abs(reform(err_width[1,*]))
-        err_width = err_width[1] - err_width[0]
-        err_color = cgColor(*self.err_color)
-        
-    ;---------------------------------------------------------------------
-    ; X-PLUS /////////////////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-        if nXPlus gt 0 then begin
-            for i = 0, nXPlus - 1 do begin
-                x     = (*self.indep)[i]
-                y     = (*self.dep)[i]
-                xplus = x + (*self.err_xplus)[i]
-                
-                ;Draw the plus part
-                plots, [x, xplus, xplus,          xplus], $
-                       [y, y,     y-err_width, y+err_width], $
-                       COLOR  =      err_color, $
-                       NOCLIP = self.err_noclip, $
-                       THICK  = self.err_thick
-            endfor
-        endif
-        
-    ;---------------------------------------------------------------------
-    ; X-MINUS ////////////////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-        if nXMinus gt 0 then begin
-            for i = 0, nXMinus - 1 do begin
-                x      = (*self.indep)[i]
-                y      = (*self.dep)[i]
-                xminus = x - (*self.err_xminus)[i]
-                
-                ;Draw the plus part
-                plots, [x, xminus, xminus,         xminus], $
-                       [y, y,      y-err_width, y+err_width], $
-                       COLOR  =      err_color, $
-                       NOCLIP = self.err_noclip, $
-                       THICK  = self.err_thick
-            endfor
-        endif
-    endif
-    
-;---------------------------------------------------------------------
-; Y Error ////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    if nYPlus gt 0 || nYMinus gt 0 then begin
-        width     = self.err_width / 2 * (!x.window[1] - !x.window[0])
-        err_width = convert_coord([-width, width], [0, 0], /NORMAL, /TO_DATA)
-        err_width = abs(reform(err_width[0,*]))
-        err_width = err_width[1] - err_width[0]
-        err_color = cgColor(*self.err_color)
-        
-    ;---------------------------------------------------------------------
-    ; Y-PLUS /////////////////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-        if nYPlus gt 0 then begin
-            for i = 0, nYPlus - 1 do begin
-                x     = (*self.indep)[i]
-                y     = (*self.dep)[i]
-                yplus = y + (*self.err_yplus)[i]
-                
-                ;Draw the plus part
-                plots, [x, x,      x-err_width, x+err_width], $
-                       [y, yplus,  yplus,          yplus], $
-                       COLOR  =      err_color, $
-                       NOCLIP = self.err_noclip, $
-                       THICK  = self.err_thick
-            endfor
-        endif
-        
-    ;---------------------------------------------------------------------
-    ; Y-MINUS ////////////////////////////////////////////////////////////
-    ;---------------------------------------------------------------------
-        if nYMinus gt 0 then begin
-            for i = 0, nYMinus - 1 do begin
-                x      = (*self.indep)[i]
-                y      = (*self.dep)[i]
-                yminus = y - (*self.err_yminus)[i]
-                
-                ;Draw the plus part
-                plots, [x, x,      x-err_width, x+err_width], $
-                       [y, yminus, yminus,         yminus], $
-                       COLOR  =      err_color, $
-                       NOCLIP = self.err_noclip, $
-                       THICK  = self.err_thick
-            endfor
-        endif
-    endif
-
+             ;Graphics Keywords
+             MAX_VALUE = *self.max_value, $
+             MIN_VALUE = *self.min_value, $
+             NSUM      =  self.nsum, $
+             POLAR     =  self.polar, $
+             XLOG      =  self.xlog, $
+             YLOG      =  self.ylog, $
+             YNOZERO   =  self.ynozero, $
+               
+             ;MrGraphicsKeywords
+             AXISCOLOR     = *self.axiscolor, $
+             BACKGROUND    = *self.background, $
+             CHARTHICK     = *self.charthick, $
+             CLIP          = *self.clip, $
+             COLOR         = *self.color, $
+             DATA          =  self.data, $
+             DEVICE        =  self.device, $
+             NORMAL        =  self.normal, $
+             FONT          = *self.font, $
+             NOCLIP        = *self.noclip, $
+             NODATA        = *self.nodata, $
+             NOERASE       =       noerase, $
+             PSYM          = *self.psym, $
+             SUBTITLE      = *self.subtitle, $
+             SYMSIZE       = *self.symsize, $
+             T3D           = *self.t3d, $
+             THICK         = *self.thick, $
+             TICKLEN       = *self.ticklen, $
+             TITLE         = *self.title, $
+             XCHARSIZE     = *self.xcharsize, $
+             XGRIDSTYLE    = *self.xgridstyle, $
+             XMINOR        = *self.xminor, $
+             XRANGE        = *self.xrange, $
+             XSTYLE        = *self.xstyle, $
+             XTHICK        = *self.xthick, $
+             XTICK_GET     = *self.xtick_get, $
+             XTICKFORMAT   = *self.xtickformat, $
+             XTICKINTERVAL = *self.xtickinterval, $
+             XTICKLAYOUT   = *self.xticklayout, $
+             XTICKLEN      = *self.xticklen, $
+             XTICKNAME     = *self.xtickname, $
+             XTICKS        = *self.xticks, $
+             XTICKUNITS    = *self.xtickunits, $
+             XTICKV        = *self.xtickv, $
+             XTITLE        = *self.xtitle, $
+             YCHARSIZE     = *self.ycharsize, $
+             YGRIDSTYLE    = *self.ygridstyle, $
+             YMINOR        = *self.yminor, $
+             YRANGE        = *self.yrange, $
+             YSTYLE        = *self.ystyle, $
+             YTHICK        = *self.ythick, $
+             YTICK_GET     = *self.ytick_get, $
+             YTICKFORMAT   = *self.ytickformat, $
+             YTICKINTERVAL = *self.ytickinterval, $
+             YTICKLAYOUT   = *self.yticklayout, $
+             YTICKLEN      = *self.yticklen, $
+             YTICKNAME     = *self.ytickname, $
+             YTICKS        = *self.yticks, $
+             YTICKUNITS    = *self.ytickunits, $
+             YTICKV        = *self.ytickv, $
+             YTITLE        = *self.ytitle, $
+             ZCHARSIZE     = *self.zcharsize, $
+             ZGRIDSTYLE    = *self.zgridstyle, $
+             ZMARGIN       = *self.zmargin, $
+             ZMINOR        = *self.zminor, $
+             ZRANGE        = *self.zrange, $
+             ZSTYLE        = *self.zstyle, $
+             ZTHICK        = *self.zthick, $
+             ZTICK_GET     = *self.ztick_get, $
+             ZTICKFORMAT   = *self.ztickformat, $
+             ZTICKINTERVAL = *self.ztickinterval, $
+             ZTICKLAYOUT   = *self.zticklayout, $
+             ZTICKLEN      = *self.zticklen, $
+             ZTICKNAME     = *self.ztickname, $
+             ZTICKS        = *self.zticks, $
+             ZTICKUNITS    = *self.ztickunits, $
+             ZTICKV        = *self.ztickv, $
+             ZTITLE        = *self.ztitle, $
+             ZVALUE        = *self.zvalue
 end
 
 
@@ -479,211 +363,31 @@ pro MrPlot::doOverplot
         return
     endif
     
-    ;Linestyle for plotting
-    linestyle = MrLineStyle(*self.linestyle)
-    if linestyle eq 6 then return
-    
-;---------------------------------------------------------------------
-; Single Overplot ////////////////////////////////////////////////////
-;---------------------------------------------------------------------
+    ;Get the character size
+    self.layout -> GetProperty, CHARSIZE=charsize
     
     ;Get the dimensions of the independent variable.
-    if self.dimension eq 0 then begin
-        ;Check the symbol to be used
-        ;   - If linestyle = 6 (None), then return
-        linestyle = MrLineStyle(*self.linestyle)
-        if linestyle eq 6 then return
+    MraOPlot, *self.indep, *self.dep, $
 
-        ;Overplot the data
-        oplot, *self.indep, *self.dep, $
-               CLIP          = *self.clip, $
-               COLOR         = cgColor(*self.color), $
-               LINESTYLE     =       linestyle, $
-               NOCLIP        = *self.noclip, $
-               MAX_VALUE     = *self.max_value, $
-               MIN_VALUE     = *self.min_value, $
-               NSUM          =  self.nsum, $
-               POLAR         =  self.polar, $
-               T3D           = *self.t3d, $
-               THICK         = *self.thick, $
-               ZVALUE        = *self.zvalue
-        RETURN
-    endif
+              ;weOPlot Keywords
+              CHARSIZE  =       charsize, $
+              COLOR     = *self.color, $
+              DIMENSION =  self.dimension, $
+              LINESTYLE = *self.linestyle, $
+              PSYM      = *self.psym, $
+              SYMCOLOR  = *self.symcolor, $
+              SYMSIZE   = *self.symsize, $
+              THICK     = *self.thick, $
 
-;---------------------------------------------------------------------
-; Multiple Overplots /////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Get number of elements to make cyclic
-    nColor     = n_elements(*self.color)
-    nLineStyle = n_elements(*self.linestyle)
-    nPSym      = n_elements(*self.psym)
-    nSymColor  = n_elements(*self.symcolor)
-    nSymSize   = n_elements(*self.symsize)
-    nThick     = n_elements(*self.thick)
-
-    ;Plot each vector of data.
-    dims = size(*self.dep, /DIMENSIONS)
-    iDim = self.dimension eq 1 ? 1 : 0
-    for j = 0, dims[iDim]-1 do begin
-        ;Get the symbol and linestyle
-        color     = cgColor((*self.color)[j mod nColor])
-        linestyle = MrLineStyle((*self.linestyle)[j mod nLineStyle])
-        if linestyle eq 6 then continue
-
-        case self.dimension of
-            1: oplot, *self.indep, (*self.dep)[*,j], $
-                      CLIP          =  *self.clip, $
-                      COLOR         =        color, $
-                      LINESTYLE     =        linestyle, $
-                      MAX_VALUE     =  *self.max_value, $
-                      MIN_VALUE     =  *self.min_value, $
-                      NOCLIP        =  *self.noclip, $
-                      NSUM          =   self.nsum, $
-                      POLAR         =   self.polar, $
-                      T3D           =  *self.t3d, $
-                      THICK         = (*self.thick)[j     mod nThick], $
-                      ZVALUE        =  *self.zvalue
-                        
-            2: oplot, *self.indep, (*self.dep)[j,*], $
-                      CLIP          =  *self.clip, $
-                      COLOR         =        color, $
-                      LINESTYLE     =        linestyle, $
-                      MAX_VALUE     =  *self.max_value, $
-                      MIN_VALUE     =  *self.min_value, $
-                      NOCLIP        =  *self.noclip, $
-                      NSUM          =   self.nsum, $
-                      POLAR         =   self.polar, $
-                      PSYM          =        psym, $
-                      SYMSIZE       = (*self.symsize)[j   mod nSymSize], $
-                      T3D           =  *self.t3d, $
-                      THICK         = (*self.thick)[j     mod nThick], $
-                      ZVALUE        =  *self.zvalue
-        endcase
-    endfor
+              ;OPlot Keywords
+              NSUM      =  self. nsum, $
+              POLAR     =  self. polar, $
+              CLIP      = *self. clip, $
+              NOCLIP    = *self. noclip, $
+              T3D       = *self. t3d, $
+              ZVALUE    = *self. zvalue
 END
-
-
-;+
-;   For lines and symbols to have different colors, they must be plotted separately.
-;   This method draws the symbols.
-;
-; :Private:
-;-
-pro MrPlot::doSymbols
-
-    catch, theerror
-    if theerror ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-;---------------------------------------------------------------------
-; Single Dimension ///////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    
-    ;Get the dimensions of the independent variable.
-    if self.dimension eq 0 then begin
-        ;Check the symbol to be used
-        ;   - If PSym = 0 (None) then return
-        psym = cgSymCat(*self.psym)
-        if psym eq 0 $
-            then return $
-            else psym = abs(psym)
-
-        ;Uniform symbols
-        if n_elements(*self.symcolor) le 1 then begin
-            ;Plot all symbols.
-            oplot, *self.indep, *self.dep, $
-                      CLIP          = *self.clip, $
-                      COLOR         =  cgColor(symcolor), $
-                      MAX_VALUE     = *self.max_value, $
-                      MIN_VALUE     = *self.min_value, $
-                      NOCLIP        = *self.noclip, $
-                      NSUM          =  self.nsum, $
-                      POLAR         =  self.polar, $
-                      PSYM          =       psym, $
-                      SYMSIZE       = *self.symsize, $
-                      T3D           = *self.t3d, $
-                      THICK         = *self.symthick, $
-                      ZVALUE        = *self.zvalue
-        
-        ;Unique symbols
-        endif else begin
-            nColors = n_elements(*self.symcolor)
-        
-            ;Step through each point
-            for i = 0, n_elements(*self.dep) do begin
-                symcolor = cgColor((*self.symcolor)[i mod nColors])
-                
-                ;Draw the point.
-                plots, (*self.indep), (*self.dep), $
-                       COLOR =       symcolor, $
-                       CLIP  = *self.clip, $
-                       THICK =  self.symthick
-            endfor
-        endelse
-        
-        return
-    endif
-
-;---------------------------------------------------------------------
-; Multiple Dimensions ////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    ;Get number of elements to make cyclic
-    nColor     = n_elements(*self.color)
-    nLineStyle = n_elements(*self.linestyle)
-    nPSym      = n_elements(*self.psym)
-    nSymColor  = n_elements(*self.symcolor)
-    nSymSize   = n_elements(*self.symsize)
-    nThick     = n_elements(*self.thick)
-
-    ;Plot each vector of data.
-    dims = size(*self.dep, /DIMENSIONS)
-    iDim = self.dimension eq 1 ? 1 : 0
-    for j = 0, dims[iDim]-1 do begin
-        ;Get the symbol and its color
-        color     = cgColor((*self.symcolor)[j mod nColor])
-        psym      = cgSymCat((*self.psym)[j mod nPSym])
-
-        ;Skip if PSYM = 0 (None)
-        if psym eq 0 then continue
-        psym = abs(psym)
-
-        ;Draw the symbols.
-        case self.dimension of
-            1: oplot, *self.indep, (*self.dep)[*,j], $
-                      CLIP          =  *self.clip, $
-                      COLOR         =        symcolor, $
-                      MAX_VALUE     =  *self.max_value, $
-                      MIN_VALUE     =  *self.min_value, $
-                      NOCLIP        =  *self.noclip, $
-                      NSUM          =   self.nsum, $
-                      POLAR         =   self.polar, $
-                      PSYM          =        psym, $
-                      SYMSIZE       = (*self.symsize)[j  mod nSymSize], $
-                      T3D           =  *self.t3d, $
-                      THICK         = (*self.symthick)[j mod nThick], $
-                      ZVALUE        =  *self.zvalue
-                        
-            2: oplot, *self.indep, (*self.dep)[j,*], $
-                      CLIP          =  *self.clip, $
-                      COLOR         =        color, $
-                      LINESTYLE     =        linestyle, $
-                      MAX_VALUE     =  *self.max_value, $
-                      MIN_VALUE     =  *self.min_value, $
-                      NOCLIP        =  *self.noclip, $
-                      NSUM          =   self.nsum, $
-                      POLAR         =   self.polar, $
-                      PSYM          =        psym, $
-                      SYMSIZE       = (*self.symsize)[j   mod nSymSize], $
-                      T3D           =  *self.t3d, $
-                      THICK         = (*self.thick)[j     mod nThick], $
-                      ZVALUE        =  *self.zvalue
-        endcase
-    endfor
-END
- 
+  
 
 ;+
 ;   The purpose of this method is to retrieve data
@@ -700,11 +404,7 @@ END
 ;       Y:              out, optional, type=numeric array
 ;                       If present, the dependent variable's data will be returned
 ;-
-pro MrPlot::GetData, x, y, $
-ERR_XMINUS = err_xminus, $
-ERR_XPLUS = err_xplus, $
-ERR_YMINUS = err_yminus, $
-ERR_YPLUS = err_yplus
+pro MrPlot::GetData, x, y
     compile_opt strictarr
     
     ;Error handling
@@ -724,12 +424,6 @@ ERR_YPLUS = err_yplus
         endcase
         else: message, 'Incorrect number of parameters.'
     endcase
-    
-    ;Error bars
-    if arg_present(err_xminus) then err_xminus = *self.err_xminus
-    if arg_present(err_xplus)  then err_xplus  = *self.err_xplus
-    if arg_present(err_yminus) then err_yminus = *self.err_yminus
-    if arg_present(err_yplus)  then err_yplus  = *self.err_yplus
 end
 
 
@@ -763,17 +457,18 @@ end
 ;                               keyword inheritance.
 ;-
 pro MrPlot::GetProperty, $
+;MrPlot Properties
 DIMENSION = dimension, $
-ERR_NOCLIP = err_noclip, $
-ERR_COLOR = err_color, $
-ERR_THICK = err_thick, $
-ERR_WIDTH = err_width, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
+LABEL = label, $
+;cgPlot Properties
+SYMCOLOR = symcolor, $
+;Graphics Properties
 NSUM = nsum, $
 POLAR = polar, $
-SYMCOLOR = symcolor, $
 YNOZERO = ynozero, $
+;MrGraphicsKeywords Properties
 _REF_EXTRA = extra
     compile_opt strictarr
     
@@ -785,19 +480,19 @@ _REF_EXTRA = extra
         return
     endif
     
-    ;Get Properties
+    ;MrPlot Properties
     if arg_present(dimension)   then dimension   =  self.dimension
     if arg_present(init_xrange) then init_xrange =  self.init_xrange
     if arg_present(init_yrange) then init_yrange =  self.init_yrange
     if arg_present(label)       then label       =  self.label
-    if arg_present(err_color)   then err_color   = *self.err_color
-    if arg_present(err_noclip)  then err_noclip  =  self.err_noclip
-    if arg_present(err_thick)   then err_thick   =  self.err_thick
-    if arg_present(err_width)   then err_width   =  self.err_width
-    if arg_present(symcolor)  and n_elements(*self.symcolor)  ne 0 then symcolor = *self.symcolor
+    
+    ;cgPlot Properties
+    if arg_present(symcolor) and n_elements(*self.symcolor)  ne 0 then symcolor = *self.symcolor
+    
+    ;Graphics Properties
     if arg_present(nsum)      and n_elements( self.nsum)      ne 0 then nsum      =  self.nsum
-    if arg_present(polar)     and n_elements( self.polar)     ne 0 then polar     =  self.polar
-    if arg_present(ynozero)   and n_elements( self.ynozero)   ne 0 then ynozero   = *self.ynozero
+    if arg_present(POLAR)     and n_elements( self.POLAR)     ne 0 then polar     =  self.polar
+    if arg_present(YNOZERO)   and n_elements( self.YNOZERO)   ne 0 then ynozero   = *self.ynozero
 
     ;Get all of the remaining keywords from MrGrDataAtom
     if n_elements(extra) gt 0 then self -> MrGrDataAtom::GetProperty, _EXTRA=extra
@@ -819,11 +514,7 @@ end
 ;       Y:              in, optional, type=numeric array
 ;                       The dependent variable data.
 ;-
-pro MrPlot::SetData, x, y, $
-ERR_XMINUS = err_xminus, $
-ERR_XPLUS = err_xplus, $
-ERR_YMINUS = err_yminus, $
-ERR_YPLUS = err_yplus
+pro MrPlot::SetData, x, y
     compile_opt strictarr
     
     ;Error handling
@@ -841,8 +532,8 @@ ERR_YPLUS = err_yplus
         
             ;Was a dimension given?
             if self.dimension ne 0 then begin
-                dims = size(x, /DIMENSIONS)
-                nPts = dims[self.dimension-1]
+                sDep = size(x, /DIMENSIONS)
+                nPts = sDep[self.dimension-1]
             endif else begin
                 nPts = n_elements(x)
             endelse
@@ -856,8 +547,8 @@ ERR_YPLUS = err_yplus
         2: begin
             ;Dimension given?
             if self.dimension ne 0 then begin
-                dims = size(y, /DIMENSIONS)
-                nPts = dims[self.dimension-1]
+                sDep = size(y, /DIMENSIONS)
+                nPts = sDep[self.dimension-1]
             endif else begin
                 nPts = n_elements(y)
             endelse
@@ -871,12 +562,8 @@ ERR_YPLUS = err_yplus
     endcase
 
     ;Set Data
-    *self.dep = temporary(dep)
-    if n_elements(indep)      gt 0 then *self.indep      = temporary(indep)
-    if n_elements(err_xplus)  gt 0 then *self.err_xplus  = err_xplus
-    if n_elements(err_xminus) gt 0 then *self.err_xminus = err_xminus
-    if n_elements(err_yplus)  gt 0 then *self.err_yplus  = err_yplus
-    if n_elements(err_yminus) gt 0 then *self.err_yminus = err_yminus
+    if n_elements(indep) gt 0 then *self.indep = temporary(indep)
+    *self.dep   = temporary(dep)
 
     ;Refresh the graphics window
     self.window -> Draw
@@ -921,23 +608,26 @@ end
 ;                               also accepted for keyword inheritance.
 ;-
 pro MrPlot::SetProperty, $
+;MrPlot Properties
 CHARSIZE = charsize, $
 DIMENSION = dimension, $
-ERR_NOCLIP = err_noclip, $
-ERR_COLOR = err_color, $
-ERR_THICK = err_thick, $
-ERR_WIDTH = err_width, $
+LABEL = label, $
+
+;cgPlot Properties
+SYMCOLOR = symcolor, $
+
+;Graphics Properties
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
 NSUM = nsum, $
 POLAR = polar, $
-POSITION = position, $
-PSYM = psym, $
-SYMCOLOR = symcolor, $
 XLOG = xlog, $
 YLOG = ylog, $
-XSTYLE = xstyle, $          ;Check explicitly so that the 2^0 bit is always set
 YNOZERO = ynozero, $
+
+;weGraphics Properties
+POSITION = position, $
+XSTYLE = xstyle, $          ;Check explicitly so that the 2^0 bit is always set
 YSTYLE = ystyle, $          ;Check explicitly so that the 2^0 bit is always set
 _REF_EXTRA = extra
     compile_opt strictarr
@@ -950,36 +640,26 @@ _REF_EXTRA = extra
         return
     endif
     
-    ;Graphics Properties
-    if n_elements(dimension)  ne 0 then  self.dimension  = dimension
-    if n_elements(err_color)  ne 0 then *self.err_color  = err_color
-    if n_elements(err_noclip) ne 0 then  self.err_noclip = err_noclip
-    if n_elements(err_thick)  ne 0 then  self.err_thick  = err_thick
-    if n_elements(err_width)  ne 0 then  self.err_width  = err_width
-    if n_elements(max_value)  ne 0 then *self.max_value  = max_value
-    if n_elements(min_value)  ne 0 then *self.min_value  = min_value
-    if n_elements(nsum)       ne 0 then  self.nsum       = nsum
-    if n_elements(polar)      ne 0 then  self.polar      = keyword_set(polar)
-    if n_elements(symcolor)   ne 0 then *self.symcolor   = symcolor
-    if n_elements(xlog)       ne 0 then  self.xlog       = keyword_set(xlog)
-    if n_elements(ylog)       ne 0 then  self.ylog       = keyword_set(ylog)
-    if n_elements(ynozero)    ne 0 then  self.ynozero    = keyword_set(ynozero)
-    if n_elements(xstyle)     ne 0 then *self.xstyle     = ~(xstyle and 1) + xstyle
-    if n_elements(ystyle)     ne 0 then *self.ystyle     = ~(ystyle and 1) + ystyle
-    if n_elements(position)   gt 0 then  self -> SetLayout, POSITION=position
-    if n_elements(charsize)   gt 0 then  self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
+    ;MrPlot Properties
+    if n_elements(DIMENSION)   ne 0 then  self.dimension = dimension
+    if n_elements(LABEL)       ne 0 then  self.label     = label
     
-    ;Symbol
-    if n_elements(psym) gt 0 then begin
-        if size(psym, /TNAME) eq 'STRING' then begin
-            names = cgSymCat(/NAMES)
-            void  = isMember(names, psym, /FOLD_CASE, /REMOVE_SPACE, N_NONMEMBERS=nFail, NONMEMBER_INDS=iFail)
-            if nFail gt 0 then $
-                message, 'PSYM not a valid symbol name: "' + strjoin(names[iFail], '", "') + '".'
-        endif
-        
-        *self.psym = psym
-    endif
+    ;cgPlot Properties
+    if n_elements(SYMCOLOR) ne 0 then *self.symcolor = symcolor
+    
+    ;Graphics Properties
+    if n_elements(MAX_VALUE) ne 0 then *self.max_value = max_value
+    if n_elements(MIN_VALUE) ne 0 then *self.min_value = min_value
+    if n_elements(NSUM)      ne 0 then  self.nsum      = nsum
+    if n_elements(POLAR)     ne 0 then  self.polar     = keyword_set(polar)
+    if n_elements(XLOG)      ne 0 then  self.xlog      = keyword_set(xlog)
+    if n_elements(YLOG)      ne 0 then  self.ylog      = keyword_set(ylog)
+    if n_elements(YNOZERO)   ne 0 then  self.ynozero   = keyword_set(ynozero)
+    if n_elements(xstyle)    ne 0 then *self.xstyle    = ~(xstyle and 1) + xstyle
+    if n_elements(ystyle)    ne 0 then *self.ystyle    = ~(ystyle and 1) + ystyle
+    
+    if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
+    if n_elements(charsize) gt 0 then self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
 
 ;---------------------------------------------------------------------
 ;Superclass Properties ///////////////////////////////////////////////
@@ -1073,43 +753,40 @@ end
 ;       _REF_EXTRA:         in, optional, type=any
 ;                           Keywords accepted by the any of the superclasses are also
 ;                               accepted for keyword inheritcance.
+;
+; :Uses:
+;   Uses the following external programs::
+;       binary.pro (Coyote Graphics)
+;       MrGraphicsKeywords__define.pro (Coyote Graphics)
+;       error_message.pro (Coyote Graphics)
+;       MrDrawWindow__define.pro
+;       MrPlotLayout.pro
+;       MrGetWindow.pro
 ;-
 function MrPlot::init, x, y, $
 ;MrPlot Keywords
-AXISCOLOR = axiscolor, $
-BACKGROUND = background, $
-COLOR = color, $
 CURRENT = current, $
 DIMENSION = dimension, $
-ERR_COLOR = err_color, $
-ERR_NOCLIP = err_noclip, $
-ERR_THICK = err_thick, $
-ERR_WIDTH = err_width, $
-ERR_XMINUS = err_xminus, $
-ERR_XPLUS = err_xplus, $
-ERR_YMINUS = err_yminus, $
-ERR_YPLUS = err_yplus, $
 HIDE = hide, $
 LAYOUT = layout, $
-LINESTYLE = linestyle, $
+NAME = name, $
+OVERPLOT = overplot, $
+POSITION = position, $
+
+;cgPlot Keywords
+SYMCOLOR = symcolor, $
+
+;Graphics Keywords
+COLOR = color, $
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
-NAME = name, $
 NSUM = nsum, $
-OVERPLOT = overplot, $
 POLAR = polar, $
-POSITION = position, $
-SYMCOLOR = symcolor, $
-SYMSIZE = symsize, $
-THICK = thick, $
-TITLE = title, $
-XLOG = xlog, $
 XRANGE = xrange, $
-XTITLE = xtitle, $
+XLOG = xlog, $
 YLOG = ylog, $
 YNOZERO = ynozero, $
 YRANGE = yrange, $
-YTITLE = ytitle, $
 _REF_EXTRA = extra
     compile_opt strictarr
 
@@ -1136,31 +813,15 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ; Defaults and Heap //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    polar      = keyword_set(polar)
-    ynozero    = keyword_set(ynozero)
-    err_noclip = n_elements(err_noclip) eq 0 ? 1 : keyword_set(err_noclip)
+    self.polar   = keyword_set(polar)
+    self.ynozero = keyword_set(ynozero)
     if n_elements(dimension) eq 0 then dimension = 0
-    if n_elements(err_thick) eq 0 then err_thick = 1.0
-    if n_elements(err_width) eq 0 then err_width = 0.01
     if n_elements(nSum)      eq 0 then nSum      = 0
-    if n_elements(psym)      eq 0 then psym      = 'None'
-    if n_elements(linestyle) eq 0 then linestyle = '-'
-    if n_elements(symsize)   eq 0 then symsize   = 1.0
-    if n_elements(thick)     eq 0 then thick     = 1.0
-    if n_elements(title)     eq 0 then title     = ''
-    if n_elements(xtitle)    eq 0 then xtitle    = ''
-    if n_elements(ytitle)    eq 0 then ytitle    = ''
-    if n_elements(ztitle)    eq 0 then ztitle    = ''
 
     ;Allocate Heap
-    self.indep      = ptr_new(/ALLOCATE_HEAP)
-    self.dep        = ptr_new(/ALLOCATE_HEAP)
-    self.symcolor   = ptr_new(/ALLOCATE_HEAP)
-    self.err_color  = ptr_new(/ALLOCATE_HEAP)
-    self.err_xminus = ptr_new(/ALLOCATE_HEAP)
-    self.err_xplus  = ptr_new(/ALLOCATE_HEAP)
-    self.err_yminus = ptr_new(/ALLOCATE_HEAP)
-    self.err_yplus  = ptr_new(/ALLOCATE_HEAP)
+    self.indep     = ptr_new(/ALLOCATE_HEAP)
+    self.dep       = ptr_new(/ALLOCATE_HEAP)
+    self.symcolor  = ptr_new(/ALLOCATE_HEAP)
     
 ;---------------------------------------------------------------------
 ;Dependent and Independent Variables /////////////////////////////////
@@ -1168,60 +829,44 @@ _REF_EXTRA = extra
     ;Set the data    
     self.dimension = dimension
     case n_params() of
-        1: self -> SetData, x,    ERR_XMINUS=err_xminus, ERR_XPLUS=err_xplus, $
-                                  ERR_YMINUS=err_yminus, ERR_YPLUS=err_yplus
-        2: self -> SetData, x, y, ERR_XMINUS=err_xminus, ERR_XPLUS=err_xplus, $
-                                  ERR_YMINUS=err_yminus, ERR_YPLUS=err_yplus
+        1: self -> SetData, x
+        2: self -> SetData, x, y
         else: message, 'Incorrect number of parameters.'
     endcase
-    
-;---------------------------------------------------------------------
-; Colors /////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
         
     ;Number of defaults to use.
     ;   - There are at most two dimensions.
     ;   -   dimension=2
+    
     depDims = size(*self.dep, /DIMENSIONS)
     if self.dimension eq 0 $
         then nDefaults = 1 $
         else nDefaults = depDims[2-self.dimension]
     
-    ;Colors
-    axiscolor  = MrDefaultColor(axiscolor,  TRADITIONAL=traditional)
-    background = MrDefaultColor(background, TRADITIONAL=traditional, /BACKGROUND)
-    colors     = MrDefaultColor(color,      NCOLORS=nDefaults)
-    err_color  = MrDefaultColor(err_color,  TRADITIONAL=traditional)
-    symcolor   = MrDefaultColor(symcolor,   NCOLORS=nDefaults)
-    
 ;---------------------------------------------------------------------
-; SetProperties //////////////////////////////////////////////////////
+;Normal Plot? ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    self -> SetProperty, AXISCOLOR = axiscolor, $
-                         BACKGROUND = background, $
-                         COLOR = colors, $
+
+    ;Pick a set of default colors so not everything is the same color.
+    default_colors = ['opposite', 'Blue', 'Forest_Green', 'Red', 'Magenta', 'Orange']
+    if nDefaults gt 5 then default_colors = [default_colors, replicate('opposite', nDefaults-5)]
+    if nDefaults eq 1 then d_color = default_colors[0] else d_color = default_colors[1:nDefaults]
+    SetDefaultValue, color, d_color
+
+    ;Set the object properties
+    self -> SetProperty, COLOR = color, $
                          DIMENSION = dimension, $
-                         ERR_NOCLIP = err_noclip, $
-                         ERR_THICK = err_thick, $
-                         ERR_WIDTH = err_width, $
-                         LINESTYLE = linestyle, $
+                         LABEL = label, $
                          MAX_VALUE = max_value, $
                          MIN_VALUE = min_value, $
                          NSUM = nsum, $
-                         PSYM = psym, $
                          POLAR = polar, $
                          SYMCOLOR = symcolor, $
-                         SYMSIZE = symsize, $
-                         THICK = thick, $
-                         TITLE = title, $
                          XLOG = xlog, $
                          XRANGE = xrange, $
-                         XTITLE = xtitle, $
                          YLOG = ylog, $
                          YNOZERO = ynozero, $
-                         YRANGE = yrange, $
-                         YTITLE = ytitle, $
-                         ZTITLE = ztitle
+                         YRANGE = yrange
 
     ;Make sure the x- and y-style keywords have the 2^0 bit set to force
     ;exact axis ranges.    
@@ -1254,26 +899,21 @@ pro MrPlot__define, class
               inherits MrGrDataAtom, $
              
               ;Data Properties
-              indep:      ptr_new(), $          ;independent variable
-              dep:        ptr_new(), $          ;dependent variable
-              err_xminus: ptr_new(), $
-              err_xplus:  ptr_new(), $
-              err_yminus: ptr_new(), $
-              err_yplus:  ptr_new(), $
+              indep:     ptr_new(), $        ;independent variable
+              dep:       ptr_new(), $        ;dependent variable
              
               ;Graphics Properties
-              dimension:  0, $                   ;The over which plots will be made
-              err_noclip: 0B, $
-              err_color:  ptr_new(), $
-              err_thick:  0.0, $
-              err_width:  0.0, $
-              polar:      0B, $                  ;create a polar plot?
-              nsum:       0L, $                  ;number of points to average when plotting
-              symcolor:   ptr_new(), $           ;color of each symbol
-              ynozero:    0B, $                  ;do not make ymin=0
+              polar:     0B, $               ;create a polar plot?
+              ynozero:   0B, $               ;do not make ymin=0
+              nsum:      0L, $               ;*number of points to average when plotting
              
-              ;Initial Properties
-              init_xrange: dblarr(2), $         ;Initial y-range
-              init_yrange: dblarr(2) $          ;Initial x-range
+              ;cgPlot Properties
+              symcolor:  ptr_new(), $        ;color of each symbol
+              label:     '', $               ;*
+             
+              ;MrPlot Properties
+              dimension:   0, $              ;The over which plots will be made
+              init_xrange: dblarr(2), $      ;Initial y-range
+              init_yrange: dblarr(2) $       ;Initial x-range
             }
 end
