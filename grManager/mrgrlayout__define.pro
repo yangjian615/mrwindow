@@ -480,6 +480,7 @@ TO_COLROW=to_colrow
     ;How many locations were given?
     nLocations = n_elements(location)
     if colrow then nLocations = nLocations / 2
+
 ;---------------------------------------------------------------------
 ;Convert Fixed Location //////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1526,7 +1527,6 @@ _REF_EXTRA = extra
             if nTaken gt 0 then begin
                 colrow = self -> ConvertLocation(pTaken, /PINDEX, /TO_COLROW)
                 colrow = [max(colrow[0,*]), max(colrow[1,*])]
-                
                 if (layout[0] lt colrow[0]) || (layout[1] lt colrow[1]) then $
                     message, 'LAYOUT is not big enough to contain the current set of plots. ' + $
                              'Try theObj -> FillHoles, /TRIMLAYOUT to.'
@@ -1540,7 +1540,7 @@ _REF_EXTRA = extra
             self.GrLayout = layout
         endelse
     endif
-    
+
     ;Calculate the positions of the plots within the new layout
     if update_layout then self -> CalcPositions
 end

@@ -140,6 +140,7 @@
 ;       2014/06/09  -   Removing graphics at fixed locations was not updating plot
 ;                           indices of other graphics. Fixed. - MRA
 ;       2014/10/04  -   Fixed typo when filling holes with fixed graphics present. - MRA
+;       2014/11/07  -   Properly re-order fixed locations when filling holes. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -495,7 +496,10 @@ pro MrPlotManager::ApplyPositions
     
         ;Check to see that it has a LAYOUT specified
         dataObjs[i] -> GetLayout, LAYOUT=layout
-        if layout[2] le 0 then continue
+        if layout[2] le 0 then begin
+            dataObjs[i] -> SetLayout, LAYOUT=[self.GrLayout, layout[2]], UPDATE_LAYOUT=0
+            continue
+        endif
         
         ;If GrLayout[0:1] does not match LAYOUT[0:1], then LAYOUT[2] might not be in
         ;the same location when placed in GRLAYOUT. To fix this, first, convert to a
@@ -559,11 +563,15 @@ DRAW=draw
         ;Find the fixed locations
         iFixed = where(pIndex lt 0, nFixed)
         if nFixed eq 0 then return
+
+        ;Take only fixed objects
+        pIndex      = pIndex[iFixed]
+        allDataObjs = allDataObjs[iFixed]
         
-        ;Sort the plot indices from least to most negative
-        iSort = sort(pIndex)
-        pIndex = reverse(pIndex[iSort])
-        iFixed = reverse(iFixed[iSort])
+        ;Sort by pIndex, from high to low
+        iSort       = reverse(sort(pIndex))
+        pIndex      = pIndex[iSort]
+        allDataObjs = allDataObjs[iSort]
 
         ;Number them from -1 to -nFixed
         ;   - Do not update the layout, thereby recalculating all positions. We just
@@ -571,7 +579,7 @@ DRAW=draw
         new_pIndex = -(indgen(nFixed)+1)
         for i = 0, nFixed - 1 do begin
             if new_pIndex[i] ne pIndex[i] $
-                then allDataObjs[iFixed[i]] -> SetLayout, [self.GrLayout, new_pIndex[i]], UPDATE_LAYOUT=0
+                then allDataObjs[i] -> SetLayout, [self.GrLayout, new_pIndex[i]], UPDATE_LAYOUT=0
         endfor
         
         return
@@ -960,13 +968,14 @@ TOFIXED = toFixed
                                      OUTPOSITION = outPosition, $
                                      OUTLOCATION = outLocation, $
                                      TOFIXED = toFixed
-    
+
     ;If there was an error, the outputs will not be defined.
     if n_elements(outPosition) eq 0 then return
         
 ;---------------------------------------------------------------------
 ;Set the Position ////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+
     ;Update the position and layout    
     theObj -> SetLayout, LAYOUT=outLocation, POSITION=outPosition, UPDATE_LAYOUT=0
         
