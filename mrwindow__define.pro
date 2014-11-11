@@ -161,7 +161,7 @@
 ;       06/16/2013  -   Can now get and set properties for objects contained within the
 ;                           MrWindow window via the GetProperty and SetProperty
 ;                           methods. Added the whichObjects method. - MRA
-;       06/19/2013  -   Value_Locate was used to search for object matches via isMember,
+;       06/19/2013  -   Value_Locate was used to search for object matches via MrIsMember,
 ;                           which was throwing errors. When setting properties of the plot
 ;                           layout, SetProperty now calls the SetPositions method instead
 ;                           of MrPlotLayout::SetProperty. This is so that the plot
@@ -954,9 +954,9 @@ _REF_EXTRA = extra
 ;CURSOR PROPERTIES ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
-        void = isMember(['CMODE'], extra, $
-                        iCursor, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
-                        N_NONMEMBERS=nExtra, /FOLD_CASE)
+        void = MrIsMember(['CMODE'], extra, $
+                        iCursor, COUNT=nMatches, COMPLEMENT=iExtra, $
+                        NCOMPLEMENT=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrCursor::GetProperty, _STRICT_EXTRA=extra[iCursor]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
@@ -966,9 +966,9 @@ _REF_EXTRA = extra
 ;ZOOM PROPERTIES /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
-        void = isMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
-                        iZoom, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
-                        N_NONMEMBERS=nExtra, /FOLD_CASE)
+        void = MrIsMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
+                        iZoom, COUNT=nMatches, COMPLEMENT=iExtra, $
+                        NCOMPLEMENT=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrZoom::GetProperty, _STRICT_EXTRA=extra[iZoom]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
@@ -1091,7 +1091,7 @@ function MrWindow::IsZoomable
     if count ne 1 then return, 0
     
     oType = typename(oGraphic)
-    tf_zoomable = IsMember([(*self.gTypes).data, (*self.gTypes).colorbar], oType)
+    tf_zoomable = MrIsMember([(*self.gTypes).data, (*self.gTypes).colorbar], oType)
 
     return, tf_zoomable
 end
@@ -1702,9 +1702,9 @@ _REF_EXTRA = extra
 ;CURSOR PROPERTIES ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
-        void = isMember(['CMODE'], extra, $
-                        iCursor, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
-                        N_NONMEMBERS=nExtra, /FOLD_CASE)
+        void = MrIsMember(['CMODE'], extra, $
+                         iCursor, COUNT=nMatches, COMPLEMENT=iExtra, $
+                         NCOMPLEMENT=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrCursor::SetProperty, _STRICT_EXTRA=extra[iCursor]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
@@ -1714,9 +1714,9 @@ _REF_EXTRA = extra
 ;ZOOM PROPERTIES /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
-        void = isMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
-                        iZoom, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
-                        N_NONMEMBERS=nExtra, /FOLD_CASE)
+        void = MrIsMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
+                        iZoom, COUNT=nMatches, COMPLEMENT=iExtra, $
+                        NCOMPLEMENT=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrZoom::SetProperty, _STRICT_EXTRA=extra[iZoom]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)

@@ -383,7 +383,7 @@ QUIET = quiet
     ;---------------------------------------------------------------------
     ;"Annotation" Objects ////////////////////////////////////////////////
     ;---------------------------------------------------------------------
-        isData = isMember((*self.gTypes).ImAData, ImA) 
+        isData = MrIsMember((*self.gTypes).ImAData, ImA) 
         if isData eq 0 then begin
             self -> MrIDL_Container::Add, theObjects[i], POSITION=thisIndex
             continue
@@ -818,7 +818,7 @@ TYPE = type
         ;As such, when they are removed from the container, they also need to be removed
         ;from the layout.
         oTypes = typename(Child_Object)
-        tf_data = IsMember((*self.gTypes).data, oTypes)
+        tf_data = MrIsMember((*self.gTypes).data, oTypes)
         
         ;Step through all of the objects.
         for i = 0, nRemove - 1 do begin
@@ -1071,7 +1071,7 @@ ZTITLE = ztitle
 ;---------------------------------------------------------------------
 ;Data Objects ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-        if IsMember((*self.gTypes).data, oClass) then begin
+        if MrIsMember((*self.gTypes).data, oClass) then begin
             allObjs[i] -> SetProperty, CHARSIZE    = charsize, $
                                        CHARTHICK   = charthick, $
                                        FONT        = font, $
@@ -1219,7 +1219,7 @@ ZTITLE = ztitle
 ;---------------------------------------------------------------------
 ;Other Annotation Objects ////////////////////////////////////////////
 ;---------------------------------------------------------------------
-        endif else if IsMember(['MRTEXT', 'WELEGENDITEM'], oClass) then begin
+        endif else if MrIsMember(['MRTEXT', 'WELEGENDITEM'], oClass) then begin
             allObjs[i] -> SetProperty, CHARSIZE = charsize, $
                                        CHARTHICK = charthick
         endif

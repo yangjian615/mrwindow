@@ -270,7 +270,7 @@ function MrBind::Binding_Exists, name
     ;Does the name exist?
     if nKeys eq 0 $
         then tf_exists = 0 $
-        else tf_exists = isMember(keys, name)
+        else tf_exists = MrIsMember(keys, name)
     
     return, tf_exists
 end
@@ -482,7 +482,7 @@ pro MrBind::UnBind, name, theObjects
     ;Step through each binding set
     for i = 0, nBindings - 1 do begin
         thisBinding = bindingList -> Get_Item(i)
-        void = ismember(theObjects, thisBinding, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
+        void = MrIsMember(theObjects, thisBinding, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
         
         ;If only one object will be left in this set of bindings, remove the entire set.
         ;Otherwise, trim out the unwanted bindings.

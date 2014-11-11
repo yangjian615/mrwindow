@@ -1232,7 +1232,7 @@ FILLHOLES = fillHoles
     if pIndex lt 0 then begin
         aIndexAll = indgen(self.nFixed)
         aIndex = self -> ConvertLocation(pIndex, /PINDEX, /TO_AINDEX)
-        void = isMember(aIndex, aIndexAll, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
+        void = MrIsMember(aIndex, aIndexAll, COMPLEMENT=iKeep, NCOMPLEMENT=nKeep)
 
         if nKeep eq 0 then begin
             self -> ClearLayout, /FIXED
@@ -1257,7 +1257,7 @@ FILLHOLES = fillHoles
         aIndex = self -> ConvertLocation(pIndex, /PINDEX, /TO_AINDEX)
         
         ;Indices being kept will not match any of the AINDEX values.
-        void = isMember(aIndex, aIndexAll, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
+        void = MrIsMember(aIndex, aIndexAll, COMPLEMENT=iKeep, NCOMPLEMENT=nKeep)
     
         ;Remove
         if nKeep eq 0 then begin

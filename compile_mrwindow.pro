@@ -74,9 +74,9 @@
 ;Utilities
 .comp ./utilities/dot_product.pro
 .comp ./utilities/epoch_to_ssm.pro
-.comp ./utilities/getindexrange.pro
+.comp ./utilities/mrindexrange.pro
 .comp ./utilities/getmrwindows.pro
-.comp ./utilities/ismember.pro
+.comp ./utilities/mrismember.pro
 .comp ./utilities/linspace.pro
 .comp ./utilities/moveplot_gui.pro
 .comp ./utilities/mraimage.pro

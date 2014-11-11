@@ -1251,7 +1251,7 @@ ALL=all
     ;Step through each binding set
     for i = 0, nBindings - 1 do begin
         thisBinding = bindingList -> Get_Item(i)
-        void = ismember(theObjects, thisBinding, NONMEMBER_INDS=iKeep, N_NONMEMBERS=nKeep)
+        void = MrIsMember(theObjects, thisBinding, COMPLEMENT=iKeep, NCOMPLEMENT=nKeep)
         
         ;If only one object will be left in this set of bindings, remove the entire set.
         ;Otherwise, trim out the unwanted bindings.

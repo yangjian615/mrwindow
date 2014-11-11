@@ -1048,8 +1048,8 @@ _REF_EXTRA=extra
 
     ;Remove duplicate keywords from the EXTRA array, if they are present
     IF N_Elements(extra) GT 0 THEN BEGIN
-        tf_member = isMember(['FONTTYPE', 'TRUETYPE'], extra, /FOLD_CASE, $
-                             NONMEMBER_INDS=iExtra, N_NONMEMBERS=nExtra)
+        tf_member = MrIsMember(['FONTTYPE', 'TRUETYPE'], extra, /FOLD_CASE, $
+                               COMPLEMENT=iExtra, NCOMPLEMENT=nExtra)
         IF Max(tf_member) GT 0 THEN BEGIN
             message, 'Cannot set FONTTYPE or TRUETYPE keywords. Use PS_FONT and PS_TT_FONT instead.', /INFORMATIONAL
             IF nExtra GT 0 $
