@@ -954,9 +954,9 @@ _REF_EXTRA = extra
 ;CURSOR PROPERTIES ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
-        void = isMember(['CMODE'], extra, $
-                        iCursor, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
-                        N_NONMEMBERS=nExtra, /FOLD_CASE)
+        void = MrIsMember(['CMODE'], extra, $
+                          iCursor, COUNT=nMatches, COMPLEMENT=iExtra, $
+                          NCOMPLEMENT=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrCursor::GetProperty, _STRICT_EXTRA=extra[iCursor]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
@@ -966,9 +966,9 @@ _REF_EXTRA = extra
 ;ZOOM PROPERTIES /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
-        void = isMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
-                        iZoom, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
-                        N_NONMEMBERS=nExtra, /FOLD_CASE)
+        void = MrIsMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
+                        iZoom, COUNT=nMatches, COMPLEMENT=iExtra, $
+                        NCOMPLEMENT=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrZoom::GetProperty, _STRICT_EXTRA=extra[iZoom]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
@@ -1021,8 +1021,12 @@ COUNT=count
         return, obj_new()
     endif
     
+    ;Assume zero counts
+    count = 0
+    
     ;Get all of the objects
     allObjs = self -> Get(/ALL, ISA=isa, COUNT=nObjs)
+    if nObjs eq 0 then return, obj_new()
 
     ;Figure out which ones were it
     hitObjs = objarr(nObjs)
@@ -1091,7 +1095,7 @@ function MrWindow::IsZoomable
     if count ne 1 then return, 0
     
     oType = typename(oGraphic)
-    tf_zoomable = IsMember([(*self.gTypes).data, (*self.gTypes).colorbar], oType)
+    tf_zoomable = MrIsMember([(*self.gTypes).data, (*self.gTypes).colorbar], oType)
 
     return, tf_zoomable
 end
@@ -1702,9 +1706,9 @@ _REF_EXTRA = extra
 ;CURSOR PROPERTIES ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
-        void = isMember(['CMODE'], extra, $
-                        iCursor, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
-                        N_NONMEMBERS=nExtra, /FOLD_CASE)
+        void = MrIsMember(['CMODE'], extra, $
+                          iCursor, COUNT=nMatches, COMPLEMENT=iExtra, $
+                          NCOMPLEMENT=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrCursor::SetProperty, _STRICT_EXTRA=extra[iCursor]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
@@ -1714,9 +1718,9 @@ _REF_EXTRA = extra
 ;ZOOM PROPERTIES /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
-        void = isMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
-                        iZoom, N_MATCHES=nMatches, NONMEMBER_INDS=iExtra, $
-                        N_NONMEMBERS=nExtra, /FOLD_CASE)
+        void = MrIsMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
+                          iZoom, COUNT=nMatches, COMPLEMENT=iExtra, $
+                          NCOMPLEMENT=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrZoom::SetProperty, _STRICT_EXTRA=extra[iZoom]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
