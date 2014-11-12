@@ -310,7 +310,7 @@ DISABLE=disable
 
         ;Ensure we can overplot on top of the target graphic
         oplottable = ['MrPlot', 'MrImage', 'MrImage2', 'MrContour', 'MrVector']
-        if min(IsMember(oplottable, MrObj_Class(target), /FOLD_CASE)) eq 0 || $
+        if min(MrIsMember(oplottable, MrObj_Class(target), /FOLD_CASE)) eq 0 || $
            min(obj_valid(target)) eq 0 $
         then message, 'TARGET must be valid and of class ' + strjoin(oplottable, ' ')
 
