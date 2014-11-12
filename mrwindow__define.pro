@@ -955,8 +955,8 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
         void = MrIsMember(['CMODE'], extra, $
-                        iCursor, COUNT=nMatches, COMPLEMENT=iExtra, $
-                        NCOMPLEMENT=nExtra, /FOLD_CASE)
+                          iCursor, COUNT=nMatches, COMPLEMENT=iExtra, $
+                          NCOMPLEMENT=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrCursor::GetProperty, _STRICT_EXTRA=extra[iCursor]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
@@ -1021,8 +1021,12 @@ COUNT=count
         return, obj_new()
     endif
     
+    ;Assume zero counts
+    count = 0
+    
     ;Get all of the objects
     allObjs = self -> Get(/ALL, ISA=isa, COUNT=nObjs)
+    if nObjs eq 0 then return, obj_new()
 
     ;Figure out which ones were it
     hitObjs = objarr(nObjs)
@@ -1715,8 +1719,8 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
         void = MrIsMember(['RMODE', 'LMODE', 'WMODE', 'ZOOMFACTOR'], extra, $
-                        iZoom, COUNT=nMatches, COMPLEMENT=iExtra, $
-                        NCOMPLEMENT=nExtra, /FOLD_CASE)
+                          iZoom, COUNT=nMatches, COMPLEMENT=iExtra, $
+                          NCOMPLEMENT=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrZoom::SetProperty, _STRICT_EXTRA=extra[iZoom]
         if nExtra gt 0 then extra = extra[iExtra] else void = temporary(extra)
