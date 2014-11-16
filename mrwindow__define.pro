@@ -229,6 +229,8 @@
 ;       2014/05/15  -   Set the grid layout after the window has been created to ensure
 ;                           graphics are positioned properly. - MRA
 ;       2014/05/16  -   The Focus method selects only the fore-most graphics object. - MRA
+;       2014/11/16  -   Added the ShowBuffer method. Incorporate the BUFFER keyword as
+;                           a Z-buffer option with no windows. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -440,6 +442,7 @@ ERASE=erase
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        if n_elements(thisDevice) gt 0 then set_plot, thisDevice
         void = cgErrorMsg()
         return
     endif
@@ -449,16 +452,16 @@ ERASE=erase
     
     ;Realize the widget if need be. This will cause Notify_Realize to call the
     ;Draw method. Thus, after realizing, we can exit.
-    if self.buffer eq 0 and self._realized eq 0 then begin
+    if self.buffer then begin
+        thisDevice = !d.name
+        set_plot, 'Z'
+    endif else if self._realized eq 0 then begin
         self -> Realize
         return
     endif
     
     ;Set the current window to the pixmap window and erase it
-    if (!d.flags and 256) ne 0 then begin
-        wset, self.pixID
-        erase
-    endif
+    if (!d.flags and 256) ne 0 then wset, self.pixID
     
     ;Get all objects
     allObj = self -> Get(/ALL, COUNT=nObj)
@@ -472,14 +475,18 @@ ERASE=erase
         allObj[i] -> Draw, NOERASE=noerase
     endfor
     
-    ;Reset the focus.
-    if self.nplots gt 0 then self -> Focus
-    
-    ;Copy plot from the pixmap
+    ;Windows possible?    
     if (!d.flags and 256) ne 0 then begin
+        ;Reset the focus.
+        if self.nplots gt 0 then self -> Focus
+        
+        ;Copy plot from the pixmap
         wset, self.winID
         device, COPY=[0, 0, self.xsize, self.ysize, 0, 0, self.pixID]
     endif
+    
+    ;Return to the initial device
+    if self.buffer then set_plot, thisDevice
 end
 
 
@@ -1324,13 +1331,14 @@ end
 ;       YSIZE:              in, required, type=long
 ;                           The height of the draw window in pixels
 ;-
-pro MrWindow::ResizeDrawWidget, xsize, ysize
+pro MrWindow::Resize, xsize, ysize
     compile_opt strictarr
     
     ;Error handling
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
+        if n_elements(thisDevice) gt 0 then set_plot, thisDevice
         void = cgErrorMsg()
         return
     endif
@@ -1340,45 +1348,52 @@ pro MrWindow::ResizeDrawWidget, xsize, ysize
     if xsize le 0 or ysize le 0 then message, 'XSIZE and YSIZE must be > 0.'
 
 ;---------------------------------------------------------------------
-;Check Windows ///////////////////////////////////////////////////////
+; Devices With Windows ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
+    if ((!d.flags and 256) eq 0) && ~self.buffer then begin
+        ;Check to see if a window is available to be resized. This may not be true if the
+        ;widget has not been realized yet.
+        drawIsValid = widget_info(self.drawID, /VALID_ID)
+        winIsAvailable = WindowAvailable(self.winID)
     
-    ;Check to see if a window is available to be resized. This may not be true if the
-    ;widget has not been realized yet.
-    drawIsValid = widget_info(self.drawID, /VALID_ID)
-    winIsAvailable = WindowAvailable(self.winID)
-    
-    ;Make sure the widget has been built first
-    if drawIsValid eq 0 && winIsAvailable eq 0 $
-        then message, 'No window exists yet. Cannot resize. (Realize the widget first).'
+        ;Make sure the widget has been built first
+        if drawIsValid eq 0 && winIsAvailable eq 0 $
+            then message, 'No window exists yet. Cannot resize. (Realize the widget first).'
 
-;---------------------------------------------------------------------
-;Pixmap //////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
+        ;Delete the pixmap, then create a new pixmap window at the new size
+        wdelete, self.pixID
+        self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, /PIXMAP)
 
-    ;Delete the pixmap, then create a new pixmap window at the new size
-    wdelete, self.pixID
-    self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /FREE, /PIXMAP)
+        ;Resize the draw widget
+        if drawIsValid then begin
+            widget_control, self.drawID, DRAW_XSIZE=xsize, DRAW_YSIZE=ysize
 
-;---------------------------------------------------------------------
-;Draw Widget /////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    
-    ;Resize the draw widget
-    if drawIsValid then begin
-        widget_control, self.drawID, DRAW_XSIZE=xsize, DRAW_YSIZE=ysize
-
-;---------------------------------------------------------------------
-;IDL Window/Pixmap ///////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    
-    ;Resize normal windows.
-    endif else if winIsAvailable then begin
-        wDelete, self.winID
+        ;Resize normal windows.
+        endif else if winIsAvailable then begin
+            wDelete, self.winID
         
-        if self.buffer then pixmap = 1 else pixmap = 0
-        self.winID = MrGetWindow(TITLE='MrWindow', XSIZE=xsize, YSIZE=ysize, /FREE, /PIXMAP)
-    endif
+            if self.buffer then pixmap = 1 else pixmap = 0
+            self.winID = MrGetWindow(TITLE='MrWindow', XSIZE=xsize, YSIZE=ysize, /FREE, /PIXMAP)
+        endif
+
+;---------------------------------------------------------------------
+; Devices Without Windows ////////////////////////////////////////////
+;---------------------------------------------------------------------
+    endif else begin
+        ;Change to the Z-buffer
+        if self.buffer then begin
+            thisDevice = !d.name
+            set_plot, 'Z'
+        endif
+
+        ;Set the device size        
+        if strupcase(!d.name) eq 'Z' $
+            then device, SET_RESOLUTION=[xsize, ysize] $
+            else device, XSIZE=xsize, YSIZE=ysize
+        
+        ;Change back to the original device
+        if self.buffer then set_plot, thisDevice
+    endelse
     
     ;Update the object properties
     self.xsize = xsize
@@ -1411,6 +1426,7 @@ pro MrWindow::Save, filename
     if the_error ne 0 then begin
         catch, /cancel
         self._refresh = thisRefresh
+        if n_elements(thisDevice) gt 0 then set_plot, thisDevice
         void = cgErrorMsg()
         return
     endif
@@ -1426,12 +1442,26 @@ pro MrWindow::Save, filename
     ;   - Raster files without ImageMagick require a snapshot. Must draw first.
     ;   - All other files will be drawn later.
     self._SaveAs -> GetProperty, IM_RASTER=im_raster
-    if (im_raster eq 0) && (extension ne 'PS' && extension ne 'EPS') $
-        then self -> Refresh $
-        else self._refresh = 1
+    if (im_raster eq 0) && (extension ne 'PS' && extension ne 'EPS') then begin
+    
+        ;Buffered image?
+        ;   - Set the "Z" device, otherwise MrSaveAs::Save will try to read a graphics window
+        ;   - If IM_RASTER=1, the device will be "PS", not "Z".
+        if self.buffer then begin
+            thisDevice = !d.name
+            set_plot, 'Z'
+        endif
+    
+        self -> Refresh
+    endif else begin
+        self._refresh = 1
+    endelse
 
     ;Save the plot
     self._SaveAs -> Save, filename
+    
+    ;Reset the device
+    if n_elements(thisDevice) gt 0 then set_plot, thisDevice
     
     ;Return to the original refresh state.
     self._refresh = thisRefresh
@@ -1461,7 +1491,7 @@ pro MrWindow::SetCurrent
         else message, 'Window is not listed. Cannot make current.'
     
     ;Set the display window
-    wset, self.winID
+    if ((!d.flags and 256) gt 0) && ~self.buffer then wset, self.winID
 end
 
 
@@ -1696,8 +1726,8 @@ _REF_EXTRA = extra
     ;Set Properties
     if n_elements(amode)   ne 0 then self.amode = amode
     if n_elements(name)    ne 0 then self.name = name
-    if n_elements(xsize)   ne 0 then self -> ResizeDrawWidget, xsize, self.ysize
-    if n_elements(ysize)   ne 0 then self -> ResizeDrawWidget, self.xsize, ysize
+    if n_elements(xsize)   ne 0 then self -> Resize, xsize, self.ysize
+    if n_elements(ysize)   ne 0 then self -> Resize, self.xsize, ysize
     if n_elements(savedir) ne 0 then self.savedir = savedir
         
     nExtra = n_elements(extra)
@@ -1768,6 +1798,42 @@ ICONIFY=iconify
     
     ;Show the window
     wshow, self.winID, doShow, ICONIC=iconify
+end
+
+
+;+
+;   Draw the contents of the Z-buffer.
+;-
+pro MrWindow::ShowBuffer
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        set_plot, thisDevice
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Change to the Z-buffer
+    thisDevice = !d.name
+    set_plot, 'Z'
+    
+    ;Read the contents of the buffer
+    theImage = cgSnapShot()
+    
+    ;Change to 'WIN' or 'X'
+    if strupcase(!version.os_family) eq 'WINDOWS' $
+        then set_plot, 'WIN' $
+        else set_plot, 'X'
+    
+    ;Create a window and draw the buffer contents
+    window, XSIZE=self.xsize, YSIZE=self.ysize, /FREE
+    cgImage, theImage, 0, 0
+    
+    ;Return to original device
+    set_plot, thisDevice
 end
 
 
@@ -2360,8 +2426,9 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     ;Buffer the output?
     if buffer then begin
-        self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
-        self.winID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
+        ; The Z-buffer will be used when BUFFER is in use. No windows.
+;        self.pixID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
+;        self.winID = MrGetWindow(XSIZE=xsize, YSIZE=ysize, /PIXMAP, /FREE)
 
 	;MrWindow or IDL Window?
 	endif else if n_elements(parent) eq 0 then begin

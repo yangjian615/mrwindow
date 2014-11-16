@@ -869,7 +869,6 @@ RESIZE=resize
 
 	;Set the current graphics windows.
 	self -> SetDisplayWindow, currentWindow
-	IF currentWindow EQ -1 THEN RETURN
 
 ;---------------------------------------------------------------------
 ; Automatic Output? //////////////////////////////////////////////////
@@ -880,15 +879,16 @@ RESIZE=resize
 	typeOut  = StrUpCase(typeOut)
 
 	;Save the file name and directory
-	self.saveFile = basename + '.' + StrLowCase(typeOut)
-	self.saveDir  = outDir
+	self.saveFile   = basename + '.' + StrLowCase(typeOut)
+	self.saveDir    = directory
 	self.ps_config -> SetProperty, DIRECTORY=outDir, FILENAME=self.saveFile
+	oFilename       = FilePath(self.saveFile, ROOT_DIR=self.saveDir)
 
 ;---------------------------------------------------------------------
 ; Raster File? ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 	;Make sure a valid file type was given
-	CASE StrUpCase(ext) OF
+	CASE typeOut OF
 		'BMP':  raster = 1B
 		'GIF':  raster = 1B
 		'JPG':  raster = 1B
@@ -898,20 +898,17 @@ RESIZE=resize
 		'TIFF': raster = 1B
 		'PS':   raster = 0B
 		'PDF':  raster = 0B
-		'EPS': BEGIN
-			raster       = 0B
-			encapsulated = 1B
-		ENDCASE
+		'EPS':  raster = 0B
 		ELSE: Message, 'Unknown file type: "' + typeOut + '".'
 	ENDCASE
 
 ;---------------------------------------------------------------------
 ; Postscript Device? /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-	IF Max(typeOut EQ ['PDF', 'PS', 'EPS']) OR self.im_raster THEN BEGIN
+	IF ~raster OR self.im_raster THEN BEGIN
 		
 		;Open the postscript file
-		self -> PS_Open, out_file
+		self -> PS_Open, oFilename
 		
 		;Draw
 		self -> Draw
@@ -923,14 +920,16 @@ RESIZE=resize
 ; Screen Shot ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 	ENDIF ELSE BEGIN
-	   void = cgSnapshot(TYPE=typeOut, FILENAME=outName + '.' + StrLowCase(typeOut), /NODIALOG)
+	   void = cgSnapshot(TYPE=typeOut, FILENAME=oFilename, /NODIALOG)
 	ENDELSE
 
 	;Indicate where the file was saved.
-	IF ~self.ps_quiet THEN Print, typeOut + ' file located here: ' + outName
+	IF ~self.ps_quiet THEN Print, typeOut + ' file located here: ' + oFilename
 
 	;Reset the window ID.
-	IF currentWindow NE -1 THEN WSet, currentWindow ELSE WSet, -1
+	IF ((!d.flags and 256) ne 0) THEN BEGIN
+		IF currentWindow NE -1 THEN WSet, currentWindow ELSE WSet, -1
+	ENDIF
 END
 
 
@@ -1012,86 +1011,86 @@ DIRECTORY=directory
 ;Check Inputs ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
-    ;If an event was passed, undefine the filename so that a dialog
-    ;is generated to ask for the file name
+	;If an event was passed, undefine the filename so that a dialog
+	;is generated to ask for the file name
 	if size(filename, /TNAME) eq 'STRUCT' then begin
-	    event = temporary(filename)
-	    widget_control, event.id, GET_VALUE=file_type
-    endif else file_type = ''
+		event = temporary(filename)
+		widget_control, event.id, GET_VALUE=file_type
+	endif else file_type = ''
 
-    ;If a file name was given, figure out how to save from the extension
+	;If a file name was given, figure out how to save from the extension
 	if n_elements(filename) ne 0 then begin
-	    void = cgRootName(filename, EXTENSION=file_type, DIRECTORY=saveDir)
-	
+		void = cgRootName(filename, EXTENSION=file_type, DIRECTORY=saveDir)
+
 	;If no file name was given, ask for one
 	endif else begin
-        ;Open to the previously chosen directory or the present working directory
-        if n_elements(directory) eq 0 then $
-            if self.saveDir eq '' $
-                then void = cgRootName(DIRECTORY=directory) $
-                else directory = self.saveDir
-        
-        ;Initial file name
-        if self.saveFile eq '' $
-            then file = 'MrWindow' $
-            else file = self.saveFile
-        
-        ;Ask for a file name
-        filename = dialog_pickfile(DIALOG_PARENT=*self._group_leader, $
-                                   FILE=file, PATH=directory, GET_PATH=saveDir, $
-                                   TITLE='Save Image As:', /WRITE)
-        
-        ;Return if cancelled
-        if filename eq '' then return
-        
-        ;Get the file extension so we know how to save. If the extension was given, do
-        ;not append another to the file name.
-        void = cgRootName(filename, EXTENSION=ext)
-	    if ext ne file_type and file_type ne '' then filename += '.' + strlowcase(file_type)
-    endelse
-    
-    ;set the save directory so we can open to the same place
-    self.saveDir = saveDir
-    self.saveFile = file_basename(filename)
+		;Open to the previously chosen directory or the present working directory
+		if n_elements(directory) eq 0 then $
+			if self.saveDir eq '' $
+				then void = cgRootName(DIRECTORY=directory) $
+				else directory = self.saveDir
+	
+		;Initial file name
+		if self.saveFile eq '' $
+			then file = 'MrWindow' $
+			else file = self.saveFile
+	
+		;Ask for a file name
+		filename = dialog_pickfile(DIALOG_PARENT=*self._group_leader, $
+		                           FILE=file, PATH=directory, GET_PATH=saveDir, $
+		                           TITLE='Save Image As:', /WRITE)
+	
+		;Return if cancelled
+		if filename eq '' then return
+	
+		;Get the file extension so we know how to save. If the extension was given, do
+		;not append another to the file name.
+		void = cgRootName(filename, EXTENSION=ext)
+		if ext ne file_type and file_type ne '' then filename += '.' + strlowcase(file_type)
+	endelse
+
+	;set the save directory so we can open to the same place
+	self.saveDir = saveDir
+	self.saveFile = file_basename(filename)
 
 ;---------------------------------------------------------------------
 ;Save the Dsplay /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;set the window to the current window
-    self -> SetDisplayWindow, currentWindow
-    if currentWindow eq -1 then return
-    
-    ;get the current color table and read the screen. Read a 24-bit color if the write
-    ;routine accepts 24-bit images. Otherwise, read an 8-bit image using the current color
-    ;table
-    if keyword_set(gif) then begin
-        tvlct, r, g, b, /get
-        theImage = tvrd()
-    endif else theImage = tvrd(TRUE=1)
-	
+	self -> SetDisplayWindow, currentWindow
+	if currentWindow eq -1 then return
+
+	;get the current color table and read the screen. Read a 24-bit color if the write
+	;routine accepts 24-bit images. Otherwise, read an 8-bit image using the current color
+	;table
+	if keyword_set(gif) then begin
+		tvlct, r, g, b, /get
+		theImage = tvrd()
+	endif else theImage = tvrd(TRUE=1)
+
 	;write the image to a file
 	case strupcase(file_type) of
-	    'JPEG': write_jpeg, filename, theImage, TRUE=1
-	    
-	    'PNG': write_png, filename, theImage
-	    
-	    'TIFF': begin
-            ;tvrd() scans from bottome to top. Tiff readers read top to bottom. Must reverse
-            ;the vertical dimension of the image.
-            theImage = reverse(theImage, 3)
-            write_tiff, filename, theImage
-        endcase
-        
-        'GIF': write_gif, filename, theImage, r, g, b
-        
-        ;If the extension is not known, save to a JPEG
-        else: write_jpeg, filename, theImage, TRUE=1
-    endcase
+		'JPEG': write_jpeg, filename, theImage, TRUE=1
+	
+		'PNG': write_png, filename, theImage
+	
+		'TIFF': begin
+			;tvrd() scans from bottome to top. Tiff readers read top to bottom. Must reverse
+			;the vertical dimension of the image.
+			theImage = reverse(theImage, 3)
+			write_tiff, filename, theImage
+		endcase
+	
+		'GIF': write_gif, filename, theImage, r, g, b
+	
+		;If the extension is not known, save to a JPEG
+		else: write_jpeg, filename, theImage, TRUE=1
+	endcase
 end
 
 
 ;+
-;   Clean up after the object is destroyed -- destroy pointers and object references.
+;   Set the current window.
 ;
 ; :Params:
 ;       CURRENTWINDOW:          out, optional, type=long
@@ -1099,25 +1098,30 @@ end
 ;                                   SetDisplayWindow.
 ;-
 PRO MrSaveAs::SetDisplayWindow, currentWindow
-    Compile_Opt strictarr
-    on_error, 2
+	Compile_Opt strictarr
+	on_error, 2
 
-    ;Set the window
-    ;   - Check the winID property
-    ;   - See if a window is open
-    IF obj_valid(self._saveWindow) && obj_hasmethod(self._saveWindow, 'SetCurrent') THEN BEGIN
-        currentWindow = !D.Window
-        self._saveWindow -> SetCurrent
-    ENDIF ELSE IF WindowAvailable(self._saveWinID) THEN BEGIN
-        currentWin = !D.Window
-        wset, self._saveWinID
-    ENDIF ELSE IF WindowAvailable(!D.Window) THEN BEGIN
-        currentWindow = !D.Window
-        ;Window is already set. Do nothing
-    ENDIF ELSE BEGIN
-        currentWindow = -1
-        message, 'No windows are available to read.'
-    ENDELSE
+	;Set the window
+	;   - Check the winID property
+	;   - See if a window is open
+	IF obj_valid(self._saveWindow) && obj_hasmethod(self._saveWindow, 'SetCurrent') THEN BEGIN
+		currentWindow = !D.Window
+		self._saveWindow -> SetCurrent
+	ENDIF ELSE BEGIN
+		;Are windows possible?
+    	IF !D.Flags AND 256 EQ 0 THEN RETURN
+    
+		IF WindowAvailable(self._saveWinID) THEN BEGIN
+			currentWin = !D.Window
+			wset, self._saveWinID
+		ENDIF ELSE IF WindowAvailable(!D.Window) THEN BEGIN
+			currentWindow = !D.Window
+			;Window is already set. Do nothing
+		ENDIF ELSE BEGIN
+			currentWindow = -1
+			message, 'No windows are available to read.'
+		ENDELSE
+	ENDELSE
 END
 
 
