@@ -689,7 +689,6 @@ USER_INPUT = user_input
 		if N_Elements(user_input)      EQ 0 THEN user_input       = 0B
 		
 		;Global Information
-		multiple         = 1B
 		background_color = !MrSaveAs_GIF.background
 		repeat_count     = !MrSaveAs_GIF.repeat_count
 		
@@ -726,7 +725,7 @@ USER_INPUT = user_input
 	           BACKGROUND_COLOR = background_color, $
 	           DELAY_TIME       = delay_time, $
 	           DISPOSAL_METHOD  = disposal_method, $
-	           MULTIPLE         = multiple, $
+	           MULTIPLE         = 1, $
 	           REPEAT_COUNT     = repeat_count, $
 	           TRANSPARENT      = transparent, $
 	           USER_INPUT       = user_input
