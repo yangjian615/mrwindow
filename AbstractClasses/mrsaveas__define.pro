@@ -554,16 +554,17 @@ END
 ;                           Number of times the GIF should repeat when planed. 0 will
 ;                               produce an infinite loop.
 ;-
-FUNCTION MrSaveAs::GIF_Open, filename, $
+PRO MrSaveAs::GIF_Open, filename, $
 BACKGROUND_COLOR=background_color, $
 REPEAT_COUNT=repeat_count
 	Compile_Opt strictarr
 	on_error, 2
 	
 	;Is a GIF file already open?
-	IF DefSysV('!MrSaveAs_GIF', /EXISTS) THEN BEGIN
+	DefSysV, '!MrSaveAs_GIF', EXISTS=tf_exists
+	IF tf_exists THEN BEGIN
 		IF !MrSaveAs_GIF.filename NE '' THEN $
-			message, 'A GIF file is already open for writing. Use MrSaveAs::GIF_Close.'
+			Message, 'A GIF file is already open for writing. Use MrSaveAs::GIF_Close.'
 	ENDIF ELSE BEGIN
 		DefSysV, '!MrSaveAs_GIF', { MrSaveAs_GIF, $
 		                            background:   0B, $
@@ -585,21 +586,23 @@ END
 ;+
 ;   Close the multi-image GIF file.
 ;-
-FUNCTION MrSaveAs::GIF_Close
+PRO MrSaveAs::GIF_Close
 	Compile_Opt strictarr
 	on_error, 2
 	
 	;Close the GIF file
 	Write_GIF, !MrSaveAs_GIF.filename, /CLOSE
-	
+
 	;Is a GIF file already open?
-	IF DefSysV('!MrSaveAs_GIF', /EXISTS) THEN BEGIN
+	DefSysV, '!MrSaveAs_GIF', EXISTS=tf_exists
+	IF tf_exists THEN BEGIN
+		Ptr_Free, !MrSaveAs_GIF.frames
 		!MrSaveAs_GIF.background   = 0B
 		!MrSaveAs_GIF.filename     = ''
 		!MrSaveAs_GIF.count        = 0L
 		!MrSaveAs_GIF.dimensions   = [0L, 0L]
 		!MrSaveAs_GIF.repeat_count = 0L
-		Ptr_Free, !MrSaveAs_GIF.frames
+		!MrSaveAs_GIF.frames       = Ptr_New(/ALLOCATE_HEAP)
 	ENDIF
 END
 
@@ -632,7 +635,7 @@ END
 ;                               (via mouse click, enter key, etc.). If `DELAY_TIME` is
 ;                               used, it will aslo trigger the next frame.
 ;-
-FUNCTION MrSaveAs::GIF_Write, $
+PRO MrSaveAs::GIF_Write, $
 CUBE = cube, $
 DITHER = dither, $
 DELAY_TIME = delay_time, $
@@ -643,7 +646,8 @@ USER_INPUT = user_input
 	on_error, 2
 
 	;GIF must be open.
-	IF ~DefSysV('!MrSaveAs_GIF', /EXISTS) THEN $
+	DefSysV, '!MrSaveAs_GIF', EXISTS=tf_exists
+	IF ~tf_exists THEN $
 		Message, 'GIF file is not open. Use MrSaveAs::GIF_Open first.'
 	IF !MrSaveAs_GIF.filename EQ '' THEN $
 		Message, 'GIF file is not open. Use MrSaveAs::GIF_Open first.'
@@ -679,25 +683,23 @@ USER_INPUT = user_input
 		!MrSaveAs_GIF.dimensions = Size(image2D, /DIMENSIONS)
 		
 		;Frame Information
-		IF N_Elements(delay_time)      EQ 0 THEN delay_time  = 50
-		IF N_Elements(disposal_method) EQ 0 THEN delay_time  = 50
-		IF N_Elements(transparent)     EQ 0 THEN transparent = -1
-		if N_Elements(user_input)      EQ 0 THEN user_input  = 0B
+		IF N_Elements(delay_time)      EQ 0 THEN delay_time       = 50
+		IF N_Elements(disposal_method) EQ 0 THEN disposal_method  = 50
+		IF N_Elements(transparent)     EQ 0 THEN transparent      = -1
+		if N_Elements(user_input)      EQ 0 THEN user_input       = 0B
 		
 		;Global Information
 		multiple         = 1B
 		background_color = !MrSaveAs_GIF.background
 		repeat_count     = !MrSaveAs_GIF.repeat_count
-		background_color = !MrSaveAs_GIF.background
-		background_color = !MrSaveAs_GIF.background
 		
 	;Subsequent saves
 	ENDIF ELSE BEGIN
 		;Take settings from the previous frame
-		IF N_Elements(delay_time)      EQ 0 THEN delay_time      = (*!MrSaveAs_GIF.frames).delay_time[count-1]
-		if N_Elements(disposal_method) EQ 0 THEN disposal_method = (*!MrSaveAs_GIF.frames).disposal_method[count-1]
-		IF N_Elements(transparent)     EQ 0 THEN transparent     = (*!MrSaveAs_GIF.frames).transparent[count-1]
-		if N_Elements(user_input)      EQ 0 THEN user_input      = (*!MrSaveAs_GIF.frames).user_input[count-1]
+		IF N_Elements(delay_time)      EQ 0 THEN delay_time      = (*!MrSaveAs_GIF.frames)[count-1].delay_time
+		if N_Elements(disposal_method) EQ 0 THEN disposal_method = (*!MrSaveAs_GIF.frames)[count-1].disposal_method
+		IF N_Elements(transparent)     EQ 0 THEN transparent     = (*!MrSaveAs_GIF.frames)[count-1].transparent
+		if N_Elements(user_input)      EQ 0 THEN user_input      = (*!MrSaveAs_GIF.frames)[count-1].user_input
 		
 		;Resize the image
 		;	- All frames must be the same size.
@@ -726,7 +728,8 @@ USER_INPUT = user_input
 	           DISPOSAL_METHOD  = disposal_method, $
 	           MULTIPLE         = multiple, $
 	           REPEAT_COUNT     = repeat_count, $
-	           _STRICT_EXTRA    = theFrame
+	           TRANSPARENT      = transparent, $
+	           USER_INPUT       = user_input
 	
 	;Increase the frame count
 	!MrSaveAs_GIF.count += 1
