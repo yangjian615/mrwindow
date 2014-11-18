@@ -153,6 +153,17 @@ NOERASE=noerase
     IF N_Elements(*self.xloc) NE 0 THEN nparams = nparams + 1
     IF N_Elements(*self.yloc) NE 0 THEN nparams = nparams + 1
     IF N_Elements(*self.zloc) NE 0 THEN nparams = nparams + 1
+    
+    ;Adjust for postscript output.
+    if !d.name eq 'PS' then begin
+        charsize  = MrPS_Rescale( self.charsize,  /CHARSIZE)
+        charthick = MrPS_Rescale(*self.charthick, /CHARTHICK)
+        thick     = MrPS_Rescale(*self.thick,     /THICK)
+    endif else begin
+        charsize  =  self.charsize
+        charthick = *self.charthick
+        thick     = *self.thick
+    endelse
 
     ;Call cgAxis with the correct number of parameters.
     CASE nparams OF
@@ -167,8 +178,8 @@ NOERASE=noerase
                    ;cgGraphicsKeywords
 ;                  AXISCOLOR     = *self.axiscolor, $
 ;                  BACKGROUND    = *self.background, $
-                   CHARSIZE      = *self.charsize, $
-                   CHARTHICK     = *self.charthick, $
+                   CHARSIZE      =       charsize, $
+                   CHARTHICK     =       charthick, $
 ;                  CLIP          = *self.clip, $
                    COLOR         = *self.color, $
                    DATA          =  self.data, $
@@ -250,8 +261,8 @@ NOERASE=noerase
                    ZLOG  =  self.zlog, $
                    
                    ;cgGraphicsKeywords
-                   CHARSIZE      =  self.charsize, $
-                   CHARTHICK     = *self.charthick, $
+                   CHARSIZE      =       charsize, $
+                   CHARTHICK     =       charthick, $
                    COLOR         = *self.color, $
                    DATA          =  self.data, $
                    DEVICE        =  self.device, $
@@ -326,8 +337,8 @@ NOERASE=noerase
                    ZLOG  =  self.zlog, $
                    
                    ;cgGraphicsKeywords
-                   CHARSIZE      =  self.charsize, $
-                   CHARTHICK     = *self.charthick, $
+                   CHARSIZE      =       charsize, $
+                   CHARTHICK     =       charthick, $
                    COLOR         = *self.color, $
                    DATA          =  self.data, $
                    DEVICE        =  self.device, $

@@ -306,12 +306,21 @@ NOERASE=noerase
         xloc = *self.xloc
         yloc = *self.yloc
     ENDELSE
+    
+    ;Rescale for suitable postscript output
+    IF !D.Name eq 'PS' THEN BEGIN
+        charsize  = MrPS_Rescale(self.charsize,  /CHARSIZE)
+        charthick = MrPS_Rescale(self.charthick, /CHARTHICK)
+    ENDIF ELSE BEGIN
+        charsize = self.charsize
+        charthick = self.charthick
+    ENDELSE
 
     ;Draw the text
     cgText, xloc, yloc, *self.text, $
             ALIGNMENT   =  self.alignment, $
-            CHARSIZE    =  self.charsize, $
-            CHARTHICK   =  self.charthick, $
+            CHARSIZE    =       charsize, $
+            CHARTHICK   =       charthick, $
             CLIP        = *self.clip, $
             COLOR       =  self.color, $
             DATA        =  self.data, $

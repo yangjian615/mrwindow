@@ -1343,6 +1343,10 @@ pro MrWindow::Resize, xsize, ysize
         return
     endif
 
+    ;Default to current size
+    if n_elements(xsize) eq 0 then xsize = self.xsize
+    if n_elements(ysize) eq 0 then ysize = self.ysize
+
     ;Make sure the dimensions of the new window are >= 0. Ambiguous error results otherwise:
     ;"integer parameter out of range for operation"
     if xsize le 0 or ysize le 0 then message, 'XSIZE and YSIZE must be > 0.'
@@ -1350,7 +1354,7 @@ pro MrWindow::Resize, xsize, ysize
 ;---------------------------------------------------------------------
 ; Devices With Windows ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if ((!d.flags and 256) eq 0) && ~self.buffer then begin
+    if ((!d.flags and 256) ne 0) && ~self.buffer then begin
         ;Check to see if a window is available to be resized. This may not be true if the
         ;widget has not been realized yet.
         drawIsValid = widget_info(self.drawID, /VALID_ID)
@@ -1724,12 +1728,14 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     
     ;Set Properties
+    tf_resize = 0B
     if n_elements(amode)   ne 0 then self.amode = amode
     if n_elements(name)    ne 0 then self.name = name
-    if n_elements(xsize)   ne 0 then self -> Resize, xsize, self.ysize
-    if n_elements(ysize)   ne 0 then self -> Resize, self.xsize, ysize
+    if n_elements(xsize)   ne 0 then tf_resize = 1
+    if n_elements(ysize)   ne 0 then tf_resize = 1
     if n_elements(savedir) ne 0 then self.savedir = savedir
-        
+    if tf_resize then self -> Resize, xsize, ysize
+    
     nExtra = n_elements(extra)
 
 ;---------------------------------------------------------------------

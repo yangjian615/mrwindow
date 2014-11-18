@@ -252,6 +252,16 @@ NOERASE=noerase
 
     if n_elements(noerase) eq 0 then noerase = *self.noerase
     self.layout -> GetProperty, CHARSIZE=charsize, POSITION=position
+    
+    ;Adjust postscript output.
+    if !d.name eq 'PS' then begin
+        charsize  = MrPS_Rescale(charsize,        /CHARSIZE)
+        charthick = MrPS_Rescale(*self.charthick, /CHARTHICK)
+        thick     = MrPS_Rescale(*self.thick,     /THICK)
+    endif else begin
+        charthick = *self.charthick
+        thick     = *self.thick
+    endelse
 
     ;Draw the plot.
     MraPlot, *self.indep, *self.dep, $
@@ -278,7 +288,7 @@ NOERASE=noerase
              ;MrGraphicsKeywords
              AXISCOLOR     = *self.axiscolor, $
              BACKGROUND    = *self.background, $
-             CHARTHICK     = *self.charthick, $
+             CHARTHICK     =       charthick, $
              CLIP          = *self.clip, $
              COLOR         = *self.color, $
              DATA          =  self.data, $
@@ -292,7 +302,7 @@ NOERASE=noerase
              SUBTITLE      = *self.subtitle, $
              SYMSIZE       = *self.symsize, $
              T3D           = *self.t3d, $
-             THICK         = *self.thick, $
+             THICK         =       thick, $
              TICKLEN       = *self.ticklen, $
              TITLE         = *self.title, $
              XCHARSIZE     = *self.xcharsize, $
@@ -366,6 +376,16 @@ pro MrPlot::doOverplot
     ;Get the character size
     self.layout -> GetProperty, CHARSIZE=charsize
     
+    ;Adjust postscript output.
+    if !d.name eq 'PS' then begin
+        charsize  = MrPS_Rescale(charsize,        /CHARSIZE)
+        charthick = MrPS_Rescale(*self.charthick, /CHARTHICK)
+        thick     = MrPS_Rescale(*self.thick,     /THICK)
+    endif else begin
+        charthick = *self.charthick
+        thick     = *self.thick
+    endelse
+    
     ;Get the dimensions of the independent variable.
     MraOPlot, *self.indep, *self.dep, $
 
@@ -377,7 +397,7 @@ pro MrPlot::doOverplot
               PSYM      = *self.psym, $
               SYMCOLOR  = *self.symcolor, $
               SYMSIZE   = *self.symsize, $
-              THICK     = *self.thick, $
+              THICK     =       thick, $
 
               ;OPlot Keywords
               NSUM      =  self. nsum, $

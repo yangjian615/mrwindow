@@ -142,6 +142,10 @@ NOERASE=noerase
         if nParams ge 2 then ycoords = !y.crange[0] + (!y.crange[1] - !y.crange[0])*ycoords
         if nParams eq 3 then zcoords = !z.crange[0] + (!z.crange[1] - !z.crange[0])*zcoords
     endif
+    
+    if !d.name eq 'PS' $
+        then thick = MrPS_Rescale(self.thick, /THICK) $
+        else thick = self.thick
 
     ;cgPlotS
     case nparams of
@@ -159,7 +163,7 @@ NOERASE=noerase
                     LINESTYLE  =  self.linestyle, $
                     NOCLIP     =  self.noclip, $
                     T3D        =  self.t3d, $
-                    THICK      =  self.thick, $
+                    THICK      =       thick, $
                     Z          =  self.zvalue
                     
         2: cgPlotS, xcoords, ycoords, $
@@ -176,7 +180,7 @@ NOERASE=noerase
                     NORMAL     =  self.normal, $
                     LINESTYLE  =  self.linestyle, $
                     T3D        =  self.t3d, $
-                    THICK      =  self.thick, $
+                    THICK      =       thick, $
                     Z          =  self.zvalue
                     
         3: cgPlotS, xcoords, ycoords, zcoords, $
@@ -193,7 +197,7 @@ NOERASE=noerase
                     LINESTYLE  =  self.linestyle, $
                     NOCLIP     =  self.noclip, $
                     T3D        =  self.t3d, $
-                    THICK      =  self.thick, $
+                    THICK      =       thick, $
                     Z          =  self.zvalue
     endcase
 end

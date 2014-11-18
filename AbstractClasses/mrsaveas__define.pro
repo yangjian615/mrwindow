@@ -479,10 +479,12 @@ END
 PRO MrSaveAs::GetProperty, $
 ADJUSTSIZE=adjustsize, $
 IM_DENSITY=im_density, $
+IM_HEIGHT=im_height, $
 IM_RESIZE=im_resize, $
 IM_OPTIONS=im_options, $
 IM_RASTER=im_raster, $
 IM_TRANSPARENT=im_transparent, $
+IM_WIDTH=im_width, $
 PDF_PATH=pdf_path, $
 PDF_UNIX_CONVERT_CMD=pdf_unix_convert_cmd, $
 PS_CHARSIZE=ps_charsize, $
@@ -529,11 +531,13 @@ WINDOW=theWindow
     IF Arg_Present(ps_tt_font)      THEN ps_tt_font      = self.ps_tt_font
     
     ; ImageMagick properties.
-    IF Arg_Present(im_transparent)  THEN im_transparent = self.im_transparent
-    IF Arg_Present(im_density)      THEN im_density     = self.im_density
-    IF Arg_Present(im_options)      THEN im_options     = self.im_options
-    IF Arg_Present(im_resize)       THEN im_resize      = self.im_resize
-    IF Arg_Present(im_raster)       THEN im_raster      = self.im_raster
+    IF Arg_Present(im_transparent)  THEN im_transparent =  self.im_transparent
+    IF Arg_Present(im_density)      THEN im_density     =  self.im_density
+    IF Arg_Present(im_height)       THEN im_raster      = *self.im_height
+    IF Arg_Present(im_options)      THEN im_options     =  self.im_options
+    IF Arg_Present(im_resize)       THEN im_resize      =  self.im_resize
+    IF Arg_Present(im_raster)       THEN im_raster      =  self.im_raster
+    IF Arg_Present(im_width)        THEN im_raster      = *self.im_width
     
     IF Arg_Present(ps_keywords)     THEN ps_keywords = self.ps_config -> GetKeywords()
 END
@@ -738,7 +742,7 @@ END
 ;+
 ;   Open a PostScript file for printing
 ;-
-FUNCTION MrSaveAs::PS_Open, filename, $
+PRO MrSaveAs::PS_Open, filename, $
 MATCH=match, $
 _REF_EXTRA=extra
 	Compile_Opt strictarr
@@ -749,7 +753,7 @@ _REF_EXTRA=extra
 	void = cgRootName(filename, EXTENSION=type)
 	
 	;Match the current window?
-	match = N_Elements(match) EQ 0 ? 1 : keyword_set(match)
+	nomatch = N_Elements(match) EQ 0 ? 0 : ~keyword_set(match)
 
 ;---------------------------------------------------------------------
 ; Open Postscript File ///////////////////////////////////////////////
@@ -763,9 +767,10 @@ _REF_EXTRA=extra
 	IF N_Elements(extra) GT 0 THEN self -> SetProperty, _EXTRA=extra
 
 	;Get the configuration keywords
-	ps_keys = self.ps_config -> GetKeywords()
-	IF StrUpCase(type) EQ 'EPS' THEN ps_keys.encapsulated = 1
-	
+	ps_keys = self.ps_config -> GetKeywords(PAGETYPE=pagetype, FONTTYPE=font, /SANE_OFFSETS)
+	IF StrUpCase(type)      EQ 'EPS' THEN ps_keys.encapsulated = 1
+	IF N_Elements(filename) NE 0     THEN ps_keys.filename     = file_basename(filename)
+
 	; Cannot successfully convert encapsulated landscape file to raster.
 	; Limitation of ImageMagick, and specifically, GhostScript, which does
 	; the conversion.
@@ -778,19 +783,26 @@ _REF_EXTRA=extra
 	cgPS_Open, CHARSIZE     =  self.ps_charsize, $
 	           ENCAPSULATED =       encapsulated, $
 	           FILENAME     =       filename, $
+	           FONT         =       font, $
 	           GROUP_LEADER = *self._group_leader, $
 	           KEYWORDS     =       ps_keywords, $
-	           MATCH        =       match, $
+	           NOMATCH      =       nomatch, $
+	           PAGETYPE     =       pagetype, $
 	           QUIET        =       1B, $
 	           SCALE_FACTOR =  self.ps_scale_factor, $
 	           TT_FONT      =  self.ps_tt_font, $
 	           _EXTRA       =  ps_keys
 
 	;Set the device
-	Device, _STRICT_EXTRA=ps_keywords
+	;	- cgPS_Open will figure out the plot position automatically.
+	;	- The position, however, will be overridden by the position contained in EXTRA
+	;	- Update the cgPS_Config object
+	;	- Convert IDL offsets to Sane_Offsets first
+	dims = self.ps_config -> PageDimensions()
+	yoffset = ps_keywords.xoffset
+	ps_keywords.xoffset = dims[1] - ps_keywords.yoffset
+	ps_keywords.yoffset = temporary(yoffset)
 
-	;cgPS_Open play with the page size and other things to make the plot look good.
-	;	- Synchronize PS_Config again. 
 	ps_keywords.filename = File_BaseName(ps_keywords.filename)
 	self.ps_config -> SetProperty, _STRICT_EXTRA=ps_keywords
 END
@@ -799,15 +811,13 @@ END
 ;+
 ;   Close the Postscript File & Device.
 ;-
-FUNCTION MrSaveAs::PS_Close, $
+PRO MrSaveAs::PS_Close, $
 NOFIX=nofix, $
 NOMESSAGE=nomessage, $
 OUTFILENAME=outfilename, $
-SUCCESS=success, $
 SHOWCMD=showcmd
 	Compile_Opt strictarr
 	on_error, 2
-
 
 	;Close the PS file and convert to requested format.
 	cgPS_Close, ALLOW_TRANSPARENT =  self.im_transparent, $
@@ -821,13 +831,8 @@ SHOWCMD=showcmd
 	            OUTFILENAME       =       outfilename, $
 	            RESIZE            =  self.im_resize, $
 	            SHOWCMD           =       showcmd, $
-	            SUCCESS           =       success, $
 	            UNIX_CONVERT_CMD  =  self.pdf_unix_convert_cmd, $
 	            WIDTH             = *self.im_width
-
-	;Successful?
-	IF ~success && ~Arg_Present(success) THEN $
-		Message, 'Unable to create PDF file. See cgPS2PDF documentation.'
 END
 
 
@@ -876,14 +881,14 @@ RESIZE=resize
 ; Automatic Output? //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 	;Get a file name to use.
-	out_file = self -> GetFilename(filename, PICK_FILE=pick_file, TYPE=filetype, $$
+	out_file = self -> GetFilename(filename, PICK_FILE=pick_file, TYPE=filetype, $
 	                               DIRECTORY=directory, BASENAME=basename, EXTENSION=typeOut)
 	typeOut  = StrUpCase(typeOut)
 
 	;Save the file name and directory
 	self.saveFile   = basename + '.' + StrLowCase(typeOut)
 	self.saveDir    = directory
-	self.ps_config -> SetProperty, DIRECTORY=outDir, FILENAME=self.saveFile
+	self.ps_config -> SetProperty, DIRECTORY=self.saveDir, FILENAME=self.saveFile
 	oFilename       = FilePath(self.saveFile, ROOT_DIR=self.saveDir)
 
 ;---------------------------------------------------------------------
@@ -908,9 +913,8 @@ RESIZE=resize
 ; Postscript Device? /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 	IF ~raster OR self.im_raster THEN BEGIN
-		
 		;Open the postscript file
-		self -> PS_Open, oFilename
+		self -> PS_Open, oFilename, MATCH=match
 		
 		;Draw
 		self -> Draw
@@ -922,7 +926,7 @@ RESIZE=resize
 ; Screen Shot ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 	ENDIF ELSE BEGIN
-	   void = cgSnapshot(TYPE=typeOut, FILENAME=oFilename, /NODIALOG)
+		void = cgSnapshot(TYPE=typeOut, FILENAME=oFilename, /NODIALOG)
 	ENDELSE
 
 	;Indicate where the file was saved.
@@ -1210,6 +1214,7 @@ IM_OPTIONS=im_options, $
 IM_RASTER=im_raster, $
 IM_RESIZE=im_resize, $
 IM_TRANSPARENT=im_transparent, $
+IM_HEIGHT = im_height, $
 IM_WIDTH = im_width, $
 PDF_UNIX_CONVERT_CMD=pdf_unix_convert_cmd, $
 PDF_PATH=pdf_path, $
@@ -1246,7 +1251,6 @@ _REF_EXTRA=extra
     IF N_Elements(im_resize)            GT 0 THEN  self.im_resize            = im_resize
     IF N_Elements(im_options)           GT 0 THEN  self.im_options           = im_options
     IF N_Elements(im_raster)            GT 0 then  self.im_raster            = im_raster
-    IF N_Elements(im_width)             GT 0 then *self.im_width             = im_width
     IF N_Elements(pdf_unix_convert_cmd) GT 0 THEN  self.pdf_unix_convert_cmd = pdf_unix_convert_cmd
     IF N_Elements(pdf_path)             GT 0 THEN  self.pdf_path             = pdf_path
     
@@ -1259,6 +1263,16 @@ _REF_EXTRA=extra
 ;    IF N_Elements(ps_font)              GT 0 THEN  self.ps_font              = ps_font
 ;    IF N_Elements(ps_decomposed)        GT 0 THEN  self.ps_decomposed        = ps_decomposed
 ;    IF N_Elements(ps_encapsulated)      GT 0 THEN  self.ps_encapsulated      = ps_encapsulated
+
+	IF N_Elements(im_height) GT 0 THEN BEGIN
+		*self.im_height = im_height
+		void = temporary(*self.im_width)
+	ENDIF
+	
+	IF N_Elements(im_width) GT 0 THEN BEGIN
+		*self.im_width = im_width
+		void = temporary(*self.im_height)
+	ENDIF
 
     ;Remove duplicate keywords from the EXTRA array, if they are present
     IF N_Elements(extra) GT 0 THEN BEGIN
@@ -1368,6 +1382,7 @@ function MrSaveAs::init, winID, theWindow, $
 ADJUSTSIZE=adjustsize, $
 GROUP_LEADER=group_leader, $
 IM_DENSITY=im_density, $
+IM_HEIGHT=im_height, $
 IM_OPTIONS=im_options, $
 IM_RASTER=im_raster, $
 IM_RESIZE=im_resize, $
@@ -1383,7 +1398,8 @@ PS_FONT=ps_font, $
 PS_METRIC=ps_metric, $
 PS_QUIET=ps_quiet, $
 PS_SCALE_FACTOR=ps_scale_factor, $
-PS_TT_FONT=ps_tt_font
+PS_TT_FONT=ps_tt_font, $
+_REF_EXTRA=extra
     compile_opt strictarr
     
     ;Error handling
@@ -1431,6 +1447,8 @@ PS_TT_FONT=ps_tt_font
     
     ;Objects
     self.ps_config = obj_new('FSC_PSConfig')
+    self.im_height = Ptr_New(/ALLOCATE_HEAP)
+    self.im_width  = Ptr_New(/ALLOCATE_HEAP)
 
     ;Defaults
     self.adjustsize     = n_elements(adjust_size)    gt 0 ? adjustsize        : d_adjustsize
@@ -1439,7 +1457,10 @@ PS_TT_FONT=ps_tt_font
     self.im_options     = n_elements(im_options)     gt 0 ? im_options        : d_im_options
     self.im_raster      = n_elements(im_raster)      gt 0 ? im_raster         : d_im_raster
     self.im_resize      = n_elements(im_resize)      gt 0 ? im_resize         : 100
-    self.im_width       = n_elements(im_width)       gt 0 ? ptr_new(im_width) : ptr_new(d_im_width)
+    
+    IF N_Elements(im_width) GT 0 $
+    	THEN *self.im_width = im_width $
+    	ELSE IF N_Elements(im_height) GT 0 THEN *self.im_height = im_height
 
     self.pdf_unix_convert_cmd = n_elements(pdf_unix_convert_cmd) gt 0 ? pdf_unix_convert_cmd : d_pdf_unix_convert_cmd
     self.pdf_path             = n_elements(pdf_path)             gt 0 ? pdf_path             : d_pdf_path
@@ -1466,6 +1487,7 @@ PS_TT_FONT=ps_tt_font
     ;PS file locations
     ps_filename = cgRootName(self.saveFile) + '.ps'
     self.ps_config -> SetProperty, DIRECTORY=self.saveDir, FILENAME='MrWindow.ps'
+    IF N_Elements(extra) GT 0 THEN self.ps_config -> SetProperty, _STRICT_EXTRA=extra
     
     return, 1
 end
@@ -1524,17 +1546,18 @@ pro MrSaveAs__define, class
              ps_font:         0, $
              ps_quiet:        0B, $
              ps_scale_factor: 0.0, $
-             ps_tt_font:      "", $
+             ps_tt_font:      '', $
              
              ; PDF options.
-             pdf_unix_convert_cmd: "", $
-             pdf_path:             "", $
+             pdf_unix_convert_cmd: '', $
+             pdf_path:             '', $
 
              ; ImageMagick output parameters.
              im_transparent: 0B, $
              im_density:     0L, $
+             im_height:      Ptr_New(), $
+             im_options:     '', $
              im_resize:      0L, $
-             im_options:     "", $
              im_raster:      0B, $
              im_width:       Ptr_New(), $
               
