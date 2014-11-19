@@ -360,19 +360,30 @@ NOERASE=noerase
 	    endif
 
 	    self.layout -> GetProperty, POSITION=position, CHARSIZE=charsize
-        plot, [0], [0], $
+    
+        ;Adjust postscript output.
+        if !d.name eq 'PS' then begin
+            charsize  = MrPS_Rescale(charsize,        /CHARSIZE)
+            charthick = MrPS_Rescale(*self.charthick, /CHARTHICK)
+            thick     = MrPS_Rescale(*self.thick,     /THICK)
+        endif else begin
+            charthick = *self.charthick
+            thick     = *self.thick
+        endelse
+
+        cgplot, [0], [0], $
               /NODATA, $
               /NOERASE, $
               BACKGROUND    =  cgColor(*self.background), $
               CHARSIZE      =       charsize, $
-              CHARTHICK     = *self.charthick, $
+              CHARTHICK     =       charthick, $
               COLOR         =  cgColor(*self.axiscolor), $
               DEVICE        =  self.device, $
               FONT          = *self.font, $
               NORMAL        =  self.normal, $
               POSITION      =       position, $
               SUBTITLE      = *self.subtitle, $
-              THICK         = *self.thick, $
+              THICK         =       thick, $
               TICKLEN       = *self.ticklen, $
               TITLE         =  cgCheckForSymbols(*self.title), $
               
@@ -382,6 +393,7 @@ NOERASE=noerase
               XMINOR        = *self.xminor, $
               XRANGE        =       xrange, $
               XSTYLE        = *self.xstyle, $
+              XTHICK        = *self.xthick, $
               XTICK_GET     = *self.xtick_get, $
               XTICKFORMAT   = *self.xtickformat, $
               XTICKINTERVAL = *self.xtickinterval, $
@@ -399,6 +411,7 @@ NOERASE=noerase
               YMINOR        = *self.yminor, $
               YRANGE        =       yrange, $
               YSTYLE        = *self.ystyle, $
+              YTHICK        = *self.ythick, $
               YTICK_GET     = *self.ytick_get, $
               YTICKFORMAT   = *self.ytickformat, $
               YTICKINTERVAL = *self.ytickinterval, $

@@ -769,14 +769,15 @@ _REF_EXTRA=extra
 	;Get the configuration keywords
 	ps_keys = self.ps_config -> GetKeywords(PAGETYPE=pagetype, FONTTYPE=font, /SANE_OFFSETS)
 	IF StrUpCase(type)      EQ 'EPS' THEN ps_keys.encapsulated = 1
-	IF N_Elements(filename) NE 0     THEN ps_keys.filename     = file_basename(filename)
+	IF N_Elements(filename) NE 0     THEN ps_keys.filename     = filename
 
 	; Cannot successfully convert encapsulated landscape file to raster.
 	; Limitation of ImageMagick, and specifically, GhostScript, which does
 	; the conversion.
 	IF ps_keys.encapsulated && ps_keys.landscape THEN BEGIN
 		Message, 'ImageMagick cannot successfully convert an encapsulated ' + $
-				 'PostScript file in landscape mode to a raster file.'
+				 'PostScript file in landscape mode to a raster file. Setting LANDSCAPE=0', /INFORMATIONAL
+		ps_keys.landscape = 0
 	ENDIF
 
 	;Open the file.

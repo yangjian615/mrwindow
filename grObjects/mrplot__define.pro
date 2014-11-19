@@ -385,7 +385,7 @@ pro MrPlot::doOverplot
         charthick = *self.charthick
         thick     = *self.thick
     endelse
-    
+
     ;Get the dimensions of the independent variable.
     MraOPlot, *self.indep, *self.dep, $
 
@@ -400,12 +400,12 @@ pro MrPlot::doOverplot
               THICK     =       thick, $
 
               ;OPlot Keywords
-              NSUM      =  self. nsum, $
-              POLAR     =  self. polar, $
-              CLIP      = *self. clip, $
-              NOCLIP    = *self. noclip, $
-              T3D       = *self. t3d, $
-              ZVALUE    = *self. zvalue
+              NSUM      =  self.nsum, $
+              POLAR     =  self.polar, $
+              CLIP      = *self.clip, $
+              NOCLIP    = *self.noclip, $
+              T3D       = *self.t3d, $
+              ZVALUE    = *self.zvalue
 END
   
 

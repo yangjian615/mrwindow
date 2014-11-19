@@ -129,11 +129,24 @@ NOERASE=noerase
     IF data && N_Elements(*self.target) GT 0 && Obj_Valid((*self.target)[0]) $
         THEN (*self.target)[0] -> SetCurrent
 
+    ;Size for postscript output
+    if !d.name eq 'PS' then begin
+        self.cgLegend -> GetProperty, CHARSIZE=charsize, CHARTHICK=charchick, THICK=thick, VSPACE=vspace
+        self.cgLegend -> SetProperty, CHARSIZE  = MrPS_Rescale(charsize,  /CHARSIZE), $
+                                      CHARTHICK = MrPS_Rescale(charchick, /CHARTHICK), $
+                                      THICK     = MrPS_Rescale(thick,     /THICK), $
+                                      VSPACE    = 1.0
+    endif
+
     ;Set the location
     self.cgLegend -> SetProperty, DATA=data, LOCATION=new_location, ALIGNMENT=alignment
 
     ;Draw
     self.cgLegend -> Draw
+    
+    ;Reset the sizes and thicknesses
+    if !d.name eq 'PS' $
+        then self.cgLegend -> SetProperty, CHARSIZE=charsize, CHARTHICK=charchick, THICK=thick, VSPACE=vspace
 END
 
 
@@ -541,6 +554,7 @@ _REF_EXTRA=extra
     
     ;Set Defaults
     SetDefaultValue, colors, d_colors
+    SetDefaultValue, charsize, 1.5
 
 ;---------------------------------------------------------------------
 ;Window //////////////////////////////////////////////////////////////

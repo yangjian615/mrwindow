@@ -227,6 +227,21 @@ NOERASE=noerase
         if n_elements(gPalette) gt 0 then *self.palette = gPalette
     ;Otherwise, use the given position
     ENDIF
+    
+    ;Adjust postscript output.
+    if !d.name eq 'PS' then begin
+        tcharsize = MrPS_Rescale(*self.tcharsize, /CHARSIZE)
+        textthick = MrPS_Rescale(self.textthick,  /THICK)
+        charsize  = MrPS_Rescale(self.charsize,   /CHARSIZE)
+        charthick = MrPS_Rescale(*self.charthick, /CHARTHICK)
+        thick     = MrPS_Rescale(*self.thick,     /THICK)
+    endif else begin
+        tcharsize =  self.tcharsize
+        textthick =  self.textthick
+        charsize  =  self.charsize
+        charthick = *self.charthick
+        thick     = *self.thick
+    endelse
 
     ;Draw the Color Bar
     cgColorBar, ANNOTATECOLOR =  self.annotatecolor, $
@@ -250,8 +265,8 @@ NOERASE=noerase
                 RANGE         =  self.range, $
                 REVERSE       =  self.reverse, $
                 RIGHT         =  self.right, $
-                TCHARSIZE     = *self.tcharsize, $
-                TEXTTHICK     =  self.textthick, $
+                TCHARSIZE     =       tcharsize, $
+                TEXTTHICK     =       textthick, $
                 TLOCATION     = *self.tlocation, $
                 TICKINTERVAL  = *self.tickinterval, $
                 TICKNAMES     = *self.ticknames, $
@@ -267,8 +282,8 @@ NOERASE=noerase
                 ;MrGraphicsKeywords
 ;                AXISCOLOR    = *self.axiscolor, $
 ;                BACKGROUND   = cgColor(*self.background), $
-                CHARSIZE      =  self.charsize, $
-                CHARTHICK     = *self.charthick, $
+                CHARSIZE      =       charsize, $
+                CHARTHICK     =       charthick, $
 ;                CLIP         = *self.clip, $
                 COLOR         = *self.color, $
                 DATA          =  self.data, $
