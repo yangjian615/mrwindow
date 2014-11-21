@@ -79,6 +79,8 @@
 ;                           by MrGraphicAtom. Renamed from MrPlotSObject to MrPlotS. - MRA
 ;       2014/03/12  -   If no target is given use the currently selected graphic. Can
 ;                           now set/get superclass properties. - MRA
+;       2014/11/21  -   PSYM property switched from type byte to type short to allow
+;                           negative symbol numbers. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -448,18 +450,18 @@ _REF_EXTRA=extra
     if n_elements(zcoords) ne 0 then *self.zcoords = zcoords
 
     ;cgPlotS Properties
-    if n_elements(color)     ne 0 then *self.color = color
-    if n_elements(psym)      ne 0 then  self.psym = psym
+    if n_elements(color)     ne 0 then *self.color    = color
+    if n_elements(psym)      ne 0 then  self.psym     = psym
     if n_elements(symcolor)  ne 0 then *self.symcolor = symcolor
-    if n_elements(symsize)   ne 0 then  self.symsize = symsize
+    if n_elements(symsize)   ne 0 then  self.symsize  = symsize
     
     ;PlotS Properties
-    if n_elements(clip)      ne 0 then *self.clip = clip
+    if n_elements(clip)      ne 0 then *self.clip      = clip
     if n_elements(linestyle) ne 0 then  self.linestyle = linestyle
-    if n_elements(noclip)    ne 0 then  self.noclip = noclip
-    if n_elements(t3d)       ne 0 then  self.t3d = t3d
-    if n_elements(thick)     ne 0 then  self.thick = thick
-    if n_elements(zvalue)    ne 0 then  self.zvalue = zvalue
+    if n_elements(noclip)    ne 0 then  self.noclip    = noclip
+    if n_elements(t3d)       ne 0 then  self.t3d       = t3d
+    if n_elements(thick)     ne 0 then  self.thick     = thick
+    if n_elements(zvalue)    ne 0 then  self.zvalue    = zvalue
 
     ;Target
     IF N_Elements(target) GT 0 THEN IF Obj_Valid(target) $
@@ -768,7 +770,7 @@ pro MrPlotS__define, class
               ;cgPlotS Properties
               color:      ptr_new(), $
               map_object: obj_new(), $
-              psym:       0B, $
+              psym:       0S, $
               symcolor:   ptr_new(), $
               symsize:    0.0, $
               
