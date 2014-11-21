@@ -236,7 +236,7 @@ NOERASE=noerase
         charthick = MrPS_Rescale(*self.charthick, /CHARTHICK)
         thick     = MrPS_Rescale(*self.thick,     /THICK)
     endif else begin
-        tcharsize =  self.tcharsize
+        tcharsize = *self.tcharsize
         textthick =  self.textthick
         charsize  =  self.charsize
         charthick = *self.charthick
