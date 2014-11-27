@@ -53,6 +53,9 @@
 ; :History:
 ;	Modification History::
 ;       2014/06/10  -   Written by Matthew Argall
+;       2014/11/24  -   Shift the legend down by half a character size when a box is not
+;                           being drawn so that LOCATION indicates the top of the first
+;                           legend item, not its middle. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -118,7 +121,7 @@ NOERASE=noerase
     IF self.hide EQ 1 THEN RETURN
 
     ;Generate a location?
-    self.cgLegend -> GetProperty, DATA=data, LOCATION=location
+    self.cgLegend -> GetProperty, DATA=data, LOCATION=location, BOX=box
     IF self._location NE 0B $
         THEN new_location = self -> CalculateLocation(ALIGNMENT=alignment) $
         ELSE new_location = location
@@ -128,15 +131,20 @@ NOERASE=noerase
     ;       data to normal coodinates. Therefore, the target must be the current graphic.
     IF data && N_Elements(*self.target) GT 0 && Obj_Valid((*self.target)[0]) $
         THEN (*self.target)[0] -> SetCurrent
+    
+    ;If a box is not being drawn, shift the legend down have a character size
+    ;   - LOCATION specifies the end point of the legend line
+    ;   - I want it to specify the location of the top of the first text item
+    if ~box then new_location -= [0.0, 0.55 * float(!d.y_ch_size) / !d.y_size]
 
     ;Size for postscript output
-    if !d.name eq 'PS' then begin
+    IF !d.name EQ 'PS' THEN BEGIN
         self.cgLegend -> GetProperty, CHARSIZE=charsize, CHARTHICK=charchick, THICK=thick, VSPACE=vspace
         self.cgLegend -> SetProperty, CHARSIZE  = MrPS_Rescale(charsize,  /CHARSIZE), $
                                       CHARTHICK = MrPS_Rescale(charchick, /CHARTHICK), $
                                       THICK     = MrPS_Rescale(thick,     /THICK), $
                                       VSPACE    = 1.0
-    endif
+    ENDIF
 
     ;Set the location
     self.cgLegend -> SetProperty, DATA=data, LOCATION=new_location, ALIGNMENT=alignment
@@ -145,8 +153,8 @@ NOERASE=noerase
     self.cgLegend -> Draw
     
     ;Reset the sizes and thicknesses
-    if !d.name eq 'PS' $
-        then self.cgLegend -> SetProperty, CHARSIZE=charsize, CHARTHICK=charchick, THICK=thick, VSPACE=vspace
+    IF !d.name EQ 'PS' $
+        THEN self.cgLegend -> SetProperty, CHARSIZE=charsize, CHARTHICK=charchick, THICK=thick, VSPACE=vspace
 END
 
 
@@ -398,11 +406,11 @@ _REF_EXTRA=extra
     ENDCASE
         
     ;Set legend properties
-    self.cgLegend -> SetProperty, ALIGNMENT=alignment, $
-                                  DATA=data, $
-                                  LOCATION=new_location, $
-                                  VISIBLE=~self.hide, $
-                                 _STRICT_EXTRA=extra
+    self.cgLegend -> SetProperty, ALIGNMENT    = alignment, $
+                                  DATA         = data, $
+                                  LOCATION     = new_location, $
+                                  VISIBLE      = ~self.hide, $
+                                 _STRICT_EXTRA = extra
     
     ;Set the target
     ;   - Make sure that all targets are valid.
