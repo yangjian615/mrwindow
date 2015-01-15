@@ -817,9 +817,9 @@ TYPE = type
         ;Objects that are of type "data" may fall into the auto-updating plot layout.
         ;As such, when they are removed from the container, they also need to be removed
         ;from the layout.
-        oTypes = typename(Child_Object)
+        oTypes = MrObj_Class(Child_Object)
         tf_data = MrIsMember((*self.gTypes).data, oTypes)
-        
+
         ;Step through all of the objects.
         for i = 0, nRemove - 1 do begin
         

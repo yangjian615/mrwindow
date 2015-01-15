@@ -569,12 +569,8 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
     ;Superclass
     ;   - Takes the window from the target, but does not set the target.
-    if self -> MrGrAtom::INIT(HIDE=hide, TARGET=target, _STRICT_EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGrAtom'
-    
-    ;Refresh the window?
-    self.window -> GetProperty, REFRESH=refreshIn
-    if refreshIn then self.window -> Refresh, /DISABLE
+    success = self -> MrGrAtom::INIT(HIDE=hide, TARGET=target, WINREFRESH=refreshIn, _STRICT_EXTRA=extra)
+    if success eq 0 then message, 'Unable to initialize MrGrAtom'
     
 ;---------------------------------------------------------------------
 ; Create the Legend //////////////////////////////////////////////////
