@@ -295,6 +295,7 @@ NOERASE=noerase
              DEVICE        =  self.device, $
              NORMAL        =  self.normal, $
              FONT          = *self.font, $
+             LINESTYLE     = *self.linestyle, $
              NOCLIP        = *self.noclip, $
              NODATA        = *self.nodata, $
              NOERASE       =       noerase, $

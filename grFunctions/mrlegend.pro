@@ -62,7 +62,6 @@
 ;       2014/06/10  -   Use the MrLegend object instead of weLegendItem. - MRA
 ;-
 function MrLegend, $
- CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -78,7 +77,7 @@ _REF_EXTRA = extra
     current = keyword_set(current)
 
     ;Create the legend
-    theLegend = obj_new('MrLegend', CURRENT=current, _STRICT_EXTRA=extra)
+    theLegend = obj_new('MrLegend', _STRICT_EXTRA=extra)
     
     return, theLegend
 end

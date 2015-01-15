@@ -455,6 +455,12 @@ ERASE=erase
     if self.buffer then begin
         thisDevice = !d.name
         set_plot, 'Z'
+        
+        ;Use 24-bit color to prevent color-table mixing.
+        if MrCmpVersion('6.4') le 0 $
+            then device, SET_PIXEL_DEPTH=24 $
+            else message, '8-bit color output in Z buffer does not maintain a consistent color tabel.', /INFORMATIONAL
+    
     endif else if self._realized eq 0 then begin
         self -> Realize
         return
@@ -913,6 +919,7 @@ end
 ;                           
 ;-
 pro MrWindow::GetProperty, index, $
+BUFFER = buffer, $
 NAME = name, $
 REFRESH = refresh, $
 SAVEDIR = save_dir, $
@@ -947,6 +954,7 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
     
     ;Get Properties
+    if arg_present(buffer)  then buffer  = self.buffer
     if arg_present(cmode)   then cmode   = self.cmode
     if arg_present(name)    then name    = self.name
     if arg_present(refresh) then refresh = self._refresh
