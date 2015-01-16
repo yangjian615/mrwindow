@@ -858,9 +858,9 @@ _REF_EXTRA = extra
     ;Number of defaults to use.
     ;   - There are at most two dimensions.
     ;   -   dimension=2
-    
+    nDims   = size(*self.dep, /N_DIMENSIONS)
     depDims = size(*self.dep, /DIMENSIONS)
-    if self.dimension eq 0 $
+    if nDims eq 1 || self.dimension eq 0 $
         then nDefaults = 1 $
         else nDefaults = depDims[2-self.dimension]
     

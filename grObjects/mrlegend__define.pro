@@ -51,6 +51,7 @@
 ;       2014/12/22  -   Completely rewritten. Independent of cgLegendItem. Based on IDL's
 ;                           Legend() function. Includes MrLegend_Item objects, MARGINS
 ;                           and SYM* properties.
+;       2015/01/15  -   RELATIVE is now independent of axis range (i.e. [max, min]). - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -743,12 +744,17 @@ PRO MrLegend::CalculateBoxSize
 		;RELATIVE
 		self.relative: BEGIN
 			;Convert from relative to data coordinates.
+			;   - If the range is [max, min], we must apply the normalization differently
 			target -> GetProperty, XRANGE=xrange, YRANGE=yrange
-			location = [ ((max(xrange, MIN=xmin, /NAN) - xmin) * self.position[0]) + xmin, $
-			             ((max(yrange, MIN=ymin, /NAN) - ymin) * self.position[1]) + ymin ]
+			IF xrange[1] GT xrange[0] $
+			    THEN xpos = ((max(xrange, MIN=xmin, /NAN) - xmin) *        self.position[0])  + xmin $
+			    ELSE xpos = ((max(xrange, MIN=xmin, /NAN) - xmin) * (1.0 - self.position[0])) + xmin
+			IF yrange[1] GT yrange[0] $
+			    THEN ypos = ((max(yrange, MIN=ymin, /NAN) - ymin) *        self.position[1])  + ymin $
+			    ELSE ypos = ((max(yrange, MIN=ymin, /NAN) - ymin) * (1.0 - self.position[1])) + ymin
 
 			;Convert from data to normal coordinates.
-			location = target -> ConvertCoord(location, /DATA, /TO_NORMAL)
+			location = target -> ConvertCoord([xpos, ypos], /DATA, /TO_NORMAL)
 		ENDCASE
 		
 		;DEVICE
@@ -881,21 +887,23 @@ NOERASE=noerase
 	y_char = Float(!D.Y_Ch_Size) / !D.Y_Size
 
 	; We want to draw in decomposed color, if possible.
-	tvlct, r, g, b, /GET
+	TVLCT, r, g, b, /GET
 	cgSetColorState, 1, Current=incomingColorState
 
-	;Legend properties
-	color      = cgColor(*self.color)
-	fill_color = cgColor(*self.fill_color)
-	linestyle  = MrLinestyle(*self.linestyle)
+	;Convert properties
+	color     = cgColor(*self.color)
+	linestyle = MrLinestyle(*self.linestyle)
 
 ;-----------------------------------------------------
 ; Draw the Box \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
 
 	;Fill the background?
-	IF ~(MrIsA(*self.fill_color, 'STRING') && *self.fill_color EQ '') $
-		THEN cgColorFill, POSITION=self.bx_pos, COLOR=fill_color
+	;   - cgColor does not like when FILL_COLOR is the empty string.
+	IF ~(MrIsA(*self.fill_color, 'STRING') && *self.fill_color EQ '') THEN BEGIN
+        fill_color = cgColor(*self.fill_color)
+		cgColorFill, POSITION=self.bx_pos, COLOR=fill_color
+	ENDIF
 
 	;Draw the box outline.
 	IF linestyle NE 6 THEN BEGIN
@@ -925,7 +933,7 @@ NOERASE=noerase
 
 	;Restore starting color state.
 	cgSetColorState, incomingColorState
-	tvlct, r, g, b
+	TVLCT, r, g, b
 END
 
 
@@ -1140,6 +1148,7 @@ END
 ;-
 PRO MrLegend::GetProperty, item, $
 ALIGNMENT=alignment, $
+BX_POS=bx_pos, $
 COLOR=color, $
 DATA=data, $
 DEVICE=device, $
@@ -1167,27 +1176,16 @@ _REF_EXTRA=extra
         RETURN
     ENDIF
 
+    ;Get an item's properties
 	IF N_Elements(item) GT 0 THEN BEGIN
 		oItem = self -> GetItem(item)
-		oItem -> GetProperty, _STRICT_EXTRA=['AUTO_TEXT_COLOR', $
-		                                     'LABEL', $
-		                                     'SAMPLE_ANGLE', $
-		                                     'SAMPLE_COLOR', $
-		                                     'SAMPLE_MAGNITUDE', $
-		                                     'SAMPLE_WIDTH', $
-		                                     'SAMPLE_LINESTYLE', $
-		                                     'SYMBOL', $
-		                                     'SYM_CENTER', $
-		                                     'SYM_COLOR', $
-		                                     'SYM_SIZE', $
-		                                     'SYM_THICK', $
-		                                     'TARGET', $
-		                                     'TEXT_COLOR', $
-		                                     'TEXT_THICK']
+		oItem -> GetProperty, _STRICT_EXTRA=extra
 		RETURN
 	ENDIF
 
+    ;Get legend properties
 	IF Arg_Present(alignment)            THEN alignment            =  self.alignment
+	IF Arg_Present(bx_pos)               THEN bx_pos               =  self.bx_pos
 	IF Arg_Present(color)                THEN color                = *self.color
 	IF Arg_Present(fill_color)           THEN fill_color           = *self.fill_color
 	IF Arg_Present(hardware)             THEN hardware             =  self.hardware
@@ -1207,7 +1205,7 @@ _REF_EXTRA=extra
 	IF Arg_Present(vertical_spacing)     THEN vertical_spacing     =  self.vertical_spacing
 
 	;Keywords for MrGrAtom
-	IF N_Elements(extra) GT 0 THEN self -> MrGrAtom::GetProperty, _STRICT_EXTRA=['HIDE', 'NAME', 'WINDOW']
+	IF N_Elements(extra) GT 0 THEN self -> MrGrAtom::GetProperty, _STRICT_EXTRA=extra
 END
 
 
