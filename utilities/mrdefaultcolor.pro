@@ -1,0 +1,1 @@
+/Users/argall/Documents/IDL/IDLlib/plot_utils/mrdefaultcolor.pro

@@ -1,1 +1,0 @@
-/Users/argall/Documents/IDL/WileEGraphics/welegenditem__define.pro

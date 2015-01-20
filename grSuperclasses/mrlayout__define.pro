@@ -78,44 +78,76 @@ function MrLayout::_OverloadPrint
     
     undefined = '<undefined>'
     
-    ;Create the string
-    charsize = string('CharSize', '=',  self.charsize, FORMAT='(a-26, a-2, f0)')
-    layout   = string('Layout',   '=',  self.layout,   FORMAT='(a-26, a-2, 3(i0, 2x))')
-    oxmargin = string('OXMargin', '=',  self.oxmargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
-    oymargin = string('OYMargin', '=',  self.oymargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
-    position = string('Position', '=',  self.position, FORMAT='(a-26, a-2, 4(f0, 2x))')
-    xmargin  = string('IXMargin', '=',  self.ixmargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
-    xgap     = string('XGap',     '=', *self.xgap,     FORMAT='(a-26, a-2, f0)')
-    x_region = string('X_Region', '=',  self.x_region, FORMAT='(a-26, a-2, 4(f0, 2x))')
-    x_window = string('X_Window', '=',  self.x_window, FORMAT='(a-26, a-2, 4(f0, 2x))')
-    ymargin  = string('IYMargin', '=',  self.iymargin, FORMAT='(a-26, a-2, 2(f0, 2x))')
-    ygap     = string('YGap',     '=', *self.ygap,     FORMAT='(a-26, a-2, f0)')
-    y_region = string('Y_Region', '=',  self.y_region, FORMAT='(a-26, a-2, 4(f0, 2x))')
-    y_window = string('Y_Window', '=',  self.y_window, FORMAT='(a-26, a-2, 4(f0, 2x))')
+    ;Column Width
+    if n_elements(*self.col_width) eq 0 $
+        then col_width = undefined $
+        else col_width = '[' + strjoin(string(*self.col_width, FORMAT='(f6.4)'), ', ') + ']'
+        
+    ;Row Height
+    if n_elements(*self.row_height) eq 0 $
+        then row_height = undefined $
+        else row_height = '[' + strjoin(string(*self.row_height, FORMAT='(f6.4)'), ', ') + ']'
     
-    ;Pointers may or may not have a value
-    aspect = string('Aspect', '=', FORMAT='(a-26, a-2)')
-    if n_elements(*self.aspect) eq 0 then aspect += undefined else aspect += string(*self.aspect, FORMAT='(f0)')
+    ;Aspect Ratio
+    if n_elements(*self.aspect) eq 0 $
+        then aspect = undefined $
+        else aspect = string(*self.aspect, FORMAT='(f0)')
+
+    ;XGap
+    case n_elements(*self.xgap) of
+        0:    xgap = undefined
+        1:    xgap = string(*self.xgap, FORMAT='(f0.4)')
+        else: xgap = '[' + strjoin(string(*self.xgap, FORMAT='(f0.4)'), ', ') + ']'
+    endcase
+    
+    ;YGap
+    case n_elements(*self.ygap) of
+        0:    ygap = undefined
+        1:    ygap = string(*self.ygap, FORMAT='(f0.4)')
+        else: ygap = '[' + strjoin(string(*self.ygap, FORMAT='(f0.4)'), ', ') + ']'
+    endcase
+    
+    ;Create the string
+    aspect     = string('Aspect',    '=',       aspect,     FORMAT='(a-26, a-2, a0)')
+    charsize   = string('CharSize',  '=',  self.charsize,   FORMAT='(a-26, a-2, f0)')
+    col_width  = string('Col_Width', '=',       col_width,  FORMAT='(a-26, a-2, a0)')
+    ixmargin   = string('IXMargin',  '=',  self.ixmargin,   FORMAT='(a-26, a-2, 2(f0, 2x))')
+    iymargin   = string('IYMargin',  '=',  self.iymargin,   FORMAT='(a-26, a-2, 2(f0, 2x))')
+    layout     = string('Layout',    '=',  self.layout,     FORMAT='(a-26, a-2, 3(i0, 2x))')
+    oxmargin   = string('OXMargin',  '=',  self.oxmargin,   FORMAT='(a-26, a-2, 2(f0, 2x))')
+    oymargin   = string('OYMargin',  '=',  self.oymargin,   FORMAT='(a-26, a-2, 2(f0, 2x))')
+    position   = string('Position',  '=',  self.position,   FORMAT='(a-26, a-2, 4(f0, 2x))')
+    xmargin    = string('IXMargin',  '=',  self.ixmargin,   FORMAT='(a-26, a-2, 2(f0, 2x))')
+    row_height = string('Col_Width', '=',       row_height, FORMAT='(a-26, a-2, a0)')
+    xgap       = string('XGap',      '=',       xgap,       FORMAT='(a-26, a-2, a0)')
+    x_region   = string('X_Region',  '=',  self.x_region,   FORMAT='(a-26, a-2, 2(f0, 2x))')
+    x_window   = string('X_Window',  '=',  self.x_window,   FORMAT='(a-26, a-2, 2(f0, 2x))')
+    ygap       = string('YGap',      '=',       ygap,       FORMAT='(a-26, a-2, a0)')
+    y_region   = string('Y_Region',  '=',  self.y_region,   FORMAT='(a-26, a-2, 2(f0, 2x))')
+    y_window   = string('Y_Window',  '=',  self.y_window,   FORMAT='(a-26, a-2, 2(f0, 2x))')
     
     ;Combine all of the string into an array
     result = [ aspect, $
                charsize, $
+               col_width, $
+               ixmargin, $
+               iymargin, $
                layout, $
                oxmargin, $
                oymargin, $
                position, $
+               row_height, $
                xmargin, $
                xgap, $
                x_region, $
                x_window, $
-               ymargin, $
                ygap, $
                y_region, $
                y_window $
              ]
     
     ;Return a column vector so that everything is printed on its own line.
-    return, transpose(result)
+    return, '  ' + transpose(result)
 end
 
 
@@ -512,25 +544,35 @@ YGAP=ygap
         else: message, 'MARGIN must be a scalar or 4-element vector.'
     endcase
     
-    ;Defualt Values
-    if n_elements(charsize) gt 0 then self.charsize = charsize else self.charsize = 1.5
-    if n_elements(iymargin) gt 0 then self.iymargin = iymargin else self.iymargin = [0,0]
-    if n_elements(ixmargin) gt 0 then self.ixmargin = ixmargin else self.ixmargin = [0,0]
-    if n_elements(oxmargin) gt 0 then self.oxmargin = oxmargin else self.oxmargin = [10, 3]
-    if n_elements(oymargin) gt 0 then self.oymargin = oymargin else self.oymargin = [4,2]
-    
     ;Default pointers
     self.aspect     = ptr_new(/ALLOCATE_HEAP)
     self.col_width  = ptr_new(/ALLOCATE_HEAP)
     self.row_height = ptr_new(/ALLOCATE_HEAP)
     self.xgap       = ptr_new(/ALLOCATE_HEAP)
     self.ygap       = ptr_new(/ALLOCATE_HEAP)
-    if n_elements(layout)     gt 0 then  self.layout     = layout     else self.layout = [0,0,0]
+    
+    ;Defualt Values
+    if n_elements(charsize) eq 0 then charsize = 1.5
+    if n_elements(iymargin) eq 0 then iymargin = [0,0]
+    if n_elements(ixmargin) eq 0 then ixmargin = [0,0]
+    if n_elements(layout)   eq 0 then layout   = [0,0,0]
+    if n_elements(oxmargin) eq 0 then oxmargin = [10, 3]
+    if n_elements(oymargin) eq 0 then oymargin = [4,2]
+    if n_elements(xgap)     eq 0 then xgap     = 14
+    if n_elements(ygap)     eq 0 then ygap     = 6
+
+    ;Set Properties
+    self.charsize = charsize
+    self.ixmargin = ixmargin
+    self.iymargin = iymargin
+    self.layout   = layout
+    self.oxmargin = oxmargin
+    self.oymargin = oymargin
+    *self.xgap    = xgap
+    *self.ygap    = ygap
     if n_elements(aspect)     gt 0 then *self.aspect     = aspect
     if n_elements(col_width)  gt 0 then *self.col_width  = col_width
     if n_elements(row_height) gt 0 then *self.row_height = row_height
-    if n_elements(xgap)       gt 0 then *self.xgap       = xgap       else *self.xgap = 14
-    if n_elements(ygap)       gt 0 then *self.ygap       = ygap       else *self.ygap = 6
     
     ;Default position
     if array_equal(self.layout, [0,0,0]) then begin
@@ -538,7 +580,7 @@ YGAP=ygap
             then self.position = [0.125, 0.125, 0.925, 0.9] $
             else self.position = position
     endif
-    
+
     return, 1
 end
 

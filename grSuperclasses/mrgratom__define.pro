@@ -80,12 +80,12 @@ function MrGrAtom::_OverloadPrint
     name = string('Name', '=', self.name, FORMAT='(a-26, a-2, a0)')
     
     ;Combine the results
-    result = [ hide, $
-               name $
+    result = [ [hide], $
+               [name] $
              ]
 
     ;Return a column so that each property is printed on a separate line.
-    return, transpose(result)
+    return, '  ' + result
 end
 
 

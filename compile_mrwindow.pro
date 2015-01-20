@@ -3,6 +3,10 @@
 .comp ./mrwindow.pro
 
 ;Abstract Classes
+.comp ./AbstractClasses/mrabstractarrow__define.pro
+.comp ./AbstractClasses/mrabstracttext__define.pro
+.comp ./AbstractClasses/mrmanipulate__define.pro
+.comp ./AbstractClasses/mrabstractanalysis__define.pro
 .comp ./AbstractClasses/mrabstractanalysis__define.pro
 .comp ./AbstractClasses/mrcursor__define.pro
 .comp ./AbstractClasses/mrsaveas__define.pro
@@ -41,6 +45,7 @@
 .comp ./grManager/mrgrlayout__define.pro
 .comp ./grManager/mridl_container__define.pro
 .comp ./grManager/mrplotmanager__define.pro
+.comp ./grManager/mrwindow_container__define.pro
 
 ;Graphic Objects
 .comp ./grObjects/mraxis__define.pro
@@ -51,16 +56,15 @@
 .comp ./grObjects/mrlegend__define.pro
 .comp ./grObjects/mrplot__define.pro
 .comp ./grObjects/mrplots__define.pro
-.comp ./grObjects/wearrow__define.pro
-.comp ./grObjects/wecolorbar__define.pro
-.comp ./grObjects/welegenditem__define.pro
-.comp ./grObjects/weoverplot__define.pro
-.comp ./grObjects/wetext__define.pro
+.comp ./WileEGraphics/wearrow__define.pro
+.comp ./WileEGraphics/wecolorbar__define.pro
+.comp ./WileEGraphics/weoverplot__define.pro
 
 ;Graphic Superclasses
 .comp ./grSuperclasses/mrdatacoords__define.pro
 .comp ./grSuperclasses/mrgraphicskeywords__define.pro
 .comp ./grSuperclasses/mrgratom__define.pro
+.comp ./grSuperclasses/mrgrdataatom__define.pro
 .comp ./grSuperclasses/mrlayout__define.pro
 
 ;Widgets
@@ -74,17 +78,18 @@
 ;Utilities
 .comp ./utilities/dot_product.pro
 .comp ./utilities/epoch_to_ssm.pro
-.comp ./utilities/mrindexrange.pro
 .comp ./utilities/getmrwindows.pro
-.comp ./utilities/mrismember.pro
 .comp ./utilities/linspace.pro
 .comp ./utilities/moveplot_gui.pro
 .comp ./utilities/mraimage.pro
 .comp ./utilities/mraoplot.pro
 .comp ./utilities/mraplot.pro
 .comp ./utilities/mrcmpversion.pro
+.comp ./utilities/mrdefaultcolor.pro
 .comp ./utilities/mrgetwindow.pro
 .comp ./utilities/mrhtvelocity.pro
+.comp ./utilities/mrindexrange.pro
+.comp ./utilities/mrismember.pro
 .comp ./utilities/mrisnull.pro
 .comp ./utilities/mrlayout.pro
 .comp ./utilities/mrnull.pro

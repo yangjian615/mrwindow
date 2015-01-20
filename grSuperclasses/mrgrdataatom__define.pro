@@ -78,21 +78,31 @@ function MrGrDataAtom::_OverloadPrint
     
     ;First, get the results from the superclasses
     atomKeys = self -> MrGrAtom::_OverloadPrint()
-    grKeys = self -> MrGraphicsKeywords::_OverloadPrint()
-    layKeys = self.layout -> _OverloadPrint()
+    grKeys   = self -> MrGraphicsKeywords::_OverloadPrint()
+    layKeys  = self.layout -> _OverloadPrint()
+
+    ;Minimum Value
+    if n_elements(*self.min_value) eq 0 $
+        then min_value = undefined $
+        else min_value = string(min_value, FORMAT='(f0)')
+
+    ;Maximum Value
+    if n_elements(*self.max_value) eq 0 $
+        then max_value = undefined $
+        else max_value = string(max_value, FORMAT='(f0)')
+    
+    ;Target
+    if obj_valid(self.target) eq 0 $
+        then target = undefObj $
+        else target = MrObj_Class(*self.target)
 
     ;Class Properties
     overplot  = string('OverPlot',  '=', self.overplot,  FORMAT='(a-26, a-2, i1)')
-    xlog      = string('Xlog',      '=', self.xlog,      FORMAT='(a-26, a-2, i1)')
+    xlog      = string('XLog',      '=', self.xlog,      FORMAT='(a-26, a-2, i1)')
     ylog      = string('YLog',      '=', self.ylog,      FORMAT='(a-26, a-2, i1)')
-    max_value = string('Max_Value', '=', FORMAT='(a-26, a-2)')
-    min_value = string('Min_Value', '=', FORMAT='(a-26, a-2)')
-    target    = string('Target',    '=', FORMAT='(a-26, a-2)')
-    
-    ;Pointers
-    if n_elements(*self.max_value) eq 0 then max_value += default else max_value += string(*self.max_value, FORMAT='(f0)')
-    if n_elements(*self.min_value) eq 0 then min_value += default else min_value += string(*self.min_value, FORMAT='(f0)')
-    if n_elements(*self.target) eq 0 then target += undefObj else target += strjoin(MrObj_Class(*self.target), joinStr)
+    max_value = string('Max_Value', '=',      max_value, FORMAT='(a-26, a-2, a0)')
+    min_value = string('Min_Value', '=',      min_value, FORMAT='(a-26, a-2, a0)')
+    target    = string('Target',    '=',      target,    FORMAT='(a-26, a-2, a0)')
     
     ;Put MrGrDataAtom properties together
     selfStr = obj_class(self) + '  <' + strtrim(obj_valid(self, /GET_HEAP_IDENTIFIER), 2) + '>'
@@ -105,9 +115,10 @@ function MrGrDataAtom::_OverloadPrint
                ]
 
     ;Group everything in alphabetical order
-    result = [[atomKeys], [grKeys], [layKeys], [plotKeys]]
-    result = result[sort(result)]
-    
+    ;   - Pad by two characters
+    result = [[atomKeys], [grKeys], [layKeys], ['  ' + plotKeys]]
+    result = result[0,sort(result)]
+
     return, result
 end
 
@@ -618,7 +629,7 @@ _REF_EXTRA = extra
   
     ;Layout -- Must be done before initializing MrGrAtom
     self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
-    
+
     ;Was the /OVERPLOT keyword set instead of giving a target
     if MrIsA(target, /SCALAR, 'INT') $
         then if keyword_set(target) then target = self -> _GetTarget()

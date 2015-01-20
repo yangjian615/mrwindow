@@ -444,8 +444,8 @@ QUIET = quiet
         theObjects[i] -> SetLayout, LAYOUT=loc, POSITION=pos, $
                                     ASPECT=*self.aspect, $
                                     OXMARGIN=self.oxmargin, OYMARGIN=self.oymargin, $
-                                    IXMARGIN=self.ixmargin, XGAP=self.xgap, $
-                                    IYMARGIN=self.iymargin, YGAP=self.ygap, $
+                                    IXMARGIN=self.ixmargin, XGAP=*self.xgap, $
+                                    IYMARGIN=self.iymargin, YGAP=*self.ygap, $
                                     UPDATE_LAYOUT=0
 
         ;Store the location and position if they were created.
@@ -518,8 +518,8 @@ pro MrPlotManager::ApplyPositions
         dataObjs[i] -> SetLayout, LAYOUT=layout, POSITION=position, UPDATE_LAYOUT=0, $
                                   ASPECT=*self.aspect, $
                                   OXMARGIN=self.oxmargin, OYMARGIN=self.oymargin, $
-                                  IXMARGIN=self.ixmargin, XGAP=self.xgap, $
-                                  IYMARGIN=self.iymargin, YGAP=self.ygap
+                                  IXMARGIN=self.ixmargin, XGAP=*self.xgap, $
+                                  IYMARGIN=self.iymargin, YGAP=*self.ygap
     endfor
 end
 

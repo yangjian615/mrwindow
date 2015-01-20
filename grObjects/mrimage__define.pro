@@ -91,65 +91,75 @@ function MrImage::_OverloadPrint
     ;Superclasses
     grKeys = self -> MrGrDataAtom::_OverloadPrint()
     
-    ;Object Properties
-    tv       = string('TV',       '=', self.tv,       FORMAT='(a-26, a-2, i1)')
-    idisplay = string('iDisplay', '=', self.idisplay, FORMAT='(a-26, a-2, i0)')
-    center   = string('Center',   '=', self.center,   FORMAT='(a-26, a-2, i1)')
-    paint    = string('Paint',    '=', self.paint,    FORMAT='(a-26, a-2, i1)')
+    ;Color Table Index
+    if n_elements(*self.ctindex) eq 0 $
+        then ctindex = undefined $
+        else ctindex = string(*self.ctindex, FORMAT='(i0)')
     
-    ;Pointers
-    axes          = string('Axes',          '=', FORMAT='(a-26, a-2)')
-    bottom        = string('Bottom',        '=', FORMAT='(a-26, a-2)')
-    ctindex       = string('CTIndex',       '=', FORMAT='(a-26, a-2)')
-    data_pos      = string('Data_Pos',      '=', FORMAT='(a-26, a-2)')
-    missing_value = string('Missing_Value', '=', FORMAT='(a-26, a-2)')
-    missing_color = string('Missing_Color', '=', FORMAT='(a-26, a-2)')
-    nan           = string('NaN',           '=', FORMAT='(a-26, a-2)')
-    palette       = string('Palette',       '=', FORMAT='(a-26, a-2)')
-    range         = string('Range',         '=', FORMAT='(a-26, a-2)')
-    scale         = string('Scale',         '=', FORMAT='(a-26, a-2)')
-    top           = string('Top',           '=', FORMAT='(a-26, a-2)')
+    ;Data Position
+    if n_elements(*self.data_pos) eq 0 $
+        then data_pos = undefined $
+        else data_pos = '[' + strjoin(string(*self.data_pos, FORMAT='(f0)'), ', ') + ']'
     
-    ;Value or Undefined?
-    if n_elements(*self.axes)          eq 0 then axes          += undefined else axes          += string(*self.axes,          FORMAT='(i1)')
-    if n_elements(*self.bottom)        eq 0 then bottom        += undefined else bottom        += string(*self.bottom,        FORMAT='(i0)')
-    if n_elements(*self.ctindex)       eq 0 then ctindex       += undefined else ctindex       += string(*self.ctindex,       FORMAT='(i0)')
-    if n_elements(*self.data_pos)      eq 0 then data_pos      += undefined else data_pos      += string(*self.data_pos,      FORMAT='(4(f0, 3x))')
-    if n_elements(*self.missing_value) eq 0 then missing_value += undefined else missing_value += string(*self.missing_value, FORMAT='(f0)')
-    if n_elements(*self.missing_color) eq 0 then missing_color += undefined else missing_color += string(*self.missing_color, FORMAT='(a0)')
-    if n_elements(*self.nan)           eq 0 then nan           += undefined else nan           += string(*self.nan,           FORMAT='(i1)')
-    if n_elements(*self.range)         eq 0 then range         += undefined else range         += string(*self.range,         FORMAT='(2(f0, 3x))')
-    if n_elements(*self.scale)         eq 0 then scale         += undefined else scale         += string(*self.scale,         FORMAT='(i1)')
-    if n_elements(*self.top)           eq 0 then top           += undefined else top           += string(*self.top,           FORMAT='(i0)')
-    if n_elements(*self.max_value)     eq 0 then max_value     += undefined else max_value     += string(*self.max_value,     FORMAT='(f0)')
-    if n_elements(*self.min_value)     eq 0 then min_value     += undefined else min_value     += string(*self.min_value,     FORMAT='(f0)')
-
-    ;Get the help string
-    if n_elements(*self.palette) gt 0 then begin
-        help, *self.palette, OUTPUT=tempStr
-        palette += tempStr
-    endif else palette += undefined 
-    
+    ;Missing Value
+    if n_elements(*self.missing_value) eq 0 $
+        then missing_value = undefined $
+        else missing_value = '[' + strjoin(string(*self.missing_value, FORMAT='(f)'), ', ') + ']'
+        
+    axes           = string('Axes',           '=', self.axes,           FORMAT='(a-26, a-2, i1)')
+    bottom         = string('Bottom',         '=', self.bottom,         FORMAT='(a-26, a-2, i3)')
+    brewer         = string('Brewer',         '=', self.brewer,         FORMAT='(a-26, a-2, i1)')
+    center         = string('Center',         '=', self.center,         FORMAT='(a-26, a-2, i1)')
+    ctindex        = string('CTIndex',        '=',      ctindex,        FORMAT='(a-26, a-2, a0)')
+    data_pos       = string('Data_Pos',       '=',      data_pos,       FORMAT='(a-26, a-2, a0)')
+    idisplay       = string('iDisplay',       '=', self.idisplay,       FORMAT='(a-26, a-2, i0)')
+    log            = string('Log',            '=', self.log,            FORMAT='(a-26, a-2, i1)')
+    missing_value  = string('Missing_Value',  '=',      missing_value,  FORMAT='(a-26, a-2, a0)')
+    missing_color  = string('Missing_Color',  '=', self.missing_color,  FORMAT='(a-26, a-2, a0)')
+    missing_index  = string('Missing_Index',  '=', self.missing_index,  FORMAT='(a-26, a-2, i0)')
+    nan            = string('NaN',            '=', self.nan,            FORMAT='(a-26, a-2, i1)')
+    paint          = string('Paint',          '=', self.paint,          FORMAT='(a-26, a-2, i1)')
+    palette        = string('Palette',        '=', 'BYTARR(255,3)',     FORMAT='(a-26, a-2, a0)')
+    polar          = string('Polar',          '=', self.polar,          FORMAT='(a-26, a-2, i1)')
+    pol_rcolor     = string('Pol_RColor',     '=', self.pol_rcolor,     FORMAT='(a-26, a-2, a0)')
+    pol_rlinestyle = string('Pol_RLineStyle', '=', self.pol_rlinestyle, FORMAT='(a-26, a-2, i1)')
+    pol_tcolor     = string('Pol_TColor',     '=', self.pol_tcolor,     FORMAT='(a-26, a-2, a0)')
+    pol_tlinestyle = string('Pol_TLineStyle', '=', self.pol_tlinestyle, FORMAT='(a-26, a-2, i1)')
+    pol_thick      = string('Pol_Thick',      '=', self.pol_thick,      FORMAT='(a-26, a-2, f0)')
+    range          = string('Range',          '=', self.range,          FORMAT='(a-26, a-2, "[", f0, ", ", f0, "]")')
+    scale          = string('Scale',          '=', self.scale,          FORMAT='(a-26, a-2, i1)')
+    top            = string('Top',            '=', self.top,            FORMAT='(a-26, a-2, i1)')
+    tv             = string('TV',             '=', self.tv,             FORMAT='(a-26, a-2, i1)')
+        
     selfStr = obj_class(self) + '  <' + strtrim(obj_valid(self, /GET_HEAP_IDENTIFIER), 2) + '>'
-    imKeys = [ tv, $
-               idisplay, $
-               center, $
-               paint, $
-               axes, $
-               bottom, $
-               ctindex, $
-               data_pos, $
-               missing_value, $
-               missing_color, $
-               nan, $
-               palette, $
-               range, $
-               scale, $
-               top $
+    imKeys = [ [axes], $
+               [bottom], $
+               [brewer], $
+               [center], $
+               [ctindex], $
+               [data_pos], $
+               [idisplay], $
+               [log], $
+               [missing_value], $
+               [missing_color], $
+               [missing_index], $
+               [nan], $
+               [paint], $
+               [palette], $
+               [polar], $
+               [pol_rcolor], $
+               [pol_rlinestyle], $
+               [pol_tcolor], $
+               [pol_tlinestyle], $
+               [pol_thick], $
+               [range], $
+               [scale], $
+               [top], $
+               [tv] $
              ]
 
-    result = [[grKeys], [transpose(imKeys)]]
-    result = [[selfStr], ['  ' + result[sort(result)]]]
+    result = [[grKeys], ['  ' + imKeys]]
+    result = [[selfStr], [result[0, sort(result)]]]
     
     return, result
 end

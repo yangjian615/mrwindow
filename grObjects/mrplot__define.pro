@@ -120,56 +120,41 @@ function MrPlot::_OverloadPrint
     endif
     
     undefined = '<undefined>'
-    undefObj = '<NullObject>'
-    default = '<IDL_Default>'
-    joinStr = '   '
+    undefObj  = '<NullObject>'
+    default   = '<IDL_Default>'
+    joinStr   = '   '
     
     ;First, get the results from the superclasses
-    atomKeys = self -> MrGrAtom::_OverloadPrint()
-    grKeys = self -> MrGraphicsKeywords::_OverloadPrint()
-    layKeys = self.layout -> _OverloadPrint()
+    atomKeys = self -> MrGrDataAtom::_OverloadPrint()
+
+    ;Symbol Color
+    case n_elements(*self.symcolor) of
+        0: symcolor = default
+        1: symcolor = size(*self.symcolor, /TNAME) eq 'STRING' ? *self.symcolor : string(*self.symcolor, FORMAT='(i0)')
+        3: symcolor = '[' + strjoin(string(symcolor, FORMAT='(i3)'), ', ') + ']'
+    endcase
 
     ;Class Properties
     dimension = string('Dimension', '=', self.dimension, FORMAT='(a-26, a-2, i0)')
-    nsum      = string('NSum',      '=', self.nsum,      FORMAT='(a-26, a-2, i1)')
-    overplot  = string('OverPlot',  '=', self.overplot,  FORMAT='(a-26, a-2, i1)')
+    nsum      = string('NSum',      '=', self.nsum,      FORMAT='(a-26, a-2, i0)')
     polar     = string('Polar',     '=', self.polar,     FORMAT='(a-26, a-2, i1)')
-    xlog      = string('Xlog',      '=', self.xlog,      FORMAT='(a-26, a-2, i1)')
-    ylog      = string('YLog',      '=', self.ylog,      FORMAT='(a-26, a-2, i1)')
     ynozero   = string('YNoZero',   '=', self.ynozero,   FORMAT='(a-26, a-2, i1)')
-    
-    label     = string('Label', '=', "'" + self.label + "'", FORMAT='(a-26, a-2, a0)')
-    
-    max_value = string('Max_Value', '=', FORMAT='(a-26, a-2)')
-    min_value = string('Min_Value', '=', FORMAT='(a-26, a-2)')
-    symcolor  = string('SymColor',  '=', FORMAT='(a-26, a-2)')
-    target    = string('Target',    '=', FORMAT='(a-26, a-2)')
-    
-    ;Pointers
-    if n_elements(*self.max_value) eq 0 then max_value += default else max_value += string(*self.max_value, FORMAT='(f0)')
-    if n_elements(*self.min_value) eq 0 then min_value += default else min_value += string(*self.min_value, FORMAT='(f0)')
-    if n_elements(*self.symcolor)  eq 0 then symcolor += "''"     else symcolor  += strjoin(string(*self.symcolor, FORMAT='(a0)'), joinStr)
-    if n_elements(*self.target)    eq 0 then target += undefObj else target += strjoin(MrObj_Class(*self.target), joinStr)
+    label     = string('Label',     '=', "'" + self.label + "'", FORMAT='(a-26, a-2, a0)')
+    symcolor  = string('SymColor',  '=', symcolor,       FORMAT='(a-26, a-2, a0)')
     
     ;Put MrPlot properties together
     selfStr = obj_class(self) + '  <' + strtrim(obj_valid(self, /GET_HEAP_IDENTIFIER), 2) + '>'
-    plotKeys = [ dimension, $
-                 nsum, $
-                 overplot, $
-                 polar, $
-                 xlog, $
-                 ylog, $
-                 ynozero, $
-                 label, $
-                 max_value, $
-                 min_value, $
-                 symcolor, $
-                 target $
+    plotKeys = [ [dimension], $
+                 [nsum], $
+                 [polar], $
+                 [ynozero], $
+                 [label], $
+                 [symcolor] $
                ]
 
     ;Group everything in alphabetical order
-    result = [[atomKeys], [grKeys], [layKeys], [transpose(plotKeys)]]
-    result = [[selfStr], ['  ' + transpose(result[sort(result)])]]
+    result = [[atomKeys], ['  ' + plotKeys]]
+    result = [[selfStr],  [result[0, sort(result)]]]
     
     return, result
 end
@@ -923,18 +908,14 @@ pro MrPlot__define, class
               indep:     ptr_new(), $        ;independent variable
               dep:       ptr_new(), $        ;dependent variable
              
-              ;Graphics Properties
-              polar:     0B, $               ;create a polar plot?
-              ynozero:   0B, $               ;do not make ymin=0
-              nsum:      0L, $               ;*number of points to average when plotting
-             
-              ;cgPlot Properties
-              symcolor:  ptr_new(), $        ;color of each symbol
-              label:     '', $               ;*
-             
-              ;MrPlot Properties
-              dimension:   0, $              ;The over which plots will be made
-              init_xrange: dblarr(2), $      ;Initial y-range
-              init_yrange: dblarr(2) $       ;Initial x-range
+              ;Properties
+              dimension:    0, $               ;The over which plots will be made
+              init_xrange: dblarr(2), $        ;Initial y-range
+              init_yrange: dblarr(2), $        ;Initial x-range
+              nsum:        0L, $               ;*number of points to average when plotting
+              polar:       0B, $               ;create a polar plot?
+              symcolor:    ptr_new(), $        ;color of each symbol
+              label:       '', $               ;*
+              ynozero:     0B $                ;do not make ymin=0
             }
 end

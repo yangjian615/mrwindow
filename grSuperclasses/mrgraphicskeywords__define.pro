@@ -297,7 +297,8 @@ FUNCTION MrGraphicsKeywords::_OverloadPrint
                ZTitle $
              ]
 
-    return, transpose(outStr)
+    ;Pad by two spaces so output is not flush with the left edge of the window.
+    return, '  ' + transpose(outStr)
 END
 
 

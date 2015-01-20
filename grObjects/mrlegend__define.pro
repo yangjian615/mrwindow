@@ -747,11 +747,11 @@ PRO MrLegend::CalculateBoxSize
 			;   - If the range is [max, min], we must apply the normalization differently
 			target -> GetProperty, XRANGE=xrange, YRANGE=yrange
 			IF xrange[1] GT xrange[0] $
-			    THEN xpos = ((max(xrange, MIN=xmin, /NAN) - xmin) *        self.position[0])  + xmin $
-			    ELSE xpos = ((max(xrange, MIN=xmin, /NAN) - xmin) * (1.0 - self.position[0])) + xmin
+			    THEN xpos = (xrange[1] - xrange[0]) *        self.position[0]  + xrange[0] $
+			    ELSE xpos = (xrange[0] - xrange[1]) * (1.0 - self.position[0]) + xrange[1]
 			IF yrange[1] GT yrange[0] $
-			    THEN ypos = ((max(yrange, MIN=ymin, /NAN) - ymin) *        self.position[1])  + ymin $
-			    ELSE ypos = ((max(yrange, MIN=ymin, /NAN) - ymin) * (1.0 - self.position[1])) + ymin
+			    THEN ypos = (yrange[1] - yrange[0]) *        self.position[1]  + yrange[0] $
+			    ELSE ypos = (yrange[0] - yrange[1]) * (1.0 - self.position[1]) + yrange[1]
 
 			;Convert from data to normal coordinates.
 			location = target -> ConvertCoord([xpos, ypos], /DATA, /TO_NORMAL)
@@ -807,7 +807,6 @@ PRO MrLegend::CalculateBoxSize
 		
 	;Draw in the background color. Do so in decomposed color.
 	cgSetColorState, 1, Current=currentState
-	bg_color  = cgColor('Background')
 
 	;For each legend item
 	FOR j = 0, nItems - 1 DO BEGIN
@@ -836,6 +835,7 @@ PRO MrLegend::CalculateBoxSize
 	IF self.orientation THEN BEGIN
 		bx1 = bx0 + total(item_width) + total(self.margins[[0,2]]*x_char) + (nItems-1)*self.horizontal_spacing*x_char
 		by0 = by1 - max(item_height)  - total(self.margins[[1,3]]*y_char)
+	
 	;Vertical
 	ENDIF ELSE BEGIN
 		bx1 = bx0 + max(item_width)    + total(self.margins[[0,2]]*x_char)
