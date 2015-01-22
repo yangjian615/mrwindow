@@ -783,6 +783,7 @@ POSITION = position, $
 SYMCOLOR = symcolor, $
 
 ;Graphics Keywords
+CHARSIZE = charsize, $
 COLOR = color, $
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
@@ -860,7 +861,8 @@ _REF_EXTRA = extra
     SetDefaultValue, color, d_color
 
     ;Set the object properties
-    self -> SetProperty, COLOR = color, $
+    self -> SetProperty, CHARSIZE = charsize, $
+                         COLOR = color, $
                          DIMENSION = dimension, $
                          LABEL = label, $
                          MAX_VALUE = max_value, $

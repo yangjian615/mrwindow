@@ -709,6 +709,7 @@ OUTFILENAME=outfilename, $
 OUTLINE=outline, $
 OUTPUT=output, $
 PALETTE=palette, $
+RANGE=range, $
 TRADITIONAL=traditional, $
 
 ;Contour Properties
@@ -762,6 +763,7 @@ _REF_EXTRA=extra
     if arg_present(output)        ne 0 then output        =  self.output
     if arg_present(palette)       ne 0 then palette       = *self.palette
     if arg_present(position)      ne 0 then position      =  self.position -> GetPosition()
+    if arg_present(range)         ne 0 then range         =  self.range
     if arg_present(traditional)   ne 0 then traditional   =  self.traditional
     
     ;Contour Properties
@@ -1033,6 +1035,7 @@ OUTFILENAME=outfilename, $
 OUTLINE=outline, $
 OUTPUT=output, $
 PALETTE=palette, $
+RANGE=range, $
 TRADITIONAL=traditional, $
 
 ;Contour Properties
@@ -1092,6 +1095,7 @@ _REF_EXTRA=extra
     if n_elements(outline)       ne 0 then  self.outline       = outline
     if n_elements(output)        ne 0 then  self.output        = output
     if n_elements(palette)       ne 0 then *self.palette       = palette
+    if n_elements(range)         ne 0 then  self.range         = range
     if n_elements(traditional)   ne 0 then  self.traditional   = traditional
     
     ;Contour Properties

@@ -33,7 +33,7 @@
 .comp ./grFunctions/mrarrow.pro
 .comp ./grFunctions/mraxis.pro
 .comp ./grFunctions/mrcolorbar.pro
-.comp ./grFunctions/mrcolorfill.pro
+.comp ./grFunctions/mrpolygon.pro
 .comp ./grFunctions/mrcontour.pro
 .comp ./grFunctions/mrimage.pro
 .comp ./grFunctions/mrlegend.pro

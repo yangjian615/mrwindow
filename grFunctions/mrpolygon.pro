@@ -1,7 +1,7 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;       MrColorFill
+;       MrPolygon
 ;
 ;*****************************************************************************************
 ;   Copyright (c) 2013, Matthew Argall                                                   ;
@@ -32,7 +32,7 @@
 ;*****************************************************************************************
 ;
 ;+
-;   Create a MrColorFill object.
+;   Create a MrPolygon object.
 ;
 ; :Params:
 ;       X:                  in, required, type=numeric
@@ -48,9 +48,6 @@
 ;                           Z coordinate(s) of the points to be connected.
 ;
 ; :Keywords:
-;       CURRENT:            in, optional, type=boolean, default=0
-;                           If set, the plot will be added to the current MrWindow
-;                               graphics window.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrColorFill__define.
 ;
@@ -72,9 +69,9 @@
 ; :History:
 ;	Modification History::
 ;       2014/01/12  -   Written by Matthew Argall.
+;       2015/01/22  -   Renamed to MrPolygon. - MRA
 ;-
-function MrColorFill, x, y, z, $
- CURRENT=current, $
+function MrPolygon, x, y, z, $
 _REF_EXTRA = extra
     compile_opt idl2
     
@@ -90,7 +87,7 @@ _REF_EXTRA = extra
     current = keyword_set(current)
 
     ;Create the plot
-    theColorFill = obj_new('MrColorFill', x, y, z, CURRENT=current, _STRICT_EXTRA=extra)
+    thePolygon = obj_new('MrPolygon', x, y, z, _STRICT_EXTRA=extra)
     
-    return, theColorFill
+    return, thePolygon
 end

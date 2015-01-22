@@ -215,13 +215,15 @@ NOERASE=noerase
         self.device = 0
         
         ;Make sure RANGE, CTINDEX, PALETTE are the same
-        self.target -> GetProperty, LOG=log, RANGE=gRange, CTINDEX=gCTIndex, PALETTE=gPalette
+        IF MrIsA(self.target, 'MrImage') $
+            THEN self.target -> GetProperty, RANGE=gRange, PALETTE=gPalette, LOG=log, CTINDEX=gCTIndex $
+            ELSE self.target -> GetProperty, RANGE=gRange, PALETTE=gPalette
 
         ;Calling the SetProperty method causes an infinite loop.
         ;Set the properties directly.
         if self.vertical $
-            then self.ylog = log $
-            else self.xlog = log
+            then self.ylog = Keyword_Set(log) $
+            else self.xlog = Keyword_Set(log)
         if n_elements(range)    gt 0 then self.range    = gRange
         if n_elements(gCTIndex) gt 0 then *self.ctindex = gCTIndex
         if n_elements(gPalette) gt 0 then *self.palette = gPalette
@@ -578,7 +580,9 @@ _REF_EXTRA=extra
     ;PALETTE, and RANGE.
     IF N_Elements(target) NE 0 THEN IF Obj_Valid(target) THEN BEGIN
         self.target = target
-        target -> GetProperty, RANGE=gRange, CTINDEX=gCTIndex, PALETTE=gPalette
+        IF MrIsA(target, 'MrImage') $
+            THEN target -> GetProperty, RANGE=gRange, PALETTE=gPalette, CTINDEX=gCTIndex $
+            ELSE target -> GetProperty, RANGE=gRange, PALETTE=gPalette
         
         ;Sync the colorbar properties with those of GRAPHIC. They will be set
         ;as object properties below.

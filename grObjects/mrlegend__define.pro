@@ -1825,7 +1825,7 @@ _REF_EXTRA=extra
 	
 	;Other defaults
 	if n_elements(fill_color)           eq 0 then fill_color           = MrDefaultColor(/BACKGROUND)
-	if n_elements(horizontal_alignment) eq 0 then horizontal_alignment = 'Right'
+	if n_elements(horizontal_alignment) eq 0 then horizontal_alignment = 'Left'
 	if n_elements(horizontal_spacing)   eq 0 then horizontal_spacing   = 3.0
 	if n_elements(linestyle)            eq 0 then linestyle            = 'Solid_Line'
 	if n_elements(margins)              eq 0 then margins              = [1.0, 0.5, 1.0, 0.5]
