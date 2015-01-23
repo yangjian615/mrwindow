@@ -64,7 +64,6 @@
 ;                           the LOCATION keyword. - MRA
 ;       2015/01/22  -   Added the AddRow, AddColumn, DeleteRow, and DeleteColumn methods.
 ;                           Added the EXPAND keyword to ShiftRow and ShiftColumn methods. - MRA
-;       2015/01/23  -   Added the FEED keyword to ShiftRow and ShiftColumn. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -73,7 +72,7 @@
 ;
 ; :Private:
 ;-
-function MrLayout::_OverloadPrint
+function MrLayoutManager::_OverloadPrint
     compile_opt strictarr
     
     ;Error handling
@@ -129,13 +128,483 @@ end
 
 
 ;+
+;   Add MrLayout objects to be managed.
+;
+; :Params:
+;       OLAYOUT:        in, required, type=object
+;                       A MrLayout object.
+;-
+pro MrLayoutManager::Add, oLayout
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Default to adding a single row
+    if MrObj_Class(oLayout) ne 'MRLAYOUT' then $
+        message, 'OLAYOUT must be a MRLAYOUT class.'
+    
+    ;Check if a location has been defined.
+    oLayout -> GetProperty, LAYOUT=layout, POSITION=position, MANAGED=managed
+    
+    ;If not, then manage the layout
+    if managed eq 0 && (layout[2] eq 0 && total(position) eq 0) then begin
+        managed = 1
+        oLayout -> SetProperty, MANAGED=managed
+    endif
+    
+;-------------------------------------------------------
+; Not Being Managed ////////////////////////////////////
+;-------------------------------------------------------
+    if managed eq 0 then begin
+        ;Add to the container
+        self::MrIDL_Container -> Add, oLayout
+        return
+    
+;-------------------------------------------------------
+; User-Defined Position ////////////////////////////////
+;-------------------------------------------------------
+    if total(position) gt 0 && layout[2] eq 0 then begin
+        ;Add to the container
+        self::MrIDL_Container -> Add, oLayout
+        return
+    
+;-------------------------------------------------------
+; User-Defined Location ////////////////////////////////
+;-------------------------------------------------------
+    endif else if layout[2] ne 0 then begin
+        ;Does it fit within the current layout?
+        tf_exist = self -> Exists(layout[2])
+        if tf_exist eq 0 then begin
+            newLayout     = self.layout
+            newLayout[0] >= layout[0]
+            newLayout[1] >= layout[1]
+            if ~array_equal(newLayout, self.layout) then self -> SetProperty, LAYOUT=newLayout
+        endif
+    
+        ;Check if something is there already
+        !Null = self -> FindByPIndex(layout[2], COUNT=nClash)
+        
+        ;If the spot is taken
+        if nClash gt 0 then begin
+            ;Find all empty cells greater then the given pIndex
+            pEmpty = self -> FindEmptyCell(COUNT=nEmpty)
+            iEmpty = where(pEmpty gt layout[2], nEmpty)
+            
+            ;If there are no empty cells, add a row
+            ;   - The next empty location will be [first column, last row].
+            if nEmpty eq 0 then begin
+                self -> AddRow, 1
+                pEmpty = self -> ConvertLocation([1,self.layout[1]], /COLROW, /TO_PINDEX)
+            endif else begin
+                pEmpty = pEmpty[iEmpty[0]]
+            endelse
+            
+            ;Step through all children
+            allChildren = self -> Get(/ALL, COUNT=nChildren)
+            for i = 0, nChildren-1 do begin
+                ;Pick out the managed layouts
+                allChildren[i] -> GetProperty, MANAGED=isManaged, LAYOUT=childLayout
+                if ~isManaged then continue
+                
+                ;If the child is between the desired and empty locations, shift it down.
+                if childLayout[2] ge layout[2] && childLayout[2] lt pEmpty $
+                    then allChildren[i] -> ShiftColumn, 1, /FEED
+            endfor
+        endif
+
+        ;Final location
+        pIndex = layout[2]
+;-------------------------------------------------------
+; No Location Given ////////////////////////////////////
+;-------------------------------------------------------
+    endif else begin
+        ;Find an empty location
+        pEmpty = self -> FindEmptyCell(COUNT=nEmpty)
+    
+        ;Need to make room?
+        if nEmpty eq 0 then begin
+            self -> AddRow, 1
+            pEmpty = self -> ConvertLocation([0, self.layout[1]], /COLROW, /TO_PINDEX)
+        endif
+        
+        ;Select the first empty location
+        pIndex = pEmpty[0]
+    endelse
+    
+    ;Synchronize
+    self -> SyncLayout, oLayout, pIndex
+    
+    ;Add to the container
+    self -> MrIDL_Container::Add, oLayout
+end
+
+;+
+;
+;-
+pro MrLayoutManager::ViewGrid
+    compile_opt idl2
+    
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMSG()
+        return
+    endif
+
+    ;Create the window
+    win = MrWindow(ASPECT     = *self.aspect, $
+                   CHARSIZE   =  self.charsize, $
+                   COL_WIDTH  = *self.col_width, $
+                   IXMARGIN   =  self.ixmargin, $
+                   IYMARGIN   =  self.iymargin, $
+                   LAYOUT     =  self.layout, $
+                   OXMARGIN   =  self.oxmargin, $
+                   OYMARGIN   =  self.oymargin, $
+                   ROW_HEIGHT = *self.row_height, $
+                   XGAP       = *self.xgap, $
+                   XSIZE      =    !d.x_size, $
+                   YGAP       = *self.ygap, $
+                   YSIZE      =    !d.y_size)
+
+    ;Show the outer margins
+    !Null = MrPlotS( self.p_region[[0,2,2,0,0]], self.p_region[[1,1,3,3,1]], $
+                     /NORMAL, COLOR='Blue' )
+
+    ;I[XY]MARGIN -- Bounded in red by P_AREAS. The space between the red box and the axes.
+    ;[XY]GAPS    -- Space between P_AREAS (red boxes) demonstrates the gaps.
+    for ii = 0, nCols*nRows-1 do begin
+        ;Draw the inner margins
+        !Null = MrPlotS( self.p_region[[0,2,2,0,0],ii], self.p_region[[1,1,3,3,1],ii], $
+                         /NORMAL, COLOR=cgColor('red') )
+        
+        ;Draw the plots
+        !Null = MrPlot( !x.range, !y.range, POSITION=pos[*,ii], /CURRENT, /NODATA, /NORMAL, $
+                        TITLE='Title', XTITLE='X-Title', YTITLE='Y-Title', CHARSIZE=charsize)
+    endfor
+end
+
+
+;+
+;   Add MrLayout objects to be managed.
+;
+; :Params:
+;       OLAYOUT:        in, required, type=object
+;                       A MrLayout object.
+;-
+pro MrLayoutManager::ComputeGrid
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+
+    xsize     = !d.x_size
+    ysize     = !d.y_size
+	xcharsize = ceil(double(!d.x_ch_size)*self.charsize)
+	ycharsize = ceil(double(!d.y_ch_size)*self.charsize)
+
+;-----------------------------------------------------------------------------------------
+; Calculate Margins and Areas \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------------------------------------------
+	;Convert from character units to pixels.
+	ixmargin = self.ixmargin * xcharsize
+    iymargin = self.iymargin * ycharsize
+	oxmargin = self.oxmargin * xcharsize
+	oymargin = self.oymargin * ycharsize
+	xgap     = self.xgap     * xcharsize
+	ygap     = self.ygap     * ycharsize
+
+	;Calculate the area of the region in which plots will be drawn.
+	p_region = [oxmargin, oymargin[0], xsize - oxmargin[1], ysize - oymargin[1]]
+
+    ;Calculate the plot dimensions
+    plot_width  = (p_region[2] - p_region[0] - total(xspace)) * *self.col_width 
+    plot_height = (p_region[3] - p_region[1] - total(yspace)) * *self.row_height
+
+    ;Offset between upper left corner of p_region and lower right corner of
+    ;the plot area of each plot.
+    xoffset = total(plot_width  + xgap, /CUMULATIVE)
+    yoffset = total(plot_height + ygap, /CUMULATIVE)
+
+	;Calculate the areas in which the plots will be created.
+	p_areas = fltarr(4, nCols, nRows)
+	for ii = 0, nCols-1 do begin
+		for jj = 0, nRows-1 do begin
+		    p_areas[2,ii,jj] = p_region[0] + xoffset[ii]
+		    p_areas[1,ii,jj] = p_region[3] - yoffset[jj]
+		    p_areas[0,ii,jj] = p_areas[2,ii,jj] - plot_width[ii]
+		    p_areas[3,ii,jj] = p_areas[1,ii,jj] + plot_height[jj]
+		endfor
+	endfor 
+
+;-----------------------------------------------------------------------------------------
+; Calculate Positions \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------------------------------------------
+	;Subtract the inner margin to create the plot position
+	positions = fltarr(4, nCols, nRows)
+	positions[0,*,*] = p_areas[0,*,*] + ixmargin[0]
+	positions[2,*,*] = p_areas[2,*,*] - ixmargin[1]
+	positions[1,*,*] = p_areas[1,*,*] + iymargin[1]
+	positions[3,*,*] = p_areas[3,*,*] - iymargin[1]
+	
+	;Reform into a 4xnCols*nRows array
+	positions = reform(positions, 4, nCols*nRows)
+	p_areas   = reform(p_areas,   4, nCols*nRows)
+
+;-----------------------------------------------------------------------------------------
+; Set the Aspect Ratio \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------------------------------------------
+	if n_elements(aspect) gt 0 then begin	    
+	    ;Loop through all of the plots
+	    for i = 0, nCols*nRows-1 do begin
+	        if aspect[i] eq 0 then continue
+	        
+	        pWidth  = positions[2,i] - positions[0,i]
+	        pHeight = positions[3,i] - positions[1,i]
+	        
+	        ;Make sure the scaled dimension becomes smaller
+	        newPWidth  = pWidth
+	        newPHeight = newPWidth * aspect[i]
+	        if newPHeight gt pHeight then begin
+	            newPHeight = pHeight
+	            newPWidth = newPHeight / aspect[i]
+	        endif
+	        
+	        ;Center the new position within its old position
+	        positions[0,i] = positions[0,i] + (pWidth  - newPWidth)  / 2
+	        positions[1,i] = positions[1,i] + (pHeight - newPHeight) / 2
+	        positions[2,i] = positions[0,i] + newPWidth
+	        positions[3,i] = positions[1,i] + newPHeight
+	    endfor
+	endif
+
+;-----------------------------------------------------------------------------------------
+; Normal or Device Coordinates? \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------------------------------------------
+	if keyword_set(normal) then begin
+		positions[[0,2],*] = positions[[0,2],*] / xsize
+		positions[[1,3],*] = positions[[1,3],*] / ysize
+		
+		p_region[[0,2]] = p_region[[0,2]] / xsize
+		p_region[[1,3]] = p_region[[1,3]] / ysize
+		
+		p_areas[[0,2],*] = p_areas[[0,2],*] / xsize
+		p_areas[[1,3],*] = p_areas[[1,3],*] / ysize
+
+	;Create integer values for device coordinates.
+	endif else begin
+	    positions[[0,1],*] = fix(floor(positions[[0,1],*]))
+	    positions[[2,3],*] = fix(ceil(positions[[2,3],*]))
+	    
+	    p_region[[0,1]] = fix(floor(p_region[[0,1]]))
+	    p_region[[2,3]] = fix(ceil(p_region[[2,3]]))
+		
+		p_areas[[0,1],*] = fix(floor(p_areas[[0,1]]))
+		p_areas[[2,3],*] = fix(ceil(p_areas[[2,3]]))
+	endelse
+
+;-----------------------------------------------------------------------------------------
+; Save the Positions \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------------------------------------------
+	self.x_region = p_region[[0,2]]
+	self.y_region = p_region[[1,3]]
+	self.x_window = p_areas[[0,2]]
+	self.y_window = p_areas[[1,3]]
+    *self.grid    = positions
+end
+
+
+;+
+;   Find a child layout by its [col,row] location.
+;
+; :Params:
+;       COLROW:         in, required, type=intarr(2)
+;                       The [column, row] in which the desired graphic is located.
+;
+; :Returns:
+;       OBJECT:         The graphics located at `COLROW`.
+;-
+function MrLayoutManager::FindByColRow, colrow, $
+COUNT=count
+    compile_opt strictarr
+
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        count = 0
+        void = cgErrorMsg()
+        return, obj_new()
+    endif
+
+    ;Convert COLROW to a plot index
+    pIndex = self._oLayout -> ConvertLocation(ColRow, /COLROW, /TO_PINDEX)
+
+    ;Call FindByPIndex
+    object = self -> FindByPIndex(pIndex, COUNT=count)
+
+    return, object
+end
+
+
+;+
+;   Find a child layout by its plot index location.
+;
+; :Params:
+;       PINDEX:         in, required, type=integer
+;                       The plot index, starting with 1 and increasing left to right then
+;                           top to bottom, in which the desired graphic is located.
+;
+; :Returns:
+;       OBJECT:         The graphics located at `PINDEX`.
+;-
+function MrLayoutManager::FindByPIndex, pIndex, $
+COUNT=count
+    compile_opt strictarr
+
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        count = 0
+        void = cgErrorMsg()
+        return, obj_new()
+    endif
+
+    ;Get all of the objects in the container
+    allObjs = self -> Get(/ALL, COUNT=count)
+    if count eq 0 then return, obj_new()
+    
+    ;Get all of the plot indices
+    objPIndex = intarr(count)
+    for i = 0, count - 1 do begin
+        allObjs[i] -> GetLayout, LAYOUT=objLayout
+        objPIndex[i] = objLayout[2]
+    endfor
+
+    ;Find a match
+    iMatch = where(objPIndex eq pIndex, count)
+    if count eq 0 then return, obj_new()
+    if count eq 1 then iMatch = iMatch[0]
+    
+    ;Return the matching objects
+    return, allObjs[iMatch]
+end
+
+
+;+
+;   Find empty locations within the layout.
+;
+; :Keywords:
+;       MASK:       out, optional, type=bytarr
+;                   An array the same size as the layout. Elements are 1 if the location
+;                       is taken and 0 if it is empty.
+;       COLROW:     in, optional, type=boolean, default=0
+;                   If set, [col,row] locations are returned instead of plot indices.
+;       COUNT:      out, optional, type=integer
+;                   The number of empty locations found.
+;
+; :Returns:
+;       PEMPTY:     Plot indices of each empty location. If `COUNT`=0, then -1 is returned.
+;-
+function MrLayoutManager::FindEmptyCells, $
+MASK=mask, $
+COLROW=colrow, $
+COUNT=nEmpty
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Defaults
+    count   = 0
+    colrow  = keyword_set(colrow)
+    
+    ;Get all of the layout objects
+    allLayouts = self -> Get(/ALL, COUNT=nLayouts)
+    
+    ;Create a mask of layout positions
+    mask = bytarr(self.layout[0]*self.layout[1])
+    
+    ;Step through each one
+    for i = 0, nLayouts - 1 do begin
+        thisLayout = allLayouts[i]
+        
+        ;Skip it if it is not being managed.
+        thisLayout[i] -> GetProperty, LAYOUT=layout
+        if layout[2] eq 0 then continue
+        
+        ;Fill in the mask -- we only know if the spot is taken.
+        aIndex = self -> ConvertLocation(layout[2], /PINDEX, /TO_AINDEX)
+        mask[aIndex] = 1
+    endfor
+    
+    ;Determine the plot indices
+    aEmpty = where(mask eq 0, nEmpty)
+    if nEmpty eq 0 $
+        then pEmpty = -1 $
+        else pEmpty = self -> ConvertLocation(aEmpty, /AINDEX, TO_COLROW=colrow, TO_PINDEX=~colrow)
+    
+    ;Return the empty positions
+    mask = reform(mask, self.layout[0:1])
+    return, pEmpty
+end
+
+
+;+
+;   Synchronize the child layout properties with those of the parent.
+;
+; :Params:
+;       OLAYOUT:        in, required, type=object
+;                       A MrLayout child object.
+;       PINDEX:         in, optional, type=integer/intarr(2)
+;                       Either the plot index or the [col,row] location at which
+;                           `OLAYOUT` is to be placed.
+;-
+pro MrLayoutManager::SyncLayout, oLayout, location
+    compile_opt strictarr
+    on_error, 2
+    
+    ;Set properties of the child layout object.
+    oLayout -> SetProperty, ASPECT     = *self.aspect, $
+                            CHARSIZE   =  self.charsize, $
+                            COL_WIDTH  = *self.col_width, $
+                            IXMARGIN   =  self.ixmargin, $
+                            IYMARGIN   =  self.iymargin, $
+                            LAYOUT     =  self.layout[0:1], $
+                            LOCATION   =       pIndex, $
+                            OXMARGIN   =  self.oxmargin, $
+                            OYMARGIN   =  self.oymargin, $
+                            ROW_HEIGHT = *self.row_height, $
+                            WDIMS      =  self.wdims, $
+                            XGAP       =  self.xgap, $
+                            YGAP       =  self.ygap)
+end
+
+
+;+
 ;   Add columns to the layout while keeping the plot in the same location.
 ;
 ; :Params:
 ;       NCOLS:          in, optional, type=int, default=1
 ;                       Number of columns to add. A negative value will remove columns.
 ;-
-pro MrLayout::AddColumn, nCols
+pro MrLayoutManager::AddColumn, nCols
     compile_opt strictarr
     
     ;Error handling
@@ -174,7 +643,7 @@ end
 ;       NROWS:          in, optional, type=int, default=1
 ;                       Number of rows to add. A negative value will remove rows.
 ;-
-pro MrLayout::AddRow, nRows
+pro MrLayoutManager::AddRow, nRows
     compile_opt strictarr
     
     ;Error handling
@@ -250,7 +719,7 @@ end
 ; :Returns:
 ;       RESULT:         The result of the convertion.
 ;-
-function MrLayout::ConvertLocation, location, layout, $
+function MrLayoutManager::ConvertLocation, location, layout, $
 EXISTS=exists, $
 COLROW=colrow, $
 AINDEX=aIndex, $
@@ -347,7 +816,7 @@ end
 ;       NCOLS:          in, optional, type=int, default=1
 ;                       Number of columns to add.
 ;-
-pro MrLayout::DeleteColumn, nCols
+pro MrLayoutManager::DeleteColumn, nCols
     compile_opt strictarr
     
     ;Error handling
@@ -386,7 +855,7 @@ end
 ;       NROWS:          in, optional, type=int, default=1
 ;                       Number of rows to delete.
 ;-
-pro MrLayout::DeleteRow, nRows
+pro MrLayoutManager::DeleteRow, nRows
     compile_opt strictarr
     
     ;Error handling
@@ -437,7 +906,7 @@ end
 ;       TF_EXIST:       Returns 1 for each `PINDEX` that exists within `LAYOUT` and 0 for
 ;                           those that do not.
 ;-
-function MrLayout::Exists, pIndex, layout, $
+function MrLayoutManager::Exists, pIndex, layout, $
 AINDEX=aIndex, $
 COLROW=ColRow
     compile_opt strictarr
@@ -482,18 +951,13 @@ end
 ;                           request; however, it can only be expanded to the right.
 ;                           Shifting too far to the left will cause an error, unless
 ;                           `WRAP` is set.
-;       FEED:           in, optional, type=boolean, default=0
-;                       If set, and there are not enough columns to shift by `NCOLS`,
-;                           then the graphic will be pushed down a row and be wrapped
-;                           around, like a typewriter's line feed.
 ;       WRAP:           in, optional, type=boolean, default=1
 ;                       If set, the graphic will be rapped around from bottom to top
 ;                           if `NROWS` pushes the graphic out of the layout. If set equal
 ;                           to zero, the same situation will cause an error.
 ;-
-pro MrLayout::ShiftColumn, nCols, $
+pro MrLayoutManager::ShiftColumn, nCols, $
 EXPAND=expnd, $
-FEED=feed, $
 WRAP=wrap
     compile_opt strictarr
     
@@ -511,8 +975,6 @@ WRAP=wrap
     ;Defaults
     wrap  = keyword_set(wrap)
     expnd = keyword_set(expnd)
-    feed  = keyword_set(feed)
-    if expnd + feed + wrap gt 0 then message, 'EXPAND, FEED, and WRAP are mutually exclusive.'
     if n_elements(nCols) eq 0 then nCols = 1
     
     ;Convert the plot index to a [col,row] location
@@ -534,17 +996,6 @@ WRAP=wrap
             if nCols lt 0 then message, 'Cannot expand layout to the left.'
             nAdd = newCol - colRow[0]
             self -> AddColumn, nAdd
-        
-        ;Feed into new column?
-        endif else if feed then begin
-            ;Shift over one column
-            self -> ShiftRow, 1
-            
-            ;Wrap around
-            ;   - New row is the remainder of NEWROW / LAYOUT[1]
-            ;   - Row 0 wraps around to the bottom row
-            newCol = abs(newCol mod self.layout[0])
-            if newCol eq 0 then newCol = self.layout[0]
             
         ;Cannot fit graphic
         endif else begin
@@ -570,22 +1021,17 @@ end
 ;
 ; :Keywords:
 ;       EXPAND:         in, optional, type=boolean, default=0
-;                       If set, and there are not enough rows to shift by `NROWS`,
+;                       If set, and there are not enough columns to shift by `NROWS`,
 ;                           then the layout will be expanded to accommodate the
 ;                           request; however, it can only be expanded down.
 ;                           Shifting too far up will cause an error, unless `WRAP` is set.
-;       FEED:           in, optional, type=boolean, default=0
-;                       If set, and there are not enough rows to shift by `NROWS`,
-;                           then the graphic will be pushed over a column and be wrapped
-;                           around, like a typewriter's line feed.
 ;       WRAP:           in, optional, type=boolean, default=0
 ;                       If set, the graphic will be rapped around from bottom to top
 ;                           if `NROWS` pushes the graphic out of the layout. If not set,
 ;                           the same situation will cause an error.
 ;-
-pro MrLayout::ShiftRow, nRows, $
+pro MrLayoutManager::ShiftRow, nRows, $
 EXPAND=expnd, $
-FEED=feed, $
 WRAP=wrap
     compile_opt strictarr
     
@@ -601,10 +1047,8 @@ WRAP=wrap
     if self.layout[3] eq 0 then return
     
     ;Defaults
-    expnd = keyword_set(expnd)
-    feed  = keyword_set(feed)
-    wrap  = keyword_set(wrap)
-    if expnd + feed + wrap gt 0 then message, 'EXPAND, FEED, and WRAP are mutually exclusive.'
+    wrap = keyword_set(wrap)
+    expn = keyword_set(expnd)
     if n_elements(nRows) eq 0 then nRows = 1
     
     ;Convert the plot index to a [col,row] location
@@ -617,27 +1061,15 @@ WRAP=wrap
     if newRow gt self.layout[1] || newRow le 0 then begin
         ;Wrap around?
         if wrap then begin
-            ;New row is the remainder of NEWROW / LAYOUT[1]
-            ;   - Row 0 wraps around to the bottom row
+            ;Row 0 wraps around to the bottom row
             newRow = abs(newRow mod self.layout[1])
-            if newRow eq 0 then newRow = self.layout[1]
+            if newRow eq 0 then newRow = self.layout[1]        
         
         ;Expand the layout?
         endif else if expnd then begin
             if nRow lt 0 then message, 'Cannot expand layout upward.'
             nAdd = newRow - colRow[1]
             self -> AddRow, nAdd
-        
-        ;Feed into new column?
-        endif else if feed then begin
-            ;Shift over one column
-            self -> ShiftCol, 1
-            
-            ;Wrap around
-            ;   - New row is the remainder of NEWROW / LAYOUT[1]
-            ;   - Row 0 wraps around to the bottom row
-            newRow = abs(newRow mod self.layout[1])
-            if newRow eq 0 then newRow = self.layout[1]
         
         ;Cannot fit graphic
         endif else begin
@@ -658,7 +1090,7 @@ end
 ;
 ; :Private:
 ;-
-pro MrLayout::SetGrid
+pro MrLayoutManager::SetGrid
     compile_opt strictarr
     
     ;Error handling
@@ -722,7 +1154,7 @@ end
 ;                           is a scalar, the output is a 4-element array. Otherise a 4xN
 ;                           array is returned, where N is the number of locations given.
 ;-
-function MrLayout::GetPosition, location, $
+function MrLayoutManager::GetPosition, location, $
 COLROW=colrow
     compile_opt strictarr
     
@@ -798,7 +1230,7 @@ end
 ;       Y_WINDOW:       out, optional, type=fltarr(2)
 ;                       Bottom and top coordinates of the window outlined by the axes
 ;-
-pro MrLayout::GetProperty, $
+pro MrLayoutManager::GetProperty, $
 ASPECT=aspect, $
 COL_WIDTH=col_width, $
 CHARSIZE=charsize, $
@@ -882,7 +1314,7 @@ end
 ;                           is the scalar 0, then 0 is returned. In the event `SUCCESS`=0,
 ;                           an invalid index will be returned (-1).
 ;-
-function MrLayout::UpdateIndex, pIndex, layout, old_layout, $
+function MrLayoutManager::UpdateIndex, pIndex, layout, old_layout, $
 AINDEX=aindex, $
 SUCCESS=success
     compile_opt strictarr
@@ -918,7 +1350,7 @@ SUCCESS=success
 end
 
 
-pro MrLayout::SetLayout, layout
+pro MrLayoutManager::SetLayout, layout
     compile_opt strictarr
     
     ;Error handling
@@ -984,7 +1416,7 @@ end
 ;       YGAP:           in, optional, type=integer
 ;                       Vertical space between plots in character units.
 ;-
-pro MrLayout::SetProperty, $
+pro MrLayoutManager::SetProperty, $
 ASPECT=aspect, $
 COL_WIDTH=col_width, $
 CHARSIZE=charsize, $
@@ -1103,7 +1535,7 @@ end
 ;+
 ;   Clean up after the object is destroy
 ;-
-pro MrLayout::cleanup
+pro MrLayoutManager::cleanup
     ptr_free, self.aspect
     ptr_free, self.grid
 end
@@ -1152,7 +1584,7 @@ end
 ;       YGAP:           in, optional, type=integer, default=6
 ;                       Vertical space between plots in character units.
 ;-
-function MrLayout::init, $
+function MrLayoutManager::init, $
 ASPECT=aspect, $
 COL_WIDTH=col_width, $
 CHARSIZE=charsize, $
@@ -1301,10 +1733,11 @@ end
 ;       Y_REGION:       Bottom and top coordinates of the region containing the plot
 ;       Y_WINDOW:       Bottom and top coordinates of the window outlined by the axes
 ;-
-pro MrLayout__define, class
+pro MrLayoutManager__define, class
     compile_opt strictarr
     
-    define = { MrLayout, $
+    define = { MrLayoutManager, $
+               inherits    MrIDL_Container, $
                aspect:     ptr_new(), $
                charsize:   0.0, $
                col_width:  ptr_new(), $
@@ -1317,11 +1750,9 @@ pro MrLayout__define, class
                position:   [0.0,0.0,0.0,0.0], $
                row_height: ptr_new(), $
                wDims:      lonarr(2), $
-               xmargin:    [0.0, 0.0], $
                xgap:       0.0, $
                x_region:   [0.0, 0.0], $
                x_window:   [0.0, 0.0], $
-               ymargin:    [0.0, 0.0], $
                ygap:       0.0, $
                y_region:   [0.0, 0.0], $
                y_window:   [0.0, 0.0] $
