@@ -183,6 +183,9 @@
 ;                           When adding a plot to the layout, the layout no longer tries
 ;                           to update itself to match the layout of the given graphic
 ;                           unless the layout is bigger. - MRA
+;       2015/01/23  -   CalcPositions now adjusts pointer values if the layout dimensions
+;                           change. It resets [xy]gap, col_width, row_height, and aspect
+;                           if they do not contain the correct number of elements. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -314,24 +317,35 @@ pro MrGrLayout::CalcPositions
                       'one column and one row.'
 
     ;Reset the column and row sizes if the layout changes
-    nColWidth  = n_elements(*self.col_width)
-    nRowHeight = n_elements(*self.row_height)
-    if nColWidth  gt 0 && nColWidth  ne self.grLayout[0] then void = temporary(*self.col_width)
-    if nRowHeight gt 0 && nRowHeight ne self.grLayout[1] then void = temporary(*self.row_height)
+    nPlots     = product(self.GrLayout)
+    nAspect    = n_elements(*self.aspect)
+    nXGap      = n_elements(*self.xgap)
+    nYGap      = n_elements(*self.ygap)
+    if nAspect eq 1 || nAspect eq nPlots               then aspect     = *self.aspect
+    if nXGap   eq 1 || nXGap   eq self.grLayout[0] - 1 then xgap       = *self.xgap
+    if nYGap   eq 1 || nYGap   eq self.grLayout[1] - 1 then ygap       = *self.ygap
+    if n_elements(*self.col_width)  eq self.grLayout[0] then col_width  = *self.col_width
+    if n_elements(*self.row_height) eq self.grLayout[1] then row_height = *self.row_height
 
     ;Calculate positions
     *self.layout_positions = MrLayout(self.GrLayout, $
-                                      ASPECT     = *self.aspect, $
+                                      ASPECT     =       aspect, $
                                       CHARSIZE   =  self.charsize, $
-                                      COL_WIDTH  = *self.col_width, $
+                                      COL_WIDTH  =       col_width, $
                                       IXMARGIN   =  self.ixmargin, $
                                       IYMARGIN   =  self.iymargin, $
                                       OXMARGIN   =  self.oxmargin, $
                                       OYMARGIN   =  self.oymargin, $
                                       P_REGION   =       p_region, $
-                                      ROW_HEIGHT = *self.row_height, $
-                                      XGAP       = *self.xgap, $
-                                      YGAP       = *self.ygap)
+                                      ROW_HEIGHT =       row_height, $
+                                      XGAP       =       xgap, $
+                                      YGAP       =       ygap)
+    
+    if nAspect    ne 1 then *self.aspect     = aspect
+    if nColWidth  ne 1 then *self.col_width  = col_width
+    if nRowHeight ne 1 then *self.row_height = row_height
+    if nXGap      ne 1 then *self.xgap       = xgap
+    if nYGap      ne 1 then *self.ygap       = ygap
     
     ;Save the window and region
     self.x_region = p_region[[0,2]]

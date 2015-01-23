@@ -397,7 +397,7 @@ _REF_EXTRA=extra
     ;Turn refresh off.
     self.window -> GetProperty, REFRESH=init_refresh
     self.window -> Refresh, /DISABLE
-    
+
     ;If we are updating the layout, let the window take care of things.
     if update_layout then begin
         ;Get the current layout

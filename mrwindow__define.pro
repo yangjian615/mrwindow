@@ -1978,7 +1978,7 @@ pro MrWindow::TLB_Events, event
             widget_control, self.drawID, DRAW_XSIZE=xNew, DRAW_YSIZE=yNew
             self.xsize = xNew
             self.ysize = yNew
-    
+
             ;Recalculate the normalized positions based on the new window size.
             ;Draw the plot to the new size
             refresh_in = self._refresh
