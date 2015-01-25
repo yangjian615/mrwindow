@@ -319,13 +319,15 @@ pro MrGrLayout::CalcPositions
     ;Reset the column and row sizes if the layout changes
     nPlots     = product(self.GrLayout)
     nAspect    = n_elements(*self.aspect)
+    nColWidth  = n_elements(*self.col_width)
+    nRowHeight = n_elements(*self.row_height)
     nXGap      = n_elements(*self.xgap)
     nYGap      = n_elements(*self.ygap)
-    if nAspect eq 1 || nAspect eq nPlots               then aspect     = *self.aspect
-    if nXGap   eq 1 || nXGap   eq self.grLayout[0] - 1 then xgap       = *self.xgap
-    if nYGap   eq 1 || nYGap   eq self.grLayout[1] - 1 then ygap       = *self.ygap
-    if n_elements(*self.col_width)  eq self.grLayout[0] then col_width  = *self.col_width
-    if n_elements(*self.row_height) eq self.grLayout[1] then row_height = *self.row_height
+    if nAspect    eq 1 || nAspect eq nPlots               then aspect     = *self.aspect
+    if nXGap      eq 1 || nXGap   eq self.grLayout[0] - 1 then xgap       = *self.xgap
+    if nYGap      eq 1 || nYGap   eq self.grLayout[1] - 1 then ygap       = *self.ygap
+    if nColWidth  eq self.grLayout[0] then col_width  = *self.col_width
+    if nRowHeight eq self.grLayout[1] then row_height = *self.row_height
 
     ;Calculate positions
     *self.layout_positions = MrLayout(self.GrLayout, $
@@ -340,8 +342,8 @@ pro MrGrLayout::CalcPositions
                                       ROW_HEIGHT =       row_height, $
                                       XGAP       =       xgap, $
                                       YGAP       =       ygap)
-    
-    if nAspect    ne 1 then *self.aspect     = aspect
+
+    if nAspect    ne 1 && n_elements(aspect) gt 0 then *self.aspect = aspect
     if nColWidth  ne 1 then *self.col_width  = col_width
     if nRowHeight ne 1 then *self.row_height = row_height
     if nXGap      ne 1 then *self.xgap       = xgap
