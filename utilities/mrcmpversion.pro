@@ -1,1 +1,0 @@
-/Users/argall/Documents/IDL/IDLlib/sys_utils/mrcmpversion.pro

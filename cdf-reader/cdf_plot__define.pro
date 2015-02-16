@@ -1,1 +1,0 @@
-/Users/argall/Documents/IDL/Files/cdf-reader/cdf_plot__define.pro

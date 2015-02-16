@@ -1,1 +1,0 @@
-/Users/argall/Documents/IDL/IDLlib/array_utils/linspace.pro
