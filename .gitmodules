@@ -1,0 +1,3 @@
+[submodule "MrIDLlib"]
+	path = MrIDLlib
+	url = https://github.com/argallmr/MrIDLlib.git
