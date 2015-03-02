@@ -354,9 +354,52 @@ function MrImage_Examples, example
         endcase
 
 ;---------------------------------------------------------------------
+; Overplot Two Polar Images //////////////////////////////////////////
+;---------------------------------------------------------------------
+        17: begin
+            ;An image with 36 energy channels and 11 pitch angle channels
+            theImage  = dist(36, 11)
+            dims      = size(theImage, /DIMENSIONS)
+            
+            ;Logarithmically spaced energy channels with +/-
+            Energy    = logspace(2, 4.4, 36)
+            E_DPlus   = [(Energy[1:*] - Energy[0:-2]) / 2, (Energy[-1] - Energy[-2]) / 2]
+            E_DMinus  = [Energy[0]/2.0, (Energy[1:*] - Energy[0:-2]) / 2]
+            
+            ;Pitch angle sectors with +/-
+            PA        = [4.5, linspace(18, 162, 9), 175.5] * !dtor
+            PA_DPlus  = [4.5, replicate(9, 9), 4.5] * !dtor
+            PA_DMinus = [4.5, replicate(9, 9), 4.5] * !dtor
+            
+            ;Display the image
+            position = MrLayout([1,1], 1, /SQUARE)
+            img1     = MrImage(theImage, Energy, PA, E_DMinus, PA_DMinus, E_DPlus, PA_DPlus, $
+                                /POLAR, /XLOG, /SCALE, /AXES, CTINDEX=13, POSITION=position, $
+                                POL_RLINESTYLE=2, POL_AXSTYLE=1, $
+                                XRANGE=[-max(Energy), max(Energy)], YRANGE=[0, 2.0 * !pi], $
+                                XTITLE='Energy (eV)', YTITLE='Energy (eV)')
+            
+            ;Turn refresh off
+            img1 -> Refresh, /DISABLE
+;            img1.xrange = [-(img1.xrange)[1], (img1.xrange)[1]]
+            img1.yrange = [0, 2.0 * !pi]
+            
+            ;Overplot a reflection of the first image
+            PA        = 2 * !pi - reverse(PA)
+            PA_DPlus  = reverse(PA_DPlus)
+            PA_DMinus = reverse(PA_DMinus)
+            img2      = MrImage(theImage, Energy, PA, E_DMinus, PA_DMinus, E_DPlus, PA_DPlus, $
+                                OVERPLOT=img1, /POLAR, /XLOG, /SCALE)
+            
+            ;Refresh and return the window
+            img1 -> Refresh
+            win = img1.window
+        endcase
+
+;---------------------------------------------------------------------
 ; No More Examples ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-        else: message, 'EXAMPLE must be between 1 and 16.'
+        else: message, 'EXAMPLE must be between 1 and 17.'
     endcase
     
     return, win
