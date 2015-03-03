@@ -551,6 +551,7 @@ pro MrImage::doImage
 
     ;Include only those pixels that are inside the data range.
     iData   = [ixrange[0], iyrange[0], ixrange[1], iyrange[1]]
+
     ;size the image differently, depending out the output window
     if !D.Name eq 'PS' then begin
         tv, (*self.img_out)[ixrange[0]:ixrange[1]:xstride, iyrange[0]:iyrange[1]:ystride], $
