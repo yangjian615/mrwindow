@@ -731,12 +731,13 @@ pro MrWindow::File_Menu_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        if obj_valid(cdf_obj) then obj_destroy, cdf_obj
-        if (obj_valid(thePlot)     eq 1) && (self -> IsContained(thePlot)     eq 0) then obj_destroy, thePlot
-        if (obj_valid(theColorbar) eq 1) && (self -> IsContained(theColorbar) eq 0) then obj_destroy, theColorbar
+        self._refresh = refresh_in
+        if obj_valid(oViewer) then obj_destroy, oViewer
         void = cgErrorMsg()
         return
     endif
+    
+    refresh_in = self._refresh
     
     ;Get the name of the button that was pressed
     widget_control, event.id, GET_VALUE=button_name
@@ -752,25 +753,18 @@ pro MrWindow::File_Menu_Events, event
         'OPEN CDF': begin
             ;Set this window as the current window
             self -> SetCurrent
+            if refresh_in then self -> Refresh, /DISABLE
             
-            ;Create the plot from the data
-            cdf_obj = obj_new('CDF_PLOT')
-            if obj_valid(cdf_obj) eq 0 then return
+            ;Create a CDF viewer object
+            oViewer = obj_new('MrCDF_Viewer')
+            if obj_valid(oViewer) eq 0 then return
             
-            thePlot = cdf_obj -> Plot(GROUP_LEADER=self.tlb, $
-                                      DISPLAY_TYPE=display_type, $
-                                      /CURRENT)
-            if obj_valid(thePlot) eq 0 then return
-            
-            ;Add Spectrograms
-            if display_type eq '3D_SPECTROGRAM' || display_type eq 'SPECTROGRAM' then begin
-                ;Make sure there is enough room for a colorbar.
-                if self.oxmargin[1] lt 15 then self -> SetProperty, OXMARGIN=[self.xmargin[0],15]
-            endif
+            theGraphic = oViewer -> View(GROUP_LEADER=self.tlb, /CURRENT, /SUM_PAGES)
+            if obj_valid(theGraphic) eq 0 then return
             
             ;Draw and destroy the object
-            self -> Draw
-            obj_destroy, cdf_obj
+            if refresh_in then self -> Refresh
+            obj_destroy, oViewer
         endcase
         
         else: message, 'Button "' + button_name + '" not recognized.'
@@ -1309,14 +1303,7 @@ end
 pro MrWindow::Refresh, $
 DISABLE=disable
     compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
+    on_error, 2
     
     ;Enable or disable.
     if n_elements(disable) eq 0 $
