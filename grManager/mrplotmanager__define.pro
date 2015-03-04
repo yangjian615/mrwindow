@@ -760,13 +760,13 @@ TYPE = type
         void = cgErrorMsg()
         return
     endif
-    
+
     ;Defaults
     draw = keyword_set(draw)
     if n_elements(destroy) eq 0 then destroy = 1 else destroy = keyword_set(destroy)
     fillHoles = keyword_set(fillHoles)
     trimLayout = keyword_set(trimLayout)
-        
+
 ;---------------------------------------------------------------------
 ;Remove All //////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -798,21 +798,21 @@ TYPE = type
     
     if n_elements(type) gt 0 then begin
         ;Get the objects being removed.
-        removeThese = self -> Get(ISA=type, COUNT=nRemove)
-        
+        removeThese = self -> Get(/ALL, ISA=type, COUNT=nRemove)
+
         ;Append the newly found objects to the input array
         if nRemove gt 0 then if n_elements(Child_Object) eq 0 $
-            then Child_Object = [Child_Object, temporary(removeThese)] $
-            else Child_Object = temporary(removeThese)
+            then Child_Object = temporary(removeThese) $
+            else Child_Object = [Child_Object, temporary(removeThese)]
     endif
         
 ;---------------------------------------------------------------------
 ;Remove Child_Objects ////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
+    tf_removed_fixed = 0B
     if n_elements(Child_Object) gt 0 then begin
         nRemove = n_elements(Child_Object)
-        tf_removed_fixed = 0B
         
         ;Objects that are of type "data" may fall into the auto-updating plot layout.
         ;As such, when they are removed from the container, they also need to be removed
@@ -832,7 +832,7 @@ TYPE = type
                 ;Remove from the layout
                 self -> RemoveFromLayout, layout[2]
             endif
-             
+
             ;Remove from the container.
             self -> MrIDL_Container::Remove, Child_Object[i], DESTROY=destroy
         endfor
