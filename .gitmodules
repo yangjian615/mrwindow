@@ -1,0 +1,10 @@
+[submodule "MrIDLlib"]
+	path = MrIDLlib
+	url = https://github.com/argallmr/MrIDLlib.git
+[submodule "cdf-reader"]
+	path = cdf-reader
+	url = https://github.com/argallmr/cdf-reader.git
+[submodule "coyote"]
+	path = coyote
+	url = https://github.com/argallmr/coyote.git
+	branch = myVersion

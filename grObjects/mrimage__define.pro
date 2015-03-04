@@ -42,10 +42,12 @@
 ;
 ; :Uses:
 ;   Uses the following external programs::
-;       cgDemoData.pro (Coyote Graphics)
-;       cgErrorMsg.pro (Coyote Graphics)
+;       cgDemoData.pro      (Coyote Graphics)
+;       cgErrorMsg.pro      (Coyote Graphics)
+;       cgPlot.pro          (Coyote Graphics)
 ;       setDefaultValue.pro (Coyote Graphics)
 ;       MrGrDataAtom__define.pro
+;       MrLog.pro
 ;       linspace.pro
 ;       logspace.pro
 ;
@@ -67,6 +69,7 @@
 ;       2014/10/05  -   SetPalette sets quantities independent of whether a color table or
 ;                           color table index is used. Allows proper scaling of image.
 ;                           Missing color is loaded at time of draw. - MRA
+;       2015/02/23  -   Determine polar ranges better. Do not draw axes if OVERPLOT is set. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -334,6 +337,11 @@ NOERASE=noerase
     p_current = !P
     x_current = !X
     y_current = !Y
+    
+    ;Restore coordinates
+    if obj_valid(self.target) $
+        then self.target -> RestoreCoords $
+        else self        -> RestoreCoords
         
 ;---------------------------------------------------------------------
 ; Display the Image //////////////////////////////////////////////////
@@ -361,7 +369,7 @@ NOERASE=noerase
 ; Draw Axes //////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 	;Box-style axes.
-	if self.axes && ( (self.polar eq 0) || ((self.pol_axstyle and 1) gt 0) ) then begin
+	if self.overplot eq 0 then if self.axes && ( (self.polar eq 0) || ((self.pol_axstyle and 1) gt 0) ) then begin
 	    if self.paint eq 0 then begin
 	        xrange = *self.xrange
 	        yrange = *self.yrange
@@ -443,7 +451,11 @@ NOERASE=noerase
     endif
 
     ;Polar axes?
-    if self.axes && self.polar then self -> DoPolarAxes, XRANGE=xrange, YRANGE=yrange
+    if self.overplot eq 0 $
+        then if self.axes && self.polar then self -> DoPolarAxes, XRANGE=xrange, YRANGE=yrange
+
+    ;Save the coordinate system
+    self -> SaveCoords
     
     ;No axes
     if self.axes eq 0 then begin
@@ -451,9 +463,6 @@ NOERASE=noerase
         !X = x_current
         !Y = y_current
     endif
-
-    ;Save the coordinate system
-    self -> SaveCoords
 
 ;---------------------------------------------------------------------
 ;RESET COLOR TABLE AND DEVICE ////////////////////////////////////////
@@ -542,6 +551,7 @@ pro MrImage::doImage
 
     ;Include only those pixels that are inside the data range.
     iData   = [ixrange[0], iyrange[0], ixrange[1], iyrange[1]]
+
     ;size the image differently, depending out the output window
     if !D.Name eq 'PS' then begin
         tv, (*self.img_out)[ixrange[0]:ixrange[1]:xstride, iyrange[0]:iyrange[1]:ystride], $
@@ -588,18 +598,18 @@ YLOG=ylog, $
 YRANGE=yrange
     compile_opt strictarr
     on_error, 2
-    
+
     ;For ease of referencing
     xrange = *self.xrange
     yrange = *self.yrange
     img    =  self.img_out
-    x0     = self.x0
-    x1     = self.x1
-    y0     = self.y0
-    y1     = self.y1
-    xlog   = self.xlog
-    ylog   = self.ylog
-
+    x0     =  self.x0
+    x1     =  self.x1
+    y0     =  self.y0
+    y1     =  self.y1
+    xlog   =  self.xlog
+    ylog   =  self.ylog
+    
 ;---------------------------------------------------------------------
 ; Pixels Inside Data Range ///////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -634,24 +644,88 @@ YRANGE=yrange
             x0     = ptr_new(MrLog(*x0))    ;Do not overwrite original pointer.
             x1     = ptr_new(MrLog(*x1))    ;Do not overwrite original pointer.
         endif
+
+        ;Ensure YRANGE is in the range of [0, 2*!pi]
+        twopi = 2.0 * !pi
+        if yrange[0] lt 0.0 $
+            then yrange[0] = yrange[0] * ceil(-yrange[0]/twopi) * twopi $
+            else if yrange[0] gt twopi then yrange[0] = yrange[0] mod twopi
         
-        ;Check the range.
-        ;   - 90 and 270 degrees give the max and min values of y.
-        _xrange = xrange
-        _yrange = yrange
-        if (yrange[0] lt   !pi/2) and (yrange[1] gt   !pi/2) then _yrange[1] =   !pi/2
-        if (yrange[0] lt 3*!pi/2) and (yrange[1] gt 3*!pi/2) then _yrange[0] = 3*!pi/2
-        _yrange = _yrange[sort(_yrange)]
+        if yrange[1] lt 0.0 $
+            then yrange[1] = yrange[1] * ceil(-yrange[1]/twopi) * twopi $
+            else if yrange[1] gt twopi then yrange[1] = yrange[1] mod twopi
         
+        ;Check range
+        ;   - For XRANGE, we want to show the entire upper and/or lower-hp (half plane)
+        ;   - For YRANGE, we want to show the entire right and/or left-hp
+        pa_range_x = yrange
+        pa_range_y = yrange
+        
+        ;Initial [XY]RANGE. Helps determine which half plane we are in.
+        xr = xrange[1] * cos(yrange)
+        yr = xrange[1] * sin(yrange)
+
+    ;---------------------------------------------------------------------
+    ; XRANGE /////////////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        ;Left-Half Plane
+        if (xr[0] ge 0.0) && (xr[1] ge 0.0) then begin
+            case 1 of
+                ;One plane if
+                ;   - YRANGE[0] in  I and YRANGE[1] in  I and YRANGE[1] ccw from YRANGE[0]
+                ;   - YRANGE[0] in IV and YRANGE[1] in IV and YRANGE[1] ccw from YRANGE[0]
+                ;   - YRANGE[0] in IV and YRANGE[1] in  I
+                ( (yrange[0] le 0.5*!pi) && ( (yrange[1] le 0.5*!pi) && (yrange[1] ge yrange[0]) ) ): pa_range_x = [0.5*!pi, 0.0]
+                ( (yrange[0] ge 1.5*!pi) && ( (yrange[1] ge 1.5*!pi) && (yrange[1] ge yrange[1]) ) ): pa_range_x = [0.5*!pi, 0.0]
+                ( (yrange[0] ge 1.5*!pi) &&   (yrange[1] le 0.5*!pi) ):                               pa_range_x = [0.5*!pi, 0.0]
+                else: pa_range_x = [!pi, 0.0]
+            endcase
+        
+        ;Right-Half Plane
+        endif else if (xr[0] le 0) && (xr[1] le 0) then begin
+            case 1 of
+                ;One plane if
+                ;   - YRANGE[0] in II or III and
+                ;     YRANGE[1] in II or III and YRANGE[1] ccw from YRANGE[0]
+                ( (yrange[0] ge 0.5*!pi) && (yrange[0] le 1.5*!pi) ) && $
+                ( (yrange[1] ge 0.5*!pi) && (yrange[1] ge 1.5*!pi) && (yrange[1] ge yrange[1]) ): pa_range_x = [!pi, 0.5*!pi]
+                else: pa_range_x = [!pi, 0.0]
+            endcase
+        
+        ;Left- and Right-Half planes
+        endif else begin
+            pa_range_x = [!pi, 0.0]
+        endelse
+
+    ;---------------------------------------------------------------------
+    ; YRANGE /////////////////////////////////////////////////////////////
+    ;---------------------------------------------------------------------
+        ;Upper-Half Plane
+        if (yr[0] ge 0.0) && (yr[1] ge 0.0) then begin
+            ;One plane if
+            ;   - YRANGE[0] in I or II and
+            ;     YRANGE[1] in I or II and YRANGE[1] ccw from YRANGE[0]
+            if (yrange[0] le !pi) && ( (yrange[1] le 0.5*!pi) && (yrange[1] ge yrange[0]) ) $
+                then pa_range_y = [0.0,     0.5*!pi] $
+                else pa_range_y = [1.5*!pi, 0.5*!pi]
+        
+        ;Lower-Half Plane
+        endif else if (xr[0] le 0) && (xr[1] le 0) then begin
+            ;One plane if
+            ;   - YRANGE[0] in III or IV and
+            ;     YRANGE[1] in III or IV and YRANGE[1] ccw from YRANGE[0]
+            if (yrange[0] ge !pi) && ( (yrange[1] ge !pi) && (yrange[1] ge yrange[0]) ) $
+                then pa_range_y = [1.5*!pi,     !pi] $
+                else pa_range_y = [1.5*!pi, 0.5*!pi]
+        
+        ;Left- and Right-Half planes
+        endif else begin
+            pa_range_y = [1.5*!pi, 0.5*!pi]
+        endelse
+
         ;Convert from polar to cartesian
-        xrange = [min( [_xrange[0] * cos( yrange[0]), $
-                        _xrange[0] * cos( yrange[1]), $
-                        _xrange[1] * cos( yrange[0]), $
-                        _xrange[1] * cos( yrange[1])], MAX=maxX, NAN=self.nan), maxX]
-        yrange = [min( [_xrange[0] * sin(_yrange[0]), $
-                        _xrange[0] * sin(_yrange[1]), $
-                        _xrange[1] * sin(_yrange[0]), $
-                        _xrange[1] * sin(_yrange[1])], MAX=maxY, NAN=self.nan ), maxY]
+        yrange = xrange[1] * sin(pa_range_y)
+        xrange = xrange[1] * cos(pa_range_x)
     endif
 
 ;---------------------------------------------------------------------
@@ -813,8 +887,8 @@ YRANGE=yrange
 ; Concentric Circles /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     ;Minimum and maximum radius and polar angle
-    _yrange = [min(*self.y0), max(*self.y1)]
-    _xrange = [min(*self.x0), max(*self.x0)]
+    _xrange = [min(*self.x0, /NAN), max(*self.x0, /NAN)]
+    _yrange = [min(*self.y0, /NAN), max(*self.y1, /NAN)]
     if self.xlog then _xrange = MrLog(_xrange) > 1e-3
     
     ;Create a circle of unit radius
@@ -1617,7 +1691,8 @@ TV=tv
         n_elements(*self.dep)  gt 0: *self.yrange = [min(*self.dep, MAX=yMax, /NAN), yMax]
         else:                        *self.yrange = [self.ylog, imDims[1]-1]
     endcase
-        
+
+
 ;---------------------------------------------------------------------
 ; Define Dataspace ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1658,7 +1733,7 @@ TV=tv
 
     ;RANGE
     self.range = [imMin, imMax]
-        
+
 ;---------------------------------------------------------------------
 ; Prep the Image /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------

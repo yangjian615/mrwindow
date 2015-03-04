@@ -1,1 +1,0 @@
-/Users/argall/Documents/IDL/IDLlib/type_utils/mrobj_class.pro

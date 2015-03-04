@@ -482,6 +482,51 @@ end
 
 
 ;+
+;   Translate or move a graphic in the x, y, or z direction.
+;
+; :Params:
+;       X:              in, required, type=float/integer
+;                       Move the graphic along the X dimension. A value of 0 results in
+;                           no traslation.
+;       Y:              in, required, type=float/integer
+;                       Move the graphic along the Y dimension. A value of 0 results in
+;                           no traslation.
+;       Z:              in, required, type=float/integer, default=0
+;                       Move the graphic along the Z dimension. A value of 0 results in
+;                           no traslation.
+;
+; :Keywords:
+;       DATA:           in, optional, type=1, default=0
+;                       If set, `X`, `Y`, and `Z` are provided in data coordinates.
+;       DEVICE:         in, optional, type=1, default=0
+;                       If set, `X`, `Y`, and `Z` are provided in device coordinates.
+;       NORMAL:         in, optional, type=1, default=0
+;                       If set, `X`, `Y`, and `Z` are provided in normal coordinates.
+;-
+pro MrGrAtom::Translate, x, y, z, $
+DATA=data, $
+DEVICE=device, $
+NORMAL=normal, $
+RESET=reset
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Translate by (x,y,z)
+    self.position[[0,2]] += x
+    self.position[[1,3]] += y
+    if n_elements(z) gt 0 then *self.z += z
+end
+
+
+
+;+
 ;   Set the selection state of the graphic.
 ;
 ; :Keywords:

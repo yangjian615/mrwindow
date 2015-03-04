@@ -1,1 +1,0 @@
-/Users/argall/Documents/IDL/IDLlib/guis/moveplot_gui.pro
