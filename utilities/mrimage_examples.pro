@@ -55,8 +55,9 @@
 ;       matthew.argall@wildcats.unh.edu
 ;
 ; :History:
-;	Modification History::
+;   Modification History::
 ;       2014/09/09  -   Written by Matthew Argall
+;       2015/03/02  -   Added example 17.
 ;-
 function MrImage_Examples, example
     compile_opt strictarr
@@ -87,7 +88,8 @@ function MrImage_Examples, example
                 ['  13       Position Each Pixel with Pixel Centers and Delta +/-'], $
                 ['  14       Polar Image'], $
                 ['  15       Polar Image, Pixel Deltas, Log-Scale'], $
-                ['  16       Polar Image, Polar axes & tickmarks']]
+                ['  16       Polar Image, Polar axes & tickmarks'], $
+                ['  17       Overplot two polar images.']]
         return, -1
     endif
 
