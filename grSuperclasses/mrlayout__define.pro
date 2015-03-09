@@ -96,7 +96,7 @@ _REF_EXTRA=extra
 	on_error, 2
 
 	;Get Properties
-	if arg_present(managed) then managed = self.managed
+	if arg_present(managed) then managed = self.isManaged
 	if n_elements(extra) gt 0 then self -> MrLayoutAtom::GetProperty, _STRICT_EXTRA=extra
 end
 
@@ -126,7 +126,7 @@ DISABLE=disable
     on_error, 2
     
     ;Turn layout management on or off.
-    self.manage = keyword_set(disable)
+    self.isManaged = keyword_set(disable)
 end
 
 
@@ -559,39 +559,6 @@ WRAP=wrap
 		self -> SetProperty, LOCATION=[newCol, newRow]
 		newLayout = self.layout
 	endelse
-end
-
-
-;+
-;   The initialization method.
-;
-; :Keywords:
-;       MANAGE:             in, optional, type=boolean, default=0
-;                           If set, the layout object will be managed by a layout manager.
-;       _REF_EXTRA:         in, optional, type=any
-;                           Any keyword accepted by the MrLayoutAtom::Init method is
-;                               also accepted via keyword inheritance.
-;-
-function MrLayout::init, $
-MANAGE=manage, $
-_REF_EXTRA=extra
-	compile_opt strictarr
-
-	;Error handling
-	catch, the_error
-	if the_error ne 0 then begin
-		catch, /cancel
-		void = cgErrorMsg()
-		return, 0
-	endif
-
-	;Are we being managed?
-	self.isManaged = keyword_set(manage)
-
-	;Initialize the atom
-	success = self -> MrLayoutAtom::Init(_STRICT_EXTRA=extra)
-	
-	return, success
 end
 
 

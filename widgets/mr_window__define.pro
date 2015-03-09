@@ -2182,7 +2182,19 @@ _REF_EXTRA=extra
     
     ;Create layout object
     ;   - Must set draw widget properties window first to get size.
-    self._oLayout = obj_new('MrLayout', LOCATION=0)
+    self._oLayout = obj_new('MrLayoutManager', $
+                            ASPECT     = aspect, $
+                            COL_WIDTH  = col_width, $
+                            CHARSIZE   = charsize, $
+                            IXMARGIN   = ixmargin, $
+                            IYMARGIN   = iymargin, $
+                            LAYOUT     = layout, $
+                            MARGIN     = margin, $
+                            OXMARGIN   = oxmargin, $
+                            OYMARGIN   = oymargin, $
+                            ROW_HEIGHT = row_height, $
+                            XGAP       = xgap, $
+                            YGAP       = ygap)
 
     ;Add to the container of open windows
     self -> _SysVAdd, self

@@ -181,7 +181,7 @@ BEFORE=before
 
 	;Update the layout
 	self.layout = [newLayout, newPIndex]
-	self -> SetGrid
+	self -> ComputeGrid
 end
 
 
@@ -238,7 +238,7 @@ BEFORE=before
 
 	;Update the layout
 	self.layout = [newLayout, newPIndex]
-	self -> SetGrid
+	self -> ComputeGrid
 end
 
 
@@ -260,6 +260,8 @@ pro MrLayoutAtom::ComputeGrid
 		return
 	endif
 
+	nCols     = self.layout[0]
+	nRows     = self.layout[1]
 	xsize     = !d.x_size
 	ysize     = !d.y_size
 	xcharsize = ceil(double(!d.x_ch_size)*self.charsize)
@@ -270,18 +272,25 @@ pro MrLayoutAtom::ComputeGrid
 ;-----------------------------------------------------------------------------------------
 	;Convert from character units to pixels.
 	ixmargin = self.ixmargin * xcharsize
-    iymargin = self.iymargin * ycharsize
+	iymargin = self.iymargin * ycharsize
 	oxmargin = self.oxmargin * xcharsize
 	oymargin = self.oymargin * ycharsize
 	xgap     = self.xgap     * xcharsize
 	ygap     = self.ygap     * ycharsize
+	
+	;Total space between plots
+	;   - A scalar indicates uniform spacing.
+	xspace     = n_elements(xgap)             eq 1     ? xgap * (nCols - 1) : total(xgap)
+	yspace     = n_elements(ygap)             eq 1     ? ygap * (nRows - 1) : total(ygap)
+	col_width  = n_elements(*self.col_width)  eq nCols ? *self.col_width    : replicate(1.0/nCols, nCols)
+	row_height = n_elements(*self.row_height) eq nRows ? *self.row_height   : replicate(1.0/nRows, nRows)
 
 	;Calculate the area of the region in which plots will be drawn.
 	p_region = [oxmargin, oymargin[0], xsize - oxmargin[1], ysize - oymargin[1]]
 
 	;Calculate the plot dimensions
-	plot_width  = (p_region[2] - p_region[0] - total(xspace)) * *self.col_width 
-	plot_height = (p_region[3] - p_region[1] - total(yspace)) * *self.row_height
+	plot_width  = (p_region[2] - p_region[0] - xspace) * col_width 
+	plot_height = (p_region[3] - p_region[1] - yspace) * row_height
 
 	;Offset between upper left corner of p_region and lower right corner of
 	;the plot area of each plot.
@@ -292,12 +301,12 @@ pro MrLayoutAtom::ComputeGrid
 	p_areas = fltarr(4, nCols, nRows)
 	for ii = 0, nCols-1 do begin
 		for jj = 0, nRows-1 do begin
-		    p_areas[2,ii,jj] = p_region[0] + xoffset[ii]
-		    p_areas[1,ii,jj] = p_region[3] - yoffset[jj]
-		    p_areas[0,ii,jj] = p_areas[2,ii,jj] - plot_width[ii]
-		    p_areas[3,ii,jj] = p_areas[1,ii,jj] + plot_height[jj]
+			p_areas[2,ii,jj] = p_region[0] + xoffset[ii]
+			p_areas[1,ii,jj] = p_region[3] - yoffset[jj]
+			p_areas[0,ii,jj] = p_areas[2,ii,jj] - plot_width[ii]
+			p_areas[3,ii,jj] = p_areas[1,ii,jj] + plot_height[jj]
 		endfor
-	endfor 
+	endfor
 
 ;-----------------------------------------------------------------------------------------
 ; Calculate Positions \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -316,7 +325,7 @@ pro MrLayoutAtom::ComputeGrid
 ;-----------------------------------------------------------------------------------------
 ; Set the Aspect Ratio \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------------------------------------------
-	if n_elements(aspect) gt 0 then begin	    
+	if n_elements(aspect) gt 0 then begin
 		;Loop through all of the plots
 		for i = 0, nCols*nRows-1 do begin
 			if aspect[i] eq 0 then continue
@@ -361,17 +370,17 @@ pro MrLayoutAtom::ComputeGrid
 		p_region[[0,1]] = fix(floor(p_region[[0,1]]))
 		p_region[[2,3]] = fix(ceil(p_region[[2,3]]))
 		
-		p_areas[[0,1],*] = fix(floor(p_areas[[0,1]]))
-		p_areas[[2,3],*] = fix(ceil(p_areas[[2,3]]))
+		p_areas[[0,1],*] = fix(floor(p_areas[[0,1],*]))
+		p_areas[[2,3],*] = fix(ceil(p_areas[[2,3],*]))
 	endelse
 
 ;-----------------------------------------------------------------------------------------
 ; Save the Positions \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------------------------------------------
-	self.x_region = p_region[[0,2], *]
-	self.y_region = p_region[[1,3], *]
-	self.x_window = p_areas[[0,2], *]
-	self.y_window = p_areas[[1,3], *]
+	self.x_region = p_region[[0,2]]
+	self.y_region = p_region[[1,3]]
+	self.x_window = p_areas[[0,2]]
+	self.y_window = p_areas[[1,3]]
 	*self.grid    = positions
 end
 
@@ -580,7 +589,7 @@ BEFORE=before
 
 	;Update the layout
 	self.layout = [newLayout, newPIndex]
-	self -> SetGrid
+	self -> ComputeGrid
 end
 
 
@@ -647,7 +656,57 @@ pro MrLayoutAtom::DeleteRow, nRows, row
 
 	;Update the layout
 	self.layout = [newLayout, newPIndex]
-	self -> SetGrid
+	self -> ComputeGrid
+end
+
+
+;+
+;   Determine if a plot index location exists within the layout.
+;
+; :Params:
+;       PINDEX:         in, required, type=int/intarr
+;                       The index of the plot, starting with 1, whose [col,row] location
+;                           is to be determined.
+;       LAYOUT:         in, optional, type=intarr(2), default=current layout
+;                       The number of columns and rows in the layout: [ncols, nrows].
+;
+; :Keywords:
+;       AINDEX:         in, optional, private, type=boolean, default=0
+;                       If set, `PINDEX` is take to be array-index value.
+;       COLROW:         in, optional, type=boolean, default=0
+;                       If set, `INDEX` is take to be a [col,row] location.
+;
+; :Returns:
+;       TF_EXIST:       Returns 1 for each `PINDEX` that exists within `LAYOUT` and 0 for
+;                           those that do not.
+;-
+function MrLayoutAtom::Exists, pIndex, layout, $
+AINDEX=aIndex, $
+COLROW=ColRow
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		void = cgErrorMsg()
+		return, 0
+	endif
+
+	;Defaults
+	if n_elements(layout) eq 0 then layout = self.layout[0:1]
+	ColRow = keyword_set(ColRow)
+	aIndex = keyword_set(aIndex)
+	if ColRow + aIndex gt 1 then message, 'COLROW and AINDEX are mutually exclusive.'
+
+	;Check if the location exists within the layout
+	case 1 of
+		aIndex: tf_exist = (pIndex lt layout[0]*layout[1]) && (pIndex ge 0)
+		ColRow: tf_exist = (pIndex[0,*] lt layout[0]) && (pIndex[1,*] lt layout[1])
+		else:   tf_exist = (pIndex le layout[0]*layout[1]) && (pIndex ge 1)
+	endcase 
+
+	return, tf_exist
 end
 
 
@@ -994,7 +1053,7 @@ YGAP=ygap
 	if nColW gt 0 then begin
 		if nColW eq 1 || nColW eq layout[0]-1 $
 			then *self.col_width = col_width $
-			else message, 'COL_WIDTH: Incorrect number of elements', /INFORMATIONAL
+			else message, 'COL_WIDTH: Incorrect number of elements'
 	endif
 
 	;Row height
@@ -1002,7 +1061,7 @@ YGAP=ygap
 	if nRowH gt 0 then begin
 		if nRowH eq 1 || nRowH eq layout[1]-1 $
 			then *self.row_height = row_height $
-			else message, 'ROW_HEIGHT: Incorrect number of elements', /INFORMATIONAL
+			else message, 'ROW_HEIGHT: Incorrect number of elements'
 	endif
 	
 ;---------------------------------------------------------------------
@@ -1021,7 +1080,7 @@ YGAP=ygap
 	;Location
 	if n_elements(location) gt 0 then begin
 		oLocation = location
-	
+
 		;Convert [col,row] to pIndex
 		;   - Make sure it fits within the layout.
 		if n_elements(oLocation) eq 2 $
@@ -1030,14 +1089,14 @@ YGAP=ygap
 
 		;Save the location. Make sure LAYOUT is not updated after.
 		if success eq 0 $
-			then message, 'LOCATION does not fit inside the current layout. Ignoring', /INFORMATIONAL $
+			then message, 'LOCATION does not fit inside the current layout. Ignoring' $
 			else self.layout[2] = oLocation
 	endif
 
 ;---------------------------------------------------------------------
 ;Update the Grid /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-	self -> SetGrid
+	self -> ComputeGrid
 
 ;---------------------------------------------------------------------
 ; Set the New Position ///////////////////////////////////////////////
@@ -1295,7 +1354,7 @@ YGAP=ygap
 	                     WDIMS      = wDims, $
 	                     XGAP       = xgap, $
 	                     YGAP       = ygap
-	
+
 	return, 1
 end
 

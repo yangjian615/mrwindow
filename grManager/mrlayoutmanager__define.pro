@@ -1098,9 +1098,9 @@ CURRENT=current
 		               OXMARGIN   =  self.oxmargin, $
 		               OYMARGIN   =  self.oymargin, $
 		               ROW_HEIGHT = *self.row_height, $
-		               XGAP       = *self.xgap, $
+		               XGAP       =  self.xgap, $
 		               XSIZE      =    !d.x_size, $
-		               YGAP       = *self.ygap, $
+		               YGAP       =  self.ygap, $
 		               YSIZE      =    !d.y_size)
 	endelse
 
