@@ -68,13 +68,17 @@
 ;-
 ;*****************************************************************************************
 ;+
-;   Determines if the layout object is being managed.
-;
-; :Returns:
-;       TF_MANAGED:     Returns true (1) if the layout is being managed and false (0) otherwise.
+;   Set properties of the object.
 ;-
-function MrLayout::IsManaged
-    return, self.isManaged
+pro MrLayout::ComputeGrid
+	compile_opt strictarr
+	on_error, 2
+
+	;Do not set if we are being managed
+	if self.isManaged then return
+
+	;Set the grid
+	self -> MrLayoutAtom::ComputeGrid
 end
 
 
@@ -88,12 +92,23 @@ end
 pro MrLayout::GetProperty, $
 MANAGED=managed, $
 _REF_EXTRA=extra
-    compile_opt strictarr
-    on_error, 2
-    
-    ;Get Properties
-    if arg_present(managed) then managed = self.managed
-    if n_elements(extra) gt 0 then self -> MrLayoutAtom::GetProperty, _STRICT_EXTRA=extra
+	compile_opt strictarr
+	on_error, 2
+
+	;Get Properties
+	if arg_present(managed) then managed = self.managed
+	if n_elements(extra) gt 0 then self -> MrLayoutAtom::GetProperty, _STRICT_EXTRA=extra
+end
+
+
+;+
+;   Determines if the layout object is being managed.
+;
+; :Returns:
+;       TF_MANAGED:     Returns true (1) if the layout is being managed and false (0) otherwise.
+;-
+function MrLayout::IsManaged
+	return, self.isManaged
 end
 
 
@@ -121,6 +136,9 @@ end
 ; :Keywords:
 ;       MANAGE:         in, optional, type=boolean
 ;                       If set, the layout will be managed by the layout manager.
+;       _REF_EXTRA:     in, optional, type=any
+;                       Any keyword accepted by the MrLayoutAtom::Init method is
+;                           also accepted via keyword inheritance.
 ;-
 pro MrLayout::SetProperty, $
 MANAGE=manage, $
@@ -135,98 +153,445 @@ end
 
 
 ;+
+;   The purpose of this method is to shift a given amount of rows.
+;
+; :Params:
+;       NCOLS:          in, optional, type=int, default=1
+;                       Number of columns to shift the graphic. If NCOLS is positive
+;                           (negative), the graphic will be shifted right (left).
+;
+; :Keywords:
+;       EXPAND:         in, optional, type=boolean, default=0
+;                       If set, graphics that are shifted beyond the layout will cause
+;                           additional columns to be added to the layout. If `FEED` is
+;                           also set, graphics will be fed through to the last row, then
+;                           additional rows will be added to accommodate the shift.
+;       FEED:           in, optional, type=boolean, default=0
+;                       If set, graphics that are shifted past the last (first) column
+;                           will be fed into the first (last) column one row below (above)
+;                           its current location (like a carriage return + line feed). If
+;                           also pushed beyond the first or last row, an error will occur
+;                           unless `WRAP` or `EXPAND` is set.
+;       NEWLAYOUT:      out, optional, type=intarr(3)
+;                       The new layout after shifting has occurred: [nCols, nRows, pIndex].
+;       TEST:           in, optional, type=boolean, default=0
+;                       If set, a dry run will be performed and nothing will be shifted.
+;                           See the `STATUS` keyword for results.
+;       STATUS:         out, optional, type=integer
+;                       Final status of the shift. Values include::
+;                           0  -  Successful shift.
+;                           1  -  Incorrect inputs given.
+;                           2  -  Not enough columns to perform shift.
+;                           3  -  WRAP or EXPAND required for FEED to work.
+;                           4  -  Error WRAPping or EXPANDing rows with FEED set.
+;       WRAP:           in, optional, type=boolean, default=1
+;                       If set, graphics that are shifted past the last (first) column
+;                           will wrap to the first (last) column. If `FEED` is also set,
+;                           the feed will occur first. If a graphic is shifted past the
+;                           last (first) row, it will be wrapped to the first (last)
+;                           row.
+;-
+pro MrLayout::ShiftColumn, nCols, $
+EXPAND=expnd, $
+FEED=feed, $
+NEWLAYOUT=newLayout, $
+STATUS=status, $
+TEST=test, $
+WRAP=wrap
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		void = cgErrorMsg()
+		return
+	endif
+	
+	;No errors
+	status = 0
+
+;---------------------------------------------------------------------
+; Defaults ///////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+	expnd = keyword_set(expnd)
+	feed  = keyword_set(feed)
+	test  = keyword_set(test)
+	wrap  = keyword_set(wrap)
+	send_message = ~arg_present(status)
+	if n_elements(nCols) eq 0 then nCols = 1
+	
+	if expnd + wrap gt 0 then begin
+		status = 1
+		msg    = 'EXPAND and WRAP are mutually exclusive.'
+		if send_message then message, msg
+	endif
+
+;---------------------------------------------------------------------
+; New Location ///////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+	;Convert the plot index to a [col,row] location
+	colRow = self -> ConvertIndex(self.layout[3], /PINDEX, /TO_COLROW)
+
+	;New column and layout
+	newLayout = self.layout
+	tempCol   = colRow[0] + nCols
+
+;---------------------------------------------------------------------
+; Does Not Fit ///////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+	if tempCol gt self.layout[0] || tempCol le 0 then begin
+		;Number of shifts to get to the first/last column
+		n_to_lastcol = (nCols gt 0) ? (self.layout[0] - colRow[1]) : (colRow[0] - 1)
+		
+		;Once we are at the end of the row, we can determine how many
+		;complete rows we will have to skip.
+		n_shift_rows = ceil( (abs(nCols) - n_to_lastcol) / self.layout[0] )
+		
+		;The number of columns remaining will determine the destination.
+		;   - N_SHIFT_ROWS includes the destination row, so subtract 1.
+		;   - If NCOLS > 0, add from beginning of layout and subtract 1 (1 - 1 = 0)
+		;   - If NCOLS < 0, subtract (add negative) from layout and add 1.
+		finalCol = (nCols gt 0) ? (nCols - n_to_lastcol - (n_shift_rows - 1) * self.layout[0]) : $
+		                          (nCols + n_to_lastcol + (n_shift_rows - 1) * self.layout[0]) + self.layout[0] + 1
+
+	;---------------------------------------------------------------------
+	; Feed ///////////////////////////////////////////////////////////////
+	;---------------------------------------------------------------------
+		if feed then begin
+			;Is a wrap or expansion required?
+			;   - Yes if the number of rows to shift is larger than the number of
+			;     rows above or below us.
+			;   - WRAP and EXPAND mean something different when FEED is set.
+			tf_wrexp = (nCols gt 0) ? n_shift_rows gt self.layout[1] - colRow[1] : $
+			                          n_shift_rows ge colRow[1]
+			
+			;Shift is possible
+			;   - WRAP and EXPAND are not necessary.
+			;   - Or they are and one of the keywords is set.
+			if (tf_wrexp eq 0) || wrap || expnd then begin
+				;Shift to the correct row.
+				;   - How we shift to a new row will be handled properly with
+				;     the WRAP and EXPAND keywords.
+				self -> ShiftRow, n_shift_rows, $
+				                  EXPAND    = expnd, $
+				                  NEWLAYOUT = newLayout, $
+				                  STATUS    = rstat, $
+				                  TEST      = test, $
+				                  WRAP      = wrap
+				
+				;Did an error occur?
+				if status ne 0 then begin
+					status = 4
+					if send_message then message, 'Error shifting rows.'
+				endif
+				
+				;Update the graphic's location
+				newCol = finalCol
+				newRow = newLayout[1]
+			
+			;Shift is not possible
+			endif else begin
+				status = 3
+				msg    = 'Error shifting columns: Not enough rows for FEED. See WRAP and EXPAND.'
+				if send_message then message, msg
+			endelse
+			
+	;---------------------------------------------------------------------
+	; Wrap ///////////////////////////////////////////////////////////////
+	;---------------------------------------------------------------------
+		;Keep the graphic in the same row and wrap it from end to end.
+		endif else if wrap then begin
+			;FINALCOL was calculated assuming we were wrapping.
+			;   - The row will stay the same.
+			newCol = finalCol
+			newRow = self.layout[1]
+		
+	;---------------------------------------------------------------------
+	; Expand /////////////////////////////////////////////////////////////
+	;---------------------------------------------------------------------
+		;Keep the graphic in the same row and add columns until there is room.
+		endif else if expnd then begin
+			;Add the columns
+			;   - Add BEFORE: tempCol = 1 - nAdd                nCols < 0
+			;   - Add AFTER:  tempCol = layout[0] + nAdd        nCols > 0
+			if nCols gt 0 then begin
+				nAdd   = tempCol - self.layout[0]
+				newCol = self.layout[0] + nAdd
+			endif else begin
+				nAdd   = abs(tempCol) + 1
+				newCol = 0
+			endelse
+			
+			;Same row
+			newRow = self.layout[1]
+		
+	;---------------------------------------------------------------------
+	; Not Possible ///////////////////////////////////////////////////////
+	;---------------------------------------------------------------------
+		endif else begin
+			status = 2
+			msg    = 'NCOLS is too large. Cannot shift.'
+			if send_message then message, msg
+		endelse
+	endif
+
+;---------------------------------------------------------------------
+; Move to New Location ///////////////////////////////////////////////
+;---------------------------------------------------------------------
+	;Was this just a test?
+	if test then begin
+		newLayout[0] += nAdd
+		newLayout[2]  = self -> ConvertLocation([newCol, newRow], newLayout[0:1], /COLROW, /PINDEX)
+	
+	;Real deal
+	endif else begin
+		;Add the proper number of columns
+		;   - Row shift has already occurred.
+		if nAdd gt 0 then self -> AddColumn, nAdd, BEFORE=(nCols lt 0)
+		
+		;Update the position
+		self -> SetProperty, LOCATION=[newCol, newRow]
+		newLayout = self.layout
+	endelse
+end
+
+
+;+
+;   The purpose of this method is to shift a given amount of rows.
+;
+; :Params:
+;       NROWS:          in, optional, type=int, default=1
+;                       Number of rows to shift the graphic. If NROWS is positive
+;                           (negative), the graphic will be shifted down (up).
+;
+; :Keywords:
+;       EXPAND:         in, optional, type=boolean, default=0
+;                       If set, graphics that are shifted beyond the layout will cause
+;                           additional rows to be added to the layout. If `FEED` is
+;                           also set, graphics will be fed through to the last column, then
+;                           additional columns will be added to accommodate the shift.
+;       FEED:           in, optional, type=boolean, default=0
+;                       If set, graphics that are shifted past the bottom (top) row
+;                           will be fed into the column to the right (left) of its current
+;                           location, then wrapped to the top (bottom) (lke a carriage
+;                           return + line feed). If also pushed beyond the first or last
+;                           column, an error will occur unless `WRAP` or `EXPAND` is set.
+;       NEWLAYOUT:      out, optional, type=intarr(3)
+;                       The new layout after shifting has occurred: [nCols, nRows, pIndex].
+;       TEST:           in, optional, type=boolean, default=0
+;                       If set, a dry run will be performed and nothing will be shifted.
+;                           See the `NEWLAYOUT` and `STATUS` keyword for results.
+;       STATUS:         out, optional, type=integer
+;                       Final status of the shift. Values include::
+;                           0  -  Successful shift.
+;                           1  -  Incorrect inputs given.
+;                           2  -  Not enough columns to perform shift.
+;                           3  -  WRAP or EXPAND required for FEED to work.
+;                           4  -  Error WRAPping or EXPANDing rows with FEED set.
+;       WRAP:           in, optional, type=boolean, default=1
+;                       If set, graphics that are shifted past the bottom (top) row
+;                           will wrap to the top (bottom) row. If `FEED` is also set,
+;                           the feed will occur first. If a graphic is shifted past the
+;                           last (first) column, it will be wrapped to the first (last)
+;                           column.
+;-
+pro MrLayout::ShiftRow, nRows, $
+EXPAND=expnd, $
+FEED=feed, $
+NEWLAYOUT=newLayout, $
+STATUS=status, $
+TEST=test, $
+WRAP=wrap
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		void = cgErrorMsg()
+		return
+	endif
+	
+	;No errors
+	status = 0
+
+;---------------------------------------------------------------------
+; Defaults ///////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+	expnd = keyword_set(expnd)
+	feed  = keyword_set(feed)
+	test  = keyword_set(test)
+	wrap  = keyword_set(wrap)
+	send_message = ~arg_present(status)
+	if n_elements(nRows) eq 0 then nRows = 1
+	
+	if expnd + wrap gt 0 then begin
+		status = 1
+		msg    = 'EXPAND and WRAP are mutually exclusive.'
+		if send_message then message, msg
+	endif
+
+;---------------------------------------------------------------------
+; New Location ///////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+	;Convert the plot index to a [col,row] location
+	colRow = self -> ConvertIndex(self.layout[3], /PINDEX, /TO_COLROW)
+
+	;New column and layout
+	newLayout = self.layout
+	tempRow   = colRow[1] + nRows
+
+;---------------------------------------------------------------------
+; Does Not Fit ///////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+	if tempRow gt self.layout[1] || tempCol le 0 then begin
+		;Number of shifts to get to the bottom/top row
+		n_to_lastrow = (nRows gt 0) ? (self.layout[1] - colRow[1]) : (colRow[1] - 1)
+		
+		;Once we are at the end of the row, we can determine how many
+		;complete rows we will have to skip.
+		n_shift_cols = ceil( (abs(nRows) - n_to_lastrow) / self.layout[1] )
+		
+		;The number of rows remaining will determine the destination.
+		;   - N_SHIFT_COLS includes the destination row, so subtract 1.
+		;   - If NROWS > 0, add from beginning of layout and subtract 1 (1 - 1 = 0)
+		;   - If NROWS < 0, subtract (add negative) from layout and add 1.
+		finalRow = (nRows gt 0) ? (nRows - n_to_lastrow - (n_shift_cols - 1) * self.layout[1]) : $
+		                          (nRows + n_to_lastrow + (n_shift_cols - 1) * self.layout[1]) + self.layout[1] + 1
+
+	;---------------------------------------------------------------------
+	; Feed ///////////////////////////////////////////////////////////////
+	;---------------------------------------------------------------------
+		if feed then begin
+			;Is a wrap or expansion required?
+			;   - Yes if the number of rows to shift is larger than the number of
+			;     columns to the left or right of us.
+			;   - WRAP and EXPAND mean something different when FEED is set.
+			tf_wrexp = (nRows gt 0) ? n_shift_cols gt self.layout[0] - colRow[0] : $
+			                          n_shift_cols ge colRow[0]
+			
+			;Shift is possible
+			;   - WRAP and EXPAND are not necessary.
+			;   - Or they are and one of the keywords is set.
+			if (tf_wrexp eq 0) || wrap || expnd then begin
+				;Shift to the correct row.
+				;   - How we shift to a new row will be handled properly with
+				;     the WRAP and EXPAND keywords.
+				self -> ShiftColumn, n_shift_cols, $
+				                     EXPAND    = expnd, $
+				                     NEWLAYOUT = newLayout, $
+				                     STATUS    = rstat, $
+				                     TEST      = test, $
+				                     WRAP      = wrap
+				
+				;Did an error occur?
+				if status ne 0 then begin
+					status = 4
+					if send_message then message, 'Error shifting columns.'
+				endif
+				
+				;Update the graphic's location
+				newCol = newLayout[0]
+				newRow = finalRow
+			
+			;Shift is not possible
+			endif else begin
+				status = 3
+				msg    = 'Error shifting rows: Not enough columns for FEED. See WRAP and EXPAND.'
+				if send_message then message, msg
+			endelse
+			
+	;---------------------------------------------------------------------
+	; Wrap ///////////////////////////////////////////////////////////////
+	;---------------------------------------------------------------------
+		;Keep the graphic in the same column and wrap it from end to end.
+		endif else if wrap then begin
+			;FINALROW was calculated assuming we were wrapping.
+			;   - The column will stay the same.
+			newCol = self.layout[0]
+			newRow = finalRow
+		
+	;---------------------------------------------------------------------
+	; Expand /////////////////////////////////////////////////////////////
+	;---------------------------------------------------------------------
+		;Keep the graphic in the same column and add rows until there is room.
+		endif else if expnd then begin
+			;Add the rows
+			;   - Add BEFORE: tempRow = 1 - nAdd                nRows < 0
+			;   - Add AFTER:  tempRow = layout[0] + nAdd        nRows > 0
+			if nCols gt 0 then begin
+				nAdd   = tempRow - self.layout[1]
+				newRow = self.layout[1] + nAdd
+			endif else begin
+				nAdd   = abs(tempRow) + 1
+				newRow = 0
+			endelse
+			
+			;Same column
+			newCol = self.layout[0]
+		
+	;---------------------------------------------------------------------
+	; Not Possible ///////////////////////////////////////////////////////
+	;---------------------------------------------------------------------
+		endif else begin
+			status = 2
+			msg    = 'NCOLS is too large. Cannot shift.'
+			if send_message then message, msg
+		endelse
+	endif
+
+;---------------------------------------------------------------------
+; Move to New Location ///////////////////////////////////////////////
+;---------------------------------------------------------------------
+	;Was this just a test?
+	if test then begin
+		newLayout[1] += nAdd
+		newLayout[2]  = self -> ConvertLocation([newCol, newRow], newLayout[0:1], /COLROW, /PINDEX)
+	
+	;Real deal
+	endif else begin
+		;Add the proper number of columns
+		;   - Row shift has already occurred.
+		if nAdd gt 0 then self -> AddRow, nAdd, BEFORE=(nRows lt 0)
+		
+		;Update the position
+		self -> SetProperty, LOCATION=[newCol, newRow]
+		newLayout = self.layout
+	endelse
+end
+
+
+;+
 ;   The initialization method.
 ;
 ; :Keywords:
-;       ASPECT:         in, optional, type=float
-;                       Aspect ratio of the plot.
-;       CHARSIZE:       in, optional, type=float, default=1.5
-;                       Fraction of IDL's default character size. Used to determine size
-;                           of `XMARGIN`, `YMARGIN`, `XGAP` and `YGAP`.
-;       LAYOUT:         in, optional, type=intarr(2)/intarr(3), default="[0,0,0]"
-;                       An array of the form [nCols, nRows] or [nCols, nRows, index].
-;                           [nCols,nRows] is the number of columns and rows in the display.
-;                           "index" is the plot index at which to place the plot,
-;                           beginning with 1,1], 1 in the upper-left corner and
-;                           incrementing first right then down. If 2-elements, the current
-;                           index will be kept.
-;       LOCATION:       in, optional, type=int/intarr(2)
-;                       Another way of specifying the index in `LAYOUT`. Can also be the
-;                           [column, row] in which the graphic is to be placed.
-;       MARGIN:         in, optional, type=int/intarr(4), default="[10,4,3,2]"
-;                       Size of the [left, bottom, right, top] margins, in character
-;                           units. If a scalar is provided, all margins will be equal.
-;                           This keyword takes precedence over `XMARGIN` and `YMARGIN`.
-;       OXMARGIN:       in, optional, type=intarr, default="[0,0]"
-;                       Size of the left and right outer margins, in units of !D.X_CH_Size.
-;                           Acts as a matte around the [XY]_REGION.
-;       OYMARGIN:       in, optional, type=intarr, default="[0,0]"
-;                       Size of the bottom and top outer margins, in units of !D.Y_CH_Size.
-;                           Acts as a matte around the [XY]_REGION.
-;       POSITION:       in, optional, type=intarr(4), default="[1,1,1,1]"
-;                       The position at which the plot is located. An array of the form
-;                           [x0,y0,x1,y1], where (x0,y0) are the normalized coordinates
-;                           of the lower-left corner and (x1,y1) are the coordinates of
-;                           the upper-right corner fo the plot.
-;       XMARGIN:        in, optional, type=intarr(2), default="[10,3]"
-;                       Width of the left and right margins in character units.
-;       XGAP:           in, optional, type=integer, default=14
-;                       Horizontal space between plots, in character units.
-;       YMARGIN:        in, optional, type=intarr(2), default="[4,2]"
-;                       Height of the top and bottom margins in character units.
-;       YGAP:           in, optional, type=integer, default=6
-;                       Vertical space between plots in character units.
+;       MANAGE:             in, optional, type=boolean, default=0
+;                           If set, the layout object will be managed by a layout manager.
+;       _REF_EXTRA:         in, optional, type=any
+;                           Any keyword accepted by the MrLayoutAtom::Init method is
+;                               also accepted via keyword inheritance.
 ;-
 function MrLayout::init, $
-ASPECT=aspect, $
-COL_WIDTH=col_width, $
-CHARSIZE=charsize, $
-IXMARGIN=ixmargin, $
-IYMARGIN=iymargin, $
-LAYOUT=layout, $
-LOCATION=location, $
 MANAGE=manage, $
-MARGIN=margin, $
-OXMARGIN=oxmargin, $
-OYMARGIN=oymargin, $
-POSITION=position, $
-ROW_HEIGHT=row_height, $
-SQUARE=square, $
-WDIMS=wDims, $
-XGAP=xgap, $
-YGAP=ygap
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return, 0
-    endif
+_REF_EXTRA=extra
+	compile_opt strictarr
 
-    ;Should the layout be managed?
-    if n_elements(position) eq 0 && n_elements(layout) lt 3 then managed = 1B
-    
-    ;Set Properties
-    self -> SetProperty, ASPECT     = aspect, $
-                         COL_WIDTH  = col_width, $
-                         CHARSIZE   = charsize, $
-                         IXMARGIN   = ixmargin, $
-                         IYMARGIN   = iymargin, $
-                         LAYOUT     = layout, $
-                         LOCATION   = location, $
-                         MANAGE     = manage, $
-                         MARGIN     = margin, $
-                         OXMARGIN   = oxmargin, $
-                         OYMARGIN   = oymargin, $
-                         POSITION   = position, $
-                         ROW_HEIGHT = row_height, $
-                         WDIMS      = wDims, $
-                         XGAP       = xgap, $
-                         YGAP       = ygap
-    
-    return, 1
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		void = cgErrorMsg()
+		return, 0
+	endif
+
+	;Are we being managed?
+	self.isManaged = keyword_set(manage)
+
+	;Initialize the atom
+	success = self -> MrLayoutAtom::Init(_STRICT_EXTRA=extra)
+	
+	return, success
 end
 
 
@@ -241,10 +606,10 @@ end
 ;       ISMANAGED:      Is the layout object being magaged by the layout manager?
 ;-
 pro MrLayout__define, class
-    compile_opt strictarr
-    
-    define = { MrLayout, $
-               inherits MrLayoutAtom, $
-               isManaged: 0B $
-             }
+	compile_opt strictarr
+
+	define = { MrLayout, $
+	           inherits MrLayoutAtom, $
+	           isManaged: 0B $
+	         }
 end
