@@ -45,13 +45,13 @@
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
-;       Morse Hall, Room 113
+;       Morse Hall, Room 348
 ;       8 College Rd.
 ;       Durham, NH, 03824
-;       matthew.argall@wildcats.unh.edu
+;       matthew.argall@unh.edu
 ;
 ; :History:
-;	Modification History::
+;   Modification History::
 ;       2014/03/17  -   Written by Matthew Argall
 ;-
 ;*****************************************************************************************
@@ -68,11 +68,14 @@
 ;                           Height of the draw widget.
 ;       WINDOW_TITLE:       in, optional, type=string, default='Mr_Window'
 ;                           Name to be placed on the window's title bar.
+;       _REF_EXTRA:         in, optional, type=any
+;                           Any keyword appropriate for MrDrawWidget::Init()
 ;-
 pro Mr_Window::_BuildWindow, $
 WINDOW_TITLE=window_title, $
 XSIZE = xsize, $
-YSIZE = ysize
+YSIZE = ysize, $
+_REF_EXTRA=extra
     compile_opt strictarr
     
     ;Error handling
@@ -83,20 +86,22 @@ YSIZE = ysize
         return
     endif
     
-    ;Default window size
-    if n_elements(xsize) eq 0 then xsize = 600
-    if n_elements(ysize) eq 0 then ysize = 600
-    
-	    
 ;---------------------------------------------------------------------
 ; Top-Level Base /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    oTLB = obj_new('MrTopLevelBase', ID=tlbID, $
-                   EVENT_OBJ=self, EVENT_PRO='', $
-                   TITLE='MrWindow', /COLUMN, $
-                   /TLB_SIZE_EVENTS, TLB_SIZE_HANDLER='TLB_RESIZE', $
-                   /TLB_KILL_REQUEST_EVENTS, TLB_KILL_REQUEST_HANDLER='TLB_KILL_REQUEST', $
-                   XOFFSET=100, YOFFSET=0, UNAME='tlb')
+    oTLB = obj_new('MrTopLevelBase', $
+                   /TLB_KILL_REQUEST_EVENTS, $
+                   /TLB_SIZE_EVENTS, $
+                   COLUMN                   = 1, $
+                   EVENT_OBJ                = self, $
+                   EVENT_PRO                = '', $
+                   ID                       = tlbID, $
+                   TITLE                    = window_title, $
+                   TLB_SIZE_HANDLER         = 'TLB_RESIZE', $
+                   TLB_KILL_REQUEST_HANDLER = 'TLB_KILL_REQUEST', $
+                   UNAME                    = 'tlb', $
+                   XOFFSET                  = 100, $
+                   YOFFSET                  = 0)
     oTLB -> GetProperty, ID=tlbID
     self._oTLB  = oTLB
     self._tlbID = tlbID
@@ -104,11 +109,16 @@ YSIZE = ysize
 ;---------------------------------------------------------------------
 ; Draw Widget ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    oDraw = obj_new('MrDrawWidget', self._tlbID, $
-                    XSIZE=xsize, YSIZE=ysize, RETAIN=retain, $
-                    EVENT_HANDLER=self, EVENT_PRO='Event_Handler', $
-                    UNAME='DRAW_WIDGET')
-    self._oDraw = oDraw
+    success = self -> MrDrawWidget::Init(oTLB, $
+                                         EVENT_HANDLER = self, $
+                                         EVENT_PRO     = 'Event_Handler', $
+                                         REFRESH       = 0, $
+                                         RETAIN        = retain, $
+                                         UNAME         = 'DRAW_WIDGET', $
+                                         XSIZE         = xsize, $
+                                         YSIZE         = ysize, $
+                                         _STRICT_EXTRA = extra)
+    if success eq 0 then message, 'Unable to initialize MrDrawWidget.'
 
 ;---------------------------------------------------------------------
 ; Button Row /////////////////////////////////////////////////////////
@@ -132,9 +142,6 @@ YSIZE = ysize
     self._statusID = widget_label(wBaseStatusID, VALUE='Value', $
                                   /DYNAMIC_RESIZE, $
                                   UVALUE={object: self, method: 'Event_Handler'})
-                                 
-    ;REALIZE
-;    oTLB -> XManager
 end
 
 
@@ -386,6 +393,24 @@ end
 
 
 ;+
+;   Add a MrLayout object to the MrLayoutManager so that it can be managed.
+;
+; :Private:
+;
+; :Params:
+;       CHILD_LAYOUT:       in, required, type=object
+;                           A MrLayout object that the layout manager can keep track of.
+;-
+pro Mr_Window::AddToLayout, child_layout
+   compile_opt strictarr
+   on_error, 2
+   
+   ;Add the child layout object to the container.
+   self._oLayoutMGR -> Add, child_layout
+end
+
+
+;+
 ;   Close the window and destroy everything in it.
 ;-
 pro Mr_Window::Close
@@ -394,120 +419,6 @@ pro Mr_Window::Close
    
    ;Destroy self to close window and clean up
    obj_destroy, self
-end
-
-
-;+
-;   Copy the contents of the window.
-;
-; :Params:
-;       WINDOW_ID:          in, optional, type=integer, default=!d.window
-;                           Window ID of the window into which the image will be copied.
-;
-; :Keywords:
-;       DESTINATION:        in, optional, type=intarr(2), default=[0\,0]
-;                           The coordinate of the lower-left corner within the window
-;                               where the image is to be copied to.
-;       EXTENT:             in, optional, type=intarr(2), default=[!d.x_size\, !d.y_size]
-;                           Number of pixels in the x- and y-direction to be copied,
-;                               starting at `ORIGIN`.
-;       IMAGE:              out, optional, type=bytarr(N\,M\,3)
-;                           A named variable into which the image will be copied. If
-;                               present, the image will not be copied to a different window.
-;       ORIGIN:             in, optional, type=intarr(2), default=[0\,0]
-;                           Coordinates specifinying the x- and y-location at which to
-;                               begin copying the image.
-;-
-pro Mr_Window::Copy, window_id, $
- DESTINATION=destination, $
- EXTENT=extent, $
- IMAGE=theImage, $
- ORIGIN=origin
-   compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        wset, currentWin
-        void = cgErrorMsg()
-        return
-    endif
-    
-    
-    ;Return the image without copying
-    if arg_present(theImage) then begin
-        self._oDraw -> Copy, DESTINATION = destination, $
-                             EXTENT      = extent, $
-                             IMAGE       = theImage, $
-                             ORIGIN      = origin
-        
-    ;Copy
-    endif else begin
-        self._oDraw -> Copy, window_id, $
-                             DESTINATION = destination, $
-                             EXTENT      = extent, $
-                             ORIGIN      = origin
-    endelse
-end
-
-
-;+
-;   Copy the contents of the window.
-;
-; :Params:
-;       WINDOW_ID:          in, optional, type=integer, default=!d.window
-;                           Window ID of the window into which the image will be copied.
-;
-; :Keywords:
-;       DESTINATION:        in, optional, type=intarr(2), default=[0\,0]
-;                           The coordinate of the lower-left corner within the window
-;                               where the image is to be copied to.
-;       EXTENT:             in, optional, type=intarr(2), default=[!d.x_size\, !d.y_size]
-;                           Number of pixels in the x- and y-direction to be copied,
-;                               starting at `ORIGIN`.
-;       IMAGE:              out, optional, type=bytarr(N\,M\,3)
-;                           A named variable into which the image will be copied. If
-;                               present, the image will not be copied to a different window.
-;       ORIGIN:             in, optional, type=intarr(2), default=[0\,0]
-;                           Coordinates specifinying the x- and y-location at which to
-;                               begin copying the image.
-;-
-pro Mr_Window::Copy_Pixmap, window_id, $
- DESTINATION=destination, $
- EXTENT=extent, $
- IMAGE=theImage, $
- ORIGIN=origin
-   compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        wset, currentWin
-        void = cgErrorMsg()
-        return
-    endif
-    
-    
-    ;Return the image without copying
-    if arg_present(theImage) then begin
-        self._oPixmap -> Copy, DESTINATION = destination, $
-                               EXTENT      = extent, $
-                               IMAGE       = theImage, $
-                               ORIGIN      = origin
-        
-    ;Copy
-    endif else begin
-        ;Default to copying to the draw window
-        if n_elements(window_id) eq 0 then self._oDraw -> GetProperty, WINDOWID=window_id
-    
-        ;Copy the pixmap
-        self._oPixmap -> Copy, window_id, $
-                               DESTINATION = destination, $
-                               EXTENT      = extent, $
-                               ORIGIN      = origin
-    endelse
 end
 
 
@@ -563,7 +474,7 @@ _EXTRA=extraKeywords
     if self._refresh eq 0 then return
 
     ;Make sure the window is valid
-    if (WindowAvailable(self._oDraw -> GetWinID()) eq 0) then $
+    if (WindowAvailable(self -> GetWinID()) eq 0) then $
         message, 'Draw widget does not have a valid window id. Try realizing it.'
 
     ;Defaults
@@ -587,25 +498,17 @@ _EXTRA=extraKeywords
     for i = 0, nObj - 1 do allObj[i] -> Draw, /NOERASE
     
     ;Copy from the pixmap to the draw window
-    if (!d.flags and 256) gt 0 then self -> Copy_Pixmap
+    if (!d.flags and 256) gt 0 then begin
+        self -> SetCurrent
+        self -> Copy_Pixmap
+    endif
 end
 
 
 ;+
 ;   The purpose of this method is to erase the draw window.
-;-
-pro Mr_Window::Erase, color
-    compile_opt strictarr
-    on_error, 2
-    
-    ;Erase the draw widget and pixmap
-    self._oDraw   -> Erase, color
-    self._oPixmap -> Erase, color
-end
-
-
-;+
-;   The purpose of this method is to erase the draw window.
+;
+; :Private:
 ;-
 pro Mr_Window::Event_Handler, event
    compile_opt strictarr
@@ -629,84 +532,6 @@ end
 
 
 ;+
-;   Find a graphic by its [col,row] location.
-;
-; :Params:
-;       COLROW:         in, required, type=intarr(2)
-;                       The [column, row] in which the desired graphic is located.
-;
-; :Returns:
-;       OBJECT:         The graphics located at `COLROW`.
-;-
-function Mr_Window::FindByColRow, colrow, $
-COUNT=count
-    compile_opt strictarr
-
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        Count = 0
-        return, obj_new()
-    endif
-
-    ;Convert COLROW to a plot index
-    pIndex = self._oLayout -> ConvertLocation(ColRow, /COLROW, /TO_PINDEX)
-
-    ;Call FindByPIndex
-    object = self -> FindByPIndex(pIndex, COUNT=count)
-
-    return, object
-end
-
-
-;+
-;   Find a graphic by its [col,row] location.
-;
-; :Params:
-;       PINDEX:         in, required, type=intarr(2)
-;                       The plot index, starting with 1 and increasing left to right then
-;                           top to bottom,  in which the desired graphic is located.
-;
-; :Returns:
-;       OBJECT:         The graphics located at `PINDEX`.
-;-
-function Mr_Window::FindByPIndex, pIndex, $
-COUNT=count
-    compile_opt strictarr
-
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        Count = 0
-        return, obj_new()
-    endif
-
-    ;Get all of the objects in the container
-    allObjs = self -> Get(/ALL, ISA=(*self.gTypes).data, COUNT=count)
-    if count eq 0 then return, obj_new()
-    
-    ;Get all of the plot indices
-    objPIndex = intarr(count)
-    for i = 0, count - 1 do begin
-        allObjs[i] -> GetLayout, LAYOUT=objLayout
-        objPIndex[i] = objLayout[2]
-    endfor
-
-    ;Find a match
-    iMatch = where(objPIndex eq pIndex, count)
-    if count eq 0 then return, obj_new()
-    if count eq 1 then iMatch = iMatch[0]
-    
-    ;Return the matching objects
-    return, allObjs[iMatch]
-end
-
-
-;+
 ;   A simple way of obtaining the window's name.
 ;
 ;   :Returns:
@@ -718,242 +543,40 @@ end
 
 
 ;+
-;   Get a position from the layout grid.
-;
-; :Params:
-;       LOCATION:       in, required, type=integer/intarr(N)/intarr(2,N)
-;                       Either the plot index or the [col, row] location of the plot
-;                           for which the position is to be returned.
-;
-; :Keywords:
-;       COLROW:         in, optional, type=boolean, default=0
-;                       If set, `INDEX` is take to be a [col,row] location. 2xN arrays
-;                           are accepted.
-;
-; :Returns:
-;       POSITION:       Position within the current layout to `PINDEX`. If `PINDEX`
-;                           is a scalar, the output is a 4-element array. Otherise a 4xN
-;                           array is returned, where N is the number of locations given.
-;-
-function Mr_Window::GetPosition, location, $
-COLROW=colrow
-    compile_opt strictarr
-    on_error, 2
-    
-    ;Return the requested position(s)
-    return, self._oLayout -> GetPosition(location, COLROW=colrow)
-end
-
-
-;+
 ;   Get class properties
 ;
 ; :Keywords;
-;   BACKGROUND_COLOR:   out, optional, type=string
-;                       The name of the initial color for the draw widget. Used when
-;                           realized and if the draw widget is set up to erase before
-;                           display (i.e., NOERASE=0).
-;       BUTTON_EVENTS:  out, optional, type=boolean
-;                       If set, button events will be enabled.
-;       CONTEXT_EVENTS: out, optional, type=boolean
-;                       If set, context events will be enabled.
-;       DRAG_NOTIFY:    out, optional, type=string/structure
-;                       If a string, the name of a procedure to be called when items are
-;                           dragged over the window. If a structure, it defines the object
-;                           and its procedure method that will handle the event.
-;       DRAW_HANDLER:   out, optional, type=string/structure
-;                       If a string is provided, it is the name of a procedure
-;                           to be called when events are generated. If a structure
-;                           is provided, its only fields must be "object" and "method",
-;                           describing the procedure method to be used as an event
-;                           handler
-;       DROP_EVENTS:    out, optional, type=boolean
-;                       If set, drop events will be enabled.
-;       DROP_HANDLER:   out, optional, type=string/structure
-;                       Either the name of the procedure or a structure defining an object
-;                           method to be called when drop events are generated.
-;       EVENT_HANDLER:  out, optional, type=object
-;                       The object used when events are generated. It object must be
-;                           a subclass of `MrGraphicsEventAdapter`.
-;       EXPOSE_EVENTS:  out, optional, type=boolean
-;                       If set, expose events will be enabled.
-;       EXPOSE_HANDLER: out, optional, type=string/structure
-;                       Either the name of the procedure or a structure defining an object
-;                           method to be called when expose events are generated.
-; IGNORE_ACCELERATORS:  out, optional, type=boolean/string/strarr
-;                       Set this keyword to specify what WIDGET_BUTTON accelerators are
-;                           to be ignored when this draw widget has keyboard focus.
-;                           Setting IGNORE_ACCELERATORS allows a defined list of
-;                           accelerators to be processed by the draw widget instead
-;                           of by the conflicting accelerated button. Valid values are::
-;                             1             -- All accelerators should be ignored.
-;                             string/strarr -- Any value that is legal for the
-;                                              ACCELERATOR keyword for BUTTONWIDGET
-;       INPUT_FOCUS:    out, optional, type=boolean
-;                       If set, the draw widget will be given keyboard focus
-;   KEYBOARD_EVENTS:    out, optional, type=boolean
-;                       If set, keyboard events will be enabled.
-;   KEYBOARD_HANDLER:   out, optional, type=string
-;                       The name of a function to be called when keyboard events are
-;                           generated. See `Widget_Window <http://exelisvis.com/docs/WIDGET_WINDOW.html>`
-;                           for details. Also, the `DRAW_HANDLER` and `EVENT_HANDLER`
-;                           keywords provide a simpler means of handling events.
-;       MOTION_EVENTS:  out, optional, type=boolean
-;                       If set, motion events will be enabled.
-;   MOUSE_UP_HANDLER:   out, optional, type=string
-;                       The name of a function to be called when button up events are
-;                           generated. See `Widget_Window <http://exelisvis.com/docs/WIDGET_WINDOW.html>`
-;                           for details. Also, the `DRAW_HANDLER` and `EVENT_HANDLER`
-;                           keywords provide a simpler means of handling events.
-;   MOUSE_DOWN_HANDLER: out, optional, type=string
-;                       The name of a function to be called when button down events are
-;                           generated. See `Widget_Window <http://exelisvis.com/docs/WIDGET_WINDOW.html>`
-;                           for details. Also, the `DRAW_HANDLER` and `EVENT_HANDLER`
-;                           keywords provide a simpler means of handling events.
-; MOUSE_MOTION_HANDLER: out, optional, type=string
-;                       The name of a function to be called when the mouse motion events are
-;                           generated. See `Widget_Window <http://exelisvis.com/docs/WIDGET_WINDOW.html>`
-;                           for details. Also, the `DRAW_HANDLER` and `EVENT_HANDLER`
-;                           keywords provide a simpler means of handling events.
-; MOUSE_WHEEL_HANDLER:  out, optional, type=string
-;                       The name of a function to be called when mouse wheel events are
-;                           generated. See `Widget_Window <http://exelisvis.com/docs/WIDGET_WINDOW.html>`
-;                           for details. Also, the `DRAW_HANDLER` and `EVENT_HANDLER`
-;                           keywords provide a simpler means of handling events.
-;       NOERASE:        out, optional, type=boolean
-;                       If set, the draw widget will not be erased before drawing.
-;       SET_DRAW_VIEW:  out, optional, type=intarr(2)
-;                       The [x,y] offset, in pixels of the viewport window from the
-;                           bottom left corner of the display window.
-;       TOOLTIP:        out, optional, type=string
-;                       A string displayed when the mouse hovers over the draw window.
-;   VIEWPORT_EVENTS:    out, optional, type=boolean
-;                       If set, viewport scroll events will be enabled.
-;   VIEWPORT_HANLER:    out, optional, type=string/structure
-;                       Either the name of the procedure or a structure defining an object
-;                           method to be called when viewport scroll events are generated.
-;       XSIZE:          out, optional, type=integer
-;                       Actual X-size of the dispaly window (pixels).
-;       YSIZE:          out, optional, type=integer
-;                       Actual Y-size of the dispaly window (pixels).
+;       NAME:           out, optional, type=string
+;                       Name of the graphic.
 ;       _REF_EXTRA:     out, optional, type=any
-;                       Any keyword appropriate for the superclass INIT methods.
+;                       Any keyword appropriate MrWidgetDraw and MrLayoutManager.
 ;-
 PRO Mr_Window::GetProperty, $
- BACKGROUND_COLOR=background_color, $
- NOERASE=noerase, $
- 
- ;Widget_Control Options
- IGNORE_ACCELERATORS=ignore_accelerators, $
- INPUT_FOCUS=input_focus, $
- SET_DRAW_VIEW=set_draw_view, $
- TOOLTIP=tooltip, $
- WINDOWID=windowID, $
- XSIZE=xsize, $
- YSIZE=ysize, $
- 
- ;Events On or Off?
- BUTTON_EVENTS=button_events, $
- CONTEXT_EVENTS=context_events, $
- DROP_EVENTS=drop_events, $
- EXPOSE_EVENTS=expose_events, $
- KEYBOARD_EVENTS=keyboard_events, $
- MOTION_EVENTS=motion_events, $
- VIEWPORT_EVENTS=viewport_events, $
- WHEEL_EVENTS=wheel_events, $
-
- ;Method Event Handling
- CONTEXT_HANDLER=context_handler, $
- DRAG_NOTIFY=drag_notify, $
- DRAW_HANDLER=draw_handler, $
- DROP_HANDLER=drop_handler, $
- EVENT_HANDLER=event_handler, $
- EXPOSE_HANDLER=expose_handler, $
- KEYBOARD_HANDLER=keyboard_handler, $
- MOUSE_DOWN_HANDLER=mouse_down_handler, $
- MOUSE_UP_HANDLER=mouse_up_handler, $
- MOUSE_MOTION_HANDLER=mouses_motion_handler, $
- MOUSE_WHEEL_HANDLER=mouse_wheel_handler, $
- VIEWPORT_HANDLER=viewport_handler, $
-_REF_EXTRA=extra
-   compile_opt strictarr
-
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        if currentWin ne -1 then wset, currentWin
-        void = cgErrorMsg()
-        return
+LAYOUTMGR=layoutMGR, $
+NAME = name, $
+_REF_EXTRA = extra
+    
+    ;Properties
+    if arg_present(layoutMGR) then layoutMGR = self._oLayoutMGR
+    if arg_present(name)      then name = self.name
+    
+    ;EXTRA
+    if n_elements(extra) gt 0 then begin
+        ;Keywords accepted by the layout manager
+        layout_keys = ['Aspect', 'Col_Width', 'CharSize', 'IXMargin', 'IYMargin', $
+                       'Layout', 'Margin',    'OXMargin', 'OYMargin', 'Row_Height', $
+                       'XGap',   'YGap']
+    
+        ;Separate LayoutManager from DrawWidget keywords.
+        void = MrIsMember(layout_keys, extra, iLayout, $
+                          COUNT       = nLayout, $
+                          COMPLEMENT  = iDraw, $
+                          NCOMPLEMENT = nDraw)
+    
+        ;MrWidgetDraw
+        if nDraw   gt 0 then self -> MrDrawWidget::GetProperty, _EXTRA=extra[iDraw]
+        if nLayout gt 0 then self.oLayoutMGR -> GetProperty, _STRICT_EXTRA=extra[iLayout]
     endif
-
-    currentWin = !d.window
-    self._oDraw -> GetProperty, ID=drawID, WINDOWID=winID
-    if widget_info(drawID, /VALID_ID) eq 0 then return
-
-    ;Object Properties
-    if arg_present(background_color) then background_color = self._background
-    if arg_present(noerase)          then noerase          = self._noerase
-    
-    ;Window sizes
-    if arg_present(xsize) || arg_present(ysize) then begin
-        if (!d.flags and 256) gt 0 then begin
-            ;Set the window
-            wset, winID
-            
-            ;Get the window sizes
-            xsize = !d.x_size
-            ysize = !d.y_size
-            
-            ;Reset the window
-            if currentWin ne -1 then wset, currentWin
-        endif else begin
-            message, 'Windows not supported. Cannot return window sizes.', /INFORMATIONAL
-        endelse
-    endif
-    
-    ;Widget_Control Options
-    if arg_present(windowID)        then widget_control, drawID, GET_VALUE=windowID
-    
-    ;Events On or Off?
-    if arg_present(button_events)   then button_events   = widget_info(drawID, /DRAW_BUTTON_EVENTS)
-    if arg_present(context_events)  then context_events  = widget_info(drawID, /CONTEXT_EVENTS)
-    if arg_present(drop_events)     then drop_events     = widget_info(drawID, /DROP_EVENTS)
-    if arg_present(expose_events)   then expose_events   = widget_info(drawID, /DRAW_EXPOSE_EVENTS)
-    if arg_present(motion_events)   then motion_events   = widget_info(drawID, /DRAW_MOTION_EVENTS)
-    if arg_present(viewport_events) then viewport_events = widget_info(drawID, /DRAW_VIEWPORT_EVENTS)
-    if arg_present(keyboard_events) then keyboard_events = widget_info(drawID, /DRAW_KEYBOARD_EVENTS)
-    if arg_present(tooltip)         then tooltip         = widget_info(drawID, /TOOLTIP)
-    if arg_present(wheel_events)    then wheel_events    = widget_info(drawID, /DRAW_WHEEL_EVENTS)
-   
-    ;Method Event Handlers
-    if arg_present(event_handler)        then event_handler        =  self._event_handler
-    if arg_present(context_handler)      then context_handler      =  self._context_handler
-    if arg_present(drag_notify)          then drag_notify          = *self._drag_notify
-    if arg_present(draw_handler)         then draw_handler         =  self._draw_handler
-    if arg_present(drop_handler)         then drop_handler         =  self._drop_handler
-    if arg_present(event_handler)        then event_handler        =  self._event_handler
-    if arg_present(expose_handler)       then expose_handler       =  self._expose_handler
-    if arg_present(keyboard_handler)     then keyboard_handler     =  self._keyboard_handler
-    if arg_present(mouse_down_handler)   then mouse_down_handler   =  self._mouse_down_handler
-    if arg_present(mouse_up_handler)     then mouse_up_handler     =  self._mouse_up_handler
-    if arg_present(mouse_motion_handler) then mouse_motion_handler =  self._mouse_motion_handler
-    if arg_present(mouse_wheel_handler)  then mouse_wheel_handler  =  self._mouse_wheel_handler
-    if arg_present(viewport_handler)     then viewport_handler     =  self._viewport_handler
-
-    ;Superclass Properties
-    if n_elements(extra) gt 0 then self -> MrWidgetAtom::GetProperty, _STRICT_EXTRA=extra
-end
-
-
-;+
-;   Get the window's refresh state.
-;
-; :Returns:
-;       REFRESH:        Returns true (1) if refresh is enabled, false (0) otherwise.
-;-
-function Mr_Window::GetRefresh
-    return, self._refresh
 end
 
 
@@ -1060,160 +683,6 @@ end
 
 
 ;+
-;   This method resizes the canvas area of the draw widget.
-;
-; :Private:
-;
-; :Params:
-;       XSIZE:      in, required, type=integer
-;                   The new X size of the canvas area of the draw widget, in pixels.
-;       YSIZE:      in, required, type=integer
-;                   The new Y size of the canvas area of the draw widget, in pixels.
-;
-; :Keywords:
-;       CM:         in, optional, type=boolean, default=0
-;                   If set, `XSIZE` and `YSIZE` are given in centimeters.
-;       DRAW:       in, optional, type=boolean, default=1
-;                   Set this keyword to call the draw method when the draw widget
-;                       resizing is completed.
-;       INCHES:     in, optional, type=boolean, default=0
-;                   If set, `XSIZE` and `YSIZE` are given in inches.
-;       SCREEN:     in, optional, type=boolean, default=0
-;                   Normally, the XSIZE and YSIZE keywords apply to the draw widget canvas.
-;                       If the SCREEN keyword is set, the keywords apply to the screen
-;                       coordinates of the draw widget. (It's actual size on the display.
-;                       Usually about 6 pixels larger than the canvas.)
-;       VIEWPORT:   in, optional, type=boolean, default=0
-;                   Normally, the XSIZE and YSIZE keywords apply to the draw widget canvas.
-;                       If the VIEWPORT keyword is set, the keywords apply to the viewport
-;                       size of the draw widget.
-;       _EXTRA:     in, optional, type=any
-;                   Any extra keywords appropriate for the DRAW method.
-;-
-PRO Mr_Window::Resize, xsize, ysize, $
- CM=cm, $
- INCHES=inches, $
- SCREEN=screen, $
- VIEWPORT=viewport, $
-_EXTRA=extraKeywords
-   compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-        if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-
-    IF N_Elements(xsize) EQ 0 THEN Message, "XSIZE parameter is missing."
-    IF N_Elements(ysize) EQ 0 THEN Message, "YSIZE parameter is missing."
-    
-    ;Convert to pixels?
-    cm     = Keyword_Set(cm)
-    inches = Keyword_Set(inches)
-    CASE 1 OF
-        cm: BEGIN
-            _xsize = xsize * !d.x_px_cm
-            _ysize = ysize * !d.y_px_cm
-        ENDCASE
-        
-        inches: BEGIN
-            _xsize = xsize * 2.54 * !d.x_px_cm
-            _ysize = ysize * 2.54 * !d.y_px_cm
-        ENDCASE
-        
-        ELSE: BEGIN
-            _xsize = xsize
-            _ysize = ysize
-        ENDCASE
-    ENDCASE
-
-    ;Resize the draw widget
-    CASE 1 OF
-        KEYWORD_SET(screen):   self._oDraw -> SetProperty, SCR_XSIZE=xsize, SCR_YSIZE=ysize
-        KEYWORD_SET(viewport): self._oDraw -> SetProperty, XSIZE=xsize, YSIZE=ysize
-        ELSE:                  self._oDraw -> SetProperty, DRAW_XSIZE=xsize, DRAW_YSIZE=ysize
-    ENDCASE
-
-    ;Redraw
-;    self -> Draw, _Extra=extraKeywords
-END
-
-
-;+
-;   The purpose of this method it enable or diable refreshing of the display.
-;
-; :Keywords:
-;       DISABLE:            in, optional, type=boolean, default=0
-;                           If set, refreshing of the draw window will be disabled.
-;-
-pro Mr_Window::Refresh, $
-DISABLE=disable
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Enable or disable.
-    self._refresh = ~keyword_set(disable)
-    
-    ;Re-draw the window contents.
-    if self._refresh then self -> Draw
-end
-
-
-;+
-;   Save the display to a file.
-;
-; :Params:
-;       FILENAME:           in, optional, type=string, default='MrWindow.ps'
-;                           Name of the file to which graphics output will be saved. The
-;                               type of image file created is determined by the extension
-;                               given. Options include "BMP", "EPS", "GIF", "JPEG", "JPG",
-;                               "PDF", "PNG", "PS", "TIF", and "TIFF".
-;-
-pro Mr_Window::Save, filename
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        self._refresh = thisRefresh
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Get the refresh state
-    thisRefresh = self._refresh
-    
-    ;Get the file extension
-    void = cgRootName(filename, EXTENSION=extension)
-    extension = strupcase(extension)
-    
-    ;Turn refresh on
-    ;   - Raster files without ImageMagick require a snapshot. Must draw first.
-    ;   - All other files will be drawn later.
-    self._SaveAs -> GetProperty, IM_RASTER=im_raster
-    if (im_raster eq 0) && (extension ne 'PS' && extension ne 'EPS') $
-        then self -> Refresh $
-        else self._refresh = 1
-
-    ;Save the plot
-    self._oSaveAs -> Save, filename
-    
-    ;Return to the original refresh state.
-    self._refresh = thisRefresh
-end
-
-
-;+
 ;   Set this window as the current window.
 ;-
 pro Mr_Window::SetCurrent
@@ -1236,7 +705,7 @@ pro Mr_Window::SetCurrent
         else message, 'Window is not listed. Cannot make current.'
     
     ;Set the display window
-    self._oDraw -> SetCurrent
+    self -> MrDrawWidget::SetCurrent
 end
 
 
@@ -1380,7 +849,7 @@ ZTITLE = ztitle
                                        ZTICKV      = ztickv, $
                                        ZTITLE      = ztitle
         endif
-                                       
+
 ;---------------------------------------------------------------------
 ;Axis Objects ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1490,126 +959,14 @@ end
 ;   Set class properties
 ;
 ; :Keywords:
-;   BACKGROUND_COLOR:   in, optional, type=string
-;                       The name of the initial color for the draw widget. Used when
-;                           realized and if the draw widget is set up to erase before
-;                           display (i.e., NOERASE=0).
-;       BUTTON_EVENTS:  in, optional, type=boolean
-;                       If set, button events will be enabled.
-;       CONTEXT_EVENTS: in, optional, type=boolean
-;                       If set, context events will be enabled.
-;       DRAG_NOTIFY:    in, optional, type=string/structure
-;                       If a string, the name of a procedure to be called when items are
-;                           dragged over the window. If a structure, it defines the object
-;                           and its procedure method that will handle the event.
-;       DRAW_HANDLER:   in, optional, type=string/structure
-;                       If a string is provided, it is the name of a procedure
-;                           to be called when events are generated. If a structure
-;                           is provided, its only fields must be "object" and "method",
-;                           describing the procedure method to be used as an event
-;                           handler
-;       DROP_EVENTS:    in, optional, type=boolean
-;                       If set, drop events will be enabled.
-;       DROP_HANDLER:   in, optional, type=string/structure
-;                       Either the name of the procedure or a structure defining an object
-;                           method to be called when drop events are generated.
-;       EVENT_HANDLER:  in, optional, type=object
-;                       The object used when events are generated. It object must be
-;                           a subclass of `MrGraphicsEventAdapter`.
-;       EXPOSE_EVENTS:  in, optional, type=boolean
-;                       If set, expose events will be enabled.
-;       EXPOSE_HANDLER: in, optional, type=string/structure
-;                       Either the name of the procedure or a structure defining an object
-;                           method to be called when expose events are generated.
-; IGNORE_ACCELERATORS:  in, optional, type=boolean/string/strarr
-;                       Set this keyword to specify what WIDGET_BUTTON accelerators are
-;                           to be ignored when this draw widget has keyboard focus.
-;                           Setting IGNORE_ACCELERATORS allows a defined list of
-;                           accelerators to be processed by the draw widget instead
-;                           of by the conflicting accelerated button. Valid values are::
-;                             1             -- All accelerators should be ignored.
-;                             string/strarr -- Any value that is legal for the
-;                                              ACCELERATOR keyword for BUTTONWIDGET
-;       INPUT_FOCUS:    in, optional, type=boolean
-;                       If set, the draw widget will be given keyboard focus
-;   KEYBOARD_EVENTS:    in, optional, type=boolean
-;                       If set, keyboard events will be enabled.
-;   KEYBOARD_HANDLER:   in, optional, type=string
-;                       The name of a function to be called when keyboard events are
-;                           generated. See `Widget_Window <http://exelisvis.com/docs/WIDGET_WINDOW.html>`
-;                           for details. Also, the `DRAW_HANDLER` and `EVENT_HANDLER`
-;                           keywords provide a simpler means of handling events.
-;       MOTION_EVENTS:  in, optional, type=boolean
-;                       If set, motion events will be enabled.
-;   MOUSE_UP_HANDLER:   in, optional, type=string
-;                       The name of a function to be called when button up events are
-;                           generated. See `Widget_Window <http://exelisvis.com/docs/WIDGET_WINDOW.html>`
-;                           for details. Also, the `DRAW_HANDLER` and `EVENT_HANDLER`
-;                           keywords provide a simpler means of handling events.
-;   MOUSE_DOWN_HANDLER: in, optional, type=string
-;                       The name of a function to be called when button down events are
-;                           generated. See `Widget_Window <http://exelisvis.com/docs/WIDGET_WINDOW.html>`
-;                           for details. Also, the `DRAW_HANDLER` and `EVENT_HANDLER`
-;                           keywords provide a simpler means of handling events.
-; MOUSE_MOTION_HANDLER: in, optional, type=string
-;                       The name of a function to be called when the mouse motion events are
-;                           generated. See `Widget_Window <http://exelisvis.com/docs/WIDGET_WINDOW.html>`
-;                           for details. Also, the `DRAW_HANDLER` and `EVENT_HANDLER`
-;                           keywords provide a simpler means of handling events.
-; MOUSE_WHEEL_HANDLER:  in, optional, type=string
-;                       The name of a function to be called when mouse wheel events are
-;                           generated. See `Widget_Window <http://exelisvis.com/docs/WIDGET_WINDOW.html>`
-;                           for details. Also, the `DRAW_HANDLER` and `EVENT_HANDLER`
-;                           keywords provide a simpler means of handling events.
-;       NOERASE:        in, optional, type=boolean
-;                       If set, the draw widget will not be erased before drawing.
-;       SET_DRAW_VIEW:  in, optional, type=intarr(2)
-;                       The [x,y] offset, in pixels of the viewport window from the
-;                           bottom left corner of the display window.
-;       TOOLTIP:        in, optional, type=string
-;                       A string displayed when the mouse hovers over the draw window.
-;   VIEWPORT_EVENTS:    in, optional, type=boolean
-;                       If set, viewport scroll events will be enabled.
-;   VIEWPORT_HANLER:    in, optional, type=string/structure
-;                       Either the name of the procedure or a structure defining an object
-;                           method to be called when viewport scroll events are generated.
+;       NAME:           in, optional, type=string
+;                       Name of the graphics object.
 ;       _REF_EXTRA:     in, optional, type=any
-;                       Any keyword appropriate for the superclass INIT methods.
+;                       Any keyword appropriate for MrLayoutManager and MrDrawWidget.
 ;-
 PRO Mr_Window::SetProperty, $
- BACKGROUND_COLOR=background_color, $
- NOERASE=noerase, $
- 
- ;Widget_Control Options
- IGNORE_ACCELERATORS=ignore_accelerators, $
- INPUT_FOCUS=input_focus, $
- SET_DRAW_VIEW=set_draw_view, $
- TOOLTIP=tooltip, $
- 
- ;Turn Events On or Off
- BUTTON_EVENTS=button_events, $
- CONTEXT_EVENTS=context_events, $
- DROP_EVENTS=drop_events, $
- EXPOSE_EVENTS=expose_events, $
- KEYBOARD_EVENTS=keyboard_events, $
- MOTION_EVENTS=motion_events, $
- VIEWPORT_EVENTS=viewport_events, $
- WHEEL_EVENTS=wheel_events, $
-
- ;Event Callback Function/Procedures/Methods
- CONTEXT_HANDLER=context_handler, $
- DRAG_NOTIFY=drag_notify, $
- DRAW_HANDLER=draw_handler, $
- DROP_HANDLER=drop_handler, $
- EVENT_HANDLER=event_handler, $
- EXPOSE_HANDLER=expose_handler, $
- KEYBOARD_HANDLER=keyboard_handler, $
- MOUSE_DOWN_HANDLER=mouse_down_handler, $
- MOUSE_UP_HANDLER=mouse_up_handler, $
- MOUSE_MOTION_HANDLER=mouses_motion_handler, $
- MOUSE_WHEEL_HANDLER=mouse_wheel_handler, $
- VIEWPORT_HANDLER=viewport_handler, $
-_REF_EXTRA=extra
+NAME = name, $
+_REF_EXTRA = extra
    compile_opt strictarr
     
     ;Error handling
@@ -1620,69 +977,27 @@ _REF_EXTRA=extra
         return
     endif
     
-    ; Make sure you have a valid widget here.
-    IF Widget_Info(self._id, /Valid_ID) NE 1 THEN RETURN
+    ;Object Properties
+    if n_elements(name) gt 0 then self.name = name
     
-    ;Class properties
-    IF N_ELEMENTS(noerase)          GT 0 THEN self._noerase    = Keyword_Set(erase_window)
-    IF N_ELEMENTS(background_color) GT 0 THEN self._background = background
-
-;---------------------------------------------------------------------
-;Widget_Control Options //////////////////////////////////////////////
-;---------------------------------------------------------------------
-    IF N_ELEMENTS(ignore_accelerators) GT 0 THEN WIDGET_CONTROL, self._id, IGNORE_ACCELERATORS = Keyword_Set(ignore_accelerators)
-    IF N_ELEMENTS(input_focus)         GT 0 THEN WIDGET_CONTROL, self._id, INPUT_FOCUS         = Keyword_Set(input_focus)
-    IF N_ELEMENTS(set_draw_view)       GT 0 THEN WIDGET_CONTROL, self._id, SET_DRAW_VIEW       = set_draw_view
-    IF N_ELEMENTS(tooltip)             NE 0 THEN Widget_Control, self._id, TOOLTIP             = tooltip
-
-    ;Superclass
-    if n_elements(extra) gt 0 then self -> MrWidgetAtom::SetProperty, _STRICT_EXTRA=extra
-
-;---------------------------------------------------------------------
-;Turn Events On or Off ///////////////////////////////////////////////
-;---------------------------------------------------------------------
-    IF N_ELEMENTS(button_events)   GT 0 THEN WIDGET_CONTROL, self._id, DRAW_BUTTON_EVENTS   = Keyword_Set(button_events)
-    IF N_Elements(context_events)  GT 0 THEN WIDGET_CONTROL, self._id, CONTEXT_EVENTS       = Keyword_Set(context_events)
-    IF N_Elements(drop_events)     GT 0 THEN Widget_Control, self._id, SET_DROP_EVENTS      = Keyword_Set(drop_events)
-    IF N_ELEMENTS(expose_events)   GT 0 THEN WIDGET_CONTROL, self._id, DRAW_EXPOSE_EVENTS   = Keyword_Set(expose_events)
-    IF N_ELEMENTS(keyboard_events) GT 0 THEN WIDGET_CONTROL, self._id, DRAW_KEYBOARD_EVENTS = Keyword_Set(keyboard_events)
-    IF N_ELEMENTS(motion_events)   GT 0 THEN WIDGET_CONTROL, self._id, DRAW_MOTION_EVENTS   = Keyword_Set(motion_events)
-    IF N_ELEMENTS(viewport_events) GT 0 THEN WIDGET_CONTROL, self._id, DRAW_VIEWPORT_EVENTS = Keyword_Set(viewport_events)
-    IF N_ELEMENTS(wheel_events)    GT 0 THEN Widget_Control, self._ID, DRAW_WHEEL_EVENTS    = Keyword_Set(wheel_events)
-
-;---------------------------------------------------------------------
-;Callback Function/Procedures/Methods ////////////////////////////////
-;---------------------------------------------------------------------
-    if n_elements(context_handler)  gt 0 then self._context_handler  = context_handler
-    if n_elements(drop_handler)     gt 0 then self._drop_handler     = drop_handler
-    if n_elements(expose_handler)   gt 0 then self._expose_handler   = expose_handler
-    if n_elements(viewport_handler) gt 0 then self._viewport_handler = viewport_handler
+    ;EXTRA
+    if n_elements(extra) gt 0 then begin
+        ;Keywords accepted by the layout manager
+        layout_keys = ['Aspect', 'Col_Width', 'CharSize', 'IXMargin', 'IYMargin', $
+                       'Layout', 'Margin',    'OXMargin', 'OYMargin', 'Row_Height', $
+                       'XGap',   'YGap']
     
-    ;MOUSE HANDLERS
-    if n_elements(event_handler)        gt 0 then self._event_handler        = event_handler
-    if n_elements(keyboard_handler)     gt 0 then self._keyboard_handler     = mouse_down_handler
-    if n_elements(mouse_down_handler)   gt 0 then self._mouse_down_handler   = mouse_down_handler
-    if n_elements(mouse_up_handler)     gt 0 then self._mouse_up_handler     = mouse_down_handler
-    if n_elements(mouse_motion_handler) gt 0 then self._mouse_motion_handler = mouse_down_handler
-    if n_elements(mouse_wheel_handler)  gt 0 then self._mouse_wheel_handler  = mouse_down_handler
+        ;Separate LayoutManager from DrawWidget keywords.
+        void = MrIsMember(layout_keys, extra, iLayout, $
+                          COUNT       = nLayout, $
+                          COMPLEMENT  = iDraw, $
+                          NCOMPLEMENT = nDraw)
     
-    ;DRAG_NOTIFY
-    if n_elements(drag_notify) gt 0 then begin
-        case size(drag_notify, /TNAME) of
-            'STRUCT': begin
-                test = {MrEventHandler}
-                struct_assign, drag_notify, test
-                *self._drag_notify = test
-                widget_control, self._id, SET_DRAG_NOTIFY='MrWidgetAtom_Drag_Notify'
-            endcase
-            'STRING': begin
-                widget_control, self_id, SET_DRAG_NOTIFY=func_get_value
-                *self._drag_notify = drag_notify
-            endcase
-            else: message, 'DRAG_NOTIFY must be a string or structure.', /INFORMATIONAL
-        endcase
+        ;MrWidgetDraw
+        if nDraw   gt 0 then self -> MrDrawWidget::SetProperty, _EXTRA=extra[iDraw]
+        if nLayout gt 0 then self._oLayoutMGR -> SetProperty, _STRICT_EXTRA=extra[iLayout]
     endif
-END
+end
 
 
 ;+
@@ -1718,11 +1033,10 @@ pro Mr_Window::TLB_Resize, event
     ynew = event.y - 2*tlbGEO.ypad - 2*botGEO.ypad - botGEO.ysize
 
     ;Set the new size of the draw widget and the pixmap.
-    self._oDraw   -> Resize, xNew, yNew
     self._oPixmap -> Resize, xNew, yNew
-
-    ;Draw the plot to the new size
-    self -> Draw
+    self          -> Resize, xNew, yNew
+    
+    ;Draw occurs in MrDrawWidget::Resize
 end
 
 
@@ -1912,16 +1226,14 @@ pro Mr_Window::cleanup
     endif
 
     ;Free event handlers (but do not destroy event handling objects)
-    if obj_valid(self._oTLB)    then obj_destroy, self._oTLB
-    if obj_valid(self._oDraw)   then obj_destroy, self._oDraw
-    if obj_valid(self._oLayout) then obj_destroy, self._oLayout
-    if obj_valid(self._oSaveAs) then obj_destroy, self._oSaveAs
+    if obj_valid(self._selection)  then obj_destroy, self._selection
+    if obj_valid(self._oLayoutMGR) then obj_destroy, self._oLayoutMGR
 
     ;Destroy the widget, if it still exists
     if widget_info(self._tlbID, /VALID_ID) then widget_control, self._tlbID, /DESTROY
     
     ;Clean up the superclasses
-    self -> MrGraphicsEventAdapter::Cleanup
+    self -> MrDrawWidget::Cleanup
 end
 
 
@@ -2077,76 +1389,28 @@ end
 ;       YSIZE:          in, optional, type=integer, default=300
 ;                       The Y size of the widget.
 ;       _REF_EXTRA:     in, optional, type=any
-;                       Any keyword appropriate for the superclass INIT methods.
+;                       Any keyword appropriate for MrDrawWidget::Init.
 ;-
-function Mr_Window::init, parent,   $
-;Mr_Window Keywords
- BACKGROUND=background, $
- NOERASE=noerase, $
- REFRESH=refresh, $
- WINDOW_TITLE=window_title, $
- 
-;MrWidgetAtom Keywords
- NO_COPY   = no_copy, $
- SENSITIVE = sensitive, $
- UNAME     = uname, $
- UVALUE    = uvalue, $
- ;Callbacks
- EVENT_FUNC       = event_func, $
- EVENT_PRO        = event_pro, $
- EVENT_OBJ        = event_obj, $
- FUNC_GET_VALUE   = func_get_value, $
- KILL_NOTIFY      = kill_notify, $
- PRO_SET_VALUE    = pro_set_value, $
- 
-;Widget_Draw Keywords
- APP_SCROLL=app_scroll, $
- ASPECT=aspect, $
-; CLASSNAME=classname, $                                -- For object graphics
-; COLOR_MODEL=color_model, $                            -- for object graphics
-; COLORS=colors, $                                      -- for first window of session
- FRAME=frame, $
- GROUP_LEADER=group_leader, $
- IGNORE_ACCELERATORS=ignore_accelerators, $
- RENDERER=renderer, $
- RESOURCE_NAME=resource_name, $
-; RETAIN=retain, $                                      -- Pick correctly here
- SCR_XSIZE=scr_xsize, $
- SCR_YSIZE=scr_ysize, $
- SCROLL=scroll, $
- TOOLTIP=tooltip, $
- UNITS=units, $
- X_SCROLL_SIZE=x_scroll_size, $
- XOFFSET=xoffset, $
- XSIZE=xsize, $
- Y_SCROLL_SIZE=y_scroll_size, $
- YOFFSET=yoffset, $
- YSIZE=ysize, $
- 
- ;EVENTS                                                -- If there is an event handler, turn on.
-; BUTTON_EVENTS=button_events, $                        -- Always on
- DROP_EVENTS=drop_events, $
-; EXPOSE_EVENTS=expose_events, $                        -- Set Current
-; KEYBOARD_EVENTS=keyboard_events, $                    -- Always on
-; MOTION_EVENTS=motion_events, $                        -- Always on
- TRACKING_EVENTS=tracking_events, $
- VIEWPORT_EVENTS=viewport_events, $
-; WHEEL_EVENTS=wheel_events, $                          -- Always on
-
- ;EVENT HANDLERS
- DRAG_NOTIFY=drag_notify, $
- DROP_HANDLER=drop_handler, $
- EVENT_HANDLER=event_handler, $
- EXPOSE_HANDLER=expose_handler, $
- KEYBOARD_HANDLER=keyboard_handler, $
- MOUSE_UP_HANDLER=mouse_up_handler, $
- MOUSE_DOWN_HANDLER=mouse_down_handler, $
- MOUSE_MOTION_HANDLER=mouse_motion_handler, $
- MOUSE_WHEEL_HANDLER=mouse_wheel_handler, $
- NOTIFY_REALIZE=notify_realize, $
- TRACKING_HANDLER=tracking_handler, $
- VIEWPORT_HANDLER=viewport_handler, $
-_REF_EXTRA=extra
+function Mr_Window::init, parent, $
+ASPECT     = aspect, $
+BUFFER     = buffer, $
+COL_WIDTH  = col_width, $
+CHARSIZE   = charsize, $
+IXMARGIN   = ixmargin, $
+IYMARGIN   = iymargin, $
+LAYOUT     = layout, $
+MARGIN     = margin, $
+NAME       = name, $
+OXMARGIN   = oxmargin, $
+OYMARGIN   = oymargin, $
+REFRESH    = refresh, $
+ROW_HEIGHT = row_height, $
+WINDOW_TITLE = window_title, $
+XGAP       = xgap, $
+XSIZE      = xsize, $
+YGAP       = ygap, $
+YSIZE      = ysize, $
+_REF_EXTRA = extra
    compile_opt strictarr
     
     ;Error handling
@@ -2156,51 +1420,44 @@ _REF_EXTRA=extra
         void = cgErrorMsg()
         return, 0
     endif
+    
+    ;Default window title and size
+    refresh = n_elements(refresh) eq 0 ? 1 : keyword_set(refresh)
+    if n_elements(window_title) eq 0 then window_title = 'Mr_Window'
+    if n_elements(xsize)        eq 0 then xsize        = 600
+    if n_elements(ysize)        eq 0 then ysize        = 600
 
     ;Build the window first so that Layout can get the dimensions of the window.
     self._selection = obj_new('MrIDL_Container')
-    self._oSaveAs   = obj_new('MrSaveAs')
-    self -> _BuildWindow
-
-    ;Set properties of the draw widget
-    self._oDraw -> SetProperty, EVENT_FUNC           = event_func, $
-                                EVENT_HANDLER        = event_handler, $
-                                EVENT_OBJ            = event_obj, $
-                                EVENT_PRO            = event_pro, $
-                                KEYBOARD_HANDLER     = keyboard_handler, $
-                                MOUSE_UP_HANDLER     = mouse_up_handler, $
-                                MOUSE_DOWN_HANDLER   = mouse_down_handler, $
-                                MOUSE_MOTION_HANDLER = mouse_motion_handler, $
-                                MOUSE_WHEEL_HANDLER  = mouse_wheel_handler, $
-                                NOTIFY_REALIZE       = notify_realize, $
-                                XSIZE                = xsize, $
-                                YSIZE                = ysize
+    self -> _BuildWindow, WINDOW_TITLE = window_title, $
+                          XSIZE        = xsize, $
+                          YSIZE        = ysize, $
+                          _EXTRA       = extra
+    if obj_valid(self._oTLB) eq 0 then return, 0
     
-    ;Create a pixmap the same size as the draw widget.
-    self._oPixmap = obj_new('MrPixmap', XSIZE = xsize, $
-                                        YSIZE = ysize)
-    
-    ;Create layout object
-    ;   - Must set draw widget properties window first to get size.
-    self._oLayout = obj_new('MrLayoutManager', $
-                            ASPECT     = aspect, $
-                            COL_WIDTH  = col_width, $
-                            CHARSIZE   = charsize, $
-                            IXMARGIN   = ixmargin, $
-                            IYMARGIN   = iymargin, $
-                            LAYOUT     = layout, $
-                            MARGIN     = margin, $
-                            OXMARGIN   = oxmargin, $
-                            OYMARGIN   = oymargin, $
-                            ROW_HEIGHT = row_height, $
-                            XGAP       = xgap, $
-                            YGAP       = ygap)
+    ;Initialize the layout manager
+    self._oLayoutMGR = obj_new('MrLayoutManager', $
+                               ASPECT     = aspect, $
+                               COL_WIDTH  = col_width, $
+                               CHARSIZE   = charsize, $
+                               IXMARGIN   = ixmargin, $
+                               IYMARGIN   = iymargin, $
+                               LAYOUT     = layout, $
+                               MARGIN     = margin, $
+                               OXMARGIN   = oxmargin, $
+                               OYMARGIN   = oymargin, $
+                               ROW_HEIGHT = row_height, $
+                               XGAP       = xgap, $
+                               YGAP       = ygap)
+    if obj_valid(self._oLayoutMGR) eq 0 then return, 0
 
     ;Add to the container of open windows
     self -> _SysVAdd, self
     
     ;Realize and manage the widget
+    self._refresh = refresh
     self._oTLB -> XManager
+    if self._refresh then self -> Draw
 
     return, 1
 end
@@ -2216,21 +1473,14 @@ end
 pro Mr_Window__define, class
 
    class = { Mr_Window, $
-             inherits IDL_Object, $
-             inherits MrGraphicsEventAdapter, $
-             inherits MrIDL_Container, $
-             _tlbID:      0L, $             ;Widget ID of the top-level base.
-             _oTLB:       obj_new(), $      ;A top-level base widget object, if required.
-             _oDraw:      obj_new(), $
-             _oLayout:    obj_new(), $
-             _oPixmap:    obj_new(), $
-             _oSaveAs:    obj_new(), $
+             inherits MrDrawWidget, $
+                      ;--> MrWidgetAtom
+                      ;    --> IDL_Object
+                      ;    MrIDL_Container
+                      ;    MrGraphicEventsAdapter
+             _oLayoutMGR: obj_new(), $
              _selection:  obj_new(), $
              _statusID:   0L, $
-
-             name:        '', $
-             _background: '', $             ;Background color of the display.
-             _noerase:    0B, $             ;Prevents the widget from being erased.
-             _refresh:    0B $              ;Refresh the graphics window
+             name:        '' $
            }
 end

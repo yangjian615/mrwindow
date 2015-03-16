@@ -68,6 +68,120 @@
 ;-
 ;*****************************************************************************************
 ;+
+;   Add columns to the layout while keeping the plot in the same location.
+;
+; :Params:
+;       NCOLS:          in, optional, type=int, default=1
+;                       Number of columns to add. A negative value will remove columns.
+;       COL:            in, optional, type=int, default=last column
+;                       The column before/after which more columns are to be added.
+;
+; :Keywords:
+;       BEFORE:         in, optional, type=boolean, default=0
+;                       If set, `NCOLS` will be added to the left (before) of `COL`. The
+;                           default is to add to the right (after).
+;-
+pro MrLayout::AddColumn, nCols, col, $
+BEFORE=before
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		void = cgErrorMsg()
+		return
+	endif
+
+	;Default to adding a single column to the right of the layout
+	before = keyword_set(before)
+	if n_elements(col)   eq 0 then col   = self.layout[0]
+	if n_elements(nCols) eq 0 then nCols = 1
+
+	;Adding nothing or removing rows?
+	if nCols eq 0 then return
+	if nCols lt 0 then begin
+		self -> DeleteColumn, nCols, col, BEFORE=before
+		return
+	endif
+
+	;Determine new layout
+	newLayout     = self.layout[0:1]
+	newLayout[0] += nCols
+
+	;Does the graphic have to move?
+	colrow = self -> ConvertLocation(self.layout[2], /PINDEX, /TO_COLROW)
+	if before then begin
+		if col le colrow[0] then colrow[0] += nCols
+	endif else begin
+		if col lt colrow[0] then colrow[0] += nCols
+	endelse
+	newPIndex = self -> ConvertLocation(colrow, newLayout, /COLROW, /TO_PINDEX)
+
+	;Update the layout
+	self.layout = [newLayout, newPIndex]
+	self -> ComputeGrid
+end
+
+
+;+
+;   Add rows to the layout while keeping the plot in the same location.
+;
+; :Params:
+;       NROWS:          in, optional, type=int, default=1
+;                       Number of rows to add. A negative value will remove rows.
+;       ROW:            in, optional, type=int, default=last row
+;                       The row above/below which more rows are to be added.
+;
+; :Keywords:
+;       BEFORE:         in, optional, type=boolean, default=0
+;                       If set, `NROWS` will be added above (before) `ROW`. The default
+;                           is to add below (after).
+;-
+pro MrLayout::AddRow, nRows, row, $
+BEFORE=before
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		void = cgErrorMsg()
+		return
+	endif
+
+	;Default to adding a single row to the bottom of the layout
+	before = keyword_set(before)
+	if n_elements(row)   eq 0 then row = self.layout[1]
+	if n_elements(nRows) eq 0 then nRows = 1
+
+	;Adding nothing or removing rows?
+	if nRows eq 0 then return
+	if nRows lt 0 then begin
+		self -> DeleteRow, abs(nRows), row, BEFORE=before
+		return
+	endif
+
+	;Determine new layout and pIndex
+	newLayout     = self.layout[0:1]
+	newLayout[1] += nRows
+
+	;Does the graphic have to move?
+	colrow = self -> ConvertLocation(self.layout[2], /PINDEX, /TO_COLROW)
+	if before then begin
+		if row le colrow[1] then colrow[1] += nRows
+	endif else begin
+		if row lt colrow[1] then colrow[1] += nRows
+	endelse
+	newPIndex = self -> ConvertLocation(colrow, newLayout, /COLROW, /TO_PINDEX)
+
+	;Update the layout
+	self.layout = [newLayout, newPIndex]
+	self -> ComputeGrid
+end
+
+
+;+
 ;   Set properties of the object.
 ;-
 pro MrLayout::ComputeGrid
@@ -79,6 +193,142 @@ pro MrLayout::ComputeGrid
 
 	;Set the grid
 	self -> MrLayoutAtom::ComputeGrid
+end
+
+
+;+
+;   Remove columns from the layout while keeping the plot in the same location.
+;
+; :Params:
+;       NCOLS:          in, optional, type=int, default=1
+;                       Number of columns to add.
+;       COL:            in, optional, type=int, default=last column
+;                       The column to be deleted. If `NCOLS` > 1, then this is the first
+;                           of `NCOLS` adjacent columns that will be deleted.
+; :Keywords:
+;       BEFORE:         in, optional, type=boolean, default=0
+;                       If set, then `COL` is the last of `NCOLS` adjacent columns to be deleted.
+;-
+pro MrLayout::DeleteColumn, nCols, col, $
+BEFORE=before
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		void = cgErrorMsg()
+		return
+	endif
+
+	;Default to deleting a single column from the right of the layout.
+	before = keyword_set(before)
+	if n_elements(col)   eq 0 then col   = self.layout[0]
+	if n_elements(nCols) eq 0 then nCols = 1
+
+	;Removing nothing?
+	if nCols eq 0 then return
+
+	;Make sure nCols is positive.
+	_nCols = abs(nCols)
+	if _nCols ge self.layout[0] $
+		then message, string(FORMAT='(%"Layout has only %i columns. Cannot delete %i columns.")', self.layout[0], _nCols)
+
+	;Determine new layout and pIndex
+	newLayout     = self.layout[0:1]
+	newLayout[0] -= _nCols
+
+	;First and last columns begin deleted
+	if before then begin
+		first_col = col - _nCols + 1
+		last_col  = col
+	endif else begin
+		first_col = col
+		last_col  = col + _nCols - 1
+	endelse
+
+	;Is the graphic being deleted?
+	colrow = self -> ConvertLocation(self.layout[2], /PINDEX, /TO_COLROW)
+	if (colrow[0] ge first_col) && (colrow[0] le last_col) $
+		then message, 'Column ' + strtrim(colrow[0], 2) + ' is not empty. Cannot delete.'
+
+	;Does the graphic need to be moved?
+	if colrow[0] gt last_col then colrow[0] -= _nCols
+
+	;Get the new pIndex
+	newPIndex = self -> ConvertLocation(colrow, newLayout, /COLROW, /TO_PINDEX)
+
+	;Update the layout
+	self.layout = [newLayout, newPIndex]
+	self -> ComputeGrid
+end
+
+
+;+
+;   Remove rows from the layout while keeping the plot in the same location.
+;
+; :Params:
+;       NROWS:          in, optional, type=int, default=1
+;                       Number of rows to delete.
+;       ROW:            in, optional, type=int, default=bottom row
+;                       The row to be deleted. If `NROWS` > 1, then this is the first
+;                           of `NROWS` adjacent rows that will be deleted.
+; :Keywords:
+;       BEFORE:         in, optional, type=boolean, default=0
+;                       If set, then `ROW` is the last of `NROWS` adjacent rows to be deleted.
+;-
+pro MrLayout::DeleteRow, nRows, row, $
+BEFORE=before
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		void = cgErrorMsg()
+		return
+	endif
+
+	;Default to adding a single row
+	before = keyword_set(before)
+	if n_elements(row)   eq 0 then row   = self.layout[1]
+	if n_elements(nRows) eq 0 then nRows = 1
+
+	;Removing nothing?
+	if nRows eq 0 then return
+
+	;Make sure nRows is positive.
+	_nRows = nRows lt 0 ? abs(nRows) : nRows
+	if _nRows ge self.layout[1] $
+		then message, string(FORMAT='(%"Layout has only %i rows. Cannot delete %i.")', self.layout[1], _nRows)
+
+	;Determine new layout and pIndex
+	newLayout     = self.layout[0:1]
+	newLayout[1] -= _nRows
+
+	;First and last row to be deleted
+	if before then begin
+		first_row = row - _nRows + 1
+		last_row  = row
+	endif else begin
+		first_row = row
+		last_row  = row + _nRows - 1
+	endelse
+
+	;Is the graphic being deleted?
+	colrow = self -> ConvertLocation(self.layout[2], /PINDEX, /TO_COLROW)
+	if (colrow[1] ge first_row) && (colrow[1] le last_row) $
+		then message, 'Row ' + strtrim(colrow[1], 2) + ' is not empty. Cannot delete.'
+	
+	;Does the graphic need to be moved?
+	if colrow[1] gt last_row then colrow[1] -= _nRows
+
+	;Get the new pIndex
+	newPIndex = self -> ConvertLocation(colrow, newLayout, /COLROW, /TO_PINDEX)
+
+	;Update the layout
+	self.layout = [newLayout, newPIndex]
+	self -> ComputeGrid
 end
 
 
@@ -126,7 +376,29 @@ DISABLE=disable
     on_error, 2
     
     ;Turn layout management on or off.
-    self.isManaged = keyword_set(disable)
+    self.isManaged = ~keyword_set(disable)
+end
+
+
+;+
+;   Set the grid. When the layout is being managed, ::ComputeGrid does not
+;   execute. To keep the grid positions up-to-date (so that ::GetPosition
+;   can obtain the current position), it must be set by the layout manager.
+;   This method should not be called by anything other than the layout
+;   manager.
+;
+; :Private:
+;
+; :Params:
+;       GRID:           in, required, type=Nx4 fltarr
+;                       An array containing plot positions for each plot in the layout.
+;-
+pro MrLayout::SetGrid, grid
+    compile_opt strictarr
+    on_error, 2
+    
+    ;Set the grid
+    *self.grid = grid
 end
 
 
@@ -221,7 +493,7 @@ WRAP=wrap
 	send_message = ~arg_present(status)
 	if n_elements(nCols) eq 0 then nCols = 1
 	
-	if expnd + wrap gt 0 then begin
+	if expnd + wrap gt 1 then begin
 		status = 1
 		msg    = 'EXPAND and WRAP are mutually exclusive.'
 		if send_message then message, msg
@@ -231,22 +503,23 @@ WRAP=wrap
 ; New Location ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 	;Convert the plot index to a [col,row] location
-	colRow = self -> ConvertIndex(self.layout[3], /PINDEX, /TO_COLROW)
+	colRow = self -> ConvertLocation(self.layout[2], /PINDEX, /TO_COLROW)
 
 	;New column and layout
-	newLayout = self.layout
+	newLayout = self.layout[0:1]
 	tempCol   = colRow[0] + nCols
 
 ;---------------------------------------------------------------------
 ; Does Not Fit ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+	nAdd = 0
 	if tempCol gt self.layout[0] || tempCol le 0 then begin
 		;Number of shifts to get to the first/last column
-		n_to_lastcol = (nCols gt 0) ? (self.layout[0] - colRow[1]) : (colRow[0] - 1)
+		n_to_lastcol = (nCols gt 0) ? (self.layout[0] - colRow[0]) : (colRow[0] - 1)
 		
 		;Once we are at the end of the row, we can determine how many
 		;complete rows we will have to skip.
-		n_shift_rows = ceil( (abs(nCols) - n_to_lastcol) / self.layout[0] )
+		n_shift_rows = ceil( float(abs(nCols) - n_to_lastcol) / self.layout[0] )
 		
 		;The number of columns remaining will determine the destination.
 		;   - N_SHIFT_ROWS includes the destination row, so subtract 1.
@@ -279,7 +552,7 @@ WRAP=wrap
 				                  STATUS    = rstat, $
 				                  TEST      = test, $
 				                  WRAP      = wrap
-				
+
 				;Did an error occur?
 				if status ne 0 then begin
 					status = 4
@@ -287,8 +560,11 @@ WRAP=wrap
 				endif
 				
 				;Update the graphic's location
+				;   - Take the final column calculated above
+				;   - Find the row within the new layout
+				tempColRow = self -> ConvertLocation(newLayout[2], newLayout[0:1], /PINDEX, /TO_COLROW)
 				newCol = finalCol
-				newRow = newLayout[1]
+				newRow = tempColRow[1]
 			
 			;Shift is not possible
 			endif else begin
@@ -305,8 +581,8 @@ WRAP=wrap
 			;FINALCOL was calculated assuming we were wrapping.
 			;   - The row will stay the same.
 			newCol = finalCol
-			newRow = self.layout[1]
-		
+			newRow = colrow[1]
+
 	;---------------------------------------------------------------------
 	; Expand /////////////////////////////////////////////////////////////
 	;---------------------------------------------------------------------
@@ -324,7 +600,7 @@ WRAP=wrap
 			endelse
 			
 			;Same row
-			newRow = self.layout[1]
+			newRow = colRow[1]
 		
 	;---------------------------------------------------------------------
 	; Not Possible ///////////////////////////////////////////////////////
@@ -334,7 +610,14 @@ WRAP=wrap
 			msg    = 'NCOLS is too large. Cannot shift.'
 			if send_message then message, msg
 		endelse
-	endif
+
+;---------------------------------------------------------------------
+; Fits ///////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+	endif else begin
+		newCol = tempCol
+		newRow = colrow[1]
+	endelse
 
 ;---------------------------------------------------------------------
 ; Move to New Location ///////////////////////////////////////////////
@@ -342,7 +625,7 @@ WRAP=wrap
 	;Was this just a test?
 	if test then begin
 		newLayout[0] += nAdd
-		newLayout[2]  = self -> ConvertLocation([newCol, newRow], newLayout[0:1], /COLROW, /PINDEX)
+		newLayout[2]  = self -> ConvertLocation([newCol, newRow], newLayout, /COLROW, /TO_PINDEX)
 	
 	;Real deal
 	endif else begin
@@ -426,7 +709,7 @@ WRAP=wrap
 	send_message = ~arg_present(status)
 	if n_elements(nRows) eq 0 then nRows = 1
 	
-	if expnd + wrap gt 0 then begin
+	if expnd + wrap gt 1 then begin
 		status = 1
 		msg    = 'EXPAND and WRAP are mutually exclusive.'
 		if send_message then message, msg
@@ -436,22 +719,23 @@ WRAP=wrap
 ; New Location ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 	;Convert the plot index to a [col,row] location
-	colRow = self -> ConvertIndex(self.layout[3], /PINDEX, /TO_COLROW)
+	colRow = self -> ConvertLocation(self.layout[2], /PINDEX, /TO_COLROW)
 
 	;New column and layout
-	newLayout = self.layout
+	newLayout = self.layout[0:1]
 	tempRow   = colRow[1] + nRows
 
 ;---------------------------------------------------------------------
 ; Does Not Fit ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-	if tempRow gt self.layout[1] || tempCol le 0 then begin
+	nAdd = 0
+	if tempRow gt self.layout[1] || tempRow le 0 then begin
 		;Number of shifts to get to the bottom/top row
 		n_to_lastrow = (nRows gt 0) ? (self.layout[1] - colRow[1]) : (colRow[1] - 1)
 		
 		;Once we are at the end of the row, we can determine how many
 		;complete rows we will have to skip.
-		n_shift_cols = ceil( (abs(nRows) - n_to_lastrow) / self.layout[1] )
+		n_shift_cols = ceil( float(abs(nRows) - n_to_lastrow) / self.layout[1] )
 		
 		;The number of rows remaining will determine the destination.
 		;   - N_SHIFT_COLS includes the destination row, so subtract 1.
@@ -492,7 +776,8 @@ WRAP=wrap
 				endif
 				
 				;Update the graphic's location
-				newCol = newLayout[0]
+				tempColRow = self -> ConvertLocation(newLayout[2], newLayout[0:1], /PINDEX, /TO_COLROW)
+				newCol = tempColRow[0]
 				newRow = finalRow
 			
 			;Shift is not possible
@@ -509,7 +794,7 @@ WRAP=wrap
 		endif else if wrap then begin
 			;FINALROW was calculated assuming we were wrapping.
 			;   - The column will stay the same.
-			newCol = self.layout[0]
+			newCol = colrow[0]
 			newRow = finalRow
 		
 	;---------------------------------------------------------------------
@@ -520,7 +805,7 @@ WRAP=wrap
 			;Add the rows
 			;   - Add BEFORE: tempRow = 1 - nAdd                nRows < 0
 			;   - Add AFTER:  tempRow = layout[0] + nAdd        nRows > 0
-			if nCols gt 0 then begin
+			if nRows gt 0 then begin
 				nAdd   = tempRow - self.layout[1]
 				newRow = self.layout[1] + nAdd
 			endif else begin
@@ -529,7 +814,7 @@ WRAP=wrap
 			endelse
 			
 			;Same column
-			newCol = self.layout[0]
+			newCol = colrow[0]
 		
 	;---------------------------------------------------------------------
 	; Not Possible ///////////////////////////////////////////////////////
@@ -539,7 +824,14 @@ WRAP=wrap
 			msg    = 'NCOLS is too large. Cannot shift.'
 			if send_message then message, msg
 		endelse
-	endif
+
+;---------------------------------------------------------------------
+; Fits ///////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+	endif else begin
+		newCol = colrow[0]
+		newRow = tempRow
+	endelse
 
 ;---------------------------------------------------------------------
 ; Move to New Location ///////////////////////////////////////////////
@@ -547,7 +839,7 @@ WRAP=wrap
 	;Was this just a test?
 	if test then begin
 		newLayout[1] += nAdd
-		newLayout[2]  = self -> ConvertLocation([newCol, newRow], newLayout[0:1], /COLROW, /PINDEX)
+		newLayout[2]  = self -> ConvertLocation([newCol, newRow], newLayout, /COLROW, /PINDEX)
 	
 	;Real deal
 	endif else begin

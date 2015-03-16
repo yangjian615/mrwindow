@@ -544,18 +544,12 @@ _REF_EXTRA = extra
         return, 0
     endif
 
-
 ;---------------------------------------------------------------------
-;Superclass Properties ///////////////////////////////////////////////
+; Set Graphics Properties ////////////////////////////////////////////
 ;---------------------------------------------------------------------
-
     ;MrGraphicsKeywords
-    if self -> MrGraphicsKeywords::INIT(_STRICT_EXTRA=extra) eq 0 then $
-        message, 'Unable to initialize MrGraphicsKeywords.'
-
-;---------------------------------------------------------------------
-;Defaults and Heap Values ////////////////////////////////////////////
-;---------------------------------------------------------------------
+    success = self -> MrGraphicsKeywords::INIT(_STRICT_EXTRA=extra)
+    if success eq 0 then message, 'Unable to initialize MrGraphicsKeywords.'
 
     ;Defaults
     self.xlog = keyword_set(xlog)
@@ -566,28 +560,47 @@ _REF_EXTRA = extra
     self.max_value = ptr_new(/ALLOCATE_HEAP)
 
 ;---------------------------------------------------------------------
-;Window and Layout ///////////////////////////////////////////////////
+; Overplot ///////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    ;Was the /OVERPLOT keyword set instead of giving a target
-    if MrIsA(overplot, /SCALAR, 'INT') then begin
-        if keyword_set(overplot) then target = self -> _GetTarget()
+    ;Overplot
+    ;   - Get target before getting a window. Window will be taken from target.
+    ;   - If set, search for a target within the current window.
+    ;   - If an object, use the object as the target.
+    if MrIsA(overplot, /SCALAR, 'INT') && keyword_set(overplot) then begin
+        target = self -> _GetTarget(/ANY)
     endif else if MrIsA(overplot, /SCALAR, 'OBJREF') then begin
         target = overplot
     endif
 
-    ;Superclass.
-    if self -> MrGrAtom::INIT(CURRENT=current, NAME=name, HIDE=hide, TARGET=target, $
-                              WINREFRESH=winRefresh, WINDOW_TITLE=window_title) eq 0 $
-       then message, 'Unable to initialize MrGrAtom'
-  
-    ;Layout
-    ;   - Do after window is chosen/open
-    self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
+;---------------------------------------------------------------------
+; Window /////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Atom object
+    ;   - Find a window and set more basic properties
+    success = self -> MrGrAtom::INIT(CURRENT=current, NAME=name, HIDE=hide, TARGET=target, $
+                                     WINREFRESH=winRefresh, WINDOW_TITLE=window_title)
+    if success eq 0 then message, 'Unable to initialize MrGrAtom'
 
 ;---------------------------------------------------------------------
-;Overplot & Refresh //////////////////////////////////////////////////
+; Layout /////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    ;Do after window is chosen/open
+    self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
+    
+    ;Manage the layout?
+    tf_manage = ( (n_elements(layout)   eq 0) || (layout[2]       eq 0) ) && $
+                ( (n_elements(position) eq 0) || (total(position) eq 0) )
+    if tf_manage then self.layout -> Manage
+    
+    ;Add to layout manager
+    self.window -> AddToLayout, self.layout
+
+;---------------------------------------------------------------------
+; Overplot & Refresh /////////////////////////////////////////////////
 ;--------------------------------------------------------------------- 
+    
     ;Overplot?
     if n_elements(overplot) gt 0 then self -> Overplot, target
 

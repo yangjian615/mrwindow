@@ -380,7 +380,7 @@ _REF_EXTRA=extra
     endif
 
     if arg_present(tlb_frame_attr) then tlb_frame_attr = self._tlb_frame_attr
-    if arg_present(title)          then title          = self.title
+    if arg_present(title)          then title          = self._window_title
     
 ;---------------------------------------------------------------------
 ;Widget_Info & Widget_Control Options ////////////////////////////////
@@ -550,7 +550,11 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
 ;Widget_Control Options //////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    if n_elements(title) ne 0 then widget_control, self._id, TLB_SET_TITLE=title
+    ;There is no Widget_Info(tlb, /GET_TITLE) option, so store the title
+    if n_elements(title) ne 0 then begin
+        widget_control, self._id, TLB_SET_TITLE=title
+        self._window_title = title
+    endif
     
     ;Superclass
     if n_elements(extra) gt 0 then self -> MrWidgetBase::SetProperty, _STRICT_EXTRA=extra
@@ -1009,6 +1013,7 @@ end
 ;       _KILL_REQUEST_HANDLER:  Method event handler for kill request events.
 ;       _MOVE_HANDLER:          Method event handler for move events.
 ;       _SIZE_HANDLER:          Method event handler for size events.
+;       _WINDOW_TITLE:          Title dispalyed in the title bar of the window.
 ;
 ; :Params:
 ;       CLASS:          out, optional, type=structure
@@ -1026,6 +1031,7 @@ pro MrTopLevelBase__define, class
                _tlb_move_handler:         '', $
                _tlb_size_handler:         '', $
                _centerTLB:                0L, $
-               _register_name:            "" $
+               _register_name:            '', $
+               _window_title:             '' $
             }
 end

@@ -1033,8 +1033,17 @@ pro MrWidgetAtom::SetProperty, $
     ;EVENT_PRO takes precedence over EVENT_FUNC
     if n_elements(event_func)       gt 0 then self -> _Set_Event_Func, event_func
     if n_elements(event_pro)        gt 0 then self -> _Set_Event_Pro, event_pro
-    if n_elements(event_obj)        gt 0 then self._event_obj        = event_obj
-    if n_elements(tracking_handler) gt 0 then self._tracking_handler = tracking_handler  
+    if n_elements(tracking_handler) gt 0 then self._tracking_handler = tracking_handler
+    
+    ;EVENT_OBJ
+    ;   - Have all events forwarded through [Obj_Class]_Event_Pro procedure
+    ;     to the proper method of Event_Obj.
+    if n_elements(event_obj) gt 0 then begin
+        self._event_obj  = event_obj
+        self._event_pro  = ''
+        self._event_func = ''
+        widget_control, self._id, EVENT_PRO=obj_class(self) + '_Event_Pro'
+    endif
 
     ;FUNC_GET_VALUE
     if n_elements(func_get_value) gt 0 then begin
@@ -1125,7 +1134,7 @@ pro MrWidgetAtom::_Set_Event_Pro, event_pro
         then widget_control, self._id, EVENT_PRO='' $
         else widget_control, self._id, EVENT_PRO=obj_class(self) + '_Event_Pro'
     
-    ;Setting EVENT_PRO will automatically set EVENT_FUNC=''
+    ;Setting EVENT_PRO will cause Widget_Control to set EVENT_FUNC=''
     self._event_pro = event_pro
     self._event_func = ''
 end
@@ -1282,7 +1291,6 @@ function MrWidgetAtom::init, parent, $
     
     
     ;Callback Func/Pro/Methods
-    if n_elements(event_pro) + n_elements(event_func) eq 0 then event_pro = obj_class(self) + '_Event_Pro'
     if n_elements(func_get_value)   eq 0 then func_get_value   = {object: self, method: 'Func_Get_Value'}
     if n_elements(kill_notify)      eq 0 then kill_notify      = {object: self, method: 'Kill_Notify'}
     if n_elements(notify_realize)   eq 0 then notify_realize   = {object: self, method: 'Notify_Realize'}

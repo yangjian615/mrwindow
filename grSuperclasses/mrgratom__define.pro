@@ -90,18 +90,29 @@ end
 
 
 ;+
-;   The purpose of this method is to obtain targets for graphics objects. Targets are
-;   pulled from the current window.
+;   The purpose of this method is to obtain targets for graphics objects. If the graphic
+;   is assigned to a graphics window, targets are drawn from that window. Otherwise, the
+;   currently active graphics window is used.
+;
+;   By default, the currently selected objects within the window are used as targets.
+;   If no objects are selected, the first object that is a subclass of MrGrDataAtom is
+;   chosen.
+;
+;   Process::
+;       1) Check if we have a window.
+;       2) If not, look in the currently active window.
+;       3) Search for selected objects
+;       4) If none are found, search for ANY other (i.e. unselected) object
+;       5) Return the first found object unless ALL is set.
+;       *  Targets must be a subclass of MrGrDataAtom.
 ;
 ; :Keywords:
 ;       ALL:                in, optional, type=boolean, default=0
 ;                           If set, all matching graphics will be returned as targets.
-;                               The default is to return a single target.
+;                               The default is to return the first target.
 ;       ANY:                in, optional, type=boolean, default=0
-;                           If set, and no objects are selected in the window, the search
-;                               for targets will be expanded to any available graphic within
-;                               the current window. If at least one graphic has been
-;                               selected, this keyword is ignored.
+;                           If set and the window contains no selected graphics, then
+;                               expand the search to include any unselected graphics.
 ;       COUNT:              out, optional, type=integer
 ;                           Number of targets returned.
 ;
@@ -158,8 +169,14 @@ end
 
 
 ;+
-;   Gets the current or a new MrWindow graphics window. By default, the refresh state
+;   Get a window to put the graphic in. Will create a new window, grab the current
+;   window, or take a window from a target object. By default, the refresh state
 ;   of a new window is set to 0 so that it will not be created immediately.
+;
+;   Window selection priority::
+;       1) Take from a target object
+;       2) Use the current window
+;       3) Create a new window
 ;
 ; :Keywords:
 ;       CURRENT:            in, optional, type=boolean, default=0
@@ -171,11 +188,13 @@ end
 ;                               present.
 ;       TARGET:             in, optional, type=object
 ;                           A graphic that is to share the same window.
+;       WINDOW_TITLE:       in, optional, type=string'
+;                           Name to appear in the title bar of the window. Used only if
+;                               a new window is being created.
 ;-
 function MrGrAtom::_GetWindow, $
 BUFFER=buffer, $
 CURRENT=current, $
-NOGUI=noGUI, $
 TARGET=target, $
 WINDOW_TITLE=window_title
     compile_opt strictarr
@@ -282,8 +301,8 @@ WINDOW=window
     endif
     
     ;Set GraphicAtom properties
-    if arg_present(hide)   then hide = self.hide
-    if arg_present(name)   then name = self.name
+    if arg_present(hide)   then hide   = self.hide
+    if arg_present(name)   then name   = self.name
     if arg_present(window) then window = self.window
 end
 
@@ -569,19 +588,23 @@ DESTROY=destroy
     endif
     
     ;Make sure a valid window was given
-    if obj_valid(newWindow) eq 0 || obj_class(newWindow) ne 'MRWINDOW' then $
-        message, 'NEWWINDOW must be a valid MrWindow object.'
+    if obj_valid(newWindow) eq 0 || obj_class(newWindow) ne 'MR_WINDOW' then $
+        message, 'NEWWINDOW must be a valid Mr_Window object.'
     
     ;Remove SELF from the current window
-    self.window -> Remove, self, DESTROY=0
+    oldWindow = self.window
+    oldWindow -> Remove, self, DESTROY=0
+    if keyword_set(destroy) then obj_destroy, oldWindow
     
     ;Switch to the new window
-    if keyword_set(destroy) then obj_destroy, self.window
-    self.window = newWindow
-    
-    ;Turn refresh off while we add the graphic to the window
-    self -> Refresh, /DISABLE
-    self.window -> Add, self
+    ;   - Turn refresh off
+    ;   - Add self to new window
+    ;   - Set window as object property
+    refresh_in = newWindow -> GetRefresh()
+    newWindow -> Refresh, /DISABLE
+    newWindow -> Add, self
+    self      -> _SetWindow, newWindow
+    if refresh_in then self.window -> Refresh
 end
 
 
@@ -602,17 +625,20 @@ end
 ; :Keywords:
 ;       BUFFER:         in, optional, type=boolean, default=0
 ;                       If set, graphics will be directed to a buffer and a window
-;                           will not be created.
+;                           will not be created. Used only for new windows, i.e., when
+;                           `CURRENT` and `TARGET` are not given.
 ;       CURRENT:        in, optional, type=boolean, default=0
 ;                       If set, the graphic will be added to the current window. If
-;                           not, a new window will be created.
-;       NOGUI:          in, optional, type=boolean, default=0
-;                       If set, graphics will be displayed in a normal IDL window.
+;                           not, a new window will be created. This keyword is ignored
+;                           if `TARGET` is present.
 ;       HIDE:           in, optional, type=boolean, default=0
-;                       If set, the graphic will not be displayed.
+;                       If set, the graphic will not be drawn.
 ;       NAME:           in, optional, type=string, default=Obj_Class(self)
 ;                       A string specifying the name of the graphic. It can be used
 ;                           retrieve the graphic using bracket array notation.
+;       TARGET:         in, optional, type=object
+;                       A MrGraphics object containing the window in which this graphic
+;                           should be displayed.
 ;       WINREFRESH:     out, optional, type=boolean
 ;                       The refresh state of the window must be turned off until the
 ;                           superclass has been fully initialized. This prevents the
@@ -621,9 +647,10 @@ end
 ;                           then this is the initial reset state of the current graphics
 ;                           window. New windows are always generated with refresh off.
 ;       WINDOW_TITLE:   in, optional, type=string, default="MrWindow"
-;                       Name to be placed on the title bar of the graphics window.
+;                       Name to be placed on the title bar of a new graphics window.
 ;-
 function MrGrAtom::init, $
+BUFFER=buffer, $
 CURRENT=current, $
 HIDE=hide, $
 NAME=name, $
@@ -650,9 +677,9 @@ WINDOW_TITLE=window_title
     if n_elements(name) eq 0 then name = obj_class(self)
 
     ;Get a window
-    theWindow = self -> _GetWindow(TARGET=target, CURRENT=current, WINDOW_TITLE=window_title)
+    theWindow  = self -> _GetWindow(TARGET=target, CURRENT=current, WINDOW_TITLE=window_title)
     self -> _SetWindow, theWindow
-    
+
     ;Turn off refreshing while the graphic is added to the window.
     winRefresh = theWindow -> GetRefresh()
     if winRefresh then theWindow -> Refresh, /DISABLE

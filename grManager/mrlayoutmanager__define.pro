@@ -301,9 +301,10 @@ pro MrLayoutManager::Add, oLayout
 		
 			;If there are no empty cells, add a row
 			;   - The next empty location will be [first column, last row].
+			;   - Otherwise, pick the first empty location
 			if nEmpty eq 0 then begin
 				self -> AddRow, 1
-				pEmpty = self -> ConvertLocation([1,self.layout[1]], /COLROW, /TO_PINDEX)
+				pEmpty = self -> ConvertLocation([1, self.layout[1]], /COLROW, /TO_PINDEX)
 			endif else begin
 				pEmpty = pEmpty[iEmpty[0]]
 			endelse
@@ -311,11 +312,14 @@ pro MrLayoutManager::Add, oLayout
 			;Step through all children
 			allChildren = self -> Get(/ALL, COUNT=nChildren)
 			for i = 0, nChildren-1 do begin
+				;Skip children that are not mananged
+				if allChildren[i] -> IsManaged() eq 0 then continue
+				
 				;Pick out the managed layouts
-				allChildren[i] -> GetProperty, MANAGED=isManaged, LAYOUT=childLayout
 				if ~isManaged then continue
 			
 				;If the child is between the desired and empty locations, shift it down.
+				allChildren[i] -> GetProperty, LAYOUT=childLayout
 				if (childLayout[2] ge layout[2]) && (childLayout[2] lt pEmpty) $
 					then allChildren[i] -> ShiftColumn, 1, /FEED
 			endfor
@@ -333,7 +337,7 @@ pro MrLayoutManager::Add, oLayout
 		;Need to make room?
 		if nEmpty eq 0 then begin
 			self -> AddRow, 1
-			pEmpty = self -> ConvertLocation([0, self.layout[1]], /COLROW, /TO_PINDEX)
+			pEmpty = self -> ConvertLocation([1, self.layout[1]], /COLROW, /TO_PINDEX)
 		endif
 	
 		;Select the first empty location
@@ -341,7 +345,8 @@ pro MrLayoutManager::Add, oLayout
 	endelse
 
 	;Synchronize
-	self -> SyncLayout, oLayout, pIndex
+	oLayout -> SetProperty, LOCATION=pIndex
+	self    -> SyncLayout, oLayout
 
 	;Add to the container
 	self -> MrIDL_Container::Add, oLayout
@@ -364,37 +369,38 @@ end
 ;-
 pro MrLayoutManager::AddColumn, nCols, col, $
 BEFORE=before
-    compile_opt strictarr
-    on_error, 2
-    
-    ;Default to adding a single column to the right of the layout
-    before = keyword_set(before)
-    if n_elements(col)   eq 0 then col   = self.layout[0]
-    if n_elements(nCols) eq 0 then nCols = 1
-    
-    ;Adding nothing or removing rows?
-    if nCols eq 0 then return
-    if nCols lt 0 then begin
-        self -> DeleteColumn, nCols, col, BEFORE=before
-        return
-    endif
-    
-    ;Determine new layout
-    newLayout     = self.layout
-    newLayout[0] += nCols
-    
-    ;Step through all children
-    oChildren = self -> Get(/ALL, COUNT=nChildren)
-    for i = 0, nChildren - 1 do begin
-        ;Is the child being managed?
-        if oChildren[i] -> IsManaged() eq 0 then continue
-        
-        ;Add the column
-        oChildren[i] -> AddColumn, nCols, col, BEFORE=before
-    endfor
-    
-    ;Update the layout
-    self.layout = newLayout
+	compile_opt strictarr
+	on_error, 2
+
+	;Default to adding a single column to the right of the layout
+	before = keyword_set(before)
+	if n_elements(col)   eq 0 then col   = self.layout[0]
+	if n_elements(nCols) eq 0 then nCols = 1
+
+	;Adding nothing or removing rows?
+	if nCols eq 0 then return
+	if nCols lt 0 then begin
+		self -> DeleteColumn, nCols, col, BEFORE=before
+		return
+	endif
+
+	;Determine new layout
+	newLayout     = self.layout[0:1]
+	newLayout[0] += nCols
+
+	;Step through all children
+	oChildren = self -> Get(/ALL, COUNT=nChildren)
+	for i = 0, nChildren - 1 do begin
+		;Is the child being managed?
+		if oChildren[i] -> IsManaged() eq 0 then continue
+	
+		;Add the column
+		oChildren[i] -> AddColumn, nCols, col, BEFORE=before
+	endfor
+
+	;Update the layout
+	;   - This will compute the new grid and apply it to all managed children.
+	self -> SetProperty, LAYOUT=newLayout[0:1]
 end
 
 
@@ -414,37 +420,38 @@ end
 ;-
 pro MrLayoutManager::AddRow, nRows, row, $
 BEFORE=before
-    compile_opt strictarr
-    on_error, 2
-    
-    ;Default to adding a single row to the bottom of the layout
-    before = keyword_set(before)
-    if n_elements(row)   eq 0 then row = self.layout[1]
-    if n_elements(nRows) eq 0 then nRows = 1
-    
-    ;Adding nothing or removing rows?
-    if nRows eq 0 then return
-    if nRows lt 0 then begin
-        self -> DeleteRow, abs(nRows), row, BEFORE=before
-        return
-    endif
-    
-    ;Determine new layout
-    newLayout     = self.layout
-    newLayout[1] += nRows
-    
-    ;Step through all children
-    oChildren = self -> Get(/ALL, COUNT=nChildren)
-    for i = 0, nChildren - 1 do begin
-        ;Is the child being managed?
-        if oChildren[i] -> IsManaged() eq 0 then continue
-        
-        ;Add the column
-        oChildren[i] -> AddRow, nRows, row, BEFORE=before
-    endfor
-    
-    ;Update the layout
-    self.layout = newLayout
+	compile_opt strictarr
+	on_error, 2
+
+	;Default to adding a single row to the bottom of the layout
+	before = keyword_set(before)
+	if n_elements(row)   eq 0 then row = self.layout[1]
+	if n_elements(nRows) eq 0 then nRows = 1
+
+	;Adding nothing or removing rows?
+	if nRows eq 0 then return
+	if nRows lt 0 then begin
+		self -> DeleteRow, abs(nRows), row, BEFORE=before
+		return
+	endif
+
+	;Determine new layout
+	newLayout     = self.layout[0:1]
+	newLayout[1] += nRows
+
+	;Step through all children
+	oChildren = self -> Get(/ALL, COUNT=nChildren)
+	for i = 0, nChildren - 1 do begin
+		;Is the child being managed?
+		if oChildren[i] -> IsManaged() eq 0 then continue
+	
+		;Add the column
+		oChildren[i] -> AddRow, nRows, row, BEFORE=before
+	endfor
+
+	;Update the layout
+	;   - This will compute the new grid and apply it to all managed children.
+	self -> SetProperty, LAYOUT=newLayout[0:1]
 end
 
 
@@ -463,55 +470,56 @@ end
 ;-
 pro MrLayoutManager::DeleteColumn, nCols, col, $
 BEFORE=before
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Default to removing the last column
-    before = keyword_set(before)
-    _nCols = n_elements(nCols) gt 0 ? abs(nCols) : 1
-    if n_elements(col) eq 0 then col = self.layout[0]
-    
-    ;Determine the new layout
-    newLayout     = self.layout
-    newLayout[0] -= _nCols
-    
-    ;At least one column must remain
-    if _nCols ge self.layout[0] $
-        then message, string(FORMAT='(%"Layout has only %i columns. Cannot delete %i columns.")', self.layout[0], _nCols)
-    
-    ;First and last columns
-    if before then begin
-        first_col = col - _nCols + 1
-        last_col  = col + _nCols - 1
-    endif else begin
-        first_col = col + _nCols - 1
-        last_col  = col
-    endelse
-    
-    ;Make sure the columns are empty
-    void = self -> FindEmptyCells(MASK=mask)
-    if total(mask[first_col-1:last_col-1, *]) gt 0 $
-        then message, 'Columns are not empty. Cannot delete.'
-    
-    ;Remove columns
-    oChildren = self -> Get(/ALL, COUNT=nChildren)
-    for i = 0, nChildren - 1 do begin
-        ;Is the child being managed?
-        if oChildren[i] -> IsManaged() eq 0 then continue
-        
-        ;Remove the columns
-        oChildren[i] -> DeleteColumn, nCols, col, BEFORE=before
-    endfor
-    
-    ;Update the layout
-    self.layout = newLayout
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		void = cgErrorMsg()
+		return
+	endif
+
+	;Default to removing the last column
+	before = keyword_set(before)
+	_nCols = n_elements(nCols) gt 0 ? abs(nCols) : 1
+	if n_elements(col) eq 0 then col = self.layout[0]
+
+	;Determine the new layout
+	newLayout     = self.layout[0:1]
+	newLayout[0] -= _nCols
+
+	;At least one column must remain
+	if _nCols ge self.layout[0] $
+		then message, string(FORMAT='(%"Layout has only %i columns. Cannot delete %i columns.")', self.layout[0], _nCols)
+
+	;First and last columns
+	if before then begin
+		first_col = col - _nCols + 1
+		last_col  = col
+	endif else begin
+		first_col = col
+		last_col  = col + _nCols - 1
+	endelse
+
+	;Make sure the columns are empty
+	void = self -> FindEmptyCells(MASK=mask)
+	if total(~mask[first_col-1:last_col-1, *]) gt 0 $
+		then message, 'Columns are not empty. Cannot delete.'
+
+	;Remove columns
+	oChildren = self -> Get(/ALL, COUNT=nChildren)
+	for i = 0, nChildren - 1 do begin
+		;Is the child being managed?
+		if oChildren[i] -> IsManaged() eq 0 then continue
+	
+		;Remove the columns
+		oChildren[i] -> DeleteColumn, nCols, col, BEFORE=before
+	endfor
+
+	;Update the layout
+	;   - This will compute the new grid and apply it to all managed children.
+	self -> SetProperty, LAYOUT=newLayout[0:1]
 end
 
 
@@ -530,55 +538,56 @@ end
 ;-
 pro MrLayoutManager::DeleteRow, nRows, row, $
 BEFORE=before
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    ;Default to adding a single row
-    before = keyword_set(before)
-    _nRows = n_elements(nRows) gt 0 ? abs(nRows) : 1
-    if n_elements(row) eq 0 then row = self.layout[1]
-    
-    ;Determine new layout
-    newLayout     = self.layout
-    newLayout[1] -= _nRows
-    
-    ;At least one row must remain
-    if _nCols ge self.layout[0] $
-        then message, string(FORMAT='(%"Layout has only %i rows. Cannot delete %i rows.")', self.layout[1], _nRows)
-    
-    ;First and last rows
-    if before then begin
-        first_row = row - _nRows + 1
-        last_row  = row + _nRows - 1
-    endif else begin
-        first_row = row + _nRows - 1
-        last_row  = row
-    endelse
-    
-    ;Make sure the columns are empty
-    void = self -> FindEmptyCells(MASK=mask)
-    if total(mask[*, first_row-1:last_row-1]) gt 0 $
-        then message, 'Rows are not empty. Cannot delete.'
-    
-    ;Remove rows
-    oChildren = self -> Get(/ALL, COUNT=nChildren)
-    for i = 0, nChildren - 1 do begin
-        ;Is the child being managed?
-        if oChildren[i] -> IsManaged() eq 0 then continue
-        
-        ;Remove the columns
-        oChildren[i] -> DeleteRow, nRows, row, BEFORE=before
-    endfor
-    
-    ;Update the layout
-    self.layout = newLayout
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		void = cgErrorMsg()
+		return
+	endif
+
+	;Default to adding a single row
+	before = keyword_set(before)
+	_nRows = n_elements(nRows) gt 0 ? abs(nRows) : 1
+	if n_elements(row) eq 0 then row = self.layout[1]
+
+	;Determine new layout
+	newLayout     = self.layout
+	newLayout[1] -= _nRows
+
+	;At least one row must remain
+	if _nRows ge self.layout[1] $
+		then message, string(FORMAT='(%"Layout has only %i rows. Cannot delete %i rows.")', self.layout[1], _nRows)
+
+	;First and last rows
+	if before then begin
+		first_row = row - _nRows + 1
+		last_row  = row
+	endif else begin
+		first_row = row
+		last_row  = row + _nRows - 1
+	endelse
+
+	;Make sure the columns are empty
+	void = self -> FindEmptyCells(MASK=mask)
+	if total(~mask[*, first_row-1:last_row-1]) gt 0 $
+		then message, 'Rows are not empty. Cannot delete.'
+
+	;Remove rows
+	oChildren = self -> Get(/ALL, COUNT=nChildren)
+	for i = 0, nChildren - 1 do begin
+		;Is the child being managed?
+		if oChildren[i] -> IsManaged() eq 0 then continue
+	
+		;Remove the columns
+		oChildren[i] -> DeleteRow, nRows, row, BEFORE=before
+	endfor
+
+	;Update the layout
+	;   - This will compute the new grid and apply it to all managed children.
+	self -> SetProperty, LAYOUT=newLayout[0:1]
 end
 
 
@@ -586,7 +595,7 @@ end
 ;   Find a child layout by its [col,row] location.
 ;
 ; :Params:
-;       COLROW:         in, required, type=intarr(2)
+;       COLROW:         in, required, type=2xN intarr
 ;                       The [column, row] in which the desired graphic is located.
 ;
 ; :Returns:
@@ -640,28 +649,30 @@ COUNT=count
     endif
 
     ;Get all of the objects in the container
-    allObjs = self -> Get(/ALL, COUNT=count)
+    allChildren = self -> Get(/ALL, COUNT=count)
     if count eq 0 then return, obj_new()
     
     ;Get all of the plot indices
-    objPIndex = lonarr(count)
+    piChild = lonarr(count)
     for i = 0L, count - 1 do begin
-        allObjs[i] -> GetProperty, LAYOUT=objLayout
-        objPIndex[i] = objLayout[2]
+        if allChildren[i] -> IsManaged() eq 0 then continue
+        allChildren[i] -> GetProperty, LAYOUT=layChild
+        piChild[i] = layChild[2]
     endfor
 
     ;Find a match
-    iMatch = where(objPIndex eq pIndex, count)
+    tf_member = MrIsMember(pIndex, piChild, iKeep, COUNT=count)
     if count eq 0 then return, obj_new()
-    if count eq 1 then iMatch = iMatch[0]
     
     ;Return the matching objects
-    return, allObjs[iMatch]
+    return, allChildren[iKeep]
 end
 
 
 ;+
 ;   Find empty locations within the layout.
+;
+; :Private:
 ;
 ; :Keywords:
 ;       MASK:       out, optional, type=bytarr
@@ -694,20 +705,21 @@ COUNT=nEmpty
     colrow  = keyword_set(colrow)
     
     ;Get all of the layout objects
-    allLayouts = self -> Get(/ALL, COUNT=nLayouts)
+    allChildren = self -> Get(/ALL, COUNT=nLayouts)
     
     ;Create a mask of layout positions. Assume all positions are empty.
     mask = make_array(self.layout[0]*self.layout[1], VALUE=1B, /BYTE)
     
     ;Step through each one
     for i = 0, nLayouts - 1 do begin
-        thisLayout = allLayouts[i]
+        thisChild = allChildren[i]
         
         ;Skip it if it is not being managed.
-        if thisLayout[i] -> IsManaged() eq 0 then continue
+        if thisChild -> IsManaged() eq 0 then continue
+        thisChild -> GetProperty, LAYOUT=chLayout
         
         ;Fill in the mask -- we only know if the spot is taken.
-        aIndex       = self -> ConvertLocation(layout[2], /PINDEX, /TO_AINDEX)
+        aIndex       = self -> ConvertLocation(chLayout[2], /PINDEX, /TO_AINDEX)
         mask[aIndex] = 0B
     endfor
     
@@ -724,43 +736,74 @@ end
 
 
 ;+
+;   Set properties of the object.
+;
+; :Keywords:
+;       _REF_EXTRA:     in, optional, type=any
+;                       Any keyword accepted by the MrLayoutAtom::SetProperty method is
+;                           also accepted via keyword inheritance.
+;-
+pro MrLayoutManager::SetProperty, $
+_REF_EXTRA=extra
+	compile_opt strictarr
+	on_error, 2
+
+	;Set properties
+	if n_elements(extra) gt 0 then begin
+		self -> MrLayoutAtom::SetProperty, _STRICT_EXTRA=extra
+		self -> SyncLayout, /ALL
+	endif
+end
+
+
+;+
 ;   Synchronize the child layout properties with those of the parent.
 ;
+; :Private:
+;
 ; :Params:
-;       OLAYOUT:        in, required, type=object
+;       CHILD_LAYOUT:   in, required, type=object
 ;                       A MrLayout child object.
-;       PINDEX:         in, optional, type=integer/intarr(2)
-;                       Either the plot index or the [col,row] location at which
-;                           `OLAYOUT` is to be placed.
 ;-
-pro MrLayoutManager::SyncLayout, oLayout, location, $
+pro MrLayoutManager::SyncLayout, oChild, $
 ALL=all
-    compile_opt strictarr
-    on_error, 2
-    
-    ;Sync all children?
-    if keyword_set(all) then begin
-        oChildren = self -> Get(/ALL, COUNT=nChildren)
-        for i = 0, nChildren - 1 do self -> SyncLayout, oChildren[i]
-    endif
-    
-    ;Is the child being managed?
-    if oLayout -> IsManaged() eq 0 then return
-    
-    ;Set properties of the child layout object.
-    oLayout -> SetProperty, ASPECT     = *self.aspect, $
-                            CHARSIZE   =  self.charsize, $
-                            COL_WIDTH  = *self.col_width, $
-                            IXMARGIN   =  self.ixmargin, $
-                            IYMARGIN   =  self.iymargin, $
-                            LAYOUT     =  self.layout[0:1], $
-                            LOCATION   =       pIndex, $
-                            OXMARGIN   =  self.oxmargin, $
-                            OYMARGIN   =  self.oymargin, $
-                            ROW_HEIGHT = *self.row_height, $
-                            WDIMS      =  self.wdims, $
-                            XGAP       =  self.xgap, $
-                            YGAP       =  self.ygap
+	compile_opt strictarr
+	on_error, 2
+
+	;Sync all children?
+	if keyword_set(all) then begin
+		oChildren = self -> Get(/ALL, COUNT=nChildren)
+		for i = 0, nChildren - 1 do self -> SyncLayout, oChildren[i]
+		return
+	endif
+
+	;Is the child being managed?
+	if oChild -> IsManaged() eq 0 then return
+	
+	;Get the child's current layout
+	oChild -> GetProperty, LAYOUT=layout, LOCATION=colrow
+
+	;Set the grid
+	oChild -> SetGrid, *self.grid
+
+	;Set properties of the child layout object.
+	oChild -> SetProperty, ASPECT     = *self.aspect, $
+	                       CHARSIZE   =  self.charsize, $
+	                       COL_WIDTH  = *self.col_width, $
+	                       IXMARGIN   =  self.ixmargin, $
+	                       IYMARGIN   =  self.iymargin, $
+	                       LAYOUT     =  self.layout[0:1], $
+	                       OXMARGIN   =  self.oxmargin, $
+	                       OYMARGIN   =  self.oymargin, $
+	                       ROW_HEIGHT = *self.row_height, $
+	                       WDIMS      =  self.wdims, $
+	                       XGAP       =  self.xgap, $
+	                       YGAP       =  self.ygap
+	
+	;If the layout has changed, keep the child in the same location
+	;  - [col, row] locations are not layout-dependent, but plot indices are.
+	if layout[0] ne self.layout[0] || self.layout[1] ne self.layout[1] $
+		then oChild -> SetProperty, LOCATION=colrow
 end
 
 
@@ -768,9 +811,11 @@ end
 ;   The purpose of this method is to shift a given amount of rows.
 ;
 ; :Params:
-;       LOCATION:       in, optional, type=int/intarr(2), default=1
+;       LOCATION:       in, optional, type=int/intarr(2)/objref, default=1
 ;                       The plot index (scalar) or [col, row] location of the graphic
-;                           to be shifted to a new column.
+;                           to be shifted to a new column. Alternatively, a child layout
+;                           object can be provided. This is useful if multiple children
+;                           reside in the same location.
 ;       NCOLS:          in, optional, type=int, default=1
 ;                       Number of columns to shift the graphic. If NCOLS is positive
 ;                           (negative), the graphic will be shifted right (left).
@@ -812,33 +857,48 @@ WRAP=wrap
 		return
 	endif
 
+	;Make sure LOCATION is defined
+	if n_elements(location) eq 0 $
+		then message, 'Usage: LayoutMGR -> ShiftColumn, location [, nCols].'
+	nLocs = n_elements(location)
+
 	;Defaults
 	expnd = keyword_set(expnd)
 	feed  = keyword_set(feed)
 	push  = keyword_set(push)
 	wrap  = keyword_set(wrap)
-	if n_elements(nCols)    eq 0 then nCols    = 1
-	if n_elements(location) eq 0 then location = 1
-
+	if nLocs gt 2 then message, 'Only one LOCATION can be provided.'
+	
 	;Incompatible keywords
 	;   - Cannot shift rows and NOT shift rows
 	if expnd + wrap gt 1 then message, 'EXPAND and WRAP are mutually exclusive.'
+	
+	;Get the child layout object to be shifted.
+	if MrIsA(location, 'MrLayout') then begin
+		theChild = location
+		count    = 1
+		if self -> IsContained(theChild) eq 0 then message, 'Child object is not being managed by me. Cannot shift.'
+	endif else begin
+		;ColRow or PIndex?
+		if n_elements(location) eq 2 $
+			then theChild = self -> FindByColRow(location, COUNT=count) $
+			else theChild = self -> FindByPIndex(location, COUNT=count)
+		if count eq 0 then message, 'Nothing exists at location [' + strjoin(strtrim(location, 2), ',') + '].'
+	endelse
+	
+	;Is the object being managed?
+	if theChild -> IsManaged() eq 0 then message, 'Child object is not being managed. Cannot shift.'
 
-	;Get the layout object and its location within the layout
-	case n_elements(location) of
-		1: oLayout = self -> FindByPIndex(location)
-		2: oLayout = self -> FindByColRow(location)
-		else: message, 'LOCATION must be a scalar plot index or a [col, row] location.'
-	endcase
-	oLayout -> GetProperty, LAYOUT=tempLay, LOCATION=colrow
-	pIndex = (temporary(tempLay))[2]
-	aIndex = self -> ConvertLocation(pIndex, /PINDEX, /TO_AINDEX)
+	;Get the child's location within the layout
+;	theChild -> GetProperty, LAYOUT=tempLay, LOCATION=colrow
+;	pIndex = (temporary(tempLay))[2]
+;	aIndex = self -> ConvertLocation(pIndex, /PINDEX, /TO_AINDEX)
 
 	;Determine the final location (might not be within the current layout).
-	newColRow = [colrow[0] + nCols, colrow[1]]
+;	newColRow = [colrow[0] + nCols, colrow[1]]
 
 	;Determine where the empty cells are
-	void = self -> FindEmptyCells(MASK=mask)
+;	void = self -> FindEmptyCells(MASK=mask)
 
 ;---------------------------------------------------------------------
 ; Push ///////////////////////////////////////////////////////////////
@@ -855,70 +915,11 @@ WRAP=wrap
 	; for those changes to be visible by other children in the layout, the manager must
 	; decide when the number of rows or columns changes. This only occurs if EXPND is set.
 	; In all other cases,
-	if push then begin
+	if push eq 0 $
+		then theChild -> ShiftColumn, nCols, EXPAND=expnd, FEED=feed, WRAP=wrap, NEWLAYOUT=newLayout
 	
-	;---------------------------------------------------------------------
-	; Feed ///////////////////////////////////////////////////////////////
-	;---------------------------------------------------------------------
-		if feed then begin
-			;Find empty cells
-			empty_cells = self -> FindEmptyCells(/COLROW, COUNT=nEmpty)
-			
-			;Check if there is an empty cell ahead/behind
-			if nEmpty gt 0 && expnd eq 0 && wrap eq 0 then begin
-				message, 'Cannot FEED through columns. No empty cells.'
-				
-			
-			endif
-		
-		
-		
-	
-	;---------------------------------------------------------------------
-	; Expand /////////////////////////////////////////////////////////////
-	;---------------------------------------------------------------------
-		endif else if expnd then begin
-			
-	
-		endif
-	endif
-    
-    
-    
-    
-    
-    
-    ;Convert the plot index to a [col,row] location
-    colRow = self -> ConvertIndex(self.layout[3], /PINDEX, /TO_COLROW)
-    
-    ;Calculate the new row
-    newCol = colRow[0] + nCols
-    
-    ;Not enough places?
-    if newCol gt self.layout[0] || newCol le 0 then begin
-        ;Wrap around?
-        if wrap then begin
-            ;Column 0 wraps to the right-most column
-            newCol = abs(newCol mod self.layout[0])
-            if newCol eq 0 then newCol = self.layout[0]
-        
-        ;Expand the layout?
-        endif else if expnd then begin
-            if nCols lt 0 then message, 'Cannot expand layout to the left.'
-            nAdd = newCol - colRow[0]
-            self -> AddColumn, nAdd
-            
-        ;Cannot fit graphic
-        endif else begin
-            message, 'NCOLS is too large. Cannot shift.'
-        endelse
-    endif
-        
-    ;Convert back to a plot index
-    pIndex = self -> ConvertIndex([newCol, colRow[1]], /COLROW, /PINDEX)
-    
-    ;Update the layout and position
-    self -> SetProperty, LOCATION=pIndex
+	if newLayout[0] ne self.layout[0] || newLayout[1] ne self.layout[1] $
+		then self -> SetProperty, LAYOUT=newLayout[0:1]
 end
 
 
@@ -941,8 +942,10 @@ end
 ;                           if `NROWS` pushes the graphic out of the layout. If not set,
 ;                           the same situation will cause an error.
 ;-
-pro MrLayoutManager::ShiftRow, nRows, $
+pro MrLayoutManager::ShiftRow, location, nRows, $
 EXPAND=expnd, $
+FEED=feed, $
+PUSH=push, $
 WRAP=wrap
     compile_opt strictarr
     
@@ -953,97 +956,60 @@ WRAP=wrap
         void = cgErrorMsg()
         return
     endif
-    
-    ;If no layout position is present, return
-    if self.layout[3] eq 0 then return
-    
-    ;Defaults
-    wrap = keyword_set(wrap)
-    expn = keyword_set(expnd)
-    if n_elements(nRows) eq 0 then nRows = 1
-    
-    ;Convert the plot index to a [col,row] location
-    colRow = self -> ConvertIndex(self.layout[3], /PINDEX, /TO_COLROW)
-    
-    ;Calculate the new row
-    newRow = colRow[1] + nRows
-    
-    ;Not enough places?
-    if newRow gt self.layout[1] || newRow le 0 then begin
-        ;Wrap around?
-        if wrap then begin
-            ;Row 0 wraps around to the bottom row
-            newRow = abs(newRow mod self.layout[1])
-            if newRow eq 0 then newRow = self.layout[1]        
-        
-        ;Expand the layout?
-        endif else if expnd then begin
-            if nRow lt 0 then message, 'Cannot expand layout upward.'
-            nAdd = newRow - colRow[1]
-            self -> AddRow, nAdd
-        
-        ;Cannot fit graphic
-        endif else begin
-            message, 'NROWS is too large. Cannot shift.'
-        endelse
-    endif
-        
-    ;Convert back to a plot index
-    pIndex = self -> ConvertIndex([colrow[0], newRow], /COLROW, /PINDEX)
-    
-    ;Update the layout and position
-    self -> SetProperty, LOCATION=pIndex
-end
 
+	;Make sure LOCATION is defined
+	if n_elements(location) eq 0 $
+		then message, 'Usage: LayoutMGR -> ShiftRow, location [, nRows].'
+	nLocs = n_elements(location)
 
-;+
-;   Calculate a position based on the layout properties.
-;
-; :Private:
-;-
-pro MrLayoutManager::SetGrid
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    nLay = n_elements(layout)
-    
-    ;If the [nCols,nRows] = [0,0] then return -- No layout has been defined.
-    if (self.layout[0] eq 0) && (self.layout[1] eq 0) then return
-    
-    ;Make sure the layout is valid.
-    if (self.layout[0] lt 0) or (self.layout[1] lt 0) then begin
-        message, 'Layout must have at least one column and one row.', /INFORMATIONAL
-        return
-    endif
+	;Defaults
+	expnd = keyword_set(expnd)
+	feed  = keyword_set(feed)
+	push  = keyword_set(push)
+	wrap  = keyword_set(wrap)
+	if nLocs gt 2 then message, 'Only one LOCATION can be provided.'
+	
+	;Incompatible keywords
+	;   - Cannot shift rows and NOT shift rows
+	if expnd + wrap gt 1 then message, 'EXPAND and WRAP are mutually exclusive.'
+	
+	;Get the child layout object to be shifted.
+	if MrIsA(location, 'MrLayout') then begin
+		theChild = location
+		count    = 1
+		if self -> IsContained(theChild) eq 0 then message, 'Child object is not being managed by me. Cannot shift.'
+	endif else begin
+		;ColRow or PIndex?
+		if n_elements(location) eq 2 $
+			then theChild = self -> FindByColRow(location, COUNT=count) $
+			else theChild = self -> FindByPIndex(location, COUNT=count)
+		if count eq 0 then message, 'Nothing exists at location [' + strjoin(strtrim(location, 2), ',') + '].'
+	endelse
+	
+	;Is the object being managed?
+	if theChild -> IsManaged() eq 0 then message, 'Child object is not being managed. Cannot shift.'
 
-    ;Calculate positions
-    grid = MrLayout(self.layout[0:1], $
-                    ASPECT     = *self.aspect, $
-                    CHARSIZE   =  self.charsize, $
-                    COL_WIDTH  = *self.col_width, $
-                    IXMARGIN   =  self.ixmargin, $
-                    IYMARGIN   =  self.iymargin, $
-                    OXMARGIN   =  self.oxmargin, $
-                    OYMARGIN   =  self.oymargin, $
-                    P_REGION   =       p_region, $
-                    ROW_HEIGHT = *self.row_height, $
-                    WDIMS      =  self.wdims, $
-                    XGAP       =  self.xgap, $
-                    YGAP       =  self.ygap)
-    
-    ;Save the window and region
-    self.x_region = p_region[[0,2]]
-    self.y_region = p_region[[1,3]]
-
-    ;Save the grid
-    *self.grid = grid
+;---------------------------------------------------------------------
+; Push ///////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+	;PUSH?
+	;   - WRAP:  All items in same row wrap. Locations are conserved.
+	;   - EXPND: A new column will be added to accomodate pushing out of the layout.
+	;   - FEED:  All items will be fed through until an empty location is reached. If no
+	;            empty location esists, an error will be thrown unless:
+	;               EXPND: A new column will be added.
+	;               WRAP:  All items are wrapped to the other end of the layout (conserves locations)
+	;
+	; Child layout objects are capable of expanding the layout, when necessary, but
+	; for those changes to be visible by other children in the layout, the manager must
+	; decide when the number of rows or columns changes. This only occurs if EXPND is set.
+	; In all other cases,
+	if push eq 0 $
+		then theChild -> ShiftRow, nRows, EXPAND=expnd, FEED=feed, WRAP=wrap, NEWLAYOUT=newLayout $
+		else message, 'The PUSH keyword is not implemented yet.'
+	
+	if newLayout[0] ne self.layout[0] || newLayout[1] ne self.layout[1] $
+		then self -> SetProperty, LAYOUT=newLayout[0:1]
 end
 
 
@@ -1052,19 +1018,20 @@ end
 ;   position of the graphic.
 ;
 ; :Keywords:
+;       ALL:                in, optional, type=boolean, default=0
+;                           If set, all positions will be displayed. The default is
+;                               to display only positions occupied by child layout objects.
 ;       CURRENT:            in, optional, type=boolean, default=0
 ;                           If set, the margins and position will be drawn into the
 ;                               current MrGraphics window.
-;       IMARGINS:           in, optional, type=boolean, default=0
-;                           If set, the inner margins (plot region) will be drawn.
-;       OMARGINS:           in, optional, type=boolean, default=0
-;                           If set, the outer margins (plot window) is drawn.
-;       POSITION:           in, optional, type=boolean, default=0
-;                           If set, the position will be drawn. If none of `IMARGINS`,
-;                               `OMARGINS` or POSITION is set, then all are drawn.
+;       DELETE:             in, optional, type=boolean, default=0
+;                           If set, all graphics are deleted from the window before
+;                               displaying the grid. Useful for successive calls to
+;                               ::ViewGrid.
 ;-
 pro MrLayoutManager::ViewGrid, $
-CURRENT=current
+CURRENT=current, $
+DELETE=delete
 	compile_opt idl2
 
 	catch, the_error
@@ -1075,106 +1042,68 @@ CURRENT=current
 	endif
 	
 	;Defaults
-	current  = keyword_set(current)
-	omargins = keyword_set(omargins)
-	imargins = keyword_set(imargins)
-	position = keyword_set(position)
-	if omargins + imargins + position eq 0 then begin
-		omargins = 1
-		imargins = 1
-		position = 1
-	endif
+	all     = keyword_set(all)
+	current = keyword_set(current)
+	delete  = keyword_set(delete)
 
 	;Create or get the window
 	if current then begin
 		win = GetMrWindows(/CURRENT)
 	endif else begin
-		win = MrWindow(ASPECT     = *self.aspect, $
-		               CHARSIZE   =  self.charsize, $
-		               COL_WIDTH  = *self.col_width, $
-		               IXMARGIN   =  self.ixmargin, $
-		               IYMARGIN   =  self.iymargin, $
-		               LAYOUT     =  self.layout, $
-		               OXMARGIN   =  self.oxmargin, $
-		               OYMARGIN   =  self.oymargin, $
-		               ROW_HEIGHT = *self.row_height, $
-		               XGAP       =  self.xgap, $
-		               XSIZE      =    !d.x_size, $
-		               YGAP       =  self.ygap, $
-		               YSIZE      =    !d.y_size)
+		win = Mr_Window(ASPECT     = *self.aspect, $
+		                CHARSIZE   =  self.charsize, $
+		                COL_WIDTH  = *self.col_width, $
+		                IXMARGIN   =  self.ixmargin, $
+		                IYMARGIN   =  self.iymargin, $
+		                LAYOUT     =  self.layout, $
+		                OXMARGIN   =  self.oxmargin, $
+		                OYMARGIN   =  self.oymargin, $
+		                ROW_HEIGHT = *self.row_height, $
+		                XGAP       =  self.xgap, $
+		                XSIZE      =    !d.x_size, $
+		                YGAP       =  self.ygap, $
+		                YSIZE      =    !d.y_size)
 	endelse
+	win -> Refresh, /DISABLE
+	
+	;Delete all current objects?
+	if delete then win -> Remove, /ALL
 
 	;Show the outer margins
 	!Null = MrPlotS( self.x_window[[0,1,1,0,0]], self.y_window[[0,0,1,1,0]], $
 	                 /NORMAL, COLOR='Black' )
 
-	;Get all of the child objects
-	allLay = self -> Get(/ALL, COUNT=nLay)
-	for i = 0, nLay do begin
-		;Get the child and is position
-		theChild = allLay[i]
-		theChild -> GetProperty, POSITION=position
-		
-		;Draw the child's inner margins and positions
-		theChild -> ViewGrid, /IMARGIN, /POSITION
-		
-		;Draw the child's container number
+	;Step through each cell in the grid
+	nCells = self.layout[0] * self.layout[1]
+	for i = 0, nCells - 1 do begin
+		pos = (*self.grid)[*,i]
+
+		;Draw the positions
+		!Null = MrPlotS( pos[[0,2,2,0,0]], pos[[1,1,3,3,1]], $
+		                 /NORMAL, COLOR='Red' )
+
+		;Draw the plot indices
 		!Null = MrText(pos[0] + (pos[2] - pos[0])/2.0, $
 		               pos[1] + (pos[3] - pos[1])/2.0, $
-		               strtrim(i, 0), $
-		               CHARSIZE = 4.0)
+		               strtrim(i+1, 2), $
+		               ALIGNMENT = 0.5, $
+		               CHARSIZE  = 4.0, $
+		               /NORMAL)
 	endfor
-end
-
-
-;+
-;   Get a position from the layout grid.
-;
-; :Params:
-;       LOCATION:       in, required, type=integer/intarr(N)/intarr(2,N)
-;                       Either the plot index or the [col, row] location of the plot
-;                           for which the position is to be returned.
-;
-; :Keywords:
-;       COLROW:         in, optional, type=boolean, default=0
-;                       If set, `INDEX` is take to be a [col,row] location. 2xN arrays
-;                           are accepted.
-;
-; :Returns:
-;       POSITION:       Position within the current layout to `PINDEX`. If `PINDEX`
-;                           is a scalar, the output is a 4-element array. Otherise a 4xN
-;                           array is returned, where N is the number of locations given.
-;-
-function MrLayoutManager::GetPosition, location, $
-COLROW=colrow
-	compile_opt strictarr
-
-	;Error handling
-	catch, the_error
-	if the_error ne 0 then begin
-		catch, /cancel
-		void = cgErrorMsg()
-	endif
-
-	;Return the current position?
-	if n_elements(location) eq 0 then begin
-		if self.layout[2] eq 0 then return, self.position
 	
-		;Use the layout position.
-		colrow   = 0
-		location = self.layout[2]
-	endif
-
-	;Default
-	colrow = keyword_set(colrow)
-
-	;Get the array index associated with the location given.
-	aIndex = self -> ConvertLocation(location, COLROW=colrow, PINDEX=~colrow, /TO_AINDEX)
-
-	;Get the position
-	position = (*self.grid)[*,aIndex]
-
-	return, position
+	;Now draw the occupied positions
+	allChildren = self -> Get(/ALL, COUNT=nChildren)
+	for i = 0, nChildren - 1 do begin
+		;Get the child and is position
+		theChild  = allChildren[i]
+		if theChild -> IsManaged() eq 0 then continue
+		
+		;Draw the child's inner margins and positions
+		theChild -> ViewGrid, /IMARGIN, /POSITION, /CURRENT
+	endfor
+	
+	;Refresh the window
+	win -> Refresh
 end
 
 

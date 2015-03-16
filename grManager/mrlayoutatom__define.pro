@@ -129,120 +129,6 @@ end
 
 
 ;+
-;   Add columns to the layout while keeping the plot in the same location.
-;
-; :Params:
-;       NCOLS:          in, optional, type=int, default=1
-;                       Number of columns to add. A negative value will remove columns.
-;       COL:            in, optional, type=int, default=last column
-;                       The column before/after which more columns are to be added.
-;
-; :Keywords:
-;       BEFORE:         in, optional, type=boolean, default=0
-;                       If set, `NCOLS` will be added to the left (before) of `COL`. The
-;                           default is to add to the right (after).
-;-
-pro MrLayoutAtom::AddColumn, nCols, col, $
-BEFORE=before
-	compile_opt strictarr
-
-	;Error handling
-	catch, the_error
-	if the_error ne 0 then begin
-		catch, /cancel
-		void = cgErrorMsg()
-		return
-	endif
-
-	;Default to adding a single column to the right of the layout
-	before = keyword_set(before)
-	if n_elements(col)   eq 0 then col   = self.layout[0]
-	if n_elements(nCols) eq 0 then nCols = 1
-
-	;Adding nothing or removing rows?
-	if nCols eq 0 then return
-	if nCols lt 0 then begin
-		self -> DeleteColumn, nCols, col, BEFORE=before
-		return
-	endif
-
-	;Determine new layout
-	newLayout     = self.layout
-	newLayout[0] += nCols
-
-	;Does the graphic have to move?
-	colrow = self -> ConvertLocation(self.layout[2], /PINDEX, /TO_COLROW)
-	if before then begin
-		if col le colrow[0] then colrow[0] += nCols
-	endif else begin
-		if col lt colrow[0] then colrow[0] += nCols
-	endelse
-	newPIndex = self -> ConvertLocation(colrow, newLayout, /COLROW, /TO_PINDEX)
-
-	;Update the layout
-	self.layout = [newLayout, newPIndex]
-	self -> ComputeGrid
-end
-
-
-;+
-;   Add rows to the layout while keeping the plot in the same location.
-;
-; :Params:
-;       NROWS:          in, optional, type=int, default=1
-;                       Number of rows to add. A negative value will remove rows.
-;       ROW:            in, optional, type=int, default=last row
-;                       The row above/below which more rows are to be added.
-;
-; :Keywords:
-;       BEFORE:         in, optional, type=boolean, default=0
-;                       If set, `NROWS` will be added above (before) `ROW`. The default
-;                           is to add below (after).
-;-
-pro MrLayoutAtom::AddRow, nRows, row, $
-BEFORE=before
-	compile_opt strictarr
-
-	;Error handling
-	catch, the_error
-	if the_error ne 0 then begin
-		catch, /cancel
-		void = cgErrorMsg()
-		return
-	endif
-
-	;Default to adding a single row to the bottom of the layout
-	before = keyword_set(before)
-	if n_elements(row)   eq 0 then row = self.layout[1]
-	if n_elements(nRows) eq 0 then nRows = 1
-
-	;Adding nothing or removing rows?
-	if nRows eq 0 then return
-	if nRows lt 0 then begin
-		self -> DeleteRow, abs(nRows), row, BEFORE=before
-		return
-	endif
-
-	;Determine new layout and pIndex
-	newLayout     = self.layout
-	newLayout[1] += nRows
-
-	;Does the graphic have to move?
-	colrow = self -> ConvertLocation(self.layout[2], /PINDEX, /TO_COLROW)
-	if before then begin
-		if row le colrow[1] then colrow[1] += nRows
-	endif else begin
-		if row lt colrow[1] then colrow[1] += nRows
-	endelse
-	newPIndex = self -> ConvertLocation(colrow, newLayout, /COLROW, /TO_PINDEX)
-
-	;Update the layout
-	self.layout = [newLayout, newPIndex]
-	self -> ComputeGrid
-end
-
-
-;+
 ;   Add MrLayout objects to be managed.
 ;
 ; :Params:
@@ -278,19 +164,35 @@ pro MrLayoutAtom::ComputeGrid
 	xgap     = self.xgap     * xcharsize
 	ygap     = self.ygap     * ycharsize
 	
-	;Total space between plots
-	;   - A scalar indicates uniform spacing.
-	xspace     = n_elements(xgap)             eq 1     ? xgap * (nCols - 1) : total(xgap)
-	yspace     = n_elements(ygap)             eq 1     ? ygap * (nRows - 1) : total(ygap)
-	col_width  = n_elements(*self.col_width)  eq nCols ? *self.col_width    : replicate(1.0/nCols, nCols)
-	row_height = n_elements(*self.row_height) eq nRows ? *self.row_height   : replicate(1.0/nRows, nRows)
+	if nCols gt 1 then begin
+		case n_elements(xgap) of
+			1:       xgap = replicate(xgap, nCols - 1)
+			nCols-1: ;Ok
+			else:    message, 'XGAP: Incorrect number of elements.'
+		endcase
+		xgap = [0.0, xgap]
+	endif else xgap = 0.0
+	if nRows gt 1 then begin
+		case n_elements(ygap) of
+			1:       ygap = replicate(ygap, nRows - 1)
+			nRows-1: ;Ok
+			else:    message, 'YGAP: Incorrect number of elements.'
+		endcase
+		ygap = [0.0, ygap]
+	endif else ygap = 0.0
+	if n_elements(*self.col_width) eq nCols $
+		then col_width = *self.col_width $
+		else col_width = replicate(1.0/nCols, nCols)
+	if n_elements(*self.row_height) eq nRows $
+		then row_height = *self.row_height $
+		else row_height = replicate(1.0/nRows, nRows)
 
 	;Calculate the area of the region in which plots will be drawn.
-	p_region = [oxmargin, oymargin[0], xsize - oxmargin[1], ysize - oymargin[1]]
+	p_region = [oxmargin[0], oymargin[0], xsize - oxmargin[1], ysize - oymargin[1]]
 
 	;Calculate the plot dimensions
-	plot_width  = (p_region[2] - p_region[0] - xspace) * col_width 
-	plot_height = (p_region[3] - p_region[1] - yspace) * row_height
+	plot_width  = (p_region[2] - p_region[0] - total(xgap)) * col_width 
+	plot_height = (p_region[3] - p_region[1] - total(ygap)) * row_height
 
 	;Offset between upper left corner of p_region and lower right corner of
 	;the plot area of each plot.
@@ -352,18 +254,9 @@ pro MrLayoutAtom::ComputeGrid
 ;-----------------------------------------------------------------------------------------
 ; Normal or Device Coordinates? \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------------------------------------------
-	if keyword_set(normal) then begin
-		positions[[0,2],*] = positions[[0,2],*] / xsize
-		positions[[1,3],*] = positions[[1,3],*] / ysize
-		
-		p_region[[0,2]] = p_region[[0,2]] / xsize
-		p_region[[1,3]] = p_region[[1,3]] / ysize
-		
-		p_areas[[0,2],*] = p_areas[[0,2],*] / xsize
-		p_areas[[1,3],*] = p_areas[[1,3],*] / ysize
 
 	;Create integer values for device coordinates.
-	endif else begin
+	if keyword_set(device) then begin
 		positions[[0,1],*] = fix(floor(positions[[0,1],*]))
 		positions[[2,3],*] = fix(ceil(positions[[2,3],*]))
 	
@@ -372,6 +265,17 @@ pro MrLayoutAtom::ComputeGrid
 		
 		p_areas[[0,1],*] = fix(floor(p_areas[[0,1],*]))
 		p_areas[[2,3],*] = fix(ceil(p_areas[[2,3],*]))
+	
+	;Normal coordinates
+	endif else begin
+		positions[[0,2],*] = positions[[0,2],*] / xsize
+		positions[[1,3],*] = positions[[1,3],*] / ysize
+		
+		p_region[[0,2]] = p_region[[0,2]] / xsize
+		p_region[[1,3]] = p_region[[1,3]] / ysize
+		
+		p_areas[[0,2],*] = p_areas[[0,2],*] / xsize
+		p_areas[[1,3],*] = p_areas[[1,3],*] / ysize
 	endelse
 
 ;-----------------------------------------------------------------------------------------
@@ -454,7 +358,7 @@ TO_COLROW=to_colrow
 	exists = 1
 
 	;Default to a [col, row] location.
-	if n_elements(layout) eq 0 then layout = self.layout
+	if n_elements(layout) eq 0 then layout = self.layout[0:1]
 	aIndex = keyword_set(aIndex)
 	pIndex = keyword_set(pIndex)
 	colrow = keyword_set(colrow)
@@ -520,147 +424,6 @@ end
 
 
 ;+
-;   Remove columns from the layout while keeping the plot in the same location.
-;
-; :Params:
-;       NCOLS:          in, optional, type=int, default=1
-;                       Number of columns to add.
-;       COL:            in, optional, type=int, default=last column
-;                       The column to be deleted. If `NCOLS` > 1, then this is the first
-;                           of `NCOLS` adjacent columns that will be deleted.
-; :Keywords:
-;       BEFORE:         in, optional, type=boolean, default=0
-;                       If set, then `COL` is the last of `NCOLS` adjacent columns to be deleted.
-;-
-pro MrLayoutAtom::DeleteColumn, nCols, col, $
-BEFORE=before
-	compile_opt strictarr
-
-	;Error handling
-	catch, the_error
-	if the_error ne 0 then begin
-		catch, /cancel
-		void = cgErrorMsg()
-		return
-	endif
-
-	;Default to deleting a single column from the right of the layout.
-	before = keyword_set(before)
-	if n_elements(col)   eq 0 then col   = self.layout[0]
-	if n_elements(nCols) eq 0 then nCols = 1
-
-	;Removing nothing?
-	if nCols eq 0 then return
-
-	;Make sure nCols is positive.
-	_nCols = abs(nCols)
-	if _nCols ge self.layout[0] $
-		then message, string(FORMAT='(%"Layout has only %i columns. Cannot delete %i columns.")', self.layout[0], _nCols)
-
-	;Determine new layout and pIndex
-	newLayout     = self.layout
-	newLayout[0] -= _nCols
-
-	;There must be at least 1 column in the layout
-	if newLayout[0] le 0 then begin
-		newLayout = 1
-		_nCols    = self.layout[0] - 1
-	endif
-
-	;First and last columns begin deleted
-	if before then begin
-		first_col = col - _nCols + 1
-		last_col  = col
-	endif else begin
-		first_col = col
-		last_col  = col + _nCols - 1
-	endelse
-
-	;Is the graphic being deleted?
-	colrow = self -> ConvertLocation(self.layout[2], /PINDEX, /TO_COLROW)
-	if (colrow[0] ge first_col) && (colrow[0] le last_col) $
-		then message, 'Column ' + strtrim(colrow[0], 2) + ' is not empty. Cannot delete.'
-
-	;Does the graphic need to be moved?
-	if colrow[0] gt last_col then colrow[0] -= _nCols
-
-	;Get the new pIndex
-	newPIndex = self -> ConvertLocation(colrow, newLayout, /COLROW, /TO_PINDEX)
-
-	;Update the layout
-	self.layout = [newLayout, newPIndex]
-	self -> ComputeGrid
-end
-
-
-;+
-;   Remove rows from the layout while keeping the plot in the same location.
-;
-; :Params:
-;       NROWS:          in, optional, type=int, default=1
-;                       Number of rows to delete.
-;       ROW:            in, optional, type=int, default=bottom row
-;                       The row to be deleted. If `NROWS` > 1, then this is the first
-;                           of `NROWS` adjacent rows that will be deleted.
-; :Keywords:
-;       BEFORE:         in, optional, type=boolean, default=0
-;                       If set, then `ROW` is the last of `NROWS` adjacent rows to be deleted.
-;-
-pro MrLayoutAtom::DeleteRow, nRows, row
-	compile_opt strictarr
-
-	;Error handling
-	catch, the_error
-	if the_error ne 0 then begin
-		catch, /cancel
-		void = cgErrorMsg()
-		return
-	endif
-
-	;Default to adding a single row
-	before = keyword_set(before)
-	if n_elements(row)   eq 0 then row   = self.layout[1]
-	if n_elements(nRows) eq 0 then nRows = 1
-
-	;Removing nothing?
-	if nRows eq 0 then return
-
-	;Make sure nRows is positive.
-	_nRows = nRows lt 0 ? abs(nRows) : nRows
-	if _nRows ge self.layout[1] $
-		then message, string(FORMAT='(%"Layout has only %i rows. Cannot delete %i.")', self.layout[1], _nRows)
-
-	;Determine new layout and pIndex
-	newLayout     = self.layout
-	newLayout[1] -= _nRows
-
-	;First and last row to be deleted
-	if before then begin
-		first_row = row - _nRows + 1
-		last_row  = row
-	endif else begin
-		first_row = row
-		last_row  = row + _nRows - 1
-	endelse
-
-	;Is the graphic being deleted?
-	colrow = self -> ConvertLocation(self.layout[2], /PINDEX, /TO_COLROW)
-	if (colrow[1] ge first_col) && (colrow[1] le last_col) $
-		then message, 'Row ' + strtrim(colrow[1], 2) + ' is not empty. Cannot delete.'
-	
-	;Does the graphic need to be moved?
-	if colrow[1] gt last_row then colrow[1] -= _nRows
-
-	;Get the new pIndex
-	newPIndex = self -> ConvertLocation(colrow, newLayout, /COLROW, /TO_PINDEX)
-
-	;Update the layout
-	self.layout = [newLayout, newPIndex]
-	self -> ComputeGrid
-end
-
-
-;+
 ;   Determine if a plot index location exists within the layout.
 ;
 ; :Params:
@@ -701,9 +464,9 @@ COLROW=ColRow
 
 	;Check if the location exists within the layout
 	case 1 of
-		aIndex: tf_exist = (pIndex lt layout[0]*layout[1]) && (pIndex ge 0)
-		ColRow: tf_exist = (pIndex[0,*] lt layout[0]) && (pIndex[1,*] lt layout[1])
-		else:   tf_exist = (pIndex le layout[0]*layout[1]) && (pIndex ge 1)
+		aIndex: tf_exist = (pIndex lt layout[0]*layout[1]) and (pIndex ge 0)
+		ColRow: tf_exist = (pIndex[0,*] le layout[0]) and (pIndex[1,*] le layout[1])
+		else:   tf_exist = (pIndex le layout[0]*layout[1]) and (pIndex ge 1)
 	endcase 
 
 	return, tf_exist
@@ -711,58 +474,11 @@ end
 
 
 ;+
-;   Calculate a position based on the layout properties.
-;
-; :Private:
-;-
-pro MrLayoutAtom::SetGrid
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-    
-    nLay = n_elements(layout)
-    
-    ;If the [nCols,nRows] = [0,0] then return -- No layout has been defined.
-    if (self.layout[0] eq 0) && (self.layout[1] eq 0) then return
-    
-    ;Make sure the layout is valid.
-    if (self.layout[0] lt 0) or (self.layout[1] lt 0) then begin
-        message, 'Layout must have at least one column and one row.', /INFORMATIONAL
-        return
-    endif
-
-    ;Calculate positions
-    grid = MrLayout(self.layout[0:1], $
-                    ASPECT     = *self.aspect, $
-                    CHARSIZE   =  self.charsize, $
-                    COL_WIDTH  = *self.col_width, $
-                    IXMARGIN   =  self.ixmargin, $
-                    IYMARGIN   =  self.iymargin, $
-                    OXMARGIN   =  self.oxmargin, $
-                    OYMARGIN   =  self.oymargin, $
-                    P_REGION   =       p_region, $
-                    ROW_HEIGHT = *self.row_height, $
-                    WDIMS      =  self.wdims, $
-                    XGAP       =  self.xgap, $
-                    YGAP       =  self.ygap)
-    
-    ;Save the window and region
-    self.x_region = p_region[[0,2]]
-    self.y_region = p_region[[1,3]]
-
-    ;Save the grid
-    *self.grid = grid
-end
-
-
-;+
 ;   Get a position from the layout grid.
+;
+;   If a child layout object is being managed, its plot index will be set, but its
+;   position will not be. At intermediate stages during layout updates, the position
+;   is out of syn
 ;
 ; :Params:
 ;       LOCATION:       in, required, type=integer/intarr(N)/intarr(2,N)
@@ -804,7 +520,16 @@ COLROW=colrow
 	colrow = keyword_set(colrow)
 
 	;Get the array index associated with the location given.
-	aIndex = self -> ConvertLocation(location, COLROW=colrow, PINDEX=~colrow, /TO_AINDEX)
+	aIndex = self -> ConvertLocation(location, COLROW=colrow, PINDEX=~colrow, /TO_AINDEX, EXISTS=exists)
+	if exists eq 0 then begin
+		;Number of positions in the grid
+		npos = (size(*self.grid, /DIMENSIONS))[1]
+		
+		;Number of positions in the current layout
+		if npos ne self.layout[1]*self.layout[1] $
+			then message, 'Layout is out of sync. Cannot retrieve position.' $
+			else message, 'LOCATION does not exist in the layout. Cannot retrieve position.'
+	endif
 
 	;Get the position
 	position = (*self.grid)[*,aIndex]
@@ -891,7 +616,7 @@ YGAP=ygap
 	if arg_present(layout)     then layout     =  self.layout
 	if arg_present(oxmargin)   then oxmargin   =  self.oxmargin
 	if arg_present(oymargin)   then oymargin   =  self.oymargin
-	if arg_present(position)   then position   =  self.position
+	if arg_present(position)   then position   =  self -> GetPosition()
 	if arg_present(row_height) then row_height = *self.row_height
 	if arg_present(wdims)      then wdims      =  self.wdims
 	if arg_present(xmargin)    then xmargin    =  self.xmargin
@@ -903,10 +628,11 @@ YGAP=ygap
 	if arg_present(y_region)   then y_region   =  self.y_region
 	if arg_present(y_window)   then y_window   =  self.y_window
 	if arg_present(margin)     then margin     = [self.xmargin[0], self.ymargin[0], $
-												  self.xmargin[1], self.ymargin[1]]
+	                                              self.xmargin[1], self.ymargin[1]]
 
+	;Return the location in [col, row] format.
 	if arg_present(location) then begin
-		location = self -> ConvertIndex(self.pindex[2], /PINDEX, /TO_COLROW, EXISTS=exists)
+		location = self -> ConvertLocation(self.layout[2], /PINDEX, /TO_COLROW, EXISTS=exists)
 		if exists eq 0 then location = [0,0]
 	endif
 end
@@ -1072,7 +798,11 @@ YGAP=ygap
 	if nLay gt 0 then begin
 		case nLay of
 			2: self.layout[0:1] = layout
-			3: self.layout      = layout
+			3: begin
+				;Set the layout and unset the position.
+				self.layout   = layout
+				self.position = fltarr(4)
+			endcase
 			else: message, 'Incorrect number of elements: Layout.'
 		endcase
 	endif
@@ -1084,13 +814,16 @@ YGAP=ygap
 		;Convert [col,row] to pIndex
 		;   - Make sure it fits within the layout.
 		if n_elements(oLocation) eq 2 $
-			then oLocation = self -> ConvertLocation(oLocation, /COLROW, /TO_PINDEX, SUCCESS=success) $
+			then oLocation = self -> ConvertLocation(oLocation, /COLROW, /TO_PINDEX, EXISTS=success) $
 			else success = self -> Exists(oLocation)
 
 		;Save the location. Make sure LAYOUT is not updated after.
 		if success eq 0 $
 			then message, 'LOCATION does not fit inside the current layout. Ignoring' $
 			else self.layout[2] = oLocation
+			
+		;Unset the position
+		self.position = fltarr(4)
 	endif
 
 ;---------------------------------------------------------------------
@@ -1101,13 +834,11 @@ YGAP=ygap
 ;---------------------------------------------------------------------
 ; Set the New Position ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
-	;Position takes precedence over LAYOUT and LOCATION
+	;Set the position and unset the plot index.
 	if n_elements(position) gt 0 then begin
 		self.position  = position
 		self.layout[2] = 0
-	endif else begin
-		self.position = self -> GetPosition()
-	endelse
+	endif
 end
 
 
@@ -1156,19 +887,19 @@ POSITION=position
 	if current then begin
 		win = GetMrWindows(/CURRENT)
 	endif else begin
-		win = MrWindow(ASPECT     = *self.aspect, $
-		               CHARSIZE   =  self.charsize, $
-		               COL_WIDTH  = *self.col_width, $
-		               IXMARGIN   =  self.ixmargin, $
-		               IYMARGIN   =  self.iymargin, $
-		               LAYOUT     =  self.layout, $
-		               OXMARGIN   =  self.oxmargin, $
-		               OYMARGIN   =  self.oymargin, $
-		               ROW_HEIGHT = *self.row_height, $
-		               XGAP       = *self.xgap, $
-		               XSIZE      =    !d.x_size, $
-		               YGAP       = *self.ygap, $
-		               YSIZE      =    !d.y_size)
+		win = Mr_Window(ASPECT     = *self.aspect, $
+		                CHARSIZE   =  self.charsize, $
+		                COL_WIDTH  = *self.col_width, $
+		                IXMARGIN   =  self.ixmargin, $
+		                IYMARGIN   =  self.iymargin, $
+		                LAYOUT     =  self.layout, $
+		                OXMARGIN   =  self.oxmargin, $
+		                OYMARGIN   =  self.oymargin, $
+		                ROW_HEIGHT = *self.row_height, $
+		                XGAP       =  self.xgap, $
+		                XSIZE      =    !d.x_size, $
+		                YGAP       =  self.ygap, $
+		                YSIZE      =    !d.y_size)
 	endelse
 
 	;Show the outer margins
@@ -1182,11 +913,11 @@ POSITION=position
 		!Null = MrPlotS( self.x_region[[0,1,1,0,0]], self.y_region[[0,0,1,1,0]], $
 		                 /NORMAL, COLOR='Blue' )
 	endif
-	
+
 	;Show position
 	if position then begin
-		!Null = MrPlotS( self.position[[0,2,2,0,0]], self.position[[1,1,3,3,1]], $
-		                 /NORMAL, COLOR='Red' )
+		pos = self -> GetPosition()
+		!Null = MrPlotS( pos[[0,2,2,0,0]], pos[[1,1,3,3,1]], /NORMAL, COLOR='Green' )
 	endif
 end
 
@@ -1308,6 +1039,7 @@ YGAP=ygap
 	case n_elements(layout) of
 		0: layout = [1,1,0]
 		2: layout = [layout, 0]
+		3: ;Everything is ok.
 		else: message, 'LAYOUT must be a vector of the form [nCols, nRows] or [nCols, nRows, index].'
 	endcase
 
@@ -1316,7 +1048,7 @@ YGAP=ygap
 		0: ;Do nothing
 		1: layout[2] = location
 		2: layout[2] = self -> ConvertIndex(location, layout[0:1], /COLROW, /TO_PINDEX)
-		else: message, 'LOCATION must be a scalar grid index or a [col,row] location.'
+		else: message, 'LOCATION must be a scalar plot index or a [col,row] location.'
 	endcase
 
 	;Defualt Values
@@ -1327,7 +1059,7 @@ YGAP=ygap
 	if n_elements(iymargin)   eq 0 then iymargin   = [0, 0]
 	if n_elements(oxmargin)   eq 0 then oxmargin   = [10, 3]
 	if n_elements(oymargin)   eq 0 then oymargin   = [ 4, 2]
-	if n_elements(position)   eq 0 then location   = 1
+	if n_elements(position)   eq 0 then if layout[2] eq 0 then layout[2] = 1
 	if n_elements(row_height) eq 0 then row_height = layout[1] eq 1 ? 1.0 : replicate(1.0 / layout[1], layout[1]-1)
 	if n_elements(xgap)       eq 0 then xgap       = 14
 	if n_elements(ygap)       eq 0 then ygap       = 6
@@ -1345,7 +1077,6 @@ YGAP=ygap
 	                     IXMARGIN   = ixmargin, $
 	                     IYMARGIN   = iymargin, $
 	                     LAYOUT     = layout, $
-	                     LOCATION   = location, $
 	                     MARGIN     = margin, $
 	                     OXMARGIN   = oxmargin, $
 	                     OYMARGIN   = oymargin, $

@@ -45,14 +45,16 @@
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
-;       Morse Hall, Room 113
+;       Morse Hall, Room 348
 ;       8 College Rd.
 ;       Durham, NH, 03824
-;       matthew.argall@wildcats.unh.edu
+;       matthew.argall@unh.edu
 ;
 ; :History:
-;	Modification History::
+;   Modification History::
 ;       2014/03/17  -   Written by Matthew Argall
+;       2015/03/09  -   Added the PixMap and SaveAs properties. Added ::Copy_Pixmap and
+;                           ::Save methods. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -457,23 +459,25 @@ _EXTRA=extraKeywords
     ;Defaults
     noerase   = keyword_set(noerase)
     hourglass = keyword_set(hourglass)
-    _noerase  = n_elements(noerase) eq 0 ? self._noerase : noerase
-    if n_elements(background_color) eq 0 then background_color = self._background
+    _noerase  = n_elements(noerase)          eq 0 ? self._noerase    : noerase
+    bg_color  = n_elements(background_color) eq 0 ? self._background : background_color
 
     ;Enable the hourglass mouse cursor, if needed.
     if hourglass then widget_control, /HOURGLASS
 
-    ;If the device supports windows, switch to the draw window.
-    if (!d.flags and 256) ne 0 then begin
-        wset, self._winid
-        if noerase eq 0B then self -> Erase, background_color
+    ;Does the device support windows?
+    ;   - Draw to the pixmap.
+    if (!d.flags and 256) gt 0 then begin
+        self._oPixmap -> SetCurrent
+        if noerase eq 0B then self -> Erase, bg_color
     endif
-   
-    ;Get all objects from the container
+
+    ;Draw all of the objects in the container.
     allObj = self -> Get(/ALL, COUNT=nObj)
+    for i = 0, nObj - 1 do allObj[i] -> Draw, /NOERASE
     
-    ;Draw all of the objects.
-    for i = 0, nObj - 1 do allObj[i] -> Draw
+    ;Copy from the pixmap to the draw window
+    if (!d.flags and 256) gt 0 then self -> Copy_Pixmap
 end
 
 
@@ -541,10 +545,11 @@ WINDOW_TITLE=window_title
     if n_elements(window_title) eq 0 then window_title = 'MrDrawWidget'
 
     ;Create a resizeable, top level base for the window    
-    self._oTLB = obj_new('MrTopLevelBase', TITLE=window_title, $
+    self._oTLB = obj_new('MrTopLevelBase', $
+                         /TLB_SIZE_EVENTS, $
                          EVENT_OBJ        = self, $
-                         TLB_SIZE_HANDLER = 'TLB_Resize_Events', $
-                         /TLB_SIZE_EVENTS)
+                         TITLE            = window_title, $
+                         TLB_SIZE_HANDLER = 'TLB_Resize_Events')
 end
 
 
@@ -615,6 +620,65 @@ end
 
 
 ;+
+;   Copy the contents of the window.
+;
+; :Params:
+;       WINDOW_ID:          in, optional, type=integer, default=draw widget
+;                           Window ID of the window into which the image will be copied.
+;
+; :Keywords:
+;       DESTINATION:        in, optional, type=intarr(2), default=[0\,0]
+;                           The coordinate of the lower-left corner within the window
+;                               where the image is to be copied to.
+;       EXTENT:             in, optional, type=intarr(2), default=[!d.x_size\, !d.y_size]
+;                           Number of pixels in the x- and y-direction to be copied,
+;                               starting at `ORIGIN`.
+;       IMAGE:              out, optional, type=bytarr(N\,M\,3)
+;                           A named variable into which the image will be copied. If
+;                               present, the image will not be copied to a different window.
+;       ORIGIN:             in, optional, type=intarr(2), default=[0\,0]
+;                           Coordinates specifinying the x- and y-location at which to
+;                               begin copying the image.
+;-
+pro MrDrawWidget::Copy_Pixmap, window_id, $
+ DESTINATION=destination, $
+ EXTENT=extent, $
+ IMAGE=theImage, $
+ ORIGIN=origin
+   compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        wset, currentWin
+        void = cgErrorMsg()
+        return
+    endif
+    
+    
+    ;Return the image without copying
+    if arg_present(theImage) then begin
+        self._oPixmap -> Copy, DESTINATION = destination, $
+                               EXTENT      = extent, $
+                               IMAGE       = theImage, $
+                               ORIGIN      = origin
+        
+    ;Copy
+    endif else begin
+        ;Default to copying to the draw window
+        if n_elements(window_id) eq 0 then window_id = self._winID
+    
+        ;Copy the pixmap
+        self._oPixmap -> Copy, window_id, $
+                               DESTINATION = destination, $
+                               EXTENT      = extent, $
+                               ORIGIN      = origin
+    endelse
+end
+
+
+;+
 ;   The purpose of this method is to erase the draw window.
 ;-
 pro MrDrawWidget::Erase, color
@@ -627,13 +691,16 @@ pro MrDrawWidget::Erase, color
         void = cgErrorMsg()
         return
     endif
-    
+
     ;Default background color
     if n_elements(color) eq 0 then color = self._background
     
     ;Erase the window.
     if (!d.flags and 256) ne 0 then wset, self._winID
     cgErase, self._background
+    
+    ;Erase the pixmap
+    self._oPixmap -> Erase, color
 end
 
 
@@ -656,13 +723,18 @@ pro MrDrawWidget::Notify_Realize, id
         void = cgErrorMsg()
         return
     endif
-    
+
     ;Get the window ID of the draw widget
     widget_control, id, GET_VALUE=winID
     self._winID = winID
 
     ;Set the name of the window to include with window number.
-    widget_control, id, TLB_SET_TITLE='MrDrawWidget (' + strtrim(winID,2) + ')'
+    if obj_valid(self._oTLB) then begin
+        self._oTLB -> GetProperty, TITLE=title
+        widget_control, id, TLB_SET_TITLE=title + ' (' + strtrim(winID, 2) + ')'
+    endif else begin
+        widget_control, id, TLB_SET_TITLE='MrDrawWidget (' + strtrim(winID,2) + ')'
+    endelse
     
     ;Erase the window to have the proper background color
     self -> Erase
@@ -708,12 +780,12 @@ PRO MrDrawWidget::Resize, xsize, ysize, $
  INCHES=inches, $
  SCREEN=screen, $
  VIEWPORT=viewport, $
-_EXTRA=extraKeywords
+_EXTRA=extra
    compile_opt strictarr
     
     ;Error handling
     catch, the_error
-        if the_error ne 0 then begin
+    if the_error ne 0 then begin
         catch, /cancel
         void = cgErrorMsg()
         return
@@ -744,13 +816,13 @@ _EXTRA=extraKeywords
 
     ;Resize the widget
     CASE 1 OF
-        KEYWORD_SET(screen):   Widget_Control, self._id, Scr_XSize=xsize, Scr_YSize=ysize
-        KEYWORD_SET(viewport): Widget_Control, self._id, XSize=xsize, YSize=ysize
-        ELSE:                  Widget_Control, self._id, Draw_XSize=xsize, Draw_YSize=ysize
+        KEYWORD_SET(screen):   Widget_Control, self._id, Scr_XSize  = _xsize, Scr_YSize  = _ysize
+        KEYWORD_SET(viewport): Widget_Control, self._id, XSize      = _xsize, YSize      = _ysize
+        ELSE:                  Widget_Control, self._id, Draw_XSize = _xsize, Draw_YSize = _ysize
     ENDCASE
 
     ;Redraw
-    self -> Draw, _Extra=extraKeywords
+    self -> Draw, _STRICT_EXTRA=extra
 END
 
 
@@ -802,14 +874,13 @@ pro MrDrawWidget::TLB_Resize_Events, event
         return
     endif
 
-    ;Subtract the height of the menu and status bars from the size of the top level base
+    ;Nothing surrouding the draw widget to subtract off.
     xNew = event.x
     yNew = event.y
     
     ;Set the new size of the draw widget
-    self -> Resize, xNew, yNew
-;    self.xsize = xNew
-;    self.ysize = yNew
+    self          -> Resize, xNew, yNew
+    self._oPixmap -> Resize, xNew, yNew
 
     ;Draw the plot to the new size
     self -> Draw
@@ -1024,6 +1095,63 @@ end
 ;-
 function MrDrawWidget::GetWinID
     return, self._winID
+end
+
+
+;+
+;   Return the refresh state of the draw widget window.
+;
+; :Returns:
+;       REFRESH:        Returns true (1) if the window is being refreshed, and
+;                           false (0) otherwise.
+;-
+function MrDrawWidget::GetRefresh
+    return, self._Refresh
+end
+
+
+;+
+;   Save the display to a file.
+;
+; :Params:
+;       FILENAME:           in, optional, type=string, default='MrWindow.ps'
+;                           Name of the file to which graphics output will be saved. The
+;                               type of image file created is determined by the extension
+;                               given. Options include "BMP", "EPS", "GIF", "JPEG", "JPG",
+;                               "PDF", "PNG", "PS", "TIF", and "TIFF".
+;-
+pro MrDrawWidget::Save, filename
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        self._refresh = thisRefresh
+        void = cgErrorMsg()
+        return
+    endif
+    
+    ;Get the refresh state
+    thisRefresh = self._refresh
+    
+    ;Get the file extension
+    void = cgRootName(filename, EXTENSION=extension)
+    extension = strupcase(extension)
+    
+    ;Turn refresh on
+    ;   - Raster files without ImageMagick require a snapshot. Must draw first.
+    ;   - All other files will be drawn later.
+    self._SaveAs -> GetProperty, IM_RASTER=im_raster
+    if (im_raster eq 0) && (extension ne 'PS' && extension ne 'EPS') $
+        then self -> Refresh $
+        else self._refresh = 1
+
+    ;Save the plot
+    self._oSaveAs -> Save, filename
+    
+    ;Return to the original refresh state.
+    self._refresh = thisRefresh
 end
 
 
@@ -1244,6 +1372,19 @@ END
 
 
 ;+
+;   Set the draw window as the current window.
+;-
+pro MrDrawWidget::ShowPixmap, $
+HIDE=hide
+    compile_opt strictarr
+    on_error, 2
+
+    ;Map the pixmap so that it is visible
+    self._oPixmap -> SetProperty, VISIBLE=~keyword_set(hide)
+end
+
+
+;+
 ;   Event handling method for Viewport Move events.
 ;
 ; :Private:
@@ -1275,6 +1416,11 @@ pro MrDrawWidget::cleanup
 
     ;Free event handlers (but do not destroy event handling objects)
     ptr_free, self._drag_notify
+    
+    ;Destroy objects
+    ;   - It is assumed that EVENT_HANDLER and TLB objects will be destroyed elsewhere.
+    if obj_valid(self._oPixmap) then obj_destroy, self._oPixmap
+    if obj_valid(self._oSaveAs) then obj_destroy, self._oSaveAs
 
     ;Destroy the widget, if it still exists
     if widget_info(self._id, /VALID_ID) then widget_control, self._id, /DESTROY
@@ -1438,7 +1584,7 @@ end
 ;       YSIZE:          in, optional, type=integer, default=300
 ;                       The Y size of the widget.
 ;       _REF_EXTRA:     in, optional, type=any
-;                       Any keyword appropriate for the superclass INIT methods.
+;                       Any keyword appropriate for the MrWidgetAtom INIT methods.
 ;-
 function MrDrawWidget::init, parent,   $
 ;MrDrawWidget Keywords
@@ -1470,7 +1616,7 @@ function MrDrawWidget::init, parent,   $
  Y_SCROLL_SIZE=y_scroll_size, $
  YOFFSET=yoffset, $
  YSIZE=ysize, $
- ;EVENTS
+;EVENTS
  BUTTON_EVENTS=button_events, $
  DROP_EVENTS=drop_events, $
  EXPOSE_EVENTS=expose_events, $
@@ -1478,7 +1624,7 @@ function MrDrawWidget::init, parent,   $
  MOTION_EVENTS=motion_events, $
  VIEWPORT_EVENTS=viewport_events, $
  WHEEL_EVENTS=wheel_events, $
- ;EVENT HANDLERS
+;EVENT HANDLERS
  DRAG_NOTIFY=drag_notify, $
  DROP_HANDLER=drop_handler, $
  EVENT_HANDLER=event_handler, $
@@ -1505,7 +1651,7 @@ _REF_EXTRA=extra
 ;Defaults ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     noerase = keyword_set(noerase)
-    refresh = keyword_set(refresh)
+    refresh = n_elements(refresh) eq 0 ? 1 : keyword_set(refresh)
     if n_elements(background_color) eq 0 then background_color = 'White'
     if n_elements(retain)           eq 0 then retain           = (!version.os_family eq 'windows') ? 1 : 2
     if n_elements(xsize)            eq 0 then xsize            = 640
@@ -1602,34 +1748,46 @@ _REF_EXTRA=extra
     
     ;Event handlers
     self -> SetProperty, $;Events On/Off
-                         BUTTON_EVENTS=button_events, $
-                         DROP_EVENTS=drop_events, $
-                         EXPOSE_EVENTS=expose_events, $
-                         KEYBOARD_EVENTS=keyboard_events, $
-                         MOTION_EVENTS=motion_events, $
-                         VIEWPORT_EVENTS=viewport_events, $
-                         WHEEL_EVENTS=wheel_events, $
+                         BUTTON_EVENTS        = button_events, $
+                         DROP_EVENTS          = drop_events, $
+                         EXPOSE_EVENTS        = expose_events, $
+                         KEYBOARD_EVENTS      = keyboard_events, $
+                         MOTION_EVENTS        = motion_events, $
+                         VIEWPORT_EVENTS      = viewport_events, $
+                         WHEEL_EVENTS         = wheel_events, $
                          ;Event Handlers
-                         EVENT_HANDLER=event_handler, $
-                         DRAG_NOTIFY=drag_notify, $
-                         DROP_HANDLER=drop_handler, $
-                         EXPOSE_HANDLER=expose_handler, $
-                         KEYBOARD_HANDLER=keyboard_handler, $
-                         MOUSE_DOWN_HANDLER=mouse_down_handler, $
-                         MOUSE_UP_HANDLER=mouse_up_handler, $
-                         MOUSE_MOTION_HANDLER=mouse_motion_handler, $
-                         MOUSE_WHEEL_HANDLER=mouse_wheel_handler, $
-                         VIEWPORT_HANDLER=viewport_handler
+                         EVENT_HANDLER        = event_handler, $
+                         DRAG_NOTIFY          = drag_notify, $
+                         DROP_HANDLER         = drop_handler, $
+                         EXPOSE_HANDLER       = expose_handler, $
+                         KEYBOARD_HANDLER     = keyboard_handler, $
+                         MOUSE_DOWN_HANDLER   = mouse_down_handler, $
+                         MOUSE_UP_HANDLER     = mouse_up_handler, $
+                         MOUSE_MOTION_HANDLER = mouse_motion_handler, $
+                         MOUSE_WHEEL_HANDLER  = mouse_wheel_handler, $
+                         VIEWPORT_HANDLER     = viewport_handler
+
+;---------------------------------------------------------------------
+; PixMap and SaveAs Objects //////////////////////////////////////////
+;---------------------------------------------------------------------
+
+    ;Create a pixmap the same size as the draw widget.
+    ;   - MrPixmap inherits MrDrawWidget and will call MrDrawWidget::Init
+    ;   - Have the pixmap create its own TLB so that Notify_Realize will
+    ;     set its winID property.
+    self._oPixmap = obj_new('MrPixmap', $
+                            XSIZE = xsize, $
+                            YSIZE = ysize)
+    
+    ;SaveAs
+    self._oSaveAs = obj_new('MrSaveAs')
 
 ;---------------------------------------------------------------------
 ; Return Step ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
     ;If we created a new tlb, realize it now and register it with XManager.
-    if tf_tlb_created then begin
-        self._oTLB -> XManager
-        self._refresh = 1B
-    endif
+    if tf_tlb_created then self._oTLB -> XManager
 
     self -> Draw
     return, 1
@@ -1654,8 +1812,9 @@ pro MrDrawWidget__define, class
              _winID:      0L, $             ;The window ID of the draw window.
              _background: '', $             ;Background color of the display.
              _noerase:    0B, $             ;Prevents the widget from being erased.
-             _pixmap:     obj_new(), $      ;Pixmap window.
+             _oPixmap:    obj_new(), $      ;Pixmap window.
              _refresh:    0B, $             ;Refresh the graphics window
+             _oSaveAs:    obj_new(), $      ;SaveAs object
              
              ;Draw Event Handlers
              _event_handler:        obj_new(), $
