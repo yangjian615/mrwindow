@@ -44,9 +44,6 @@
 ;                           The text to be put on the axis.
 ;
 ; :Keywords:
-;       CURRENT:            in, optional, type=boolean, default=0
-;                           If set, the plot will be added to the current MrWindow
-;                               graphics window.
 ;       _REF_EXTRA:         in, optional, type=structure
 ;                           Any keyword accepted by MrText__define.
 ;
@@ -57,10 +54,10 @@
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
-;       Morse Hall, Room 113
+;       Morse Hall, Room 348
 ;       8 College Rd.
 ;       Durham, NH, 03824
-;       matthew.argall@wildcats.unh.edu
+;       matthew.argall@unh.edu
 ;
 ; :Copyright:
 ;       Matthew Argall 2013
@@ -70,29 +67,15 @@
 ;       2013/11/27  -   Written by Matthew Argall.
 ;       2014/02/03  -   Create MrText objects, not weText objects. Removed the PLACE,
 ;                           OUTLOC, and WIDTH keywords. - MRA
+;       2014/03/16  -   Include the CURRENT keyword in _REF_EXTRA. - MRA
 ;-
 function MrText, xloc, yloc, text, $
- CURRENT=current, $
 _REF_EXTRA = extra
     compile_opt idl2
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return, obj_new()
-    endif
+    on_error, 2
 
-    ;Add to the current window?
-    current = keyword_set(current)
-
-    ;If PLACE is set, then no location was given. Shuffle
-    if keyword_set(place) then text = temporary(xloc)
-
-    ;Create a cgOverPlot object
-    theText = obj_new('MrText', xloc, yloc, text, CURRENT=current, $
-                      _STRICT_EXTRA=extra)
+    ;Create a MrText object
+    theText = obj_new('MrText', xloc, yloc, text, _STRICT_EXTRA=extra)
 
     return, theText
 end
