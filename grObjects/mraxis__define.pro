@@ -989,8 +989,14 @@ ZAXIS=zaxis
 ;---------------------------------------------------------------------
     ;Make sure the axes do not interfere with one another
     IF nx GT 0 THEN BEGIN
-        IF N_Elements(*self.yaxis) NE 0 THEN void = temporary(*self.yaxis)
-        IF N_Elements(*self.zaxis) NE 0 THEN void = temporary(*self.zaxis)
+        IF N_Elements(*self.yaxis) NE 0 THEN BEGIN
+            Ptr_Free, self.yaxis
+            self.yaxis = Ptr_New(/ALLOCATE_HEAP)
+        ENDIF
+        IF N_Elements(*self.zaxis) NE 0 THEN BEGIN
+            Ptr_Free, self.zaxis
+            self.zaxis = Ptr_New(/ALLOCATE_HEAP)
+        ENDIF
         *self.xaxis = xaxis
     ENDIF
     
@@ -998,8 +1004,14 @@ ZAXIS=zaxis
 ;Z-Axis //////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     IF ny GT 0 THEN BEGIN
-        IF N_Elements(*self.xaxis) NE 0 THEN void = temporary(*self.xaxis)
-        IF N_Elements(*self.zaxis) NE 0 THEN void = temporary(*self.zaxis)
+        IF N_Elements(*self.xaxis) NE 0 THEN BEGIN
+            Ptr_Free, self.xaxis
+            self.xaxis = Ptr_New(/ALLOCATE_HEAP)
+        ENDIF
+        IF N_Elements(*self.zaxis) NE 0 THEN BEGIN
+            Ptr_Free, self.zaxis
+            self.zaxis = Ptr_New(/ALLOCATE_HEAP)
+        ENDIF
         *self.yaxis = yaxis
     ENDIF
     
@@ -1007,8 +1019,14 @@ ZAXIS=zaxis
 ;Z-Axis //////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     IF nz GT 0 THEN BEGIN
-        IF N_Elements(*self.xaxis) NE 0 THEN void = temporary(*self.xaxis)
-        IF N_Elements(*self.yaxis) NE 0 THEN void = temporary(*self.yaxis)
+        IF N_Elements(*self.xaxis) NE 0 THEN BEGIN
+            Ptr_Free, self.xaxis
+            self.xaxis = Ptr_New(/ALLOCATE_HEAP)
+        ENDIF
+        IF N_Elements(*self.yaxis) NE 0 THEN BEGIN
+            Ptr_Free, self.yaxis
+            self.yaxis = Ptr_New(/ALLOCATE_HEAP)
+        ENDIF
         *self.zaxis = zaxis
     ENDIF
 END
@@ -1419,7 +1437,9 @@ END
 ;                               tickmarks
 ;       TICKDIR:            in, optional, type=byte, default=0
 ;                           Direction of the tick marks. 0 indicates above or to the right
-;                               of the axis, 1 indicates below or to the left.
+;                               of the axis, 1 indicates below or to the left. Axis
+;                               annotations are drawn on the opposite side of the axis as
+;                               the tickmarks.
 ;       TICKFORMAT:         in, optional, type=string/strarr, default=""
 ;                           Format to be applied to tick labels. See the `online help for
 ;                               more details.

@@ -148,13 +148,18 @@ NOERASE=noerase
     if !d.name eq 'PS' $
         then thick = MrPS_Rescale(self.thick, /THICK) $
         else thick = self.thick
+    
+    ;If LINESTYLE is "None", then do not draw the lines.
+    psym      = cgSymCat(self.psym)
+    linestyle = MrLineStyle(*self.linestyle)
+    if linestyle eq 6 then psym = abs(psym)
 
     ;cgPlotS
     case nparams of
         1: cgPlotS, xcoords, $
                     COLOR      = *self.color, $
                     MAP_OBJECT =  self.map_object, $
-                    PSYM       =  self.psym, $
+                    PSYM       =       psym, $
                     SYMCOLOR   = *self.symcolor, $
                     SYMSIZE    =  self.symsize, $
                     CONTINUE   =       continue, $
@@ -162,7 +167,7 @@ NOERASE=noerase
                     DATA       =  self.data, $
                     DEVICE     =  self.device, $
                     NORMAL     =  self.normal, $
-                    LINESTYLE  =  self.linestyle, $
+                    LINESTYLE  =       linestyle, $
                     NOCLIP     =  self.noclip, $
                     T3D        =  self.t3d, $
                     THICK      =       thick, $
@@ -171,7 +176,7 @@ NOERASE=noerase
         2: cgPlotS, xcoords, ycoords, $
                     COLOR      = *self.color, $
                     MAP_OBJECT =  self.map_object, $
-                    PSYM       =  self.psym, $
+                    PSYM       =       psym, $
                     SYMCOLOR   = *self.symcolor, $
                     SYMSIZE    =  self.symsize, $
                     CONTINUE   =       continue, $
@@ -180,7 +185,7 @@ NOERASE=noerase
                     DEVICE     =  self.device, $
                     NOCLIP     =  self.noclip, $
                     NORMAL     =  self.normal, $
-                    LINESTYLE  =  self.linestyle, $
+                    LINESTYLE  =       linestyle, $
                     T3D        =  self.t3d, $
                     THICK      =       thick, $
                     Z          =  self.zvalue
@@ -188,7 +193,7 @@ NOERASE=noerase
         3: cgPlotS, xcoords, ycoords, zcoords, $
                     COLOR      = *self.color, $
                     MAP_OBJECT =  self.map_object, $
-                    PSYM       =  self.psym, $
+                    PSYM       =       psym, $
                     SYMCOLOR   = *self.symcolor, $
                     SYMSIZE    =  self.symsize, $
                     CONTINUE   =       continue, $
@@ -196,7 +201,7 @@ NOERASE=noerase
                     DATA       =  self.data, $
                     DEVICE     =  self.device, $
                     NORMAL     =  self.normal, $
-                    LINESTYLE  =  self.linestyle, $
+                    LINESTYLE  =       linestyle, $
                     NOCLIP     =  self.noclip, $
                     T3D        =  self.t3d, $
                     THICK      =       thick, $
@@ -321,7 +326,7 @@ _REF_EXTRA=extra
     if arg_present(data)      ne 0 then data      =  self.data
     if arg_present(device)    ne 0 then device    =  self.device
     if arg_present(normal)    ne 0 then normal    =  self.normal
-    if arg_present(linestyle) ne 0 then linestyle =  self.linestyle
+    if arg_present(linestyle) ne 0 then linestyle = *self.linestyle
     if arg_present(noclip)    ne 0 then noclip    =  self.noclip
     if arg_present(relative)  ne 0 then relative  =  self.relative
     if arg_present(t3d)       ne 0 then t3d       =  self.t3d
@@ -457,7 +462,7 @@ _REF_EXTRA=extra
     
     ;PlotS Properties
     if n_elements(clip)      ne 0 then *self.clip      = clip
-    if n_elements(linestyle) ne 0 then  self.linestyle = linestyle
+    if n_elements(linestyle) ne 0 then *self.linestyle = linestyle
     if n_elements(noclip)    ne 0 then  self.noclip    = noclip
     if n_elements(t3d)       ne 0 then  self.t3d       = t3d
     if n_elements(thick)     ne 0 then  self.thick     = thick
@@ -568,9 +573,10 @@ pro MrPlotS::cleanup
     ptr_free, self.xcoords
     ptr_free, self.ycoords
     ptr_free, self.zcoords
-    ptr_free, self.color
-    ptr_free, self.symcolor
     ptr_free, self.clip
+    ptr_free, self.color
+    ptr_free, self.linestyle
+    ptr_free, self.symcolor
     
     ;Destroy Map Objects
     if obj_valid(self.map_object) then obj_destroy, self.map_object
@@ -692,22 +698,24 @@ _REF_EXTRA=extra
 ;Keywords ////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
-    setDefaultValue, symsize,  1.0
-    setDefaultValue, thick,    1.0
-    setDefaultValue, noclip,   1,  /BOOLEAN
-    setDefaultValue, data,     0,  /BOOLEAN
-    setDefaultValue, device,   0,  /BOOLEAN
-    setDefaultValue, normal,   0,  /BOOLEAN
-    setDefaultValue, relative, 0,  /BOOLEAN
+    setDefaultValue, symsize,   1.0
+    setDefaultValue, thick,     1.0
+    setDefaultValue, linestyle, 'Solid'
+    setDefaultValue, noclip,    1,  /BOOLEAN
+    setDefaultValue, data,      0,  /BOOLEAN
+    setDefaultValue, device,    0,  /BOOLEAN
+    setDefaultValue, normal,    0,  /BOOLEAN
+    setDefaultValue, relative,  0,  /BOOLEAN
     if normal + device eq 0 then data = 1B
     
     ;Allocate heap for the variables
     self.xcoords    = ptr_new(/ALLOCATE_HEAP)
     self.ycoords    = ptr_new(/ALLOCATE_HEAP)
     self.zcoords    = ptr_new(/ALLOCATE_HEAP)
-    self.color      = ptr_new(/ALLOCATE_HEAP)
-    self.symcolor   = ptr_new(/ALLOCATE_HEAP)
     self.clip       = ptr_new(/ALLOCATE_HEAP)
+    self.color      = ptr_new(/ALLOCATE_HEAP)
+    self.linestyle  = ptr_new(/ALLOCATE_HEAP)
+    self.symcolor   = ptr_new(/ALLOCATE_HEAP)
     
     ;Objects
     self.map_object = obj_new()
@@ -779,7 +787,7 @@ pro MrPlotS__define, class
               data:      0B, $
               device:    0B, $
               normal:    0B, $
-              linestyle: 0B, $
+              linestyle: ptr_new(), $
               noclip:    0B, $
               relative:  0B, $
               t3d:       0B, $

@@ -480,11 +480,15 @@ NOERASE=noerase
     by0         = pos[1] - (N_Elements(*self.text)-1) * ychar * self.charsize
     bx1         = bx0 + width
     by1         = by0 + height
+    
+    ;Adjust vertical alignemnt
+    by0 -= height * self.vertical_alignment
+    by1 -= height * self.vertical_alignment
     self.bx_pos = [bx0, by0, bx1, by1]
 
     ;Location of text
     ;   - POS is the location of the lower-left corner of the first line of text
-    ;   - POS[1] needs to be adjusted for VERTICAL_ALIGNMENT. ALIGNMENT happens automatically.
+    ;   - POS[1] needs to be adjusted for VERTICAL_ALIGNMENT. XYOutS will handle ALIGNMENT automatically.
     txt_pos = [pos[0], by1 - ychar*self.charsize]
 
     ;Apply margins
@@ -1282,7 +1286,7 @@ TARGET=target, $
 TEXT_AXES=text_axes, $
 TT_FONT=tt_font, $
 UPDIR=updir, $
-VERTICAL_ALIGNMENT=vertical_aligment, $
+VERTICAL_ALIGNMENT=vertical_alignment, $
 _REF_EXTRA=extra
     compile_opt strictarr
     
