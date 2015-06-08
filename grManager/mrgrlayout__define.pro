@@ -186,6 +186,9 @@
 ;       2015/01/23  -   CalcPositions now adjusts pointer values if the layout dimensions
 ;                           change. It resets [xy]gap, col_width, row_height, and aspect
 ;                           if they do not contain the correct number of elements. - MRA
+;       2015/05/29  -   Moving plots from fixed location to a different fixed location
+;                           did not keep PIndex the same. Cluged work-around in
+;                           ::SetPosition. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -258,7 +261,7 @@ UPDATE_LAYOUT=update_layout
         ;Create the location
         layout = self -> MakeFixedLocation()
         if update_layout eq 0 then return
-        
+
         ;Add to the layout
         self.nFixed += 1
         *self.fixed_positions = [[*self.fixed_positions], [position]]
@@ -1403,9 +1406,29 @@ TOFIXED = toFixed
 ;Set a [Col, Row] Location ///////////////////////////////////////////
 ;---------------------------------------------------------------------
 
+    ;
+    ; If OLDPINDEX is a fixed location and NEWLAYOUT is a fixed position,
+    ; then we run into problems. ::RemoveFromLayout will remove the position
+    ; and reduce the number of plots in fixed positions, but in doing so, it
+    ; inadvertently shifts the PINDEX of all fixed locations > OLDPINDEX
+    ; without notifying its owner.
+    ;
+    ; ::MakeFixedLocation merely checks self.nFixed and adds one.
+    ; ::WhichLayout iterates up to self.nFixed. Nothing actually
+    ; keeps track of the fixed plot indices.
+    ;
+    ; As a solution, we keep the plot index the same by not doing anything,
+    ; and merely update the position.
+    ;
+
     ;Remove the old position, add the new one.
-    self -> RemoveFromLayout, oldPI
-    self -> AddToLayout, newLay, newPos
+    if oldPIndex lt 0 && n_elements(newLayout) eq 4 then begin
+        (*self.fixed_positions)[*, abs(oldPIndex)-1] = newPos
+        newLay = [self.GrLayout, oldPI]
+    endif else begin
+        self -> RemoveFromLayout, oldPI
+        self -> AddToLayout, newLay, newPos
+    endelse
     
     ;Return the new position and layout location.
     outPosition = newPos
