@@ -359,6 +359,9 @@ pro MrPlot::doOverplot
         return
     endif
     
+    ;Return if we are not to show anything.
+    if *self.nodata then return
+    
     ;Get the character size
     self.layout -> GetProperty, CHARSIZE=charsize
     
