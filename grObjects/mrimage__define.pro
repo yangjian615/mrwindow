@@ -60,7 +60,7 @@
 ;       matthew.argall@wildcats.unh.edu
 ;
 ; :History:
-;	Modification History::
+;   Modification History::
 ;       2014/09/09  -   Written by Matthew Argall
 ;       2014/09/15  -   Removed the RLOG property. ::PrepImage scales the image correctly.
 ;                           Out-of-range pixels determined before change from polar to
@@ -70,6 +70,7 @@
 ;                           color table index is used. Allows proper scaling of image.
 ;                           Missing color is loaded at time of draw. - MRA
 ;       2015/02/23  -   Determine polar ranges better. Do not draw axes if OVERPLOT is set. - MRA
+;       2015/07/06  -   Check RANGE keyword when /LOG is set to prevent infinite range. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -1321,10 +1322,9 @@ pro MrImage::PrepImage
 
         ;Scale the image
         ;   - Set the NaN flag
-        img_out = bytscl(img_out, $
+        img_out = bytscl(img_out, /NAN, $
                          MIN=range[0], MAX=range[1], $
-                         TOP=self.top-self.bottom, $
-                         /NAN)
+                         TOP=self.top-self.bottom )
         
         ;BYTSCL scales between 0 and TOP. Bump everything up by BOTTOM.
         if self.bottom ne 0 then img_out += self.bottom
@@ -1564,6 +1564,10 @@ TV=tv
         return
     endif
     
+    ;Disable refresh until end to prevent drawing multiple times.
+    refresh = self.window -> GetRefresh()
+    if refresh then self -> Refresh, /DISABLE
+    
     ;Image dimensions
     imDims = size(theImage, /DIMENSIONS)
     nDims  = size(theImage, /N_DIMENSIONS)
@@ -1713,33 +1717,59 @@ TV=tv
 ;---------------------------------------------------------------------
 ; Scale, NaN, Range //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    
-    ;NAN
-    iNotFinite = where(finite(*self.image) eq 0, nNotFinite)
-    if nNotFinite gt 0 then self.nan = 1B
-    
-    ;SCALE
-    ;   - Determine the min and max values.
-    ;   - Avoid missing values.
-    if n_elements(*self.missing_value) gt 0 then begin
-        iNotMissing = where(*self.image ne *self.missing_value, nNotMissing)
-        if nNotMissing gt 0 $
-            then imMin = min((*self.image)[iNotMissing], NAN=self.nan, MAX=imMax) $
-            else imMin = min((*self.image), NAN=self.nan, MAX=imMax)
-    endif else begin
-        imMin = min((*self.image), NAN=self.nan, MAX=imMax)
-    endelse
-    if imMin lt 0 || imMax gt 255 then self.scale = 1B
 
-    ;RANGE
-    self.range = [imMin, imMax]
+	;By default, do filter image for NaNs or scale it.
+	nan   = 0B
+	scale = 0B
 
-;---------------------------------------------------------------------
-; Prep the Image /////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    self -> PrepImage
-    
-    self.window -> draw
+	;NAN
+	img_type = size(*self.image, /TNAME)
+	if img_type eq 'FLOAT' || img_type eq 'DOUBLE' then begin
+		iNotFinite = where(finite(*self.image) eq 0, nNotFinite)
+		if nNotFinite gt 0 then nan = 1B
+	endif
+
+	;
+	;RANGE
+	;   - Determine the min and max values.
+	;   - Avoid missing values.
+	;   - If LOG is set, avoid values <= 0
+	;
+	nKeep = n_elements(*self.image)
+	iKeep = lonarr(nKeep)
+
+	;Missing Value
+	if n_elements(*self.missing_value) gt 0 $
+		then iKeep = where(*self.image ne *self.missing_value, nKeep)
+
+	;Log scale?
+	if nKeep gt 0 && self.log then begin
+		if nKeep gt 0 then begin
+			iPos = where((*self.image)[iKeep] gt 0, nKeep)
+			iKeep = iKeep[iPos]
+		endif else begin
+			iKeep = where(*self.image gt 0, nKeep)
+		endelse
+	endif
+
+	;Find range
+	if nKeep gt 0 then begin
+		imMin = min((*self.image)[iKeep], NAN=nan, MAX=imMax)
+	endif else begin
+		imMin = self.log ?  1 : 0
+		imMax = self.log ? 10 : 1
+	endelse
+stop
+	;SCALE
+	if imMin lt 0 || imMax gt 255 then scale = 1B
+
+	;Set Properties
+	;   - NAN and SCALE will cause ::PrepImage to be called.
+	;   - We ALWAYS want to call ::PrepImage on new data.
+	self -> SetProperty, NAN=nan, RANGE=[imMin, imMax], SCALE=scale
+
+	;Redraw   
+	if refresh then self -> Refresh 
 end
 
 
@@ -1852,20 +1882,33 @@ _REF_EXTRA = extra
     if n_elements(pol_tcolor)     gt 0 then  self.pol_tcolor     = pol_tcolor
     if n_elements(pol_tlinestyle) gt 0 then  self.pol_tlinestyle = pol_tlinestyle
     
-    ;SCALE
-    ;   - RANGE is set.
-    nRange = n_elements(range)
-    if nRange gt 0 then begin
-        ;User-defined range?
-        if range[0] ne range[1] then begin
-            self.range = range
-            if self.scale eq 0 then scale = 1
-            
-        ;Automatic range
-        endif else begin
-            self.range = [min(*self.image, MAX=maxIm, /NAN), maxIm]
-        endelse
-    endif
+    ;RANGE
+	nRange = n_elements(range)
+	if nRange gt 0 then begin
+		;Auto-determine range?
+		if range[0] eq range[1] then begin
+			_range = [min(*self.image, MAX=maxIm, /NAN), maxIm]
+		
+		;User-defined range
+		endif else begin
+			_range = range
+			if self.scale eq 0 then scale = 1
+		endelse
+	
+		;Check the range
+		if self.log || keyword_set(log) then begin
+			;Cannot take log of negative numbers
+			if _range[0] lt 0 || _range[1] lt 0 then $
+				message, 'RANGE must be positive if /LOG is set.'
+		
+			;Log of 0 is infinity
+			if _range[0] eq 0 || _range[1] eq 0 $
+				then message, 'Warning: Infinite plot range.', /INFORMATIONAL
+		endif
+
+		;Set the range
+		self.range = _range
+	endif
     
     ;PREP-IMAGE
     ;   - These keywords require the image to be re-prepped
@@ -1873,8 +1916,7 @@ _REF_EXTRA = extra
     nNaN     = n_elements(nan)
     nMissing = n_elements(missing_value)
     nLog     = n_elements(log)
-    nRange   = n_elements(range)
-    if nScale + nNaN + nMissing + nLog + nRange gt 0 then begin
+    if nScale + nNaN + nMissing + nLog gt 0 then begin
         if nScale   gt 0 then  self.scale         = keyword_set(scale)
         if nNaN     gt 0 then  self.nan           = keyword_set(nan)
         if nMissing gt 0 then *self.missing_value = missing_value
@@ -2237,7 +2279,7 @@ _REF_EXTRA = extra
 
     ;RANGE
     ;   - Automatic range has been set in ::SetData.
-    if range[0] ne range[1] then self.range = range
+    if range[0] ne range[1] then _range = range
 
     ;Set the object properties
     ;   - [XY]RANGE must be set after the data is set.
@@ -2257,6 +2299,7 @@ _REF_EXTRA = extra
                          POL_TCOLOR     = pol_tcolor, $
                          POL_TLINESTYLE = pol_tlinestyle, $
                          POL_THICK      = pol_thick, $
+                         RANGE          = _range, $
                          TITLE          = title, $
                          XLOG           = xlog, $
                          XRANGE         = xrange, $
