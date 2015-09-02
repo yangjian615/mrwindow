@@ -354,7 +354,7 @@ NOERASE=noerase
     
     ;Load the palette
     tvlct, self.palette
-    
+
     ;Load the missing color
     if self.missing_color ne '' then tvlct, cgColor(self.missing_color, /TRIPLE), self.missing_index
 
@@ -370,12 +370,21 @@ NOERASE=noerase
 ; Draw Axes //////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 	;Box-style axes.
-	if self.overplot eq 0 then if self.axes && ( (self.polar eq 0) || ((self.pol_axstyle and 1) gt 0) ) then begin
+	if self.overplot eq 0 then if self.axes then begin
 	    if self.paint eq 0 then begin
 	        xrange = *self.xrange
 	        yrange = *self.yrange
 	        xlog   =  self.xlog
 	        ylog   =  self.ylog
+	    endif
+	    
+	    ;Axis style
+	    ;   - Draw only the titles for polar plots, unless otherwise indicated
+	    xstyle = *self.xstyle
+	    ystyle = *self.ystyle
+	    if ((self.pol_axstyle) and 1) eq 0 then begin
+	        xstyle += 4 * ((xstyle and 4) eq 0)
+	        ystyle += 4 * ((ystyle and 4) eq 0)
 	    endif
 
 	    self.layout -> GetProperty, POSITION=position, CHARSIZE=charsize
@@ -411,7 +420,7 @@ NOERASE=noerase
               XLOG          =       xlog, $
               XMINOR        = *self.xminor, $
               XRANGE        =       xrange, $
-              XSTYLE        = *self.xstyle, $
+              XSTYLE        =       xstyle, $
               XTHICK        = *self.xthick, $
               XTICK_GET     = *self.xtick_get, $
               XTICKFORMAT   = *self.xtickformat, $
@@ -429,7 +438,7 @@ NOERASE=noerase
               YLOG          =       ylog, $
               YMINOR        = *self.yminor, $
               YRANGE        =       yrange, $
-              YSTYLE        = *self.ystyle, $
+              YSTYLE        =       ystyle, $
               YTHICK        = *self.ythick, $
               YTICK_GET     = *self.ytick_get, $
               YTICKFORMAT   = *self.ytickformat, $
@@ -649,11 +658,11 @@ YRANGE=yrange
         ;Ensure YRANGE is in the range of [0, 2*!pi]
         twopi = 2.0 * !pi
         if yrange[0] lt 0.0 $
-            then yrange[0] = yrange[0] * ceil(-yrange[0]/twopi) * twopi $
+            then yrange[0] = yrange[0] + ceil(-yrange[0]/twopi) * twopi $
             else if yrange[0] gt twopi then yrange[0] = yrange[0] mod twopi
         
         if yrange[1] lt 0.0 $
-            then yrange[1] = yrange[1] * ceil(-yrange[1]/twopi) * twopi $
+            then yrange[1] = yrange[1] + ceil(-yrange[1]/twopi) * twopi $
             else if yrange[1] gt twopi then yrange[1] = yrange[1] mod twopi
         
         ;Check range
@@ -661,7 +670,7 @@ YRANGE=yrange
         ;   - For YRANGE, we want to show the entire right and/or left-hp
         pa_range_x = yrange
         pa_range_y = yrange
-        
+
         ;Initial [XY]RANGE. Helps determine which half plane we are in.
         xr = xrange[1] * cos(yrange)
         yr = xrange[1] * sin(yrange)
@@ -1419,6 +1428,15 @@ TOP = top
                   REVERSE   =  self.reverse, $
                   BREWER    =  self.brewer, $
                   RGB_TABLE =       tempPalette
+
+        ;If NCOLORS < 255, we need to grab the rest of the color table
+        ;   - If not, TEMPPALETTE and SELF.PALETTE will not be the same
+        ;     size and the results will be messed up.
+        if nColors lt 255 then begin
+        	tvlct, pp, /GET
+        	pp[self.bottom:self.bottom+nColors-1,*] = tempPalette
+        	tempPalette = temporary(pp)
+        endif
         self.palette = temporary(tempPalette)
     endif
 
@@ -1759,7 +1777,7 @@ TV=tv
 		imMin = self.log ?  1 : 0
 		imMax = self.log ? 10 : 1
 	endelse
-stop
+
 	;SCALE
 	if imMin lt 0 || imMax gt 255 then scale = 1B
 
