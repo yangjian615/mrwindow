@@ -868,8 +868,8 @@ TAIL=tail
 
     ;perform MVA -- Transpose to ensure 3xN
     case dimension of
-        1: eigvecs = mva(indep[iRange[0]:iRange[1]], transpose(dep[iRange[0]:iRange[1],*]), EIGVALS=eigvals)
-        2: eigvecs = mva(indep[iRange[0]:iRange[1]], dep[*,iRange[0]:iRange[1]], EIGVALS=eigvals)
+        1: eigvecs = MrMVA(transpose(dep[iRange[0]:iRange[1],*]), EIGENVALUES=eigvals)
+        2: eigvecs = MrMVA(dep[*,iRange[0]:iRange[1]], EIGENVALUES=eigvals)
         else: message, 'Data must be a 3xN or Nx3 array.'
     endcase
     

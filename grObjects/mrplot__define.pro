@@ -889,6 +889,10 @@ _REF_EXTRA = extra
         then *self.ystyle = 1 $
         else *self.ystyle += ~(*self.ystyle and 1)
 
+    ;Set the initial ranges
+    self.init_xrange = [min(*self.indep, MAX=xmax), xmax]
+    self.init_yrange = [min(*self.dep,   MAX=ymax), ymax]
+
     ;Refresh the graphics?
     if refresh then self -> Refresh
 
