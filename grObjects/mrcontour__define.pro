@@ -126,6 +126,12 @@ NOERASE=noerase
     ;Return if we are hiding
     if self.hide then return
     
+    ;Set up PostScript device for working with colors.
+    IF !D.Name EQ 'PS' THEN Device, COLOR=1, BITS_PER_PIXEL=8
+    
+    ; Going to have to do all of this in decomposed color, if possible.
+    cgSetColorState, 1, CURRENTSTATE=currentState
+    
     ;Overplot?
     if self.overplot then begin
         ;Restore target's coordinate system. Make sure that the overplot
@@ -801,6 +807,101 @@ _REF_EXTRA=extra
     
     ;Superclass properties
     if n_elements(extra) ne 0 then self -> MrGrDataAtom::GetProperty, _EXTRA=extra
+end
+
+
+;+
+;   Set the color palette.
+;-
+pro MrContour::SetPalette, $
+BOTTOM = bottom, $
+BREWER = brewer, $
+CTINDEX = ctindex, $
+MISSING_COLOR = missing_color, $
+MISSING_INDEX = missing_index, $
+NCOLORS = ncolors, $
+PALETTE = palette, $
+REVERSE = reverse, $
+TOP = top
+    compile_opt strictarr
+    
+    ;Error handling
+    catch, the_error
+    if the_error ne 0 then begin
+        catch, /cancel
+        void = cgErrorMsg()
+        return
+    endif
+
+;---------------------------------------------------------------------
+; Set Properties /////////////////////////////////////////////////////
+;--------------------------------------------------------------------- 
+    if n_elements(brewer)        gt 0 then self.brewer        = keyword_set(brewer)
+    if n_elements(missing_color) gt 0 then self.missing_color = missing_color
+    if n_elements(missing_index) gt 0 then self.missing_index = missing_index
+    if n_elements(reverse)       gt 0 then self.reverse       = keyword_set(reverse)
+    
+    ;PALETTE takes precedence over CTINDEX.
+    if n_elements(ctindex) gt 0 then *self.ctindex = ctindex
+    if n_elements(palette) gt 0 then begin
+        self.palette = palette
+        void = temporary(*self.ctindex)
+    endif
+
+    ;Rescale?
+    ;   - If the SCALE property is set, ::PrepImage will make use of TOP and BOTTOM
+    ;       when byte-scaling the image.
+    ;   - If they change, must rescale.
+    ;   - NCOLORS takes precedence over TOP
+    nCol       = n_elements(nColors)
+    nBottom    = n_elements(bottom)
+    nTop       = n_elements(top)
+    scale_flag = 0
+    if nBottom + nTop + nCol gt 0 then begin
+        scale_flag = 1
+        if nBottom gt 0 then self.bottom = 0B > bottom < 255B
+        if nTop    gt 0 then self.top    = 0B > top    < 255B
+        if nCol    gt 0 then self.top    = 0B > self.bottom + nColors - 1 < 255B
+    endif
+    nColors = self.top - self.bottom + 1
+
+;---------------------------------------------------------------------
+; Hide Missing Color? ////////////////////////////////////////////////
+;---------------------------------------------------------------------  
+    ;Missing index
+    ;   - Check if the missing index is at the top/bottom of the color table.
+    ;       o Adjust the top/bottom to hide it.
+    ;   - The missing color is loaded into the color table at time of draw.
+    ;       o Prevent color palette contamination
+    ;       o Facilitate change of missing color.
+    if self.missing_color ne '' then begin
+        if self.missing_index eq !d.table_size-1 then self.top    = self.top    < !d.table_size-2
+        if self.missing_index eq 0B              then self.bottom = self.bottom > 1B
+    endif
+
+;---------------------------------------------------------------------
+;Load a Color Table Index? ///////////////////////////////////////////
+;---------------------------------------------------------------------    
+    if n_elements(*self.ctindex) gt 0 then begin
+        ;Load the color table
+        cgLoadCT, *self.ctindex, $
+                  BOTTOM    =  self.bottom, $
+                  NCOLORS   =       nColors, $
+                  REVERSE   =  self.reverse, $
+                  BREWER    =  self.brewer, $
+                  RGB_TABLE =       tempPalette
+        self.palette = temporary(tempPalette)
+    endif
+
+;---------------------------------------------------------------------
+; Cleanup ////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+    
+    ;Does the image now need to be scaled?
+    if scale_flag then if self.scale then self -> PrepImage
+    
+    ;Redraw
+    self.window -> Draw
 end
 
 

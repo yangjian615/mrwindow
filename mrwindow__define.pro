@@ -450,9 +450,12 @@ ERASE=erase
     ;Return if we are not refreshing.
     if self._refresh eq 0B then return
     
-    ;Realize the widget if need be. This will cause Notify_Realize to call the
-    ;Draw method. Thus, after realizing, we can exit.
-    if self.buffer then begin
+    ;PS - Do not switch to "Z" device or realize the widget if we are in "PS" mode.
+    if !d.name eq 'PS' then begin
+        ;Avoid other cases
+    
+    ;BUFFER - switch to 'Z' device
+    endif else if self.buffer then begin
         thisDevice = !d.name
         set_plot, 'Z'
         
@@ -461,6 +464,8 @@ ERASE=erase
             then device, SET_PIXEL_DEPTH=24 $
             else message, '8-bit color output in Z buffer does not maintain a consistent color tabel.', /INFORMATIONAL
     
+    ;Realize the widget if need be. This will cause Notify_Realize to call the
+    ;Draw method. Thus, after realizing, we can exit.
     endif else if self._realized eq 0 then begin
         self -> Realize
         return
@@ -481,7 +486,7 @@ ERASE=erase
         allObj[i] -> Draw, NOERASE=noerase
     endfor
     
-    ;Windows possible?    
+    ;Windows possible?
     if (!d.flags and 256) ne 0 then begin
         ;Reset the focus.
         if self.nplots gt 0 then self -> Focus
@@ -492,7 +497,7 @@ ERASE=erase
     endif
     
     ;Return to the initial device
-    if self.buffer then set_plot, thisDevice
+    if n_elements(thisDevice) gt 0 then set_plot, thisDevice
 end
 
 

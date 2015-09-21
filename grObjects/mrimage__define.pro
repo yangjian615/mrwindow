@@ -1718,7 +1718,7 @@ TV=tv
 ; Scale, NaN, Range //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
-	;By default, do filter image for NaNs or scale it.
+	;By default, do not filter image for NaNs or scale it.
 	nan   = 0B
 	scale = 0B
 
@@ -1743,10 +1743,10 @@ TV=tv
 		then iKeep = where(*self.image ne *self.missing_value, nKeep)
 
 	;Log scale?
-	if nKeep gt 0 && self.log then begin
+	if self.log then begin
 		if nKeep gt 0 then begin
-			iPos = where((*self.image)[iKeep] gt 0, nKeep)
-			iKeep = iKeep[iPos]
+			iPos  = where((*self.image)[iKeep] gt 0, nKeep)
+			iKeep = iKeep[temporary(iPos)]
 		endif else begin
 			iKeep = where(*self.image gt 0, nKeep)
 		endelse
@@ -1759,7 +1759,7 @@ TV=tv
 		imMin = self.log ?  1 : 0
 		imMax = self.log ? 10 : 1
 	endelse
-stop
+
 	;SCALE
 	if imMin lt 0 || imMax gt 255 then scale = 1B
 
@@ -1885,15 +1885,10 @@ _REF_EXTRA = extra
     ;RANGE
 	nRange = n_elements(range)
 	if nRange gt 0 then begin
-		;Auto-determine range?
-		if range[0] eq range[1] then begin
-			_range = [min(*self.image, MAX=maxIm, /NAN), maxIm]
-		
-		;User-defined range
-		endif else begin
-			_range = range
-			if self.scale eq 0 then scale = 1
-		endelse
+		;Auto-determine range or User-defined?
+		if range[0] eq range[1] $
+			then _range = [min(*self.image, MAX=maxIm, /NAN), maxIm] $
+			else _range = range
 	
 		;Check the range
 		if self.log || keyword_set(log) then begin
@@ -2256,21 +2251,22 @@ _REF_EXTRA = extra
     ; before either of them are called in ::SetData
     ;
     
-    ;Pixel-related properties
+    ;Data & Pixel-related properties
     ;   - Those not set in the colors section above.
+    self.xlog  = keyword_set(xlog)
+    self.ylog  = keyword_set(ylog)
     self.log   = keyword_set(log)
     self.polar = keyword_set(polar)
     self.tv    = keyword_set(tv)
     
     ;Image output-related properties
     ;   - Scale the image if range[0] ne range[1] (user-given range)
-    if n_elements(range) eq 0 then range = [0,0]
-    if range[0] ne range[1]   then scale = 1B
-    self.scale = keyword_set(scale)
-	self.nan   = keyword_set(nan)
+    if n_elements(range)         eq 0 then range = [0,0]
     if n_elements(missing_value) gt 0 then *self.missing_value = missing_value
 
     ;Set the data
+    ;   - Automatically sets NAN, RANGE and SCALE.
+    ;   - Depends on XLOG, YLOG, LOG, TV, and MISSING_VALUE being set.
     self -> SetData, theImage, x, y, x0, y0, x1, y1
     
 ;---------------------------------------------------------------------
@@ -2291,6 +2287,7 @@ _REF_EXTRA = extra
                          IDISPLAY       = iDisplay, $
                          MAX_VALUE      = max_value, $
                          MIN_VALUE      = min_value, $
+                         NAN            = nan, $
                          NOCLIP         = noclip, $
                          NORMAL         = normal, $
                          POL_AXSTYLE    = pol_axstyle, $
@@ -2300,12 +2297,11 @@ _REF_EXTRA = extra
                          POL_TLINESTYLE = pol_tlinestyle, $
                          POL_THICK      = pol_thick, $
                          RANGE          = _range, $
+                         SCALE          = scale, $
                          TITLE          = title, $
-                         XLOG           = xlog, $
                          XRANGE         = xrange, $
                          XTICKLEN       = xticklen, $
                          XTITLE         = xtitle, $
-                         YLOG           = ylog, $
                          YRANGE         = yrange, $
                          YTICKLEN       = yticklen, $
                          YTITLE         = ytitle

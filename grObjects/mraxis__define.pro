@@ -95,15 +95,27 @@ NOERASE=noerase
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
+        if n_elements(currentState) gt 0 then cgSetColorState, currentState
+        if n_elements(rr) gt 0 then tvlct, rr, gg, bb
         void = cgErrorMsg()
         RETURN
     ENDIF
 
     IF self.hide THEN RETURN
+    
+    ;Do this in decomposed color, if possible
+    cgSetColorState, 1, CURRENTSTATE=currentState
+    
+    ; Set up PostScript device for working with colors.
+    IF !D.Name EQ 'PS' THEN Device, COLOR=1, BITS_PER_PIXEL=8
 
-    ;Make the axis "sticky" so that it moves around with the plot it is associated with.
-    ;   This must be done before checking the number of parameters below. If OFFSET=0,
-    ;   then the position is nullified and determined automatically by cgAxis.
+    ; Draw the axis. Do this in Decomposed color, if possible.
+    cgSetColorState, 1, CURRENTSTATE=currentState
+    
+    ;Get the input color table.
+    TVLCT, rr, gg, bb, /Get
+
+    ;Make the axis "sticky" so that it moves around with its target.
     IF MrIsA(*self.location, 'STRING') THEN self -> SetLocation
     
     ;Get the current coordinats
@@ -123,6 +135,12 @@ NOERASE=noerase
         !Z = z_sysvar
         !P = p_sysvar
     ENDIF
+    
+    ;Reset the color state
+    cgSetColorState, currentState
+
+    ;Restore the color tables.
+    IF (!D.Name NE 'Z') THEN TVLCT, rr, gg, bb
 END
 
 
@@ -148,11 +166,11 @@ NOERASE=noerase
         RETURN
     ENDIF
     
-    ;Count the number of parameters.    
-    nparams = 0
-    IF N_Elements(*self.xloc) NE 0 THEN nparams = nparams + 1
-    IF N_Elements(*self.yloc) NE 0 THEN nparams = nparams + 1
-    IF N_Elements(*self.zloc) NE 0 THEN nparams = nparams + 1
+    ;Count the number of parameters.
+    nparams = n_elements(*self.xloc) eq 0 ? 0 : $
+              n_elements(*self.yloc) eq 0 ? 1 : $
+              n_elements(*self.zloc) eq 0 ? 2 : $
+              3
     
     ;Adjust for postscript output.
     if !d.name eq 'PS' then begin
@@ -165,320 +183,327 @@ NOERASE=noerase
         thick     = *self.thick
     endelse
 
+    ;Create the color
+    color = cgColor(*self.color)
+
     ;Call cgAxis with the correct number of parameters.
     CASE nparams OF
-        0: cgAxis, SAVE  =  1B, $
-                   XAXIS = *self.xaxis, $
-                   XLOG  =  self.xlog, $
-                   YAXIS = *self.yaxis, $
-                   YLOG  =  self.ylog, $
-                   ZAXIS = *self.zaxis, $
-                   ZLOG  =  self.zlog, $
-                   
-                   ;cgGraphicsKeywords
-;                  AXISCOLOR     = *self.axiscolor, $
-;                  BACKGROUND    = *self.background, $
-                   CHARSIZE      =       charsize, $
-                   CHARTHICK     =       charthick, $
-;                  CLIP          = *self.clip, $
-                   COLOR         = *self.color, $
-                   DATA          =  self.data, $
-                   DEVICE        =  self.device, $
-                   NORMAL        =  self.normal, $
-                   FONT          = *self.font, $
-;                  NOCLIP        = *self.noclip, $
-                   NODATA        = *self.nodata, $
-                   NOERASE       = *self.noerase, $
-;                  POSITION      = *self.position, $
-;                  PSYM          = *self.psym, $
-                   SUBTITLE      = *self.subtitle, $
-;                  SYMSIZE       = *self.symsize, $
-                   T3D           = *self.t3d, $
-;                  THICK         = *self.thick, $
-                   TICKLEN       = *self.ticklen, $
-                   TITLE         = *self.title, $
-                   XCHARSIZE     = *self.xcharsize, $
-                   XGRIDSTYLE    = *self.xgridstyle, $
-                   XMARGIN       = *self.xmargin, $
-                   XMINOR        = *self.xminor, $
-                   XRANGE        = *self.xrange, $
-                   XSTYLE        = *self.xstyle, $
-                   XTHICK        = *self.xthick, $
-                   XTICK_GET     = *self.xtick_get, $
-                   XTICKFORMAT   = *self.xtickformat, $
-                   XTICKINTERVAL = *self.xtickinterval, $
-                   XTICKLAYOUT   = *self.xticklayout, $
-                   XTICKLEN      = *self.xticklen, $
-                   XTICKNAME     = *self.xtickname, $
-                   XTICKS        = *self.xticks, $
-                   XTICKUNITS    = *self.xtickunits, $
-                   XTICKV        = *self.xtickv, $
-                   XTITLE        = *self.xtitle, $
-                   YCHARSIZE     = *self.ycharsize, $
-                   YGRIDSTYLE    = *self.ygridstyle, $
-                   YMARGIN       = *self.ymargin, $
-                   YMINOR        = *self.yminor, $
-                   YRANGE        = *self.yrange, $
-                   YSTYLE        = *self.ystyle, $
-                   YTHICK        = *self.ythick, $
-                   YTICK_GET     = *self.ytick_get, $
-                   YTICKFORMAT   = *self.ytickformat, $
-                   YTICKINTERVAL = *self.ytickinterval, $
-                   YTICKLAYOUT   = *self.yticklayout, $
-                   YTICKLEN      = *self.yticklen, $
-                   YTICKNAME     = *self.ytickname, $
-                   YTICKS        = *self.yticks, $
-                   YTICKUNITS    = *self.ytickunits, $
-                   YTICKV        = *self.ytickv, $
-                   YTITLE        = *self.ytitle, $
-                   ZCHARSIZE     = *self.zcharsize, $
-                   ZGRIDSTYLE    = *self.zgridstyle, $
-                   ZMARGIN       = *self.zmargin, $
-                   ZMINOR        = *self.zminor, $
-                   ZRANGE        = *self.zrange, $
-                   ZSTYLE        = *self.zstyle, $
-                   ZTHICK        = *self.zthick, $
-                   ZTICK_GET     = *self.ztick_get, $
-                   ZTICKFORMAT   = *self.ztickformat, $
-                   ZTICKINTERVAL = *self.ztickinterval, $
-                   ZTICKLAYOUT   = *self.zticklayout, $
-                   ZTICKLEN      = *self.zticklen, $
-                   ZTICKNAME     = *self.ztickname, $
-                   ZTICKS        = *self.zticks, $
-                   ZTICKUNITS    = *self.ztickunits, $
-                   ZTICKV        = *self.ztickv, $
-                   ZTITLE        = *self.ztitle, $
-                   ZVALUE        = *self.zvalue
+        0: Axis, SAVE    =  1B, $
+                 XAXIS   = *self.xaxis, $
+                 XLOG    =  self.xlog, $
+                 YAXIS   = *self.yaxis, $
+                 YLOG    =  self.ylog, $
+                 YNOZERO =  self.ynozero, $
+                 ZAXIS   = *self.zaxis, $
+;                 ZLOG    =  self.zlog, $                    ; !!!!!!!!!!!!!
+                 
+                 ;cgGraphicsKeywords
+                 AM_PM         = *self.am_pm, $              ; !!!!!!!!!!!!!
+;                AXISCOLOR     = *self.axiscolor, $
+;                BACKGROUND    = *self.background, $
+                 CHARSIZE      =       charsize, $
+                 CHARTHICK     =       charthick, $
+;                CLIP          = *self.clip, $
+                 COLOR         =       color, $
+                 DATA          =  self.data, $
+                 DAYS_OF_WEEK  = *self.days_of_week, $       ; !!!!!!!!!!!!!!
+                 DEVICE        =  self.device, $
+                 NORMAL        =  self.normal, $
+                 FONT          = *self.font, $
+                 MONTHS        = *self.months, $             ; !!!!!!!!!!!!!!
+;                NOCLIP        = *self.noclip, $
+                 NODATA        = *self.nodata, $
+                 NOERASE       = *self.noerase, $
+;                POSITION      = *self.position, $
+;                PSYM          = *self.psym, $
+                 SUBTITLE      = *self.subtitle, $
+;                SYMSIZE       = *self.symsize, $
+                 T3D           = *self.t3d, $
+;                THICK         = *self.thick, $
+                 TICKLEN       = *self.ticklen, $
+;                 TITLE         = *self.title, $             ; !!!!!!!!!!!!!
+                 XCHARSIZE     = *self.xcharsize, $
+                 XGRIDSTYLE    = *self.xgridstyle, $
+                 XMARGIN       = *self.xmargin, $
+                 XMINOR        = *self.xminor, $
+                 XRANGE        = *self.xrange, $
+                 XSTYLE        = *self.xstyle, $
+                 XTHICK        = *self.xthick, $
+                 XTICK_GET     = *self.xtick_get, $
+                 XTICKFORMAT   = *self.xtickformat, $
+                 XTICKINTERVAL = *self.xtickinterval, $
+                 XTICKLAYOUT   = *self.xticklayout, $
+                 XTICKLEN      = *self.xticklen, $
+                 XTICKNAME     = *self.xtickname, $
+                 XTICKS        = *self.xticks, $
+                 XTICKUNITS    = *self.xtickunits, $
+                 XTICKV        = *self.xtickv, $
+                 XTITLE        = *self.xtitle, $
+                 YCHARSIZE     = *self.ycharsize, $
+                 YGRIDSTYLE    = *self.ygridstyle, $
+                 YMARGIN       = *self.ymargin, $
+                 YMINOR        = *self.yminor, $
+                 YRANGE        = *self.yrange, $
+                 YSTYLE        = *self.ystyle, $
+                 YTHICK        = *self.ythick, $
+                 YTICK_GET     = *self.ytick_get, $
+                 YTICKFORMAT   = *self.ytickformat, $
+                 YTICKINTERVAL = *self.ytickinterval, $
+                 YTICKLAYOUT   = *self.yticklayout, $
+                 YTICKLEN      = *self.yticklen, $
+                 YTICKNAME     = *self.ytickname, $
+                 YTICKS        = *self.yticks, $
+                 YTICKUNITS    = *self.ytickunits, $
+                 YTICKV        = *self.ytickv, $
+                 YTITLE        = *self.ytitle, $
+                 ZCHARSIZE     = *self.zcharsize, $
+                 ZGRIDSTYLE    = *self.zgridstyle, $
+                 ZMARGIN       = *self.zmargin, $
+                 ZMINOR        = *self.zminor, $
+                 ZRANGE        = *self.zrange, $
+                 ZSTYLE        = *self.zstyle, $
+                 ZTHICK        = *self.zthick, $
+                 ZTICK_GET     = *self.ztick_get, $
+                 ZTICKFORMAT   = *self.ztickformat, $
+                 ZTICKINTERVAL = *self.ztickinterval, $
+                 ZTICKLAYOUT   = *self.zticklayout, $
+                 ZTICKLEN      = *self.zticklen, $
+                 ZTICKNAME     = *self.ztickname, $
+                 ZTICKS        = *self.zticks, $
+                 ZTICKUNITS    = *self.ztickunits, $
+                 ZTICKV        = *self.ztickv, $
+                 ZTITLE        = *self.ztitle, $
+                 ZVALUE        = *self.zvalue
 
         ;Keywords commented out above have been removed
-        1: cgAxis, *self.xloc, $
-                   SAVE  =  1B, $
-                   XAXIS = *self.xaxis, $
-                   XLOG  =  self.xlog, $
-                   YAXIS = *self.yaxis, $
-                   YLOG  =  self.ylog, $
-                   ZAXIS = *self.zaxis, $
-                   ZLOG  =  self.zlog, $
+        1: Axis, *self.xloc, $
+                 SAVE    =  1B, $
+                 XAXIS   = *self.xaxis, $
+                 XLOG    =  self.xlog, $
+                 YAXIS   = *self.yaxis, $
+                 YLOG    =  self.ylog, $
+                 YNOZERO =  self.ynozero, $
+                 ZAXIS   = *self.zaxis, $
+                 ZLOG    =  self.zlog, $
+                 
+                 ;cgGraphicsKeywords
+                 CHARSIZE      =       charsize, $
+                 CHARTHICK     =       charthick, $
+                 COLOR         =       color, $
+                 DATA          =  self.data, $
+                 DEVICE        =  self.device, $
+                 NORMAL        =  self.normal, $
+                 FONT          = *self.font, $
+                 NODATA        = *self.nodata, $
+                 NOERASE       = *self.noerase, $
+                 SUBTITLE      = *self.subtitle, $
+                 T3D           = *self.t3d, $
+                 TICKLEN       = *self.ticklen, $
+                 XCHARSIZE     = *self.xcharsize, $
+                 XGRIDSTYLE    = *self.xgridstyle, $
+                 XMARGIN       = *self.xmargin, $
+                 XMINOR        = *self.xminor, $
+                 XRANGE        = *self.xrange, $
+                 XSTYLE        = *self.xstyle, $
+                 XTHICK        = *self.xthick, $
+                 XTICK_GET     = *self.xtick_get, $
+                 XTICKFORMAT   = *self.xtickformat, $
+                 XTICKINTERVAL = *self.xtickinterval, $
+                 XTICKLAYOUT   = *self.xticklayout, $
+                 XTICKLEN      = *self.xticklen, $
+                 XTICKNAME     = *self.xtickname, $
+                 XTICKS        = *self.xticks, $
+                 XTICKUNITS    = *self.xtickunits, $
+                 XTICKV        = *self.xtickv, $
+                 XTITLE        = *self.xtitle, $
+                 YCHARSIZE     = *self.ycharsize, $
+                 YGRIDSTYLE    = *self.ygridstyle, $
+                 YMARGIN       = *self.ymargin, $
+                 YMINOR        = *self.yminor, $
+                 YRANGE        = *self.yrange, $
+                 YSTYLE        = *self.ystyle, $
+                 YTHICK        = *self.ythick, $
+                 YTICK_GET     = *self.ytick_get, $
+                 YTICKFORMAT   = *self.ytickformat, $
+                 YTICKINTERVAL = *self.ytickinterval, $
+                 YTICKLAYOUT   = *self.yticklayout, $
+                 YTICKLEN      = *self.yticklen, $
+                 YTICKNAME     = *self.ytickname, $
+                 YTICKS        = *self.yticks, $
+                 YTICKUNITS    = *self.ytickunits, $
+                 YTICKV        = *self.ytickv, $
+                 YTITLE        = *self.ytitle, $
+                 ZCHARSIZE     = *self.zcharsize, $
+                 ZGRIDSTYLE    = *self.zgridstyle, $
+                 ZMARGIN       = *self.zmargin, $
+                 ZMINOR        = *self.zminor, $
+                 ZRANGE        = *self.zrange, $
+                 ZSTYLE        = *self.zstyle, $
+                 ZTHICK        = *self.zthick, $
+                 ZTICK_GET     = *self.ztick_get, $
+                 ZTICKFORMAT   = *self.ztickformat, $
+                 ZTICKINTERVAL = *self.ztickinterval, $
+                 ZTICKLAYOUT   = *self.zticklayout, $
+                 ZTICKLEN      = *self.zticklen, $
+                 ZTICKNAME     = *self.ztickname, $
+                 ZTICKS        = *self.zticks, $
+                 ZTICKUNITS    = *self.ztickunits, $
+                 ZTICKV        = *self.ztickv, $
+                 ZTITLE        = *self.ztitle, $
+                 ZVALUE        = *self.zvalue
                    
-                   ;cgGraphicsKeywords
-                   CHARSIZE      =       charsize, $
-                   CHARTHICK     =       charthick, $
-                   COLOR         = *self.color, $
-                   DATA          =  self.data, $
-                   DEVICE        =  self.device, $
-                   NORMAL        =  self.normal, $
-                   FONT          = *self.font, $
-                   NODATA        = *self.nodata, $
-                   NOERASE       = *self.noerase, $
-                   SUBTITLE      = *self.subtitle, $
-                   T3D           = *self.t3d, $
-                   TICKLEN       = *self.ticklen, $
-                   TITLE         = *self.title, $
-                   XCHARSIZE     = *self.xcharsize, $
-                   XGRIDSTYLE    = *self.xgridstyle, $
-                   XMARGIN       = *self.xmargin, $
-                   XMINOR        = *self.xminor, $
-                   XRANGE        = *self.xrange, $
-                   XSTYLE        = *self.xstyle, $
-                   XTHICK        = *self.xthick, $
-                   XTICK_GET     = *self.xtick_get, $
-                   XTICKFORMAT   = *self.xtickformat, $
-                   XTICKINTERVAL = *self.xtickinterval, $
-                   XTICKLAYOUT   = *self.xticklayout, $
-                   XTICKLEN      = *self.xticklen, $
-                   XTICKNAME     = *self.xtickname, $
-                   XTICKS        = *self.xticks, $
-                   XTICKUNITS    = *self.xtickunits, $
-                   XTICKV        = *self.xtickv, $
-                   XTITLE        = *self.xtitle, $
-                   YCHARSIZE     = *self.ycharsize, $
-                   YGRIDSTYLE    = *self.ygridstyle, $
-                   YMARGIN       = *self.ymargin, $
-                   YMINOR        = *self.yminor, $
-                   YRANGE        = *self.yrange, $
-                   YSTYLE        = *self.ystyle, $
-                   YTHICK        = *self.ythick, $
-                   YTICK_GET     = *self.ytick_get, $
-                   YTICKFORMAT   = *self.ytickformat, $
-                   YTICKINTERVAL = *self.ytickinterval, $
-                   YTICKLAYOUT   = *self.yticklayout, $
-                   YTICKLEN      = *self.yticklen, $
-                   YTICKNAME     = *self.ytickname, $
-                   YTICKS        = *self.yticks, $
-                   YTICKUNITS    = *self.ytickunits, $
-                   YTICKV        = *self.ytickv, $
-                   YTITLE        = *self.ytitle, $
-                   ZCHARSIZE     = *self.zcharsize, $
-                   ZGRIDSTYLE    = *self.zgridstyle, $
-                   ZMARGIN       = *self.zmargin, $
-                   ZMINOR        = *self.zminor, $
-                   ZRANGE        = *self.zrange, $
-                   ZSTYLE        = *self.zstyle, $
-                   ZTHICK        = *self.zthick, $
-                   ZTICK_GET     = *self.ztick_get, $
-                   ZTICKFORMAT   = *self.ztickformat, $
-                   ZTICKINTERVAL = *self.ztickinterval, $
-                   ZTICKLAYOUT   = *self.zticklayout, $
-                   ZTICKLEN      = *self.zticklen, $
-                   ZTICKNAME     = *self.ztickname, $
-                   ZTICKS        = *self.zticks, $
-                   ZTICKUNITS    = *self.ztickunits, $
-                   ZTICKV        = *self.ztickv, $
-                   ZTITLE        = *self.ztitle, $
-                   ZVALUE        = *self.zvalue
+        2: Axis, *self.xloc, *self.yloc, $
+                 SAVE    =  1B, $
+                 XAXIS   = *self.xaxis, $
+                 XLOG    =  self.xlog, $
+                 YAXIS   = *self.yaxis, $
+                 YLOG    =  self.ylog, $
+                 YNOZERO =  self.ynozero, $
+                 ZAXIS   = *self.zaxis, $
+                 ZLOG    =  self.zlog, $
+                 
+                 ;cgGraphicsKeywords
+                 CHARSIZE      =       charsize, $
+                 CHARTHICK     =       charthick, $
+                 COLOR         =       color, $
+                 DATA          =  self.data, $
+                 DEVICE        =  self.device, $
+                 NORMAL        =  self.normal, $
+                 FONT          = *self.font, $
+                 NODATA        = *self.nodata, $
+                 NOERASE       = *self.noerase, $
+                 SUBTITLE      = *self.subtitle, $
+                 T3D           = *self.t3d, $
+                 TICKLEN       = *self.ticklen, $
+                 XCHARSIZE     = *self.xcharsize, $
+                 XGRIDSTYLE    = *self.xgridstyle, $
+                 XMARGIN       = *self.xmargin, $
+                 XMINOR        = *self.xminor, $
+                 XRANGE        = *self.xrange, $
+                 XSTYLE        = *self.xstyle, $
+                 XTHICK        = *self.xthick, $
+                 XTICK_GET     = *self.xtick_get, $
+                 XTICKFORMAT   = *self.xtickformat, $
+                 XTICKINTERVAL = *self.xtickinterval, $
+                 XTICKLAYOUT   = *self.xticklayout, $
+                 XTICKLEN      = *self.xticklen, $
+                 XTICKNAME     = *self.xtickname, $
+                 XTICKS        = *self.xticks, $
+                 XTICKUNITS    = *self.xtickunits, $
+                 XTICKV        = *self.xtickv, $
+                 XTITLE        = *self.xtitle, $
+                 YCHARSIZE     = *self.ycharsize, $
+                 YGRIDSTYLE    = *self.ygridstyle, $
+                 YMARGIN       = *self.ymargin, $
+                 YMINOR        = *self.yminor, $
+                 YRANGE        = *self.yrange, $
+                 YSTYLE        = *self.ystyle, $
+                 YTHICK        = *self.ythick, $
+                 YTICK_GET     = *self.ytick_get, $
+                 YTICKFORMAT   = *self.ytickformat, $
+                 YTICKINTERVAL = *self.ytickinterval, $
+                 YTICKLAYOUT   = *self.yticklayout, $
+                 YTICKLEN      = *self.yticklen, $
+                 YTICKNAME     = *self.ytickname, $
+                 YTICKS        = *self.yticks, $
+                 YTICKUNITS    = *self.ytickunits, $
+                 YTICKV        = *self.ytickv, $
+                 YTITLE        = *self.ytitle, $
+                 ZCHARSIZE     = *self.zcharsize, $
+                 ZGRIDSTYLE    = *self.zgridstyle, $
+                 ZMARGIN       = *self.zmargin, $
+                 ZMINOR        = *self.zminor, $
+                 ZRANGE        = *self.zrange, $
+                 ZSTYLE        = *self.zstyle, $
+                 ZTHICK        = *self.zthick, $
+                 ZTICK_GET     = *self.ztick_get, $
+                 ZTICKFORMAT   = *self.ztickformat, $
+                 ZTICKINTERVAL = *self.ztickinterval, $
+                 ZTICKLAYOUT   = *self.zticklayout, $
+                 ZTICKLEN      = *self.zticklen, $
+                 ZTICKNAME     = *self.ztickname, $
+                 ZTICKS        = *self.zticks, $
+                 ZTICKUNITS    = *self.ztickunits, $
+                 ZTICKV        = *self.ztickv, $
+                 ZTITLE        = *self.ztitle, $
+                 ZVALUE        = *self.zvalue
                    
-        2: cgAxis, *self.xloc, *self.yloc, $
-                   SAVE  =  1B, $
-                   XAXIS = *self.xaxis, $
-                   XLOG  =  self.xlog, $
-                   YAXIS = *self.yaxis, $
-                   YLOG  =  self.ylog, $
-                   ZAXIS = *self.zaxis, $
-                   ZLOG  =  self.zlog, $
-                   
-                   ;cgGraphicsKeywords
-                   CHARSIZE      =       charsize, $
-                   CHARTHICK     =       charthick, $
-                   COLOR         = *self.color, $
-                   DATA          =  self.data, $
-                   DEVICE        =  self.device, $
-                   NORMAL        =  self.normal, $
-                   FONT          = *self.font, $
-                   NODATA        = *self.nodata, $
-                   NOERASE       = *self.noerase, $
-                   SUBTITLE      = *self.subtitle, $
-                   T3D           = *self.t3d, $
-                   TICKLEN       = *self.ticklen, $
-                   TITLE         = *self.title, $
-                   XCHARSIZE     = *self.xcharsize, $
-                   XGRIDSTYLE    = *self.xgridstyle, $
-                   XMARGIN       = *self.xmargin, $
-                   XMINOR        = *self.xminor, $
-                   XRANGE        = *self.xrange, $
-                   XSTYLE        = *self.xstyle, $
-                   XTHICK        = *self.xthick, $
-                   XTICK_GET     = *self.xtick_get, $
-                   XTICKFORMAT   = *self.xtickformat, $
-                   XTICKINTERVAL = *self.xtickinterval, $
-                   XTICKLAYOUT   = *self.xticklayout, $
-                   XTICKLEN      = *self.xticklen, $
-                   XTICKNAME     = *self.xtickname, $
-                   XTICKS        = *self.xticks, $
-                   XTICKUNITS    = *self.xtickunits, $
-                   XTICKV        = *self.xtickv, $
-                   XTITLE        = *self.xtitle, $
-                   YCHARSIZE     = *self.ycharsize, $
-                   YGRIDSTYLE    = *self.ygridstyle, $
-                   YMARGIN       = *self.ymargin, $
-                   YMINOR        = *self.yminor, $
-                   YRANGE        = *self.yrange, $
-                   YSTYLE        = *self.ystyle, $
-                   YTHICK        = *self.ythick, $
-                   YTICK_GET     = *self.ytick_get, $
-                   YTICKFORMAT   = *self.ytickformat, $
-                   YTICKINTERVAL = *self.ytickinterval, $
-                   YTICKLAYOUT   = *self.yticklayout, $
-                   YTICKLEN      = *self.yticklen, $
-                   YTICKNAME     = *self.ytickname, $
-                   YTICKS        = *self.yticks, $
-                   YTICKUNITS    = *self.ytickunits, $
-                   YTICKV        = *self.ytickv, $
-                   YTITLE        = *self.ytitle, $
-                   ZCHARSIZE     = *self.zcharsize, $
-                   ZGRIDSTYLE    = *self.zgridstyle, $
-                   ZMARGIN       = *self.zmargin, $
-                   ZMINOR        = *self.zminor, $
-                   ZRANGE        = *self.zrange, $
-                   ZSTYLE        = *self.zstyle, $
-                   ZTHICK        = *self.zthick, $
-                   ZTICK_GET     = *self.ztick_get, $
-                   ZTICKFORMAT   = *self.ztickformat, $
-                   ZTICKINTERVAL = *self.ztickinterval, $
-                   ZTICKLAYOUT   = *self.zticklayout, $
-                   ZTICKLEN      = *self.zticklen, $
-                   ZTICKNAME     = *self.ztickname, $
-                   ZTICKS        = *self.zticks, $
-                   ZTICKUNITS    = *self.ztickunits, $
-                   ZTICKV        = *self.ztickv, $
-                   ZTITLE        = *self.ztitle, $
-                   ZVALUE        = *self.zvalue
-                   
-        3: cgAxis, *self.xloc, *self.yloc, *self.zloc, $
-                   SAVE  =  1B, $
-                   XAXIS = *self.xaxis, $
-                   XLOG  =  self.xlog, $
-                   YAXIS = *self.yaxis, $
-                   YLOG  =  self.ylog, $
-                   ZAXIS = *self.zaxis, $
-                   ZLOG  =  self.zlog, $
-                   
-                   ;cgGraphicsKeywords
-                   CHARSIZE      =  self.charsize, $
-                   CHARTHICK     = *self.charthick, $
-                   COLOR         = *self.color, $
-                   DATA          = *self.data, $
-                   DEVICE        = *self.device, $
-                   NORMAL        = *self.normal, $
-                   FONT          = *self.font, $
-                   NODATA        = *self.nodata, $
-                   NOERASE       = *self.noerase, $
-                   SUBTITLE      = *self.subtitle, $
-                   T3D           = *self.t3d, $
-                   TICKLEN       = *self.ticklen, $
-                   TITLE         = *self.title, $
-                   XCHARSIZE     = *self.xcharsize, $
-                   XGRIDSTYLE    = *self.xgridstyle, $
-                   XMARGIN       = *self.xmargin, $
-                   XMINOR        = *self.xminor, $
-                   XRANGE        = *self.xrange, $
-                   XSTYLE        = *self.xstyle, $
-                   XTHICK        = *self.xthick, $
-                   XTICK_GET     = *self.xtick_get, $
-                   XTICKFORMAT   = *self.xtickformat, $
-                   XTICKINTERVAL = *self.xtickinterval, $
-                   XTICKLAYOUT   = *self.xticklayout, $
-                   XTICKLEN      = *self.xticklen, $
-                   XTICKNAME     = *self.xtickname, $
-                   XTICKS        = *self.xticks, $
-                   XTICKUNITS    = *self.xtickunits, $
-                   XTICKV        = *self.xtickv, $
-                   XTITLE        = *self.xtitle, $
-                   YCHARSIZE     = *self.ycharsize, $
-                   YGRIDSTYLE    = *self.ygridstyle, $
-                   YMARGIN       = *self.ymargin, $
-                   YMINOR        = *self.yminor, $
-                   YRANGE        = *self.yrange, $
-                   YSTYLE        = *self.ystyle, $
-                   YTHICK        = *self.ythick, $
-                   YTICK_GET     = *self.ytick_get, $
-                   YTICKFORMAT   = *self.ytickformat, $
-                   YTICKINTERVAL = *self.ytickinterval, $
-                   YTICKLAYOUT   = *self.yticklayout, $
-                   YTICKLEN      = *self.yticklen, $
-                   YTICKNAME     = *self.ytickname, $
-                   YTICKS        = *self.yticks, $
-                   YTICKUNITS    = *self.ytickunits, $
-                   YTICKV        = *self.ytickv, $
-                   YTITLE        = *self.ytitle, $
-                   ZCHARSIZE     = *self.zcharsize, $
-                   ZGRIDSTYLE    = *self.zgridstyle, $
-                   ZMARGIN       = *self.zmargin, $
-                   ZMINOR        = *self.zminor, $
-                   ZRANGE        = *self.zrange, $
-                   ZSTYLE        = *self.zstyle, $
-                   ZTHICK        = *self.zthick, $
-                   ZTICK_GET     = *self.ztick_get, $
-                   ZTICKFORMAT   = *self.ztickformat, $
-                   ZTICKINTERVAL = *self.ztickinterval, $
-                   ZTICKLAYOUT   = *self.zticklayout, $
-                   ZTICKLEN      = *self.zticklen, $
-                   ZTICKNAME     = *self.ztickname, $
-                   ZTICKS        = *self.zticks, $
-                   ZTICKUNITS    = *self.ztickunits, $
-                   ZTICKV        = *self.ztickv, $
-                   ZTITLE        = *self.ztitle, $
-                   ZVALUE        = *self.zvalue
-    ENDCASE
+        3: Axis, *self.xloc, *self.yloc, *self.zloc, $
+                 SAVE    =  1B, $
+                 XAXIS   = *self.xaxis, $
+                 XLOG    =  self.xlog, $
+                 YAXIS   = *self.yaxis, $
+                 YLOG    =  self.ylog, $
+                 YNOZERO =  self.ynozero, $
+                 ZAXIS   = *self.zaxis, $
+                 ZLOG    =  self.zlog, $
+               
+                 ;cgGraphicsKeywords
+                 CHARSIZE      =       charsize, $
+                 CHARTHICK     =       charthick, $
+                 COLOR         =       color, $
+                 DATA          = *self.data, $
+                 DEVICE        = *self.device, $
+                 NORMAL        = *self.normal, $
+                 FONT          = *self.font, $
+                 NODATA        = *self.nodata, $
+                 NOERASE       = *self.noerase, $
+                 SUBTITLE      = *self.subtitle, $
+                 T3D           = *self.t3d, $
+                 TICKLEN       = *self.ticklen, $
+                 XCHARSIZE     = *self.xcharsize, $
+                 XGRIDSTYLE    = *self.xgridstyle, $
+                 XMARGIN       = *self.xmargin, $
+                 XMINOR        = *self.xminor, $
+                 XRANGE        = *self.xrange, $
+                 XSTYLE        = *self.xstyle, $
+                 XTHICK        = *self.xthick, $
+                 XTICK_GET     = *self.xtick_get, $
+                 XTICKFORMAT   = *self.xtickformat, $
+                 XTICKINTERVAL = *self.xtickinterval, $
+                 XTICKLAYOUT   = *self.xticklayout, $
+                 XTICKLEN      = *self.xticklen, $
+                 XTICKNAME     = *self.xtickname, $
+                 XTICKS        = *self.xticks, $
+                 XTICKUNITS    = *self.xtickunits, $
+                 XTICKV        = *self.xtickv, $
+                 XTITLE        = *self.xtitle, $
+                 YCHARSIZE     = *self.ycharsize, $
+                 YGRIDSTYLE    = *self.ygridstyle, $
+                 YMARGIN       = *self.ymargin, $
+                 YMINOR        = *self.yminor, $
+                 YRANGE        = *self.yrange, $
+                 YSTYLE        = *self.ystyle, $
+                 YTHICK        = *self.ythick, $
+                 YTICK_GET     = *self.ytick_get, $
+                 YTICKFORMAT   = *self.ytickformat, $
+                 YTICKINTERVAL = *self.ytickinterval, $
+                 YTICKLAYOUT   = *self.yticklayout, $
+                 YTICKLEN      = *self.yticklen, $
+                 YTICKNAME     = *self.ytickname, $
+                 YTICKS        = *self.yticks, $
+                 YTICKUNITS    = *self.ytickunits, $
+                 YTICKV        = *self.ytickv, $
+                 YTITLE        = *self.ytitle, $
+                 ZCHARSIZE     = *self.zcharsize, $
+                 ZGRIDSTYLE    = *self.zgridstyle, $
+                 ZMARGIN       = *self.zmargin, $
+                 ZMINOR        = *self.zminor, $
+                 ZRANGE        = *self.zrange, $
+                 ZSTYLE        = *self.zstyle, $
+                 ZTHICK        = *self.zthick, $
+                 ZTICK_GET     = *self.ztick_get, $
+                 ZTICKFORMAT   = *self.ztickformat, $
+                 ZTICKINTERVAL = *self.ztickinterval, $
+                 ZTICKLAYOUT   = *self.zticklayout, $
+                 ZTICKLEN      = *self.zticklen, $
+                 ZTICKNAME     = *self.ztickname, $
+                 ZTICKS        = *self.zticks, $
+                 ZTICKUNITS    = *self.ztickunits, $
+                 ZTICKV        = *self.ztickv, $
+                 ZTITLE        = *self.ztitle, $
+                 ZVALUE        = *self.zvalue
+      ENDCASE
 END
 
 
@@ -791,7 +816,7 @@ PRO MrAxis::SetLocation, location
     ;---------------------------------------------------------------------
     ;X-Axis //////////////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
-        IF self.direction EQ 'X' THEN BEGIN
+        IF self.direction EQ 0 THEN BEGIN
             CASE StrUpCase(location) OF
                 'CENTER': BEGIN
                     xloc = refPos[0] ;ignored, but necessary
@@ -814,7 +839,7 @@ PRO MrAxis::SetLocation, location
     ;---------------------------------------------------------------------
     ;Y-Axis //////////////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
-        ENDIF ELSE IF self.direction EQ 'Y' THEN BEGIN
+        ENDIF ELSE IF self.direction EQ 1 THEN BEGIN
 
             ;Calculate the axis position
             CASE StrUpCase(location) OF
@@ -1167,6 +1192,7 @@ DEVICE=device, $
 FONT=font, $
 GRIDSTYLE=gridstyle, $
 LOG=log, $
+MAJFOR=major, $
 MINOR=minor, $
 NODATA=noData, $
 NORMAL=normal, $
@@ -1203,9 +1229,9 @@ _REF_EXTRA=extra
     
     ;Object Properties
     IF N_Elements(charsize) GT 0 THEN self.charsize = charsize
+    IF N_Elements(major)    GT 0 THEN ticks         = major
     IF N_Elements(offset)   GT 0 THEN self.offset   = offset
     IF N_Elements(save)     GT 0 THEN self.save     = keyword_set(save)
-    IF N_Elements(tickdir)  GT 0 THEN self.tickdir  = keyword_set(tickdir)
     IF N_Elements(xmargin)  GT 0 THEN self.xmargin  = xmargin
     IF N_Elements(ymargin)  GT 0 THEN self.ymargin  = ymargin
     IF N_Elements(zmargin)  GT 0 THEN self.zmargin  = zmargin
@@ -1215,27 +1241,43 @@ _REF_EXTRA=extra
         THEN self.target = target $
         ELSE self.target = Obj_New()
     
+    ;Set the axis direction. TICKDIR must be checked first.
+    IF N_Elements(direction) GT 0 THEN BEGIN
+        ;String or integer given?
+        IF MrIsA(direction, /SCALAR, 'String') THEN BEGIN
+            CASE StrUpCase(direction) OF
+                'X': _direction = 0B
+                'Y': _direction = 1B
+                'Z': _direction = 2B
+                else: message, 'Invalid DIRECTION. Must be {"X" | "Y" | "Z"}'
+            ENDCASE
+        ENDIF ELSE BEGIN
+            IF MrIsA(direction, /SCALAR, /INTEGER) $
+                THEN _direction = direction $
+                ELSE message, 'DIRECTION must be a scalar string or integer.'
+        ENDELSE
+        
+        ;Set the axis
+        CASE _direction OF
+            0:   self -> SetAxis, XAXIS=self.tickdir
+            1:   self -> SetAxis, YAXIS=self.tickdir
+            2:   self -> SetAxis, ZAXIS=self.tickdir
+            else: message, 'Invalid DIRECTION. Must be {0 | 1 | 2}', /INFORMATIONAL
+        ENDCASE
+        
+        ;Set the property
+        self.direction = _direction
+    ENDIF
+    
     ;Set the tick direction for the proper axis.
     IF N_Elements(tickdir) GT 0 THEN BEGIN
-        _direction = N_Elements(direction) EQ 0 ? self.direction : direction
-        CASE StrUpCase(_direction) OF
-            'X': *self.xaxis = tickdir
-            'Y': *self.yaxis = tickdir
-            'Z': *self.zaxis = tickdir
+        CASE self.direction OF
+            0: self -> SetAxis, XAXIS=tickdir
+            1: self -> SetAxis, YAXIS=tickdir
+            2: self -> SetAxis, ZAXIS=tickdir
         ENDCASE
         
         self.tickdir = keyword_set(tickdir)
-    ENDIF
-    
-    ;Set the axis direction. TICKDIR must be checked first.
-    IF N_Elements(direction) GT 0 THEN BEGIN
-        CASE StrUpCase(direction) OF
-            'X': self -> SetAxis, XAXIS=self.tickdir
-            'Y': self -> SetAxis, YAXIS=self.tickdir
-            'Z': self -> SetAxis, ZAXIS=self.tickdir
-        ENDCASE
-        
-        self.direction = StrUpCase(direction)
     ENDIF
     
     ;Set the location. DIRECTION must be checked first.
@@ -1255,7 +1297,7 @@ _REF_EXTRA=extra
 
     ;Set other axis properties
     CASE self.direction OF
-        'X': BEGIN
+        0: BEGIN
             IF N_Elements(gridstyle)    GT 0 THEN *self.xgridstyle    = gridstyle
             IF N_Elements(log)          GT 0 THEN  self.xlog          = log
             IF N_Elements(minor)        GT 0 THEN *self.xminor        = minor
@@ -1270,10 +1312,10 @@ _REF_EXTRA=extra
             IF N_Elements(ticks)        GT 0 THEN *self.xticks        = ticks
             IF N_Elements(tickunits)    GT 0 THEN *self.xtickunits    = tickunits
             IF N_Elements(tickvalues)   GT 0 THEN *self.xtickv        = tickvalues
-            IF N_Elements(title)        GT 0 THEN *self.xtitle        = title
+            IF N_Elements(title)        GT 0 THEN *self.xtitle        = cgCheckForSymbols(title)
         ENDCASE
         
-        'Y': BEGIN
+        1: BEGIN
             IF N_Elements(gridstyle)    GT 0 THEN *self.ygridstyle    = gridstyle
             IF N_Elements(log)          GT 0 THEN  self.ylog          = log
             IF N_Elements(minor)        GT 0 THEN *self.yminor        = minor
@@ -1288,10 +1330,10 @@ _REF_EXTRA=extra
             IF N_Elements(ticks)        GT 0 THEN *self.yticks        = ticks
             IF N_Elements(tickunits)    GT 0 THEN *self.ytickunits    = tickunits
             IF N_Elements(tickvalues)   GT 0 THEN *self.ytick         = tickvalues
-            IF N_Elements(title)        GT 0 THEN *self.ytitle        = title
+            IF N_Elements(title)        GT 0 THEN *self.ytitle        = cgCheckForSymbols(title)
         ENDCASE
         
-        'Z': BEGIN
+        2: BEGIN
             IF N_Elements(gridstyle)    GT 0 THEN *self.zgridstyle    = gridstyle
             IF N_Elements(log)          GT 0 THEN  self.zlog          = log
             IF N_Elements(minor)        GT 0 THEN *self.zminor        = minor
@@ -1306,10 +1348,10 @@ _REF_EXTRA=extra
             IF N_Elements(ticks)        GT 0 THEN *self.zticks        = ticks
             IF N_Elements(tickunits)    GT 0 THEN *self.ztickunits    = tickunits
             IF N_Elements(tickvalues)   GT 0 THEN *self.ztickv        = tickvalues
-            IF N_Elements(title)        GT 0 THEN *self.ztitle        = title
+            IF N_Elements(title)        GT 0 THEN *self.ztitle        = cgCheckForSymbols(title)
         ENDCASE
     ENDCASE
-
+help, *self.location, self.direction, self.tickdir
     ;Draw?
     self.window -> Draw
 END
@@ -1484,6 +1526,7 @@ DATA=data, $
 FONT=font, $
 GRIDSTYLE=gridstyle, $
 LOG=log, $
+MAJOR=major, $
 MINOR=minor, $
 SUBTITLE=subtitle, $
 STYLE=sytle, $
@@ -1506,6 +1549,28 @@ ZCHARSIZE=zcharsize, $
 ZMARGIN=zmargin, $
 ZVALUE=zvalue, $
 _REF_EXTRA=extra
+
+
+
+;ANTIALIAS
+;CLIP
+;COORD_TRANSFORM
+;MAJOR
+;MINOR
+;SHOWTEXT
+;SUBGRIDSTYLE
+;SUBTICKLEN
+;TEXT_COLOR
+;TEXT_ORIENTATION
+;TEXTPOS
+;TICKFONT_NAME
+;TICKFONT_SIZE
+;TICKFONT_STYLE
+;TRANSPARENCY
+;UVALUE
+
+
+
     Compile_Opt StrictArr
     
     ; Catch the error.
@@ -1515,7 +1580,9 @@ _REF_EXTRA=extra
         void = cgErrorMsg()
         RETURN, 0
     ENDIF
-    
+
+    ;MAJOR takes precedence over TICKS
+    if n_elements(major) gt 0 then ticks = major
 
 ;-----------------------------------------------------
 ;Target, Window, & Superclasses \\\\\\\\\\\\\\\\\\\\\\
@@ -1535,11 +1602,10 @@ _REF_EXTRA=extra
         Message, 'Unable to initialize cgGraphicsKeywords.'
         
     ;Superclass
-    if self -> MrGrAtom::INIT(TARGET=target) eq 0 then $
+    if self -> MrGrAtom::INIT(TARGET=target, WINREFRESH=refreshIn) eq 0 then $
         message, 'Unable to initialize MrGrAtom'
     
-    ;Refresh the window?
-    self.window -> GetProperty, REFRESH=refreshIn
+    ;Disable refreshing
     if refreshIn then self.window -> Refresh, /DISABLE
 
 ;---------------------------------------------------------------------
@@ -1548,19 +1614,50 @@ _REF_EXTRA=extra
     
     ;Set Defaults
     current = keyword_set(current)
-    log = keyword_set(log)
-    tickdir = keyword_set(tickdir)
+    log     = keyword_set(log)
     setDefaultValue, charsize, 1.5
     setDefaultValue, direction, 'X'
     setDefaultValue, offset, 0
 
-    ;Default location    
-    case strupcase(direction) of
-        'X': setDefaultVAlue, location, 'BOTTOM'
-        'Y': setDefaultValue, location, 'RIGHT'
-        'Z': setDefualtValue, location, ['RIGHT', 'BOTTOM']
-        else: message, "DIRECTION must be {'X' | 'Y' | 'Z'}"
-    endcase
+    ;DIRECTION
+    if n_elements(direction) eq 0 then begin
+        _direction = 0
+        
+    endif else if MrIsA(direction, /SCALAR, 'String') then begin
+        case strupcase(direction) of
+            'X': _direction = 0
+            'Y': _direction = 1
+            'Z': _direction = 2
+            else: message, "DIRECTION must be {'X' | 'Y' | 'Z'}"
+        endcase
+        
+    endif else if MrIsA(direction, /SCALAR, /INTEGER) then begin
+        if direction lt 0 || direction gt 3 then message, 'DIRECTION must be {0 | 1 | 2}'
+        _direction = direction
+        
+    endif else begin
+         message, 'DIRECTION must be a scalar string or integer.'
+    endelse
+    
+    ;LOCATION
+    if n_elements(location) eq 0 then begin
+        case _direction of
+            0: _location = 'BOTTOM'
+            1: _location = 'RIGHT'
+            2: _location = ['RIGHT', 'BOTTOM']
+            else: message, 'Invalid DIRECTION.'
+        endcase
+    endif else _location = strupcase(location)
+    
+    ;TICKDIR
+    if n_elements(tickdir) eq 0 then begin
+        case _direction of
+            0: _tickdir = _location eq 'BOTTOM' ? 0 : 1
+            1: _tickdir = _location eq 'LEFT'   ? 0 : 1
+            2: _tickdir = 0
+            else: message, 'Invalid DIRECTION.'
+        endcase
+    endif else _tickdir = tickdir
     
     ;Make pointers valid
     self.xloc     = Ptr_New(/ALLOCATE_HEAP)
@@ -1577,50 +1674,50 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
 ;Set Properties //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    self -> SetProperty, CHARSIZE=charsize, $
-                         DIRECTION=direction, $
-                         LOCATION=location, $
-                         OFFSET = offset, $
-                         SAVE=save, $
-                         TARGET=target, $
-                         TICKDIR=tickdir, $
+    self -> SetProperty, CHARSIZE    = charsize, $
+                         DIRECTION   = _direction, $
+                         LOCATION    = _location, $
+                         OFFSET      = offset, $
+                         SAVE        = save, $
+                         TARGET      = target, $
+                         TICKDIR     = _tickdir, $
                          ;Direct Graphics Keywords
-                         AXIS_RANGE=axis_range, $
-                         CHARTHICK=charthick, $
-                         COLOR=color, $
-                         DATA=data, $
-                         DEVICE=device, $
-                         FONT=font, $
-                         GRIDSTYLE=gridstyle, $
-                         LOG=log, $
-                         MINOR=minor, $
-                         NODATA=noData, $
-                         NORMAL=normal, $
-                         SUBTITLE=subtitle, $
-                         STYLE=sytle, $
-                         T3D=t3d, $
-                         THICK=thick, $
-                         TICKFORMAT=tickformat, $
-                         TICKINTERVAL=tickinterval, $
-                         TICKLAYOUT=ticklayout, $
-                         TICKLEN=ticklen, $
-                         TICKNAME=tickname, $
-                         TICKS=ticks, $
-                         TICKUNITS=tickunits, $
-                         TICKVALUES=tickvalues, $
-                         TITLE=title, $
-                         XCHARSIZE=xcharsize, $
-                         XMARGIN=xmargin, $
-                         YCHARSIZE=ycharsize, $
-                         YMARGIN=ymargin, $
-                         ZCHARSIZE=zcharsize, $
-                         ZMARGIN=zmargin, $
-                         ZVALUE=zvalue, $
-                        _EXTRA=extra
+                         AXIS_RANGE   = axis_range, $
+                         CHARTHICK    = charthick, $
+                         COLOR        = color, $
+                         DATA         = data, $
+                         DEVICE       = device, $
+                         FONT         = font, $
+                         GRIDSTYLE    = gridstyle, $
+                         LOG          = log, $
+                         MINOR        = minor, $
+                         NODATA       = noData, $
+                         NORMAL       = normal, $
+                         SUBTITLE     = subtitle, $
+                         STYLE        = sytle, $
+                         T3D          = t3d, $
+                         THICK        = thick, $
+                         TICKFORMAT   = tickformat, $
+                         TICKINTERVAL = tickinterval, $
+                         TICKLAYOUT   = ticklayout, $
+                         TICKLEN      = ticklen, $
+                         TICKNAME     = tickname, $
+                         TICKS        = ticks, $
+                         TICKUNITS    = tickunits, $
+                         TICKVALUES   = tickvalues, $
+                         TITLE        = title, $
+                         XCHARSIZE    = xcharsize, $
+                         XMARGIN      = xmargin, $
+                         YCHARSIZE    = ycharsize, $
+                         YMARGIN      = ymargin, $
+                         ZCHARSIZE    = zcharsize, $
+                         ZMARGIN      = zmargin, $
+                         ZVALUE       = zvalue, $
+                        _EXTRA        = extra
     
     ;Refersh the graphics window
     if refreshIn then self -> Refresh
-                         
+
     Return, 1
 END
 
@@ -1638,23 +1735,24 @@ PRO MrAxis__define, class
               inherits MrGrAtom, $
               inherits MrGraphicsKeywords, $
             
-              xloc: Ptr_New(), $
-              yloc: Ptr_New(), $
-              zloc: Ptr_New(), $
-              charsize: 0.0, $
-              direction: '', $
-              location: Ptr_New(), $
-              offset: 0.0, $
-              save: 0B, $
-              target: Obj_New(), $
-              tickdir: 0B, $
-              xaxis: Ptr_New(), $
-              xlog: 0B, $
-              xmargin: Ptr_New(), $
-              yaxis: Ptr_New(), $
-              ylog: 0B, $
-              ymargin: Ptr_New(), $
-              zaxis: Ptr_New(), $
-              zlog: 0B $
+              xloc:      Ptr_New(), $
+              yloc:      Ptr_New(), $
+              zloc:      Ptr_New(), $
+              charsize:  0.0, $
+              direction: 0B, $
+              location:  ptr_new(), $
+              offset:    0.0, $
+              save:      0B, $
+              target:    Obj_New(), $
+              tickdir:   0B, $
+              xaxis:     Ptr_New(), $
+              xlog:      0B, $
+              xmargin:   Ptr_New(), $
+              ynozero:   0B, $
+              yaxis:     Ptr_New(), $
+              ylog:      0B, $
+              ymargin:   Ptr_New(), $
+              zaxis:     Ptr_New(), $
+              zlog:      0B $
             }
 END
