@@ -706,11 +706,11 @@ _REF_EXTRA=extra
                                              XCHARSIZE=xcharsize, $
                                              YCHARSIZE=ycharsize, $
                                              ZCHARSIZE=zcharsize, $
-                                             ZVALUE=zvalue    
+                                             ZVALUE=zvalue
 
     ;Set other axis properties
     CASE self.direction OF
-        'X': BEGIN
+        0: BEGIN
             IF Arg_Present(gridstyle)    GT 0 THEN gridstyle    = *self.xgridstyle
             IF Arg_Present(log)          GT 0 THEN log          =  self.xlog
             IF Arg_Present(minor)        GT 0 THEN minor        = *self.xminor
@@ -728,7 +728,7 @@ _REF_EXTRA=extra
             IF Arg_Present(title)        GT 0 THEN title        = *self.xtitle
         ENDCASE
         
-        'Y': BEGIN
+        1: BEGIN
             IF Arg_Present(gridstyle)    GT 0 THEN gridstyle    = *self.ygridstyle
             IF Arg_Present(log)          GT 0 THEN log          =  self.ylog
             IF Arg_Present(minor)        GT 0 THEN minor        = *self.yminor
@@ -746,7 +746,7 @@ _REF_EXTRA=extra
             IF Arg_Present(title)        GT 0 THEN title        = *self.ytitle
         ENDCASE
         
-        'Z': BEGIN
+        2: BEGIN
             IF Arg_Present(gridstyle)    GT 0 THEN gridstyle    = *self.zgridstyle
             IF Arg_Present(log)          GT 0 THEN log          =  self.zlog
             IF Arg_Present(minor)        GT 0 THEN minor        = *self.zminor
@@ -1351,7 +1351,7 @@ _REF_EXTRA=extra
             IF N_Elements(title)        GT 0 THEN *self.ztitle        = cgCheckForSymbols(title)
         ENDCASE
     ENDCASE
-help, *self.location, self.direction, self.tickdir
+
     ;Draw?
     self.window -> Draw
 END
