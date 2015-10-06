@@ -1,10 +1,10 @@
 ; docformat = 'rst'
 ;
 ; NAME:
-;       MrColorbar
+;       MrColorbar_Examples
 ;
 ;*****************************************************************************************
-;   Copyright (c) 2013, Matthew Argall                                                   ;
+;   Copyright (c) 2015, Matthew Argall                                                   ;
 ;   All rights reserved.                                                                 ;
 ;                                                                                        ;
 ;   Redistribution and use in source and binary forms, with or without modification,     ;
@@ -32,35 +32,86 @@
 ;*****************************************************************************************
 ;
 ;+
-;   Create a MrColorbar object.
+;   Examples of how to use MrColorbar__Define.
 ;
-; :Keywords:
-;       _REF_EXTRA:         in, optional, type=structure
-;                           Any keyword accepted by MrColorbar__define.
+; :Examples:
+;   See MrImage_Examples.pro for a series of examples::
+;       IDL> void = MrContour_Examples()
+;       IDL> win  = MrContour_Examples(1)
+;
+; :Params:
+;       EXAMPLE:        in, required, type=int
+;                       Index number of the example to be excecuted.
 ;
 ; :Returns:
-;       THECOLORBAR:        out, required, type=object
-;                           A weColorbar object reference.
+;       WIN:            A MrImage object reference.
 ;
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
-;       Morse Hall, Room 113
+;       Morse Hall, Room 348
 ;       8 College Rd.
 ;       Durham, NH, 03824
-;       matthew.argall@wildcats.unh.edu
-;
-; :Copyright:
-;       Matthew Argall 2013
+;       matthew.argall@unh.edu
 ;
 ; :History:
-;	Modification History::
-;       2013/11/27  -   Written by Matthew Argall.
+;   Modification History::
+;       2015/10/05  -   Written by Matthew Argall
 ;-
-function MrColorbar, $
-_REF_EXTRA = extra
-	on_error, 2
-	
-	;Create the color bar
-	return, obj_new('MrColorBar', _STRICT_EXTRA=extra)
+function MrColorbar_Examples, example
+	compile_opt strictarr
+
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /CANCEL
+		if obj_valid(img) then img -> Close
+		void = cgErrorMSG()
+		return, obj_new()
+	endif
+
+	;Print a description of each example
+	if n_elements(example) eq 0 then begin
+		print, [['EXAMPLE    DESCRIPTION'], $
+		        ['   1       Vertical Colorbar']]
+		return, -1
+	endif
+
+	case example of
+;---------------------------------------------------------------------
+; Vertical Colorbr ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+		1: begin
+			;Get the data
+			file = FILEPATH('surface.dat', SUBDIR=['examples','data'])
+			data = READ_BINARY(file, DATA_DIMS=[350,450], DATA_TYPE=2, ENDIAN='little')
+			
+			;Create an Image
+			im = MrImage(data, $
+			             RGB_TABLE  = 4, $
+			             POSITION   = [0.25,0.05,0.95,0.9], $
+			             TITLE      = 'Maroon Bells')
+
+			; Add a colorbar
+			c = MrColorbar(TARGET      = im, $
+			               ORIENTATION = 1, $
+			               POSITION    = [0.15,0.05,0.19,0.9], $
+			               TITLE       = 'Elevation (m)')
+
+			; Change some properties
+			c.TEXTPOS    = 0
+			c.TICKDIR    = 1
+			c.BORDER     = 1
+			c.COLOR      = 'Blue'
+			
+			;Window to be returned
+			win = im.window
+		endcase
+
+;---------------------------------------------------------------------
+; No More Examples ///////////////////////////////////////////////////
+;---------------------------------------------------------------------
+		else: message, 'EXAMPLE must be between 1 and 1.'
+	endcase
+
+	return, win
 end

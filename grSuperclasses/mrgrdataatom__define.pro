@@ -453,6 +453,7 @@ HIDE = hide, $
 LAYOUT = layout, $
 NAME = name, $
 POSITION = position, $
+TARGET = target, $
 ;Graphics Properties
 MAX_VALUE = max_value, $
 MIN_VALUE = min_value, $
@@ -478,6 +479,8 @@ _REF_EXTRA = extra
 
     if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
     if n_elements(charsize) gt 0 then self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
+
+    if obj_valid(target) then self.target = target
 
 ;---------------------------------------------------------------------
 ;Superclass Properties ///////////////////////////////////////////////
@@ -631,12 +634,17 @@ _REF_EXTRA = extra
     self.layout = obj_new('MrLayout', LAYOUT=layout, POSITION=position)
 
     ;Was the /OVERPLOT keyword set instead of giving a target
+    ;   - Here we simply the target, later we overplot.
     if MrIsA(target, /SCALAR, 'INT') $
         then if keyword_set(target) then target = self -> _GetTarget()
 
     ;Superclass.
-    if self -> MrGrAtom::INIT(CURRENT=current, NAME=name, HIDE=hide, TARGET=target, $
-                              WINREFRESH=winRefresh, WINDOW_TITLE=window_title) eq 0 $
+    if self -> MrGrAtom::INIT( CURRENT=current, $
+                               NAME         = name, $
+                               HIDE         = hide, $
+                               TARGET       = target, $
+                               WINREFRESH   = winRefresh, $
+                               WINDOW_TITLE = window_title ) eq 0 $
        then message, 'Unable to initialize MrGrAtom'
 
 ;---------------------------------------------------------------------

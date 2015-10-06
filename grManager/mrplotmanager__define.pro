@@ -1371,6 +1371,7 @@ function MrPlotManager::WhatAmI, objRef
         'MRAXIS':       ImA = 'AXIS'
         'MRPOLYGON':    ImA = 'COLORFILL'
         'MRCIRCLE':     ImA = 'COLORFILL'
+        'MRCOLORBAR':   ImA = 'COLORBAR'
         'MRCONTOUR':    ImA = 'CONTOUR'
         'MRIMAGE':      ImA = 'IMAGE'
         'MRLEGEND':     ImA = 'LEGEND'
@@ -1378,10 +1379,7 @@ function MrPlotManager::WhatAmI, objRef
         'MRPLOTS':      ImA = 'PLOTS'
         'MRTEXT':       ImA = 'TEXT'
         'MRVECTOR':     ImA = 'VECTOR'
-        'WECOLORBAR':   ImA = 'COLORBAR'
         'WEARROW':      ImA = 'ARROW'
-        'WEOVERPLOT':   ImA = 'OVERPLOT'
-        'WELEGENDITEM': ImA = 'LEGEND'
         else:           ImA = ''
     endcase
     
@@ -1409,23 +1407,22 @@ pro MrPlotManager::Config
     
     ;Class names of the supported graphics types
     types = { $
-              arrow: ['WEARROW'], $
-              axis: ['MRAXIS'], $
-              colorbar: ['WECOLORBAR'], $
-              contour: ['MRCONTOUR'], $
-              image: ['MRIMAGE'], $
-              legend: ['WELEGENDITEM', 'MRLEGEND'], $
-              overplot: ['WEOVERPLOT'], $
-              plot: ['MRPLOT'], $
-              plots: ['MRPLOTS'], $
+              arrow:    ['WEARROW'], $
+              axis:     ['MRAXIS'], $
+              colorbar: ['MRCOLORBAR'], $
+              contour:  ['MRCONTOUR'], $
+              image:    ['MRIMAGE'], $
+              legend:   ['MRLEGEND'], $
+              plot:     ['MRPLOT'], $
+              plots:    ['MRPLOTS'], $
               polyfill: ['MRPOLYGON', 'MRCIRCLE'], $
-              text: ['MRTEXT'], $
-              vector: ['MRVECTOR'], $
-              ImAData: ['PLOT', 'IMAGE', 'CONTOUR', 'VECTOR'], $     ;TO BE USED WITH ::WHATAMI
-              data: ['MRPLOT', 'MRIMAGE', 'MRCONTOUR', 'MRVECTOR'], $
-              annotate: ['WECOLORBAR', 'MRAXIS', 'WELEGENDITEM', 'WEARROW', 'MRTEXT', $
-                         'MRPLOTS', 'WEOVERPLOT', 'MRPOLYGON', 'MRLEGEND', 'MRCIRCLE'], $
-              files: ['CDF_PLOT'] $
+              text:     ['MRTEXT'], $
+              vector:   ['MRVECTOR'], $
+              ImAData:  ['PLOT', 'IMAGE', 'CONTOUR', 'VECTOR'], $     ;TO BE USED WITH ::WHATAMI
+              data:     ['MRPLOT', 'MRIMAGE', 'MRCONTOUR', 'MRVECTOR'], $
+              annotate: ['MRCOLORBAR', 'MRAXIS', 'WEARROW', 'MRTEXT', $
+                         'MRPLOTS', 'MRPOLYGON', 'MRLEGEND', 'MRCIRCLE'], $
+              files:    ['CDF_PLOT'] $
             }
     
     ;Store them as a class property

@@ -123,7 +123,7 @@ function MrImage::_OverloadPrint
     missing_index  = string('Missing_Index',  '=', self.missing_index,  FORMAT='(a-26, a-2, i0)')
     nan            = string('NaN',            '=', self.nan,            FORMAT='(a-26, a-2, i1)')
     paint          = string('Paint',          '=', self.paint,          FORMAT='(a-26, a-2, i1)')
-    palette        = string('Palette',        '=', 'BYTARR(255,3)',     FORMAT='(a-26, a-2, a0)')
+    rgb_table      = string('Palette',        '=', 'BYTARR(255,3)',     FORMAT='(a-26, a-2, a0)')
     polar          = string('Polar',          '=', self.polar,          FORMAT='(a-26, a-2, i1)')
     pol_rcolor     = string('Pol_RColor',     '=', self.pol_rcolor,     FORMAT='(a-26, a-2, a0)')
     pol_rlinestyle = string('Pol_RLineStyle', '=', self.pol_rlinestyle, FORMAT='(a-26, a-2, i1)')
@@ -149,7 +149,7 @@ function MrImage::_OverloadPrint
                [missing_index], $
                [nan], $
                [paint], $
-               [palette], $
+               [rgb_table], $
                [polar], $
                [pol_rcolor], $
                [pol_rlinestyle], $
@@ -312,144 +312,146 @@ end
 ;-
 pro MrImage::Draw, $
 NOERASE=noerase
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /CANCEL
-        if n_elements(r)           gt 0 then tvlct, r, g, b
-	    if n_elements(init_decomp) gt 0 then cgSetColorState, init_decomp
-	    if n_elements(p_current)   gt 0 then !P = p_current
-	    if n_elements(x_current)   gt 0 then !X = x_current
-	    if n_elements(y_current)   gt 0 then !Y = y_current
-        void = cgErrorMsg()
-        return
-    endif
-    
-    if self.hide then return
-    
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /CANCEL
+		if n_elements(r)           gt 0 then tvlct, r, g, b
+		if n_elements(init_decomp) gt 0 then cgSetColorState, init_decomp
+		if n_elements(p_current)   gt 0 then !P = p_current
+		if n_elements(x_current)   gt 0 then !X = x_current
+		if n_elements(y_current)   gt 0 then !Y = y_current
+		void = cgErrorMsg()
+		return
+	endif
+
+	if self.hide then return
+
 	;Change color states
 	;   - Save the initial color table
 	tvlct, r, g, b, /GET
 	cgSetColorState, 0, CURRENTSTATE=init_decomp
 
-    ;Store the current system variables
-    p_current = !P
-    x_current = !X
-    y_current = !Y
-    
-    ;Restore coordinates
-    if obj_valid(self.target) $
-        then self.target -> RestoreCoords $
-        else self        -> RestoreCoords
-        
+	;Store the current system variables
+	p_current = !P
+	x_current = !X
+	y_current = !Y
+
+	;Restore coordinates
+	if obj_valid(self.target) $
+		then self.target -> RestoreCoords $
+		else self        -> RestoreCoords
+	
 ;---------------------------------------------------------------------
 ; Display the Image //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
-    ;Erase?
-    if n_elements(noerase)  eq 0 then noerase = self.noerase
-    if keyword_set(noerase) eq 0 then cgErase, self.background
-    
-    ;Load the palette
-    tvlct, self.palette
+	;Erase?
+	if n_elements(noerase)  eq 0 then noerase = self.noerase
+	if keyword_set(noerase) eq 0 then cgErase, self.background
 
-    ;Load the missing color
-    if self.missing_color ne '' then tvlct, cgColor(self.missing_color, /TRIPLE), self.missing_index
+	;Load the rgb_table
+	self.palette -> GetProperty, RGB_TABLE=rgb_table
+	tvlct, rgb_table
 
-    ;Now display the image
-    case 1 of
-        self.paint: self -> doPaint, XLOG=xlog, XRANGE=xrange, $
-                                     YLOG=ylog, YRANGE=yrange
-        self.tv:    self -> doTV
-        else:       self -> doImage
-    endcase
-    
+	;Load the missing color
+	if n_elements(*self.missing_value) gt 0 $
+		then tvlct, transpose(self.missing_color), self.missing_index
+
+	;Now display the image
+	case 1 of
+		self.paint: self -> doPaint, XLOG=xlog, XRANGE=xrange, $
+		                             YLOG=ylog, YRANGE=yrange
+		self.tv:    self -> doTV
+		else:       self -> doImage
+	endcase
+
 ;---------------------------------------------------------------------
 ; Draw Axes //////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 	;Box-style axes.
 	if self.overplot eq 0 then if self.axes then begin
-	    if self.paint eq 0 then begin
-	        xrange = *self.xrange
-	        yrange = *self.yrange
-	        xlog   =  self.xlog
-	        ylog   =  self.ylog
-	    endif
-	    
-	    ;Axis style
-	    ;   - Draw only the titles for polar plots, unless otherwise indicated
-	    xstyle = *self.xstyle
-	    ystyle = *self.ystyle
-	    if ((self.pol_axstyle) and 1) eq 0 then begin
-	        xstyle += 4 * ((xstyle and 4) eq 0)
-	        ystyle += 4 * ((ystyle and 4) eq 0)
-	    endif
+		if self.paint eq 0 then begin
+			xrange = *self.xrange
+			yrange = *self.yrange
+			xlog   =  self.xlog
+			ylog   =  self.ylog
+		endif
+	
+		;Axis style
+		;   - Draw only the titles for polar plots, unless otherwise indicated
+		xstyle = *self.xstyle
+		ystyle = *self.ystyle
+		if ((self.pol_axstyle) and 1) eq 0 then begin
+			xstyle += 4 * ((xstyle and 4) eq 0)
+			ystyle += 4 * ((ystyle and 4) eq 0)
+		endif
 
-	    self.layout -> GetProperty, POSITION=position, CHARSIZE=charsize
-    
-        ;Adjust postscript output.
-        if !d.name eq 'PS' then begin
-            charsize  = MrPS_Rescale(charsize,        /CHARSIZE)
-            charthick = MrPS_Rescale(*self.charthick, /CHARTHICK)
-            thick     = MrPS_Rescale(*self.thick,     /THICK)
-        endif else begin
-            charthick = *self.charthick
-            thick     = *self.thick
-        endelse
+		self.layout -> GetProperty, POSITION=position, CHARSIZE=charsize
 
-        cgplot, [0], [0], $
-              /NODATA, $
-              /NOERASE, $
-              BACKGROUND    =  cgColor(*self.background), $
-              CHARSIZE      =       charsize, $
-              CHARTHICK     =       charthick, $
-              COLOR         =  cgColor(*self.axiscolor), $
-              DEVICE        =  self.device, $
-              FONT          = *self.font, $
-              NORMAL        =  self.normal, $
-              POSITION      =       position, $
-              SUBTITLE      = *self.subtitle, $
-              THICK         =       thick, $
-              TICKLEN       = *self.ticklen, $
-              TITLE         =  cgCheckForSymbols(*self.title), $
-              
-              XCHARSIZE     = *self.xcharsize, $
-              XGRIDSTYLE    = *self.xgridstyle, $
-              XLOG          =       xlog, $
-              XMINOR        = *self.xminor, $
-              XRANGE        =       xrange, $
-              XSTYLE        =       xstyle, $
-              XTHICK        = *self.xthick, $
-              XTICK_GET     = *self.xtick_get, $
-              XTICKFORMAT   = *self.xtickformat, $
-              XTICKINTERVAL = *self.xtickinterval, $
-              XTICKLAYOUT   = *self.xticklayout, $
-              XTICKLEN      = *self.xticklen, $
-              XTICKNAME     = *self.xtickname, $
-              XTICKS        = *self.xticks, $
-              XTICKUNITS    = *self.xtickunits, $
-              XTICKV        = *self.xtickv, $
-              XTITLE        =  cgCheckForSymbols(*self.xtitle), $
-              
-              YCHARSIZE     = *self.ycharsize, $
-              YGRIDSTYLE    = *self.ygridstyle, $
-              YLOG          =       ylog, $
-              YMINOR        = *self.yminor, $
-              YRANGE        =       yrange, $
-              YSTYLE        =       ystyle, $
-              YTHICK        = *self.ythick, $
-              YTICK_GET     = *self.ytick_get, $
-              YTICKFORMAT   = *self.ytickformat, $
-              YTICKINTERVAL = *self.ytickinterval, $
-              YTICKLAYOUT   = *self.yticklayout, $
-              YTICKLEN      = *self.yticklen, $
-              YTICKNAME     = *self.ytickname, $
-              YTICKS        = *self.yticks, $
-              YTICKUNITS    = *self.ytickunits, $
-              YTICKV        = *self.ytickv, $
-              YTITLE        =  cgCheckForSymbols(*self.ytitle)
+		;Adjust postscript output.
+		if !d.name eq 'PS' then begin
+			charsize  = MrPS_Rescale(charsize,        /CHARSIZE)
+			charthick = MrPS_Rescale(*self.charthick, /CHARTHICK)
+			thick     = MrPS_Rescale(*self.thick,     /THICK)
+		endif else begin
+			charthick = *self.charthick
+			thick     = *self.thick
+		endelse
+
+		cgplot, [0], [0], $
+		        /NODATA, $
+		        /NOERASE, $
+		        BACKGROUND    =  cgColor(*self.background), $
+		        CHARSIZE      =       charsize, $
+		        CHARTHICK     =       charthick, $
+		        COLOR         =  cgColor(*self.axiscolor), $
+		        DEVICE        =  self.device, $
+		        FONT          = *self.font, $
+		        NORMAL        =  self.normal, $
+		        POSITION      =       position, $
+		        SUBTITLE      = *self.subtitle, $
+		        THICK         =       thick, $
+		        TICKLEN       = *self.ticklen, $
+		        TITLE         =  cgCheckForSymbols(*self.title), $
+		        
+		        XCHARSIZE     = *self.xcharsize, $
+		        XGRIDSTYLE    = *self.xgridstyle, $
+		        XLOG          =       xlog, $
+		        XMINOR        = *self.xminor, $
+		        XRANGE        =       xrange, $
+		        XSTYLE        =       xstyle, $
+		        XTHICK        = *self.xthick, $
+		        XTICK_GET     = *self.xtick_get, $
+		        XTICKFORMAT   = *self.xtickformat, $
+		        XTICKINTERVAL = *self.xtickinterval, $
+		        XTICKLAYOUT   = *self.xticklayout, $
+		        XTICKLEN      = *self.xticklen, $
+		        XTICKNAME     = *self.xtickname, $
+		        XTICKS        = *self.xticks, $
+		        XTICKUNITS    = *self.xtickunits, $
+		        XTICKV        = *self.xtickv, $
+		        XTITLE        =  cgCheckForSymbols(*self.xtitle), $
+		        
+		        YCHARSIZE     = *self.ycharsize, $
+		        YGRIDSTYLE    = *self.ygridstyle, $
+		        YLOG          =       ylog, $
+		        YMINOR        = *self.yminor, $
+		        YRANGE        =       yrange, $
+		        YSTYLE        =       ystyle, $
+		        YTHICK        = *self.ythick, $
+		        YTICK_GET     = *self.ytick_get, $
+		        YTICKFORMAT   = *self.ytickformat, $
+		        YTICKINTERVAL = *self.ytickinterval, $
+		        YTICKLAYOUT   = *self.yticklayout, $
+		        YTICKLEN      = *self.yticklen, $
+		        YTICKNAME     = *self.ytickname, $
+		        YTICKS        = *self.yticks, $
+		        YTICKUNITS    = *self.ytickunits, $
+		        YTICKV        = *self.ytickv, $
+		        YTITLE        =  cgCheckForSymbols(*self.ytitle)
 
               ;Graphics keywords that are not used
               ; - CLIP --> DATA_POS
@@ -458,21 +460,21 @@ NOERASE=noerase
 ;              DATA:          0B, $
 ;              LINESTYLE:     Ptr_New(), $
 
-    endif
+	endif
 
-    ;Polar axes?
-    if self.overplot eq 0 $
-        then if self.axes && self.polar then self -> DoPolarAxes, XRANGE=xrange, YRANGE=yrange
+	;Polar axes?
+	if self.overplot eq 0 $
+		then if self.axes && self.polar then self -> DoPolarAxes, XRANGE=xrange, YRANGE=yrange
 
-    ;Save the coordinate system
-    self -> SaveCoords
-    
-    ;No axes
-    if self.axes eq 0 then begin
-        !P = p_current
-        !X = x_current
-        !Y = y_current
-    endif
+	;Save the coordinate system
+	self -> SaveCoords
+
+	;No axes
+	if self.axes eq 0 then begin
+		!P = p_current
+		!X = x_current
+		!Y = y_current
+	endif
 
 ;---------------------------------------------------------------------
 ;RESET COLOR TABLE AND DEVICE ////////////////////////////////////////
@@ -1146,6 +1148,7 @@ IDISPLAY = iDisplay, $
 INIT_XRANGE = init_xrange, $
 INIT_YRANGE = init_yrange, $
 LAYOUT = layout, $
+PALETTE = palette, $
 POSITION = position, $
 TV = tv, $
 XMIN = xmin, $
@@ -1174,7 +1177,7 @@ MISSING_COLOR = missing_color, $
 NAN = nan, $
 NOCLIP = noclip, $
 PAINT = paint, $
-PALETTE = palette, $
+RGB_TABLE = rgb_table, $
 RANGE = range, $
 RLOG = rlog, $
 SCALE = scale, $
@@ -1186,67 +1189,66 @@ MIN_VALUE = min_value, $
 XLOG = xlog, $
 YLOG = ylog, $
 _REF_EXTRA = extra
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
+	compile_opt strictarr
 
-    ;MrImage Properties
-    if arg_present(charsize)    then self.layout -> GetProperty, CHARSIZE=charsize
-    if arg_present(iDisplay)    then iDisplay    =  self.iDisplay
-    if arg_present(INIT_XRANGE) then init_xrange =  self.init_xrange
-    if arg_present(INIT_YRANGE) then init_yrange =  self.init_yrange
-    if arg_present(layout)      then layout      =  self.layout -> GetLayout()
-    if arg_present(log)         then log         =  self.log
-    if arg_present(position)    then position    =  self.layout -> GetPosition()
-    if arg_present(rlog)        then rlog        =  self.rlog
-    if arg_present(xmin) then if n_elements(*self.Xmin) gt 0 then xmin = *self.Xmin
-    if arg_present(xmax) then if n_elements(*self.Xmax) gt 0 then xmax = *self.Xmax
-    if arg_present(ymin) then if n_elements(*self.Ymin) gt 0 then ymin = *self.Ymin
-    if arg_present(ymax) then if n_elements(*self.Ymax) gt 0 then ymax = *self.Ymax
-    
-    ;Polar options
-    if arg_present(pol_axstyle)    gt 0 then pol_axstyle    = self.pol_axstyle
-    if arg_present(pol_thick)      gt 0 then pol_thick      = self.pol_thick
-    if arg_present(pol_rcolor)     gt 0 then pol_rcolor     = self.pol_rcolor
-    if arg_present(pol_rlinestyle) gt 0 then pol_rlinestyle = self.pol_rlinestyle
-    if arg_present(pol_tcolor)     gt 0 then pol_tcolor     = self.pol_tcolor
-    if arg_present(pol_tlinestyle) gt 0 then pol_tlinestyle = self.pol_tlinestyle
-    
-    ;Graphics Properties
-    if arg_present(MAX_VALUE) and n_elements(*self.MAX_VALUE) ne 0 then max_value = *self.max_value
-    if arg_present(MIN_VALUE) and n_elements(*self.MIN_VALUE) ne 0 then min_value = *self.min_value
-    if arg_present(XLOG)     then xlog = self.xlog
-    if arg_present(YLOG)     then ylog = self.ylog
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		void = cgErrorMsg()
+		return
+	endif
 
-    ;mraImage.pro Properties
-    if arg_present(AXES)           then axes          =  self.axes
-    if arg_present(BOTTOM)         then bottom        =  self.bottom
-    if arg_present(RANGE)          then range         =  self.range
-    if arg_present(MISSING_COLOR)  then missing_color =  self.missing_color
-    if arg_present(PALETTE)        then palette       =  self.palette
-    if arg_present(NAN)            then nan           =  self.nan
-    if arg_present(SCALE)          then scale         =  self.scale
-    if arg_present(TOP)            then top           =  self.top
-    if arg_present(noclip)         && n_elements(*self.noclip)        gt 0 then noclip        =  self.noclip
-    if arg_present(CTINDEX)        && n_elements(*self.ctindex)       gt 0 then ctindex       = *self.ctindex
-    if arg_present(data_pos)       && n_elements(*self.data_pos)      gt 0 then data_pos      = *self.data_pos
-    if arg_present(MISSING_VALUE)  && n_elements(*self.missing_value) gt 0 then missing_value = *self.missing_value
-    
-    if arg_present(center) then center = self.center
-    if arg_present(paint)  then paint  = self.paint
-    if arg_present(polar)  then polar  = self.polar
-    
-    ;MrGraphicsKeywords Properties
-    if n_elements(EXTRA) ne 0 then begin
-        self -> MrGrAtom::GetProperty, _EXTRA=extra
-        self -> MrGraphicsKeywords::GetProperty, _EXTRA=extra
-    endif
+	;MrImage Properties
+	if arg_present(charsize)    then self.layout -> GetProperty, CHARSIZE=charsize
+	if arg_present(iDisplay)    then iDisplay    =  self.iDisplay
+	if arg_present(INIT_XRANGE) then init_xrange =  self.init_xrange
+	if arg_present(INIT_YRANGE) then init_yrange =  self.init_yrange
+	if arg_present(layout)      then layout      =  self.layout -> GetLayout()
+	if arg_present(log)         then log         =  self.log
+	if arg_present(palette)     then palette     =  self.palette
+	if arg_present(position)    then position    =  self.layout -> GetPosition()
+	if arg_present(rlog)        then rlog        =  self.rlog
+	if arg_present(xmin) then if n_elements(*self.Xmin) gt 0 then xmin = *self.Xmin
+	if arg_present(xmax) then if n_elements(*self.Xmax) gt 0 then xmax = *self.Xmax
+	if arg_present(ymin) then if n_elements(*self.Ymin) gt 0 then ymin = *self.Ymin
+	if arg_present(ymax) then if n_elements(*self.Ymax) gt 0 then ymax = *self.Ymax
+
+	;Polar options
+	if arg_present(pol_axstyle)    gt 0 then pol_axstyle    = self.pol_axstyle
+	if arg_present(pol_thick)      gt 0 then pol_thick      = self.pol_thick
+	if arg_present(pol_rcolor)     gt 0 then pol_rcolor     = self.pol_rcolor
+	if arg_present(pol_rlinestyle) gt 0 then pol_rlinestyle = self.pol_rlinestyle
+	if arg_present(pol_tcolor)     gt 0 then pol_tcolor     = self.pol_tcolor
+	if arg_present(pol_tlinestyle) gt 0 then pol_tlinestyle = self.pol_tlinestyle
+
+	;Graphics Properties
+	if arg_present(MAX_VALUE) and n_elements(*self.MAX_VALUE) ne 0 then max_value = *self.max_value
+	if arg_present(MIN_VALUE) and n_elements(*self.MIN_VALUE) ne 0 then min_value = *self.min_value
+	if arg_present(XLOG)     then xlog = self.xlog
+	if arg_present(YLOG)     then ylog = self.ylog
+
+	;mraImage.pro Properties
+	if arg_present(AXES)           then axes          =  self.axes
+	if arg_present(BOTTOM)         then bottom        =  self.bottom
+	if arg_present(RANGE)          then range         =  self.range
+	if arg_present(MISSING_COLOR)  then missing_color =  self.missing_color
+	if arg_present(rgb_table)      then self.palette ->  GetProperty, RGB_TABLE=rgb_table
+	if arg_present(NAN)            then nan           =  self.nan
+	if arg_present(SCALE)          then scale         =  self.scale
+	if arg_present(TOP)            then top           =  self.top
+	if arg_present(noclip)         && n_elements(*self.noclip)        gt 0 then noclip        =  self.noclip
+	if arg_present(CTINDEX)        && n_elements(*self.ctindex)       gt 0 then ctindex       = *self.ctindex
+	if arg_present(data_pos)       && n_elements(*self.data_pos)      gt 0 then data_pos      = *self.data_pos
+	if arg_present(MISSING_VALUE)  && n_elements(*self.missing_value) gt 0 then missing_value = *self.missing_value
+
+	if arg_present(center) then center = self.center
+	if arg_present(paint)  then paint  = self.paint
+	if arg_present(polar)  then polar  = self.polar
+
+	;MrGraphicsKeywords Properties
+	if n_elements(EXTRA) ne 0 $
+		then self -> MrGrDataAtom::GetProperty, _STRICT_EXTRA=extra
 end
 
 
@@ -1329,126 +1331,22 @@ pro MrImage::PrepImage
 	if self.scale then begin
 	    range = self.log ? MrLog(self.range) : self.range
 
-        ;Scale the image
-        ;   - Set the NaN flag
-        img_out = bytscl(img_out, /NAN, $
-                         MIN=range[0], MAX=range[1], $
-                         TOP=self.top-self.bottom )
-        
-        ;BYTSCL scales between 0 and TOP. Bump everything up by BOTTOM.
-        if self.bottom ne 0 then img_out += self.bottom
+		;Get the number of colors in the color table
+		self.palette -> GetProperty, NCOLORS=ncolors
+
+		;Scale the image
+		;   - Set the NaN flag
+		img_out = bytscl(img_out, /NAN, $
+		                 MIN=range[0], MAX=range[1], $
+		                 TOP=ncolors-1 )
 	endif
 	
 	;Replace missing values with missing index
 	if n_elements(nMask) gt 0 $
-        then if nMask gt 0 then img_out[iMask] = self.missing_index
+		then if nMask gt 0 then img_out[iMask] = self.missing_index
 	
 	;Store the result
 	*self.img_out = img_out
-end
-
-
-;+
-;   Set the color palette.
-;-
-pro MrImage::SetPalette, $
-BOTTOM = bottom, $
-BREWER = brewer, $
-CTINDEX = ctindex, $
-MISSING_COLOR = missing_color, $
-MISSING_INDEX = missing_index, $
-NCOLORS = ncolors, $
-PALETTE = palette, $
-REVERSE = reverse, $
-TOP = top
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return
-    endif
-
-;---------------------------------------------------------------------
-; Set Properties /////////////////////////////////////////////////////
-;--------------------------------------------------------------------- 
-    if n_elements(brewer)        gt 0 then self.brewer        = keyword_set(brewer)
-    if n_elements(missing_color) gt 0 then self.missing_color = missing_color
-    if n_elements(missing_index) gt 0 then self.missing_index = missing_index
-    if n_elements(reverse)       gt 0 then self.reverse       = keyword_set(reverse)
-    
-    ;PALETTE takes precedence over CTINDEX.
-    if n_elements(ctindex) gt 0 then *self.ctindex = ctindex
-    if n_elements(palette) gt 0 then begin
-        self.palette = palette
-        void = temporary(*self.ctindex)
-    endif
-
-    ;Rescale?
-    ;   - If the SCALE property is set, ::PrepImage will make use of TOP and BOTTOM
-    ;       when byte-scaling the image.
-    ;   - If they change, must rescale.
-    ;   - NCOLORS takes precedence over TOP
-    nCol       = n_elements(nColors)
-    nBottom    = n_elements(bottom)
-    nTop       = n_elements(top)
-    scale_flag = 0
-    if nBottom + nTop + nCol gt 0 then begin
-        scale_flag = 1
-        if nBottom gt 0 then self.bottom = 0B > bottom < 255B
-        if nTop    gt 0 then self.top    = 0B > top    < 255B
-        if nCol    gt 0 then self.top    = 0B > self.bottom + nColors - 1 < 255B
-    endif
-    nColors = self.top - self.bottom + 1
-
-;---------------------------------------------------------------------
-; Hide Missing Color? ////////////////////////////////////////////////
-;---------------------------------------------------------------------  
-    ;Missing index
-    ;   - Check if the missing index is at the top/bottom of the color table.
-    ;       o Adjust the top/bottom to hide it.
-    ;   - The missing color is loaded into the color table at time of draw.
-    ;       o Prevent color palette contamination
-    ;       o Facilitate change of missing color.
-    if self.missing_color ne '' then begin
-        if self.missing_index eq !d.table_size-1 then self.top    = self.top    < !d.table_size-2
-        if self.missing_index eq 0B              then self.bottom = self.bottom > 1B
-    endif
-
-;---------------------------------------------------------------------
-;Load a Color Table Index? ///////////////////////////////////////////
-;---------------------------------------------------------------------    
-    if n_elements(*self.ctindex) gt 0 then begin
-        ;Load the color table
-        cgLoadCT, *self.ctindex, $
-                  BOTTOM    =  self.bottom, $
-                  NCOLORS   =       nColors, $
-                  REVERSE   =  self.reverse, $
-                  BREWER    =  self.brewer, $
-                  RGB_TABLE =       tempPalette
-
-        ;If NCOLORS < 255, we need to grab the rest of the color table
-        ;   - If not, TEMPPALETTE and SELF.PALETTE will not be the same
-        ;     size and the results will be messed up.
-        if nColors lt 255 then begin
-        	tvlct, pp, /GET
-        	pp[self.bottom:self.bottom+nColors-1,*] = tempPalette
-        	tempPalette = temporary(pp)
-        endif
-        self.palette = temporary(tempPalette)
-    endif
-
-;---------------------------------------------------------------------
-; Cleanup ////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-    
-    ;Does the image now need to be scaled?
-    if scale_flag then if self.scale then self -> PrepImage
-    
-    ;Redraw
-    self.window -> Draw
 end
 
 
@@ -1700,20 +1598,42 @@ TV=tv
 ;---------------------------------------------------------------------
 ; Dataspace Ranges ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+	;
+	; We have several choices for ranges
+	;   1. User-defined range
+	;   2. Range of pixel centers
+	;   3. Range of dataspace
+	;   4. Range of Target
+	;   5. Arbitrary range
+	;
+	; Define the dataspace range based on the actual data provided.
+	; If none was provided, check for a target object. When all
+	; else fails, set an arbitrary range.
+	;
+
     ;XRANGE
     case 1 of
-        n_elements(*self.x0)    gt 0: *self.xrange = [min(*self.x0, /NAN), max(*self.x1, /NAN)]
-        n_elements(*self.indep) gt 0: *self.xrange = [min(*self.indep, MAX=xMax, /NAN), xmax]
-        else:                         *self.xrange = [self.xlog, imDims[0]-1]
+        n_elements(*self.xrange) gt 0: ;Do nothing
+        n_elements(*self.x0)     gt 0: *self.xrange = [min(*self.x0, /NAN), max(*self.x1, /NAN)]
+        n_elements(*self.indep)  gt 0: *self.xrange = [min(*self.indep, MAX=xMax, /NAN), xmax]
+        obj_valid(self.target): begin
+            self.target -> GetProperty, XRANGE=xrange
+            *self.xrange = xrange
+        endcase
+        else: *self.xrange = [0, imDims[0]-1] + self.xlog
     endcase
     
     ;YRANGE
     case 1 of
-        n_elements(*self.y0)   gt 0: *self.yrange = [min(*self.y0, /NAN), max(*self.y1, /NAN)]
-        n_elements(*self.dep)  gt 0: *self.yrange = [min(*self.dep, MAX=yMax, /NAN), yMax]
-        else:                        *self.yrange = [self.ylog, imDims[1]-1]
+        n_elements(*self.yrange) gt 0: ;Do nothing
+        n_elements(*self.y0)     gt 0: *self.yrange = [min(*self.y0, /NAN), max(*self.y1, /NAN)]
+        n_elements(*self.dep)    gt 0: *self.yrange = [min(*self.dep, MAX=yMax, /NAN), yMax]
+        obj_valid(self.target): begin
+            self.target -> GetProperty, YRANGE=yrange
+            *self.yrange = yrange
+        endcase
+        else: *self.yrange = [0, imDims[0]-1] + self.ylog
     endcase
-
 
 ;---------------------------------------------------------------------
 ; Define Dataspace ///////////////////////////////////////////////////
@@ -1819,7 +1739,7 @@ end
 ;       NAN:                in, optional, type=boolean
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
-;       PALETTE:            in, optional, type=bytarr(3\,256)
+;       RGB_TABLE:            in, optional, type=bytarr(3\,256)
 ;                           Color table to be loaded before the image is displayed.
 ;       POLAR:              in, optional, type=boolean, default=0
 ;                           If set, the image will be plotted in polar coordinates, with
@@ -1855,9 +1775,11 @@ CENTER = center, $
 DATA_POS = data_pos, $
 LOG = log, $
 MISSING_VALUE = missing_value, $
+MISSING_INDEX = missing_index, $
 NAN = nan, $
 NOCLIP = noclip, $
 RANGE = range, $
+RGB_TABLE = rgb_table, $
 SCALE = scale, $
 
 ;POLAR Plot Options
@@ -1885,35 +1807,60 @@ _REF_EXTRA = extra
 
     reprep_flag = 0B
 
-    ;MrImage Keywords
-    if n_elements(iDisplay)    ne 0 then self.iDisplay = iDisplay
-    if n_elements(TV)          ne 0 then self.tv = keyword_set(tv)
+	;MrImage Keywords
+	if n_elements(iDisplay)    ne 0 then self.iDisplay = iDisplay
+	if n_elements(TV)          ne 0 then self.tv = keyword_set(tv)
 
-    ;mraImage.pro Properties
-    if n_elements(axes)           gt 0 then  self.axes           = keyword_set(axes)
-    if n_elements(data_pos)       gt 0 then *self.data_pos       = data_pos
-    if n_elements(noclip)         ne 0 then *self.noclip         = keyword_set(noclip)
-    if n_elements(pol_axstyle)    gt 0 then  self.pol_axstyle    = pol_axstyle
-    if n_elements(pol_thick)      gt 0 then  self.pol_thick      = pol_thick
-    if n_elements(pol_rcolor)     gt 0 then  self.pol_rcolor     = pol_rcolor
-    if n_elements(pol_rlinestyle) gt 0 then  self.pol_rlinestyle = pol_rlinestyle
-    if n_elements(pol_tcolor)     gt 0 then  self.pol_tcolor     = pol_tcolor
-    if n_elements(pol_tlinestyle) gt 0 then  self.pol_tlinestyle = pol_tlinestyle
-    
-    ;RANGE
+	;mraImage.pro Properties
+	if n_elements(axes)           gt 0 then  self.axes           = keyword_set(axes)
+	if n_elements(data_pos)       gt 0 then *self.data_pos       = data_pos
+	if n_elements(noclip)         ne 0 then *self.noclip         = keyword_set(noclip)
+	if n_elements(pol_axstyle)    gt 0 then  self.pol_axstyle    = pol_axstyle
+	if n_elements(pol_thick)      gt 0 then  self.pol_thick      = pol_thick
+	if n_elements(pol_rcolor)     gt 0 then  self.pol_rcolor     = cgColor(pol_rcolor, /TRIPLE)
+	if n_elements(pol_rlinestyle) gt 0 then  self.pol_rlinestyle = pol_rlinestyle
+	if n_elements(pol_tcolor)     gt 0 then  self.pol_tcolor     = cgColor(pol_tcolor, /TRIPLE)
+	if n_elements(pol_tlinestyle) gt 0 then  self.pol_tlinestyle = pol_tlinestyle
+
+	;PALETTE
+	if n_elements(rgb_table) gt 0 then begin
+		;Get the number of colors
+		self.palette -> GetProperty, N_COLORS=n_old
+		
+		;Set the color palette
+		self.palette -> SetProperty, RGB_TABLE=the_table
+		
+		;If the number of colors changed, adjust the missing index
+		self.palette -> GetProperty, N_COLORS=n_new
+		if n_new ne n_old && self.missing_index gt n_new-1 then self.missing_index = n_new - 1
+		
+		;Add a missing color
+		if n_elements(*self.missing_value) gt 0 $
+			then self.palette -> SetRGB, self.missing_index, self.missing_color
+	endif
+	
+	;MISSING INDEX
+	if n_elements(missing_index) gt 0 then begin
+		self.palette -> GetProperty, NCOLORS=ncolors
+		if missing_index ge ncolors $
+			then message, 'MISSING_INDEX does not fit in the color table.', /INFORMATIONAL $
+			else self.missing_index = missing_index
+	endif
+
+	;RANGE
 	nRange = n_elements(range)
 	if nRange gt 0 then begin
 		;Auto-determine range or User-defined?
 		if range[0] eq range[1] $
 			then _range = [min(*self.image, MAX=maxIm, /NAN), maxIm] $
 			else _range = range
-	
+
 		;Check the range
 		if self.log || keyword_set(log) then begin
 			;Cannot take log of negative numbers
 			if _range[0] lt 0 || _range[1] lt 0 then $
 				message, 'RANGE must be positive if /LOG is set.'
-		
+	
 			;Log of 0 is infinity
 			if _range[0] eq 0 || _range[1] eq 0 $
 				then message, 'Warning: Infinite plot range.', /INFORMATIONAL
@@ -1922,50 +1869,50 @@ _REF_EXTRA = extra
 		;Set the range
 		self.range = _range
 	endif
-    
-    ;PREP-IMAGE
-    ;   - These keywords require the image to be re-prepped
-    nScale   = n_elements(scale)
-    nNaN     = n_elements(nan)
-    nMissing = n_elements(missing_value)
-    nLog     = n_elements(log)
-    if nScale + nNaN + nMissing + nLog gt 0 then begin
-        if nScale   gt 0 then  self.scale         = keyword_set(scale)
-        if nNaN     gt 0 then  self.nan           = keyword_set(nan)
-        if nMissing gt 0 then *self.missing_value = missing_value
-        if nLog     gt 0 then  self.log           = keyword_set(log)
-        reprep_flag = 1B
-    endif
-    
-    ;PAINT
-    ;   - Parameters used to determine if image is painted or pasted.
-    ;   - It is set automatically in ::SetData and ::SetPixelLocations.
-    ;   - It can only be toggled with the CENTER, POLAR, and [XYR]LOG keywords
-    ;   - It takes priority over DPOSITION. If PAINT is set, DPOSITION is ignored in ::Draw.
-    nxlog   = n_elements(xlog)
-    nylog   = n_elements(ylog)
-    nCenter = n_elements(center)
-    nPolar  = n_elements(polar)
-    if nxlog + nylog + nCenter + nPolar gt 0 then begin
-        if nPolar  gt 0 then self.polar  = keyword_set(polar)
-        if nxlog   gt 0 then self.xlog   = keyword_set(xlog)
-        if nylog   gt 0 then self.ylog   = keyword_set(ylog)
-        if nCenter gt 0 then self.center = keyword_set(center)
 
-        ;If only X and Y were given, pixel locations must be recalculated
-        if self.nparams eq 3 && self.tv eq 0 $
-            then self -> SetPixelLocations, *self.indep, *self.dep
-    endif
-    
-    ;Superclass properties
-    if n_elements(extra) gt 0 $
-        then self -> MrGrDataAtom::SetProperty, _EXTRA=extra
+	;PREP-IMAGE
+	;   - These keywords require the image to be re-prepped
+	nScale   = n_elements(scale)
+	nNaN     = n_elements(nan)
+	nMissing = n_elements(missing_value)
+	nLog     = n_elements(log)
+	if nScale + nNaN + nMissing + nLog gt 0 then begin
+		if nScale   gt 0 then  self.scale         = keyword_set(scale)
+		if nNaN     gt 0 then  self.nan           = keyword_set(nan)
+		if nMissing gt 0 then *self.missing_value = missing_value
+		if nLog     gt 0 then  self.log           = keyword_set(log)
+		reprep_flag = 1B
+	endif
 
-    ;Prep the image?
-    if reprep_flag then self -> PrepImage
+	;PAINT
+	;   - Parameters used to determine if image is painted or pasted.
+	;   - It is set automatically in ::SetData and ::SetPixelLocations.
+	;   - It can only be toggled with the CENTER, POLAR, and [XYR]LOG keywords
+	;   - It takes priority over DPOSITION. If PAINT is set, DPOSITION is ignored in ::Draw.
+	nxlog   = n_elements(xlog)
+	nylog   = n_elements(ylog)
+	nCenter = n_elements(center)
+	nPolar  = n_elements(polar)
+	if nxlog + nylog + nCenter + nPolar gt 0 then begin
+		if nPolar  gt 0 then self.polar  = keyword_set(polar)
+		if nxlog   gt 0 then self.xlog   = keyword_set(xlog)
+		if nylog   gt 0 then self.ylog   = keyword_set(ylog)
+		if nCenter gt 0 then self.center = keyword_set(center)
 
-    ;Refresh the window
-    self.window -> Draw
+		;If only X and Y were given, pixel locations must be recalculated
+		if self.nparams eq 3 && self.tv eq 0 $
+			then self -> SetPixelLocations, *self.indep, *self.dep
+	endif
+
+	;Superclass properties
+	if n_elements(extra) gt 0 $
+		then self -> MrGrDataAtom::SetProperty, _STRICT_EXTRA=extra
+
+	;Prep the image?
+	if reprep_flag then self -> PrepImage
+
+	;Refresh the window
+	self.window -> Draw
 end
 
 
@@ -1992,7 +1939,6 @@ pro MrImage::cleanup
     ptr_free, self.x1
     ptr_free, self.y0
     ptr_free, self.y1
-    ptr_free, self.ctindex
     ptr_free, self.data_pos
     ptr_free, self.missing_value
     ptr_free, self.xdelta_minus
@@ -2003,6 +1949,8 @@ pro MrImage::cleanup
     ptr_free, self.ydelta_plus
     ptr_free, self.Ymin
     ptr_free, self.Ymax
+    
+    obj_destroy, self.palette
     
     ;Superclasses
     self -> MrGrDataAtom::cleanup
@@ -2072,7 +2020,7 @@ end
 ;       NAN:                in, optional, type=boolean, default=0
 ;                           Look for NaN's when scaling the image. Treat them as missing
 ;                               data.
-;       PALETTE:            in, optional, type=bytarr(3\,256)
+;       RGB_TABLE:            in, optional, type=bytarr(3\,256)
 ;                           Color table to be loaded before the image is displayed.
 ;       POL_AXSTYLE:        in, optional, type=integer, default=1
 ;                           A bit-wise mask determining how axes should be drawn when
@@ -2137,7 +2085,7 @@ MISSING_COLOR = missing_color, $
 MISSING_INDEX = missing_index, $
 NAN = nan, $
 PAINT = paint, $
-PALETTE = palette, $
+RGB_TABLE = rgb_table, $
 RANGE = range, $
 SCALE = scale, $
 TOP = top, $
@@ -2188,46 +2136,45 @@ _REF_EXTRA = extra
 	device = keyword_set(device)
 	if normal + device eq 0 then normal = 1
 	if normal + device gt 1 then $
-	    message, 'DEVICE and NORMAL are mutually exclusive.'
+		message, 'DEVICE and NORMAL are mutually exclusive.'
 	
 	;Polar options
 	if n_elements(pol_thick)      eq 0 then pol_thick      = 1
 	if n_elements(pol_axstyle)    eq 0 then pol_axstyle    = 1
 	if n_elements(pol_rlinestyle) eq 0 then pol_rlinestyle = 1
 	if n_elements(pol_tlinestyle) eq 0 then pol_tlinestyle = 1
-    
-    ;Make sure the titles are defined so we can use cgCheckForSymbols in ::Draw.
-    if n_elements(title)  eq 0 then  title = ''
-    if n_elements(xtitle) eq 0 then xtitle = ''
-    if n_elements(ytitle) eq 0 then ytitle = ''
-    
-    ;Have tickmarks pointing outward instead of inward.
-    if n_elements(xticklen) eq 0 then xticklen = -0.02
-    if n_elements(yticklen) eq 0 then yticklen = -0.02
-    
+
+	;Make sure the titles are defined so we can use cgCheckForSymbols in ::Draw.
+	if n_elements(title)  eq 0 then  title = ''
+	if n_elements(xtitle) eq 0 then xtitle = ''
+	if n_elements(ytitle) eq 0 then ytitle = ''
+
+	;Have tickmarks pointing outward instead of inward.
+	if n_elements(xticklen) eq 0 then xticklen = -0.02
+	if n_elements(yticklen) eq 0 then yticklen = -0.02
+
 ;---------------------------------------------------------------------
 ;Allocate Heap to Pointers ///////////////////////////////////////////
 ;---------------------------------------------------------------------
-    self.image         = ptr_new(/ALLOCATE_HEAP)
-    self.img_out       = ptr_new(/ALLOCATE_HEAP)
-    self.indep         = ptr_new(/ALLOCATE_HEAP)
-    self.dep           = ptr_new(/ALLOCATE_HEAP)
-    self.x0            = ptr_new(/ALLOCATE_HEAP)
-    self.x1            = ptr_new(/ALLOCATE_HEAP)
-    self.y0            = ptr_new(/ALLOCATE_HEAP)
-    self.y1            = ptr_new(/ALLOCATE_HEAP)
-    self.ctindex       = ptr_new(/ALLOCATE_HEAP)
-    self.data_pos      = ptr_new(/ALLOCATE_HEAP)
-    self.missing_value = ptr_new(/ALLOCATE_HEAP)
-    self.xdelta_minus  = ptr_new(/ALLOCATE_HEAP)
-    self.xdelta_plus   = ptr_new(/ALLOCATE_HEAP)
-    self.ydelta_minus  = ptr_new(/ALLOCATE_HEAP)
-    self.ydelta_plus   = ptr_new(/ALLOCATE_HEAP)
-    self.xMax          = ptr_new(/ALLOCATE_HEAP)
-    self.xMin          = ptr_new(/ALLOCATE_HEAP)
-    self.yMax          = ptr_new(/ALLOCATE_HEAP)
-    self.yMin          = ptr_new(/ALLOCATE_HEAP)
-        
+	self.image         = ptr_new(/ALLOCATE_HEAP)
+	self.img_out       = ptr_new(/ALLOCATE_HEAP)
+	self.indep         = ptr_new(/ALLOCATE_HEAP)
+	self.dep           = ptr_new(/ALLOCATE_HEAP)
+	self.x0            = ptr_new(/ALLOCATE_HEAP)
+	self.x1            = ptr_new(/ALLOCATE_HEAP)
+	self.y0            = ptr_new(/ALLOCATE_HEAP)
+	self.y1            = ptr_new(/ALLOCATE_HEAP)
+	self.data_pos      = ptr_new(/ALLOCATE_HEAP)
+	self.missing_value = ptr_new(/ALLOCATE_HEAP)
+	self.xdelta_minus  = ptr_new(/ALLOCATE_HEAP)
+	self.xdelta_plus   = ptr_new(/ALLOCATE_HEAP)
+	self.ydelta_minus  = ptr_new(/ALLOCATE_HEAP)
+	self.ydelta_plus   = ptr_new(/ALLOCATE_HEAP)
+	self.xMax          = ptr_new(/ALLOCATE_HEAP)
+	self.xMin          = ptr_new(/ALLOCATE_HEAP)
+	self.yMax          = ptr_new(/ALLOCATE_HEAP)
+	self.yMin          = ptr_new(/ALLOCATE_HEAP)
+	
 ;---------------------------------------------------------------------
 ; Color Palette //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -2236,57 +2183,55 @@ _REF_EXTRA = extra
 	;   - Foreground, Background, and Missing Index.
 	;   - Default to putting the missing value at the top of the color table.
 	;   - Use as much of the color table as possible.
-	;   - Make sure a color table or color palette was given.
+	;   - Make sure a color table or color rgb_table was given.
 	brewer  = keyword_set(brewer)
 	reverse = keyword_set(reverse)
 	if n_elements(color)         eq 0 then color         = 'black'
 	if n_elements(axiscolor)     eq 0 then axiscolor     = color
 	if n_elements(pol_rcolor)    eq 0 then pol_rcolor    = color
 	if n_elements(pol_tcolor)    eq 0 then pol_tcolor    = color
-    if n_elements(background)    eq 0 then background    = 'white'
-    if n_elements(missing_color) eq 0 then missing_color = ''
-    if n_elements(missing_index) eq 0 then missing_index = !d.table_size - 1
-    if n_elements(top)           eq 0 then top           = !d.table_size - 1
-	if n_elements(palette) eq 0 && n_elements(ctindex) eq 0 then ctindex = 13
+	if n_elements(background)    eq 0 then background    = 'white'
+	if n_elements(missing_color) eq 0 then missing_color = ''
+	if n_elements(missing_index) eq 0 then missing_index = !d.table_size - 1
+	if n_elements(top)           eq 0 then top           = !d.table_size - 1
+	if n_elements(rgb_table)     eq 0 then rgb_table     = 13
 
-	;Set the palette
+	;Set the rgb_table
 	;   - Do not set the SCALE property before now.
-	self -> SetPalette, BOTTOM        = bottom, $
-                        BREWER        = brewer, $
-                        CTINDEX       = ctindex, $
-                        MISSING_COLOR = missing_color, $
-                        MISSING_INDEX = missing_index, $
-                        NCOLORS       = ncolors, $
-                        PALETTE       = palette, $
-                        REVERSE       = reverse, $
-                        TOP           = top
+	self.palette = obj_new('MrColorPalette', rgb_table, $
+	                                         BOTTOM        = bottom, $
+	                                         BREWER        = brewer, $
+	                                         NCOLORS       = ncolors, $
+	                                         REVERSE       = reverse )
 
 ;---------------------------------------------------------------------
 ; Set Data ///////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    ;
-    ; Set properties needed for ::PrepImage and ::SetPixelLocations
-    ; before either of them are called in ::SetData
-    ;
-    
-    ;Data & Pixel-related properties
-    ;   - Those not set in the colors section above.
-    self.xlog  = keyword_set(xlog)
-    self.ylog  = keyword_set(ylog)
-    self.log   = keyword_set(log)
-    self.polar = keyword_set(polar)
-    self.tv    = keyword_set(tv)
-    
-    ;Image output-related properties
-    ;   - Scale the image if range[0] ne range[1] (user-given range)
-    if n_elements(range)         eq 0 then range = [0,0]
-    if n_elements(missing_value) gt 0 then *self.missing_value = missing_value
+	;
+	; Set properties needed for ::PrepImage and ::SetPixelLocations
+	; before either of them are called in ::SetData
+	;
 
-    ;Set the data
-    ;   - Automatically sets NAN, RANGE and SCALE.
-    ;   - Depends on XLOG, YLOG, LOG, TV, and MISSING_VALUE being set.
-    self -> SetData, theImage, x, y, x0, y0, x1, y1
-    
+	;Data & Pixel-related properties
+	;   - Those not set in the colors section above.
+	self.xlog  = keyword_set(xlog)
+	self.ylog  = keyword_set(ylog)
+	self.log   = keyword_set(log)
+	self.polar = keyword_set(polar)
+	self.tv    = keyword_set(tv)
+
+	;Image output-related properties
+	;   - Scale the image if range[0] ne range[1] (user-given range)
+	if n_elements(range)         eq 0 then range               = [0,0]
+	if n_elements(xrange)        gt 0 then *self.xrange        = xrange
+	if n_elements(yrange)        gt 0 then *self.yrange        = yrange
+	if n_elements(missing_value) gt 0 then *self.missing_value = missing_value
+
+	;Set the data
+	;   - Automatically sets NAN, RANGE and SCALE.
+	;   - Depends on XLOG, YLOG, LOG, TV, and MISSING_VALUE being set.
+	self -> SetData, theImage, x, y, x0, y0, x1, y1
+
 ;---------------------------------------------------------------------
 ;Check/Set Keywords //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -2317,10 +2262,8 @@ _REF_EXTRA = extra
                          RANGE          = _range, $
                          SCALE          = scale, $
                          TITLE          = title, $
-                         XRANGE         = xrange, $
                          XTICKLEN       = xticklen, $
                          XTITLE         = xtitle, $
-                         YRANGE         = yrange, $
                          YTICKLEN       = yticklen, $
                          YTITLE         = ytitle
 
@@ -2368,7 +2311,7 @@ pro MrImage__define
                x1:      ptr_new(), $
                y0:      ptr_new(), $
                y1:      ptr_new(), $
-               tv: 0B, $                         ;indicate that a TV position was given
+               tv:      0B, $                    ;indicate that a TV position was given
                
                ;Type of data given
                nparams: 0B, $
@@ -2382,28 +2325,26 @@ pro MrImage__define
                ;POLAR options
                polar:          0B, $            ;Create a polar image?
                pol_axstyle:    0S, $
-               pol_rcolor:     '', $
+               pol_rcolor:     bytarr(3), $
                pol_rlinestyle: 0S, $
-               pol_tcolor:     '', $
+               pol_tcolor:     bytarr(3), $
                pol_tlinestyle: 0S, $
                pol_thick:      0S, $
                
+               ;Palette Properties
+               palette:        obj_new(), $
+               
                ;mraImage Keywords
                axes:          0B, $             ;Draw axes around the image?
-               bottom:        0B, $             ;If scaled, minimum scaled value
-               brewer:        0B, $             ;Use a brewer color table?
                center:        0B, $             ;Center of pixel locations was given?
-               ctindex:       ptr_new(), $      ;Color index to load
                data_pos:      ptr_new(), $      ;A data position for the image
                missing_value: ptr_new(), $      ;Value to be treated as missing
-               missing_color: '', $             ;Color of missing value
+               missing_color: bytarr(3), $      ;Color of missing value
                missing_index: 0B, $             ;Color table index of missing color
                nan:           0B, $             ;Search for NaN's when scaling?
                log:           0B, $             ;Log-scale the image.
                paint:         0B, $             ;Paint the image pixel-by-pixel?
-               palette:       bytarr(256,3), $  ;Color table to be loaded
                range:         dblarr(2), $      ;Range at which the color table saturates
-               reverse:       0B, $             ;Reverse the color table?
                scale:         0B, $             ;Byte-scale the image
                top:           0B, $             ;If scaled, maximum scaled value
                xdelta_minus:  ptr_new(), $      ;Distance from center of pixel to left edge
