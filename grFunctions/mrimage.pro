@@ -95,18 +95,9 @@
 ;-
 function MrImage, img, x, y, x0, y0, x1, y1, $
 _REF_EXTRA = extra
-    compile_opt strictarr
-    
-    ;Error handling
-    catch, the_error
-    if the_error ne 0 then begin
-        catch, /cancel
-        void = cgErrorMsg()
-        return, obj_new()
-    endif
+	compile_opt strictarr
+	on_error, 2
 
-    ;Create the color bar
-    theImage = obj_new('MrImage', img, x, y, x0, y0, x1, y1, _STRICT_EXTRA=extra)
-    
-    return, theImage
+	;Create the color bar
+	return, obj_new('MrImage', img, x, y, x0, y0, x1, y1, _STRICT_EXTRA=extra)
 end

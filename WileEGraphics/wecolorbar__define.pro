@@ -209,15 +209,15 @@ NOERASE=noerase
             THEN RETURN $
             ELSE self.position = position
         
-        ;The position is caluclated in normal coordinates.    
+        ;The position is caluclated in normal coordinates.
         self.normal = 1
         self.data   = 0
         self.device = 0
         
         ;Make sure RANGE, CTINDEX, PALETTE are the same
         IF MrIsA(self.target, 'MrImage') $
-            THEN self.target -> GetProperty, RANGE=gRange, PALETTE=gPalette, LOG=log, CTINDEX=gCTIndex $
-            ELSE self.target -> GetProperty, RANGE=gRange, PALETTE=gPalette
+            THEN self.target -> GetProperty, RANGE=gRange, RGB_TABLE=gPalette, LOG=log, CTINDEX=gCTIndex $
+            ELSE self.target -> GetProperty, RANGE=gRange, RGB_TABLE=gPalette
 
         ;Calling the SetProperty method causes an infinite loop.
         ;Set the properties directly.
@@ -581,8 +581,8 @@ _REF_EXTRA=extra
     IF N_Elements(target) NE 0 THEN IF Obj_Valid(target) THEN BEGIN
         self.target = target
         IF MrIsA(target, 'MrImage') $
-            THEN target -> GetProperty, RANGE=gRange, PALETTE=gPalette, CTINDEX=gCTIndex $
-            ELSE target -> GetProperty, RANGE=gRange, PALETTE=gPalette
+            THEN target -> GetProperty, RANGE=gRange, RGB_TABLE=gPalette, CTINDEX=gCTIndex $
+            ELSE target -> GetProperty, RANGE=gRange, RGB_TABLE=gPalette
         
         ;Sync the colorbar properties with those of GRAPHIC. They will be set
         ;as object properties below.
