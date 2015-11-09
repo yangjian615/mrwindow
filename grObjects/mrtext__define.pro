@@ -1185,9 +1185,9 @@ END
 ;
 ; :Params:
 ;       XLOC:           in, required, type=depends
-;                       The X location of the text. 
+;                       The X location of the text.
 ;       YLOC:           in, required, type=depends
-;                       The Y location of the text. 
+;                       The Y location of the text.
 ;       TEXT:           in, optional, type=string
 ;                       The text to output. By default, the calling sequence of the program.
 ;

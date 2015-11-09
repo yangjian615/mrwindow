@@ -534,7 +534,12 @@ pro MrPlot::SetData, x, y
         return
     endif
     
-    case n_params() of
+    ;Number of consecutive inputs with data
+    nparams = n_elements(x)     eq 0 ? 0 : $
+                  n_elements(y) eq 0 ? 1 : $
+                  2
+    
+    case nparams of
         1: begin
             if n_elements(x) eq 0 then $
                 message, 'First parameter must contain data.'
@@ -549,7 +554,13 @@ pro MrPlot::SetData, x, y
         
             ;Only set the dependent variable if the number
             ;of points has changed.
-            if n_elements(*self.indep) ne nPts then indep = lindgen(nPts)
+            if n_elements(*self.indep) ne nPts then begin
+                ;XRANGE given?
+                if n_elements(*self.xrange) gt 0 $
+                    then indep = MrMake_Array(nPts, START=(*self.xrange)[0], LAST=(*self.xrange)[1], /FLOAT) $
+                    else indep = lindgen(nPts)
+            endif
+            
             dep = x
         endcase
         
@@ -573,6 +584,10 @@ pro MrPlot::SetData, x, y
     ;Set Data
     if n_elements(indep) gt 0 then *self.indep = temporary(indep)
     *self.dep   = temporary(dep)
+
+    ;Set ranges
+    *self.xrange = [min(*self.indep, MAX=xmax), xmax]
+    *self.yrange = [min(*self.dep,   MAX=ymax), ymax]
 
     ;Refresh the graphics window
     self.window -> Draw

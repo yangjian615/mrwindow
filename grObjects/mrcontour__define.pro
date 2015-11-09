@@ -138,7 +138,7 @@ NOERASE=noerase
 		;is positioned correctly.
 		self.target -> RestoreCoords
 		position = [!x.window[0], !y.window[0], $
-					!x.window[1], !y.window[1]]
+		            !x.window[1], !y.window[1]]
 		self.layout -> SetProperty, POSITION=position, UPDATE_LAYOUT=0
 	
 		;Overplot

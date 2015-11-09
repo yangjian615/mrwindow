@@ -1136,7 +1136,7 @@ ZTITLE = ztitle
             allObjs[i] -> GetProperty, DIRECTION=direction
             
             case direction of
-                'X': begin
+                0: begin
                     allObjs[i] -> SetProperty, AXIS_RANGE   = xrange, $
                                                CHARSIZE     = charsize, $
                                                CHARTHICK    = charthick, $
@@ -1160,7 +1160,7 @@ ZTITLE = ztitle
                                                XCHARSIZE    = xcharsize
                 endcase
                 
-                'Y': begin
+                1: begin
                     allObjs[i] -> SetProperty, AXIS_RANGE   = yrange, $
                                                CHARSIZE     = charsize, $
                                                CHARTHICK    = charthick, $
@@ -1185,7 +1185,7 @@ ZTITLE = ztitle
                 
                 endcase
                 
-                'Z': begin
+                2: begin
                     allObjs[i] -> SetProperty, AXIS_RANGE   = zrange, $
                                                CHARSIZE     = charsize, $
                                                CHARTHICK    = charthick, $
