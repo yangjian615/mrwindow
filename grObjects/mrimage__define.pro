@@ -343,7 +343,7 @@ NOERASE=noerase
 	if obj_valid(self.target) $
 		then self.target -> RestoreCoords $
 		else self        -> RestoreCoords
-	
+
 ;---------------------------------------------------------------------
 ; Display the Image //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1674,7 +1674,7 @@ TV=tv
 	;   - If LOG is set, avoid values <= 0
 	;
 	nKeep = n_elements(*self.image)
-	iKeep = lonarr(nKeep)
+	iKeep = indgen(nKeep)
 
 	;Missing Value
 	if n_elements(*self.missing_value) gt 0 $

@@ -117,25 +117,14 @@ NOERASE=noerase
 
     ;Make the axis "sticky" so that it moves around with its target.
     IF MrIsA(*self.location, 'STRING') THEN self -> SetLocation
-    
-    ;Get the current coordinats
-    x_sysvar = !X
-    y_sysvar = !Y
-    z_sysvar = !Z
-    p_sysvar = !P
-    
+
+    ;Restore the target's coordinates
+    self.target -> RestoreCoords
+
     ;Draw the axis and save its coordinate space
     self -> doAxis
     self -> SaveCoords
 
-    ;Restore the old coordinate space
-    IF self.save EQ 0 THEN BEGIN
-        !X = x_sysvar
-        !Y = y_sysvar
-        !Z = z_sysvar
-        !P = p_sysvar
-    ENDIF
-    
     ;Reset the color state
     cgSetColorState, currentState
 
@@ -706,7 +695,7 @@ _REF_EXTRA=extra
                                              XCHARSIZE=xcharsize, $
                                              YCHARSIZE=ycharsize, $
                                              ZCHARSIZE=zcharsize, $
-                                             ZVALUE=zvalue    
+                                             ZVALUE=zvalue
 
     ;Set other axis properties
     CASE self.direction OF
@@ -1302,7 +1291,7 @@ _REF_EXTRA=extra
             IF N_Elements(log)          GT 0 THEN  self.xlog          = log
             IF N_Elements(minor)        GT 0 THEN *self.xminor        = minor
             IF N_Elements(axis_range)   GT 0 THEN *self.xrange        = axis_range
-            IF N_Elements(style)        GT 0 THEN *self.xstyle        = style
+            IF N_Elements(style)        GT 0 THEN *self.xstyle        = style + ((style and 1) eq 0)
             IF N_Elements(thick)        GT 0 THEN *self.xthick        = thick
             IF N_Elements(tickformat)   GT 0 THEN *self.xtickformat   = tickformat
             IF N_Elements(tickinterval) GT 0 THEN *self.xtickinterval = tickinterval
@@ -1320,7 +1309,7 @@ _REF_EXTRA=extra
             IF N_Elements(log)          GT 0 THEN  self.ylog          = log
             IF N_Elements(minor)        GT 0 THEN *self.yminor        = minor
             IF N_Elements(axis_range)   GT 0 THEN *self.yrange        = axis_range
-            IF N_Elements(style)        GT 0 THEN *self.ystyle        = style
+            IF N_Elements(style)        GT 0 THEN *self.ystyle        = style + ((style and 1) eq 0)
             IF N_Elements(thick)        GT 0 THEN *self.ythick        = thick
             IF N_Elements(tickformat)   GT 0 THEN *self.ytickformat   = tickformat
             IF N_Elements(tickinterval) GT 0 THEN *self.ytickinterval = tickinterval
@@ -1338,7 +1327,7 @@ _REF_EXTRA=extra
             IF N_Elements(log)          GT 0 THEN  self.zlog          = log
             IF N_Elements(minor)        GT 0 THEN *self.zminor        = minor
             IF N_Elements(axis_range)   GT 0 THEN *self.zrange        = axis_range
-            IF N_Elements(style)        GT 0 THEN *self.zstyle        = style
+            IF N_Elements(style)        GT 0 THEN *self.zstyle        = style + ((style and 1) eq 0)
             IF N_Elements(thick)        GT 0 THEN *self.zthick        = thick
             IF N_Elements(tickformat)   GT 0 THEN *self.ztickformat   = tickformat
             IF N_Elements(tickinterval) GT 0 THEN *self.ztickinterval = tickinterval
@@ -1618,6 +1607,10 @@ _REF_EXTRA=extra
     setDefaultValue, charsize, 1.5
     setDefaultValue, direction, 'X'
     setDefaultValue, offset, 0
+    setDefaultValue, style, 1
+    
+    ;AXIS_RANGE should always be exact
+    style += ((style and 1) eq 0)
 
     ;DIRECTION
     if n_elements(direction) eq 0 then begin
@@ -1694,7 +1687,7 @@ _REF_EXTRA=extra
                          NODATA       = noData, $
                          NORMAL       = normal, $
                          SUBTITLE     = subtitle, $
-                         STYLE        = sytle, $
+                         STYLE        = style, $
                          T3D          = t3d, $
                          THICK        = thick, $
                          TICKFORMAT   = tickformat, $

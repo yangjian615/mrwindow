@@ -551,8 +551,8 @@ WIDTH=width
         theText = *self.text
     
         ; In order to figure out how wide the box is, we first need to draw the text.
-        ;	- If windows are not supported, we have to draw outside the visible area.
-        ;	- For other devices, create a pixmap window and draw in the middle.
+        ;   - If windows are not supported, we have to draw outside the visible area.
+        ;   - For other devices, create a pixmap window and draw in the middle.
         IF ((!D.Flags AND 256) EQ 0) THEN BEGIN
             x = 0.1
             y = 1.25
@@ -580,6 +580,7 @@ WIDTH=width
     ENDIF ELSE BEGIN
         charsize  = self.charsize
         charthick = self.charthick
+        font      = self.font
     ENDELSE
     color = cgColor(*self.color)
 
@@ -600,7 +601,7 @@ WIDTH=width
             CHARTHICK   =       charthick, $
             CLIP        = *self.clip, $
             COLOR       =       color, $
-            FONT        =  self.font, $
+            FONT        =       font, $
             NOCLIP      =  self.noclip, $
             ORIENTATION =  self.orientation, $
             T3D         =  self.t3d, $
@@ -1486,7 +1487,7 @@ PRO MrText__define, class
               box_color:          Ptr_New(), $
               bx_pos:             [0.0, 0.0, 0.0, 0.0], $
               charsize:           0.0, $
-              charthick:          0.0, $
+              charthick:          0S, $
               clip:               Ptr_New(), $
               color:              Ptr_New(), $
               data:               0B, $

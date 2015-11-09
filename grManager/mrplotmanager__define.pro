@@ -1128,12 +1128,15 @@ ZTITLE = ztitle
                                        ZTICKV        = ztickv, $
                                        ZTITLE        = ztitle
         endif
-                                       
+        
 ;---------------------------------------------------------------------
 ;Axis Objects ////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
         if oClass eq 'MRAXIS' then begin
             allObjs[i] -> GetProperty, DIRECTION=direction
+            
+            ;THICK changes [XYZ]THICK
+            if n_elements(thick) gt 0 then allObjs[i] -> SetProperty, THICK=thick
             
             case direction of
                 0: begin
@@ -1215,11 +1218,21 @@ ZTITLE = ztitle
 ;---------------------------------------------------------------------
         endif else if oClass eq 'MRIMAGE' then begin
             allObjs[i] -> SetProperty, RANGE=range
-            
-        endif else if oClass eq 'WECOLORBAR' then begin
+
+;---------------------------------------------------------------------
+; PlotS //////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+        endif else if oClass eq 'MRPLOTS' then begin
+            allObjs[i] -> SetProperty, THICK=thick
+
+;---------------------------------------------------------------------
+; ColorBars //////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+        endif else if oClass eq 'MRCOLORBAR' then begin
             allObjs[i] -> SetProperty, RANGE=range, CHARSIZE=charsize, $
-                                       CHARTHICK=charthick, TCHARSIZE=charsize
-            
+                                       CHARTHICK=charthick, TCHARSIZE=charsize, $
+                                       THICK=thick
+    
 ;---------------------------------------------------------------------
 ;Other Annotation Objects ////////////////////////////////////////////
 ;---------------------------------------------------------------------
