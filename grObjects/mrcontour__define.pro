@@ -1265,7 +1265,6 @@ RESOLUTION=resolution
 	              : n_elements(y) eq 0 ? 2 $
 	              : 3
 
-
 	;Retrieve the data
 	case nparams of
 		1: begin
@@ -1279,9 +1278,9 @@ RESOLUTION=resolution
 				*self.xcoords = temporary(x)
 				*self.ycoords = temporary(y)
 			endif else begin
-				*self.c_data = z
-				*self.c_data = x
-				*self.c_data = y
+				*self.c_data  = z
+				*self.xcoords = x
+				*self.ycoords = y
 			endelse
 		endcase
 		else: message, 'Incorrect number of parameters.'

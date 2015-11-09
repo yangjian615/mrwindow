@@ -833,25 +833,38 @@ LANDSCAPE=landscape, $
 NOMATCH=nomatch, $
 PAGETYPE=pagetype, $
 QUIET=quiet, $
-                      SET_FONT=set_font, $
+SET_FONT=set_font, $
 SCALE_FACTOR=scale_factor, $
 TT_FONT=tt_font, $
 _REF_EXTRA=extra
 	Compile_Opt strictarr
 	on_error, 2
+	
+	;
+	; TODO: Rethink how inputs are implemented. Specifically
+	;           CHARSIZE, DEFAULT_THICKNESS, DEJAVUSANS FONT
+	;           SET_FONT, TT_FONT
+	;
+	;       In cgPS_Open, they set system variable properties
+	;       that affect the default fonts while in postscript
+	;       mode. For MrGraphics, all of these properties have
+	;       are provided via the graphics routines. As a
+	;       result, the system variables are always over-
+	;       ridden and have no effect.
+	;
 
 ;-----------------------------------------------------
 ; Defaults \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
 	gui        =  Keyword_Set(gui)
-	dejavusans =  Keyword_Set(dejavusans)
+;	dejavusans =  Keyword_Set(dejavusans)
 	landscape  =  Keyword_Set(landscape)
 	tf_match   = ~Keyword_Set(nomatch)
 	IF N_Elements(filename)          EQ 0 THEN pick_file         =      1
 	IF N_Elements(quiet)             EQ 0 THEN quiet             = self.ps_quiet
-	IF N_Elements(font)              EQ 0 THEN font              = self.ps_font
+;	IF N_Elements(font)              EQ 0 THEN font              = self.ps_font
 	IF N_Elements(encapsulated)      EQ 0 THEN encapsulated      = self.ps_encapsulated
-	IF N_Elements(default_thickness) EQ 0 THEN default_thickness = 3
+;	IF N_Elements(default_thickness) EQ 0 THEN default_thickness = 3
 	IF N_Elements(pagetype)          EQ 0 THEN pagetype          = self.ps_pagetype
 	IF N_Elements(scale_factor)      EQ 0 THEN scale_factor      = self.ps_scale_factor
 	
@@ -864,13 +877,13 @@ _REF_EXTRA=extra
 	
 	; Save the current True-Type font before entering the PostScript device.
 	; Necessary for restoring it later.
-	self._ps_restore_tt_font_old = self.ps_tt_font
+;	self._ps_restore_tt_font_old = self.ps_tt_font
 
 	; Need DejaVuSans fonts?
-	IF dejavusans && (Float(!Version.Release) GE 8.2) THEN BEGIN
-		tt_font = 'DejaVuSans'
-		font = 1
-	ENDIF
+;	IF dejavusans && (Float(!Version.Release) GE 8.2) THEN BEGIN
+;		tt_font = 'DejaVuSans'
+;		font = 1
+;	ENDIF
 	
 	;
 	; I did a bad thing and made the keyword TT_FONT specify the name of a true-type font. This is
@@ -883,19 +896,19 @@ _REF_EXTRA=extra
 	;
 	; In this method, TT_FONT is used as SET_FONT. Unmix them here.
 	;
-	IF Size(tt_font, /TNAME) EQ 'STRING' THEN BEGIN
-		setfont = tt_font
-		tt_font = 1
-	ENDIF
+;	IF Size(tt_font, /TNAME) EQ 'STRING' THEN BEGIN
+;		setfont = tt_font
+;		tt_font = 1
+;	ENDIF
 
 	; We can pick TT fonts either by name with TT_FONT or by class with FONT
 	;   - Make sure that both are defined consistently.
-	IF (N_Elements(setfont) EQ 0) AND (font EQ 1) THEN setfont = self.ps_tt_font
-	IF N_Elements(setfont) GT 0 THEN BEGIN
-		self._ps_restore_tt_font = setfont
-		font = 1
-	ENDIF
-	self._ps_restore_font = font
+;	IF (N_Elements(setfont) EQ 0) AND (font EQ 1) THEN setfont = self.ps_tt_font
+;	IF N_Elements(setfont) GT 0 THEN BEGIN
+;		self._ps_restore_tt_font = setfont
+;		font = 1
+;	ENDIF
+;	self._ps_restore_font = font
 
 	;If no file name was given, have the user select it.
 	;   - Retrieve the extension to determine if we will convert to raster.
@@ -935,24 +948,24 @@ _REF_EXTRA=extra
 	;Save setup
 	self._ps_restore_setup  = 1
 	self._ps_restore_device = !D.Name
-	self._ps_restore_p      = !P
-	self._ps_restore_x      = !X
-	self._ps_restore_y      = !Y
-	self._ps_restore_z      = !Z
+;	self._ps_restore_p      = !P
+;	self._ps_restore_x      = !X
+;	self._ps_restore_y      = !Y
+;	self._ps_restore_z      = !Z
 
 	; Change any parameters you feel like changing.
-	IF self._ps_restore_p.thick     EQ 0 THEN !P.Thick     = default_thickness
-	IF self._ps_restore_p.charthick EQ 0 THEN !P.Charthick = default_thickness
-	IF self._ps_restore_x.thick     EQ 0 THEN !X.Thick     = default_thickness
-	IF self._ps_restore_y.thick     EQ 0 THEN !Y.Thick     = default_thickness
-	IF self._ps_restore_z.thick     EQ 0 THEN !Z.Thick     = default_thickness
+;	IF self._ps_restore_p.thick     EQ 0 THEN !P.Thick     = default_thickness
+;	IF self._ps_restore_p.charthick EQ 0 THEN !P.Charthick = default_thickness
+;	IF self._ps_restore_x.thick     EQ 0 THEN !X.Thick     = default_thickness
+;	IF self._ps_restore_y.thick     EQ 0 THEN !Y.Thick     = default_thickness
+;	IF self._ps_restore_z.thick     EQ 0 THEN !Z.Thick     = default_thickness
 	
 	; Set the true-type font.
 	IF self._SaveWinID EQ -1 AND ((!D.Flags AND 256) NE 0) THEN BEGIN
 		Window, /FREE, /PIXMAP
 		pixmap = !D.Window
 	ENDIF
-	!P.Font = self._ps_restore_font
+;	!P.Font = self._ps_restore_font
 	IF N_Elements(pixmap) NE 0 THEN WDelete, pixmap
 
 ;-----------------------------------------------------
@@ -962,7 +975,7 @@ _REF_EXTRA=extra
 	IF tf_match THEN BEGIN
 		;Try landscape if the window is wider than it is tall.
 		IF !D.X_Size GT !D.Y_Size THEN landscape = 1 ELSE landscape = 0
-		IF ~encapsulated          THEN landscape = 0
+		IF encapsulated           THEN landscape = 0
 		
 		;Create a PS Window with the same dimensions as the device window
 		sizes = cgPSWindow(_Extra=extra, LANDSCAPE=landscape, /SANE_OFFSETS)
@@ -980,6 +993,7 @@ _REF_EXTRA=extra
 		                        ENCAPSULATED = encapsulated, $
 		                        FILENAME     = file_basename(ps_filename), $
 		                        DIRECTORY    = directory)
+
 	ENDIF ELSE BEGIN
 		keywords = cgPS_Config(_Strict_Extra = extra, $
 		                       ENCAPSULATED  = encapsulated, $
@@ -1002,16 +1016,16 @@ _REF_EXTRA=extra
 	;Change to the PostScrip device and configure it
 	Set_Plot, 'PS'
 	Device, _EXTRA=keywords, SCALE_FACTOR=scale_factor
-	IF N_Elements(setfont) NE 0 THEN Device, SET_FONT=setfont, /TT_Font
+;	IF N_Elements(setfont) NE 0 THEN Device, SET_FONT=setfont, /TT_Font
 
 	; Determine the character size.
-	IF self._ps_restore_p.charsize EQ 0 THEN BEGIN
-		IF N_Elements(charsize) EQ 0 THEN BEGIN
-			!P.Charsize = cgDefCharsize(FONT=font)
-		ENDIF ELSE !P.Charsize = charsize
-	ENDIF ELSE BEGIN
-		IF N_Elements(charsize) NE 0 THEN !P.Charsize = charsize
-	ENDELSE
+;	IF self._ps_restore_p.charsize EQ 0 THEN BEGIN
+;		IF N_Elements(charsize) EQ 0 THEN BEGIN
+;			!P.Charsize = cgDefCharsize(FONT=font)
+;		ENDIF ELSE !P.Charsize = charsize
+;	ENDIF ELSE BEGIN
+;		IF N_Elements(charsize) NE 0 THEN !P.Charsize = charsize
+;	ENDELSE
 
 	; Store filename and other pertinent information.
 	self._ps_restore_filename  = keywords.filename
@@ -1057,10 +1071,10 @@ WIDTH=width
 
 		; Clean up.
 		IF self._ps_restore_device NE "" THEN Set_Plot, self._ps_restore_device
-		!P = self._ps_restore_p
-		!X = self._ps_restore_x
-		!Y = self._ps_restore_y
-		!Z = self._ps_restore_z
+;		!P = self._ps_restore_p
+;		!X = self._ps_restore_x
+;		!Y = self._ps_restore_y
+;		!Z = self._ps_restore_z
 		self._ps_restore_setup      = 0
 		self._ps_restore_device     = ""
 		self._ps_restore_filename   = ""
@@ -1189,14 +1203,14 @@ WIDTH=width
 ; Clean Up \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
 	; Restore the previous True-Type font state for the PostScript device.
-	IF !D.Name EQ 'PS' THEN Device, SET_FONT=self._ps_restore_tt_font_old, /TT_Font
+;	IF !D.Name EQ 'PS' THEN Device, SET_FONT=self._ps_restore_tt_font_old, /TT_Font
 
 	; Clean up.
 	IF self._ps_restore_device NE "" THEN Set_Plot, self._ps_restore_device
-	!P = self._ps_restore_p
-	!X = self._ps_restore_x
-	!Y = self._ps_restore_y
-	!Z = self._ps_restore_z
+;	!P = self._ps_restore_p
+;	!X = self._ps_restore_x
+;	!Y = self._ps_restore_y
+;	!Z = self._ps_restore_z
 	self._ps_restore_setup      = 0
 	self._ps_restore_device     = ""
 	self._ps_restore_filename   = ""
@@ -1963,11 +1977,11 @@ _REF_EXTRA=extra
 	;ImageMagick Properties
 	IF N_Elements(im_density)           GT 0 THEN  self.im_density     = im_density
 	IF N_Elements(im_options)           GT 0 THEN  self.im_options     = im_options
-	IF N_Elements(im_png8)              GT 0 THEN  self.im_png8        = im_png8
-	IF N_Elements(im_raster)            GT 0 then  self.im_raster      = im_raster
+	IF N_Elements(im_png8)              GT 0 THEN  self.im_png8        = Keyword_Set(im_png8)
+	IF N_Elements(im_raster)            GT 0 then  self.im_raster      = Keyword_Set(im_raster)
 	IF N_Elements(im_resize)            GT 0 THEN  self.im_resize      = im_resize
 	IF N_Elements(im_tiff_depth)        GT 0 THEN  self.im_tiff_depth  = im_tiff_depth
-	IF N_Elements(im_transparent)       GT 0 THEN  self.im_transparent = im_transparent
+	IF N_Elements(im_transparent)       GT 0 THEN  self.im_transparent = Keyword_Set(im_transparent)
 	
 	;PDF Properties
 	IF N_Elements(pdf_unix_convert_cmd) GT 0 THEN  self.pdf_unix_convert_cmd = pdf_unix_convert_cmd
@@ -1975,16 +1989,16 @@ _REF_EXTRA=extra
 
 	;PS Properties
 	IF N_Elements(adjustsize)           GT 0 THEN  self.adjustsize      = Keyword_Set(adjustsize)
-	IF N_Elements(ps_delete)            GT 0 THEN  self.ps_delete       = ps_delete
 	IF N_Elements(ps_charsize)          GT 0 THEN  self.ps_charsize     = ps_charsize
-	IF N_Elements(ps_quiet)             GT 0 THEN  self.ps_quiet        = ps_quiet
+	IF N_Elements(ps_decomposed)        GT 0 THEN  self.ps_decomposed   = Keyword_Set(ps_decomposed)
+	IF N_Elements(ps_delete)            GT 0 THEN  self.ps_delete       = Keyword_Set(ps_delete)
+	IF N_Elements(ps_encapsulated)      GT 0 THEN  self.ps_encapsulated = Keyword_Set(ps_encapsulated)
+	IF N_Elements(ps_font)              GT 0 THEN  self.ps_font         = ps_font
+	IF N_Elements(ps_metric)            GT 0 THEN  self.ps_metric       = Keyword_Set(ps_metric)
+	IF N_Elements(ps_pagetype)          GT 0 THEN  self.ps_pagetype     = ps_pagetype
+	IF N_Elements(ps_quiet)             GT 0 THEN  self.ps_quiet        = Keyword_Set(ps_quiet)
 	IF N_Elements(ps_scale_factor)      GT 0 THEN  self.ps_scale_factor = ps_scale_factor
 	IF N_Elements(ps_tt_font)           GT 0 THEN  self.ps_tt_font      = ps_tt_font
-;	IF N_Elements(ps_metric)            GT 0 THEN  self.ps_metric       = ps_metric
-;	IF N_Elements(ps_pagetype)          GT 0 THEN  self.ps_pagetype     = ps_pagetype
-;	IF N_Elements(ps_font)              GT 0 THEN  self.ps_font         = ps_font
-;	IF N_Elements(ps_decomposed)        GT 0 THEN  self.ps_decomposed   = ps_decomposed
-;	IF N_Elements(ps_encapsulated)      GT 0 THEN  self.ps_encapsulated = ps_encapsulated
 
 	IF N_Elements(im_height) GT 0 THEN BEGIN
 		Ptr_Free, self.im_width
@@ -2011,12 +2025,12 @@ _REF_EXTRA=extra
 	ENDIF
 
 
-	self.ps_config -> SetProperty, DECOMPOSED   = ps_decomposed, $
-	                               ENCAPSULATED = ps_encapsulated, $
-	                               FONTTYPE     = ps_font, $
-	                               METRIC       = ps_metric, $
-	                               PAGETYPE     = ps_pagetype, $
-	                              _STRICT_EXTRA = extra
+;	self.ps_config -> SetProperty, DECOMPOSED   = ps_decomposed, $
+;	                               ENCAPSULATED = ps_encapsulated, $
+;	                               FONTTYPE     = ps_font, $
+;	                               METRIC       = ps_metric, $
+;	                               PAGETYPE     = ps_pagetype, $
+;	                              _STRICT_EXTRA = extra
 END
 
 

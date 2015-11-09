@@ -104,10 +104,10 @@ FUNCTION MrColorbar::CalcPosition
 	;   - Text to [left, bottom, right, top] ==> Put colorbar on [left, bottom, right, top]
 	IF self.location EQ '' THEN BEGIN
 		CASE 1 OF
-			self.orientation EQ 1 && self.textpos EQ 1: location = 'TOP'
-			self.orientation EQ 1 && self.textpos EQ 0: location = 'BOTTOM'
-			self.orientation EQ 0 && self.textpos EQ 1: location = 'LEFT'
-			self.orientation EQ 0 && self.textpos EQ 0: location = 'RIGHT'
+			self.orientation EQ 1 && self.textpos EQ 1: location = 'RIGHT'
+			self.orientation EQ 1 && self.textpos EQ 0: location = 'LEFT'
+			self.orientation EQ 0 && self.textpos EQ 1: location = 'TOP'
+			self.orientation EQ 0 && self.textpos EQ 0: location = 'BOTTOM'
 			ELSE: message, 'Incorrect property values for ORIENTATION and LOCATION.'
 		ENDCASE
 	ENDIF ELSE BEGIN
@@ -275,7 +275,7 @@ PRO MrColorbar::doAxes, position
 	;Adjust postscript output.
 	if !d.name eq 'PS' then begin
 		tcharsize = MrPS_Rescale(self.tcharsize, /CHARSIZE)
-		charsize  = MrPS_Rescale(self.charsize,   /CHARSIZE)
+		charsize  = MrPS_Rescale(self.charsize,  /CHARSIZE)
 		charthick = MrPS_Rescale(self.charthick, /CHARTHICK)
 		thick     = MrPS_Rescale(self.thick,     /THICK)
 	endif else begin
@@ -307,28 +307,54 @@ PRO MrColorbar::doAxes, position
 ;-----------------------------------------------------
 ; Vertical \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
+	;
+	; The basic idea is to establish a dataspace using PLOT
+	; to which the color bar AXIS can attach itself. PLOT
+	; also serves as the border of the colorbar.
+	;
+	; The axis opposite to the annotation axis (determined
+	; by TEXTPOS) is left blank, with no tickmarks and no
+	; annotations ([XYZ]TICK=0.001, [XYZ]TICKFORMAT='(a1)')
+	;
+	; PLOT is always used to draw the axis on the left or
+	; bottom of the colorbar. If the annotations are on that
+	; side, then PLOT is allowed to draw the annotations and
+	; tickmarks while AXIS draws the opposite, blank axis.
+	; PLOT will use [XYZ]STYLE=9 to leave an empty space for
+	; AXIS.
+	;
+	; AXIS is always used to draw the top or right axis, and
+	; is annotated only if TEXTPOS indicates it should be.
+	;
+	; If TITLE is on the same side of the axis as the
+	; annotations, then AXIS or PLOT is allowed to draw it.
+	; Otherwise, XYOUTS draws the title.
+	;
+
+	;VERTICAL
 	IF self.orientation THEN BEGIN
 		;ANNOTATE LEFT
 		IF self.textpos EQ 1 THEN BEGIN
 			;TITLE RIGHT
 			IF self.tlocation EQ 'LEFT' THEN BEGIN
-				;Establish data coordinate system
 				PLOT, self.range, self.range, /NODATA, /NOERASE, $
-				      COLOR         =      color, $
-				      CHARSIZE      = self.charsize, $
-				      CHARTHICK     = self.charthick, $
-				      DATA          = self.data, $
-				      FONT          = self.font, $
-				      POSITION      =      position, $
-				      XSTYLE        =      xstyle, $
-				      XTICKFORMAT   =      '(A1)', $
+				      COLOR         =       color, $
+				      CHARSIZE      =       charsize, $
+				      CHARTHICK     =       charthick, $
+				      DATA          =  self.data, $
+				      FONT          =  self.font, $
+				      POSITION      =       position, $
+				      XSTYLE        =       xstyle, $
+				      XTHICK        =       thick, $
+				      XTICKFORMAT   =       '(A1)', $
 				      XTICKLAYOUT   = *self.ticklayout, $
-				      XTICKS        =      1, $
-				      XTITLE        =      '', $
+				      XTICKS        =       1, $
+				      XTITLE        =       '', $
 				      XTICKLEN      =       xticklen, $
 				      YLOG          =  self.log, $
 				      YMINOR        =  self.minor, $
-				      YTICKFORMAT   =      '(A1)', $
+				      YTHICK        =       thick, $
+				      YTICKFORMAT   =       '(A1)', $
 				      YTICKNAME     = *self.tickname, $
 				      YTICKS        =  self.major, $
 				      YTICKINTERVAL = *self.tickinterval, $
@@ -339,8 +365,8 @@ PRO MrColorbar::doAxes, position
 				
 				;Left axis with title on right
 				AXIS, YAXIS = 1, $
-				      CHARSIZE      =  self.charsize, $
-				      CHARTHICK     =  self.charthick, $
+				      CHARSIZE      =       charsize, $
+				      CHARTHICK     =       charthick, $
 				      COLOR         =       color, $
 				      FONT          =  self.font, $
 				      SUBTITLE      =       subtitle, $
@@ -350,6 +376,7 @@ PRO MrColorbar::doAxes, position
 				      YMINOR        =  self.minor, $
 				      YRANGE        =  self.range, $
 				      YSTYLE        =  self.style, $
+				      YTHICK        =       thick, $
 				      YTICKFORMAT   =  self.tickformat, $
 				      YTICKINTERVAL = *self.tickinterval, $
 				      YTICKLAYOUT   = *self.ticklayout, $
@@ -368,8 +395,8 @@ PRO MrColorbar::doAxes, position
 				;Draw the title
 				XYOUTS, xloc, yloc, title, /NORMAL, $
 				        ALIGNMENT   =      0.5, $
-				        CHARSIZE    = self.tcharsize, $
-				        CHARTHICK   = self.charthick, $
+				        CHARSIZE    =      tcharsize, $
+				        CHARTHICK   =      charthick, $
 				        COLOR       =      color, $
 				        FONT        = self.font, $
 				        ORIENTATION =      -270
@@ -378,12 +405,14 @@ PRO MrColorbar::doAxes, position
 			ENDIF ELSE BEGIN
 				PLOT, self.range, self.range, /NODATA, /NOERASE, $
 				      COLOR         =       color, $
-				      CHARSIZE      =  self.charsize, $
-				      CHARTHICK     =  self.charthick, $
+				      CHARSIZE      =       charsize, $
+				      CHARTHICK     =       charthick, $
 				      DATA          =  self.data, $
 				      FONT          =  self.font, $
 				      POSITION      =       position, $
+				      THICK         =  self.thick, $
 				      XSTYLE        =       xstyle, $
+				      XTHICK        =       thick, $
 				      XTICKFORMAT   =       '(A1)', $
 				      XTICKLAYOUT   = *self.ticklayout, $
 				      XTICKLEN      =       xticklen, $
@@ -391,19 +420,20 @@ PRO MrColorbar::doAxes, position
 				      XTITLE        =       '', $
 				      YLOG          =  self.log, $
 				      YMINOR        =  self.minor, $
+				      YSTYLE        =       ystyle, $
+				      YTHICK        =       thick, $
 				      YTICKFORMAT   =      '(A1)', $
 				      YTICKNAME     = *self.tickname, $
 				      YTICKS        =  self.major, $
 				      YTICKINTERVAL = *self.tickinterval, $
 				      YTICKLAYOUT   = *self.ticklayout, $
 				      YTICKLEN      =       yticklen, $
-				      YSTYLE        =       ystyle, $
 				      YTITLE        =       ''
 
 				;Draw the axis with title and annotations on same side
 				AXIS, YAXIS =      1, $
-				      CHARSIZE      =  self.charsize, $
-				      CHARTHICK     =  self.charthick, $
+				      CHARSIZE      =       charsize, $
+				      CHARTHICK     =       charthick, $
 				      COLOR         =       color, $
 				      FONT          =  self.font, $
 				      SUBTITLE      =       subtitle, $
@@ -413,6 +443,7 @@ PRO MrColorbar::doAxes, position
 				      YMINOR        =  self.minor, $
 				      YRANGE        =  self.range, $
 				      YSTYLE        =  self.style, $
+				      YTHICK        =       thick, $
 				      YTICKFORMAT   =  self.tickformat, $
 				      YTICKINTERVAL = *self.tickinterval, $
 				      YTICKLAYOUT   = *self.ticklayout, $
@@ -431,12 +462,13 @@ PRO MrColorbar::doAxes, position
 				;Establish data coordinate system
 				PLOT, self.range, self.range, /NODATA, /NOERASE, $
 				      COLOR         =       color, $
-				      CHARSIZE      =  self.charsize, $
-				      CHARTHICK     =  self.charthick, $
+				      CHARSIZE      =       charsize, $
+				      CHARTHICK     =       charthick, $
 				      DATA          =  self.data, $
 				      FONT          =  self.font, $
 				      POSITION      =       position, $
 				      XSTYLE        =       xstyle, $
+				      XTHICK        =       thick, $
 				      XTICKFORMAT   =       '(A1)', $
 				      XTICKLAYOUT   = *self.ticklayout, $
 				      XTICKLEN      =        xticklen, $
@@ -444,19 +476,20 @@ PRO MrColorbar::doAxes, position
 				      XTITLE        =       '', $
 				      YLOG          =   self.log, $
 				      YMINOR        =   self.minor, $
+				      YSTYLE        =       ystyle, $
+				      YTHICK        =       thick, $
 				      YTICKFORMAT   =       '(A1)', $
 				      YTICKNAME     = *self.tickname, $
 				      YTICKS        =  self.major, $
 				      YTICKINTERVAL = *self.tickinterval, $
 				      YTICKLAYOUT   = *self.ticklayout, $
 				      YTICKLEN      =       yticklen, $
-				      YSTYLE        =       ystyle, $
 				      YTITLE        =       ''
 
 				;Left axis with title on left
 				AXIS, YAXIS = 0, $
-				      CHARSIZE      =  self.charsize, $
-				      CHARTHICK     =  self.charthick, $
+				      CHARSIZE      =       charsize, $
+				      CHARTHICK     =       charthick, $
 				      COLOR         =       color, $
 				      FONT          =  self.font, $
 				      SUBTITLE      =       subtitle, $
@@ -466,6 +499,7 @@ PRO MrColorbar::doAxes, position
 				      YMINOR        =  self.minor, $
 				      YRANGE        =  self.range, $
 				      YSTYLE        =  self.style, $
+				      YTHICK        =       thick, $
 				      YTICKFORMAT   =  self.tickformat, $
 				      YTICKINTERVAL = *self.tickinterval, $
 				      YTICKLAYOUT   = *self.ticklayout, $
@@ -482,7 +516,7 @@ PRO MrColorbar::doAxes, position
 				
 				XYOUTS, xloc, yloc, title, /NORMAL, $
 				        COLOR       =      color, $
-				        CHARTHICK   = self.charthick, $
+				        CHARTHICK   =      charthick, $
 				        ALIGNMENT   =      0.5, $
 				        FONT        = self.font, $
 				        CHARSIZE    = self.tcharsize, $
@@ -491,12 +525,13 @@ PRO MrColorbar::doAxes, position
 			ENDIF ELSE BEGIN
 				PLOT, self.range, self.range, /NODATA, /NOERASE, $
 				      COLOR         =      color, $
-				      CHARSIZE      = self.charsize, $
-				      CHARTHICK     = self.charthick, $
+				      CHARSIZE      =      charsize, $
+				      CHARTHICK     =      charthick, $
 				      DATA          = self.data, $
 				      FONT          = self.font, $
 				      POSITION      =      position, $
 				      XSTYLE        =      xstyle, $
+				      XTHICK        =       thick, $
 				      XTICKFORMAT   =      '(A1)', $
 				      XTICKLAYOUT   = *self.ticklayout, $
 				      XTICKLEN      =       xticklen, $
@@ -504,18 +539,19 @@ PRO MrColorbar::doAxes, position
 				      XTITLE        =      '', $
 				      YLOG          =  self.log, $
 				      YMINOR        =  self.minor, $
+				      YSTYLE        =       ystyle, $
+				      YTHICK        =       thick, $
 				      YTICKFORMAT   =      '(A1)', $
 				      YTICKNAME     = *self.tickname, $
 				      YTICKS        =  self.major, $
 				      YTICKINTERVAL = *self.tickinterval, $
 				      YTICKLAYOUT   = *self.ticklayout, $
 				      YTICKLEN      =       yticklen, $
-				      YSTYLE        =       ystyle, $
 				      YTITLE        =       ''
     
 				AXIS, YAXIS = 0, $
-				      CHARSIZE      =  self.charsize, $
-				      CHARTHICK     =  self.charthick, $
+				      CHARSIZE      =       charsize, $
+				      CHARTHICK     =       charthick, $
 				      COLOR         =       color, $
 				      FONT          =  self.font, $
 				      SUBTITLE      =       subtitle, $
@@ -525,6 +561,7 @@ PRO MrColorbar::doAxes, position
 				      YMINOR        =  self.minor, $
 				      YRANGE        =  self.range, $
 				      YSTYLE        =  self.style, $
+				      YTHICK        =       thick, $
 				      YTICKFORMAT   =  self.tickformat, $
 				      YTICKINTERVAL = *self.tickinterval, $
 				      YTICKLAYOUT   = *self.ticklayout, $
@@ -546,12 +583,13 @@ PRO MrColorbar::doAxes, position
 
 			PLOT, self.range, self.range, /NODATA, /NOERASE, $
 			      COLOR         =      color, $
-			      CHARSIZE      = self.charsize, $
-			      CHARTHICK     = self.charthick, $
+			      CHARSIZE      =      charsize, $
+			      CHARTHICK     =      charthick, $
 			      DATA          = self.data, $
 			      FONT          = self.font, $
 			      POSITION      =      position, $
 			      XMINOR        =  self.minor, $
+			      XTHICK        =       thick, $
 			      XTICKFORMAT   =      '(A1)', $
 			      XTICKNAME     = *self.tickname, $
 			      XTICKS        =  self.major, $
@@ -562,6 +600,7 @@ PRO MrColorbar::doAxes, position
 			      XSTYLE        =       9, $
 			      XTITLE        =       '', $
 			      YSTYLE        =      Ystyle, $
+			      YTHICK        =       thick, $
 			      YTICKFORMAT   =      '(A1)', $
 			      YTICKLAYOUT   = *self.ticklayout, $
 			      YTICKLEN      =       yticklen, $
@@ -569,8 +608,8 @@ PRO MrColorbar::doAxes, position
 			      YTITLE        =      ''
 
 			AXIS, XAXIS = 1, $
-			      CHARSIZE      =  self.charsize, $
-			      CHARTHICK     =  self.charthick, $
+			      CHARSIZE      =       charsize, $
+			      CHARTHICK     =       charthick, $
 			      COLOR         =       color, $
 			      FONT          =  self.font, $
 			      SUBTITLE      =       subtitle, $
@@ -579,6 +618,7 @@ PRO MrColorbar::doAxes, position
 			      XMINOR        =  self.minor, $
 			      XRANGE        =  self.range, $
 			      XSTYLE        =  self.style, $
+			      XTHICK        =       thick, $
 			      XTICKFORMAT   =  self.tickformat, $
 			      XTICKINTERVAL = *self.tickinterval, $
 			      XTICKLAYOUT   = *self.ticklayout, $
@@ -608,7 +648,7 @@ PRO MrColorbar::doAxes, position
 				
 				XYOUTS, xloc, yloc, title, /NORMAL, $
 				        COLOR     =      color, $
-				        CHARTHICK = self.charthick, $
+				        CHARTHICK =      charthick, $
 				        ALIGNMENT =      0.5, $
 				        FONT      = self.font, $
 				        CHARSIZE  = self.tcharsize
@@ -619,12 +659,13 @@ PRO MrColorbar::doAxes, position
 
 			PLOT, self.range, self.range, /NODATA, /NOERASE, $
 			      COLOR         =      color, $
-			      CHARSIZE      = self.charsize, $
-			      CHARTHICK     = self.charthick, $
+			      CHARSIZE      =      charsize, $
+			      CHARTHICK     =      charthick, $
 			      DATA          = self.data, $
 			      FONT          = self.font, $
 			      POSITION      =      position, $
 			      XMINOR        =  self.minor, $
+			      XTHICK        =       thick, $
 			      XTICKFORMAT   =      '(A1)', $
 			      XTICKNAME     = *self.tickname, $
 			      XTICKS        =  self.major, $
@@ -635,6 +676,7 @@ PRO MrColorbar::doAxes, position
 			      XSTYLE        =       xstyle, $
 			      XTITLE        =       '', $
 			      YSTYLE        =      ystyle, $
+			      YTHICK        =       thick, $
 			      YTICKFORMAT   =      '(A1)', $
 			      YTICKLAYOUT   = *self.ticklayout, $
 			      YTICKLEN      =       yticklen, $
@@ -642,8 +684,8 @@ PRO MrColorbar::doAxes, position
 			      YTITLE        =      ''
 
 			AXIS, XAXIS = 0, $
-			      CHARSIZE      =  self.charsize, $
-			      CHARTHICK     =  self.charthick, $
+			      CHARSIZE      =       charsize, $
+			      CHARTHICK     =       charthick, $
 			      COLOR         =       color, $
 			      FONT          =  self.font, $
 			      SUBTITLE      =       subtitle, $
@@ -652,6 +694,7 @@ PRO MrColorbar::doAxes, position
 			      XMINOR        =  self.minor, $
 			      XRANGE        =  self.range, $
 			      XSTYLE        =  self.style, $
+			      XTHICK        =       thick, $
 			      XTICKFORMAT   =  self.tickformat, $
 			      XTICKINTERVAL = *self.tickinterval, $
 			      XTICKLAYOUT   = *self.ticklayout, $
@@ -682,7 +725,7 @@ PRO MrColorbar::doAxes, position
 				
 				XYOUTS, xloc, yloc, title, /NORMAL, $
 				        COLOR     =      color, $
-				        CHARTHICK = self.charthick, $
+				        CHARTHICK =      charthick, $
 				        ALIGNMENT =      0.5, $
 				        FONT      = self.font, $
 				        CHARSIZE  = self.tcharsize
@@ -801,7 +844,6 @@ CLAMP=clamp, $
 DISCRETE=discrete, $
 HIDE=hide, $
 LOCATION=location, $
-NAME=name, $
 NEUTRAL_INDEX=neutral_index, $
 OFFSET=offset, $
 OOB_FACTOR=oob_factor, $
@@ -877,6 +919,7 @@ _REF_EXTRA=extra
 	IF Arg_Present(taper)         THEN taper         = self.taper
 	IF Arg_Present(tcharsize)     THEN tcharsize     = self.tcharsize
 	IF Arg_Present(text_color)    THEN text_color    = self.text_color
+	IF Arg_Present(textpos)       THEN textpos       = self.textpos
 	IF Arg_Present(textthick)     THEN textthick     = self.textthick
 	IF Arg_Present(tickdir)       THEN tickdir       = self.tickdir
 	IF Arg_Present(tlocation)     THEN tlocation     = self.tlocation
@@ -1011,7 +1054,7 @@ _REF_EXTRA=extra
 ;-----------------------------------------------------
 ;Object Properties \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
-	;Superclas
+	;Superclass
 	IF N_Elements(extra) GT 0 THEN self -> MrGrAtom::SetProperty, _STRICT_EXTRA=extra
 
 	;Colorbar Properties
@@ -1049,7 +1092,7 @@ _REF_EXTRA=extra
 	IF N_Elements(style)        NE 0 THEN  self.style        = style + ((style and 1) eq 0)
 	IF N_Elements(t3d)          NE 0 THEN  self.t3d          = t3d
 	IF N_Elements(thick)        NE 0 THEN  self.thick        = thick
-	IF N_Elements(tickformat)   NE 0 THEN *self.tickformat   = tickformat
+	IF N_Elements(tickformat)   NE 0 THEN  self.tickformat   = tickformat
 	IF N_Elements(tickinterval) NE 0 THEN *self.tickinterval = tickinterval
 	IF N_Elements(ticklayout)   NE 0 THEN *self.ticklayout   = ticklayout
 	IF N_Elements(ticklen)      NE 0 THEN  self.ticklen      = ticklen
@@ -1090,14 +1133,15 @@ _REF_EXTRA=extra
 			else message, 'NEUTRAL_INDEX is outside the color table range.', /INFORMATIONAL
 	endif
 	
-	;TLOCATION
+	;ORIENTATION
+	;   - Assist with TLOCATION
 	IF N_Elements(orientation) GT 0 THEN BEGIN
 		self.orientation = Keyword_Set(orientation)
 		IF self.orientation EQ 1 THEN BEGIN
 			IF self.tlocation EQ 'BOTTOM' || self.tlocation EQ 'TOP' $
 				THEN self.tlocation = self.tlocation eq 'BOTTOM' ? 'LEFT' : 'RIGHT'
 		ENDIF ELSE BEGIN
-			IF self.tlocation EQ 'LEFT' || self.tlocation EQ 'TOP' $
+			IF self.tlocation EQ 'LEFT' || self.tlocation EQ 'RIGHT' $
 				THEN self.tlocation = self.tlocation eq 'LEFT' ? 'BOTTOM' : 'TOP'
 		ENDELSE
 	ENDIF
@@ -1304,6 +1348,7 @@ FUNCTION MrColorbar::INIT, $
 BORDER=border, $
 CLAMP=clamp, $
 DISCRETE=discrete, $
+NAME=name, $
 NEUTRAL_INDEX=neutral_ndex, $
 OFFSET = offset, $
 OOB_FACTOR=oob_factor, $
@@ -1377,9 +1422,9 @@ _REF_EXTRA=extra
 ;-----------------------------------------------------
 ;Superclasses \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
-	;MrGraphicsKeywords
-	success = self -> MrGrAtom::INIT(_STRICT_EXTRA=extra)
-	IF success EQ 0 THEN Message, 'Unable to initialize MrGraphicsKeywords.'
+	;Superclass. Use the target's window. If no target was given, get the current window.
+	success = self -> MrGrAtom::INIT(TARGET=target, /CURRENT, NAME=name, HIDE=hide, WINREFRESH=refreshIn)
+	if success eq 0 then message, 'Unable to initialize MrGrAtom'
 
 ;-----------------------------------------------------
 ;Validate Pointers \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -1392,14 +1437,6 @@ _REF_EXTRA=extra
 	self.tickname      = Ptr_New(/ALLOCATE_HEAP)
 	self.tickunits     = Ptr_New(/ALLOCATE_HEAP)
 	self.tickvalues    = Ptr_New(/ALLOCATE_HEAP)
-
-;---------------------------------------------------------------------
-;Window //////////////////////////////////////////////////////////////
-;---------------------------------------------------------------------
-
-	;Superclass. Use the target's window. If no target was given, get the current window.
-	success = self -> MrGrAtom::INIT(TARGET=target, /CURRENT, NAME=name, HIDE=hide, WINREFRESH=refreshIn)
-	if success eq 0 then message, 'Unable to initialize MrGrAtom'
 
 ;-----------------------------------------------------
 ; Set Color Palette \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -1479,14 +1516,16 @@ _REF_EXTRA=extra
 	setDefaultValue, title,         ''
 	setDefaultValue, ticklen,       0.25
 	setDefaultValue, tcharsize,     charsize
-	setDefaultValue, textpos,       0
 	setDefaultValue, textthick,     1.0
 	setDefaultValue, width,         1.5
 
-	; Deal with tick intervals, if you have them.
-	IF orientation EQ 1 $
-		THEN IF N_Elements(tlocation) EQ 0 THEN tlocation = textpos EQ 1 ? 'RIGHT' : 'LEFT' $
-		ELSE IF N_Elements(tlocation) EQ 0 THEN tlocation = textpos EQ 1 ? 'TOP'   : 'BOTTOM'
+	; Default to right (vertical) or top (horizontal)
+	IF N_Elements(textpos) EQ 0 THEN textpos = 1
+		
+	; Title location
+	IF N_Elements(tlocation) EQ 0 $
+		THEN IF orientation EQ 1 THEN tlocation = (textpos EQ 1) ? 'RIGHT' : 'LEFT' $
+		ELSE IF orientation EQ 0 THEN tlocation = (textpos EQ 1) ? 'TOP'   : 'BOTTOM'
 
 	; A plot command limitation restricts the number of divisions to 59.
 	major = major < 59 
