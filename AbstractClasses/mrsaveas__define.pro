@@ -393,9 +393,9 @@ TYPE=type
 	
 		;Open the PS_Config GUI
 		IF typeOut EQ 'PDF' || typeOut EQ 'PS' || typeOut EQ 'EPS' THEN BEGIN
-			self.ps_config -> GUIFont, CANCEL       =      cancel, $
-			                           GROUP_LEADER =*self._group_leader, $
-			                           FONTTYPE     = self.ps_font
+			self.ps_config -> GUIFont, CANCEL       =       cancel, $
+			                           GROUP_LEADER = *self._group_leader, $
+			                           FONTTYPE     =  self.ps_font
 
 			;Get the filename.    
 			IF cancel THEN BEGIN
@@ -1969,9 +1969,9 @@ _REF_EXTRA=extra
 		RETURN
 	ENDIF
 
-	IF N_Elements(winID)                GT 0 THEN self._saveWinID    = winID
-	IF N_Elements(theWindow)            GT 0 THEN self._saveWindow   = theWindow
-	IF N_Elements(group_leader)         GT 0 THEN self._group_leader = group_leader
+	IF N_Elements(winID)                GT 0 THEN  self._saveWinID    = winID
+	IF N_Elements(theWindow)            GT 0 THEN  self._saveWindow   = theWindow
+	IF N_Elements(group_leader)         GT 0 THEN *self._group_leader = group_leader
 
 
 	;ImageMagick Properties
@@ -2038,6 +2038,7 @@ END
 ;   Clean up after the object is destroyed -- destroy pointers and object references.
 ;-
 pro MrSaveAs::cleanup
+	ptr_free,    self._group_leader
 	ptr_free,    self.im_width
 	ptr_free,    self.im_height
 	obj_destroy, self.ps_config
@@ -2157,9 +2158,10 @@ _REF_EXTRA=extra
 ; Allocate Heap //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 	;Objects & Heap
-	self.ps_config = obj_new('FSC_PSConfig')
-	self.im_height = Ptr_New(/ALLOCATE_HEAP)
-	self.im_width  = Ptr_New(/ALLOCATE_HEAP)
+	self.ps_config     = Obj_New('FSC_PSConfig')
+	self._group_leader = Ptr_New(/ALLOCATE_HEAP)
+	self.im_height     = Ptr_New(/ALLOCATE_HEAP)
+	self.im_width      = Ptr_New(/ALLOCATE_HEAP)
  
 ;---------------------------------------------------------------------
 ;Get Default Values //////////////////////////////////////////////////
@@ -2268,7 +2270,7 @@ pro MrSaveAs__define, class
 	          ;Display window
 	          _SaveWindow:   obj_new(), $   ; Window in which graphics are displayed.
 	          _SaveWinID:    0L, $          ; ID of the window from which the image will be read.
-	          _group_leader: 0L, $          ; ID of a widget to serve as a group leader.
+	          _group_leader: ptr_new(), $   ; ID of a widget to serve as a group leader.
 	          _has_im:       0B, $
 	          
 	          ; PostScript options.
