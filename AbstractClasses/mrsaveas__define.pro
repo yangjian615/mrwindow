@@ -544,14 +544,14 @@ WINDOW=theWindow
 
 	; ImageMagick properties.
 	IF Arg_Present(im_density)      THEN im_density     =  self.im_density
-	IF Arg_Present(im_height)       THEN im_raster      = *self.im_height
+	IF Arg_Present(im_height)       THEN im_height      = *self.im_height
 	IF Arg_Present(im_options)      THEN im_options     =  self.im_options
 	IF Arg_Present(im_png8)         THEN im_png8        =  self.im_png8
 	IF Arg_Present(im_tiff_depth)   THEN im_tiff_depth  =  self.im_tiff_depth
 	IF Arg_Present(im_transparent)  THEN im_transparent =  self.im_transparent
 	IF Arg_Present(im_resize)       THEN im_resize      =  self.im_resize
 	IF Arg_Present(im_raster)       THEN im_raster      =  self.im_raster
-	IF Arg_Present(im_width)        THEN im_raster      = *self.im_width
+	IF Arg_Present(im_width)        THEN im_width      = *self.im_width
 
 	IF Arg_Present(ps_keywords)     THEN ps_keywords = self.ps_config -> GetKeywords()
 END
@@ -1501,7 +1501,7 @@ RESET=reset
 		IF exists $
 			THEN !MrSaveAs_Defaults = mrsaveas_defaults $
 			ELSE DefSysV, '!MrSaveAs_Defaults', mrsaveas_defaults
-	
+
 	;Set defaults
 	ENDIF ELSE BEGIN
 		IF N_Elements(adjustsize)           GT 0 THEN !MRSAVEAS_DEFAULTS.adjustsize           = adjustsize
@@ -2166,6 +2166,10 @@ _REF_EXTRA=extra
 ;---------------------------------------------------------------------
 ;Get Default Values //////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+	;Do we have ImageMagick?
+	;   - Must be known before setting default properties
+	self._has_im = cgHasImageMagick()
+
 	;Establish default values
 	;   - Call SetDefaults to initialize system variable if need be.
 	self -> SetDefaults
@@ -2207,9 +2211,6 @@ _REF_EXTRA=extra
 	                     WINID                = winID, $
 	                     WINDOW               = theWindow, $
 	                     _REF_EXTRA           = extra
-
-	;Do we have ImageMagick?
-	self._has_im = cgHasImageMagick()
 
 	;Default save file location
 	CD, CURRENT=current

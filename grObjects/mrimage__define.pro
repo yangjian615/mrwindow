@@ -1876,7 +1876,7 @@ _REF_EXTRA = extra
 	nNaN     = n_elements(nan)
 	nMissing = n_elements(missing_value)
 	nLog     = n_elements(log)
-	if nScale + nNaN + nMissing + nLog gt 0 then begin
+	if nRange + nScale + nNaN + nMissing + nLog gt 0 then begin
 		if nScale   gt 0 then  self.scale         = keyword_set(scale)
 		if nNaN     gt 0 then  self.nan           = keyword_set(nan)
 		if nMissing gt 0 then *self.missing_value = missing_value
