@@ -579,6 +579,8 @@ pro MrPlot::SetData, x, y
             indep = x
             dep   = y
         endcase
+        
+        else: message, 'Incorrect number of parameters.'
     endcase
 
     ;Set Data
