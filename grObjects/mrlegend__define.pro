@@ -74,9 +74,24 @@ HEIGHT=height, $
 WIDTH=width
 	Compile_Opt idl2
 	
+	;Convert thickensses and sizes
+	IF !D.Name EQ 'PS' THEN BEGIN
+		sample_thick = MrPS_ReScale(self.sample_thick, /THICK)
+		sym_size     = MrPS_ReScale(self.sym_size,     /CHARSIZE)
+		sym_thick    = MrPS_ReScale(self.sym_thick,    /CHARTHICK)
+		text_size    = MrPS_ReScale(self.text_size,    /CHARSIZE)
+		text_thick   = MrPS_ReScale(self.text_thick,   /CHARTHICK)
+	ENDIF ELSE BEGIN
+		sample_thick = self.sample_thick
+		sym_size     = self.sym_size
+		sym_thick    = self.sym_thick
+		text_size    = self.text_size
+		text_thick   = self.text_thick
+	ENDELSE
+	
 	;Character sizes
-	x_char = Float(!D.X_Ch_Size) / !D.X_Size
-	y_char = Float(!D.Y_Ch_Size) / !D.Y_Size
+	x_char = text_size * (Float(!D.X_Ch_Size) / !D.X_Size)
+	y_char = text_size * (Float(!D.Y_Ch_Size) / !D.Y_Size)
 
 ;-----------------------------------------------------
 ; Line Properties \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -149,21 +164,6 @@ WIDTH=width
 	sample_linestyle = MrLineStyle(*self.sample_linestyle)
 	sym_color        = cgColor(*self.sym_color)
 	
-	;Convert thickensses and sizes
-	IF !D.Name EQ 'PS' THEN BEGIN
-		sample_thick = MrPS_ReScale(self.sample_thick, /THICK)
-		sym_size     = MrPS_ReScale(self.sym_size,     /CHARSIZE)
-		sym_thick    = MrPS_ReScale(self.sym_thick,    /CHARTHICK)
-		text_size    = MrPS_ReScale(self.text_size,    /CHARSIZE)
-		text_thick   = MrPS_ReScale(self.text_thick,   /CHARTHICK)
-	ENDIF ELSE BEGIN
-		sample_thick = self.sample_thick
-		sym_size     = self.sym_size
-		sym_thick    = self.sym_thick
-		text_size    = self.text_size
-		text_thick   = self.text_thick
-	ENDELSE
-	
 ;-----------------------------------------------------
 ; Draw \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
@@ -204,7 +204,8 @@ WIDTH=width
 	        /NORMAL, $
 	        COLOR     = text_color, $
 	        CHARSIZE  = text_size, $
-	        WIDTH     = width
+	        FONT      = self.font, $
+	        WIDTH     = width, $
 	        CHARTHICK = text_thick
 
 	;Finalize height and width of legend item
@@ -267,6 +268,7 @@ END
 ;-
 PRO MrLegend_Item::GetProperty, $
 AUTO_TEXT_COLOR=auto_text_color, $
+FONT=font, $
 LABEL=label, $
 TEXT_COLOR=text_color, $
 TEXT_SIZE=text_size, $
@@ -287,6 +289,7 @@ SYM_THICK=sym_thick
 	On_Error, 2
 	
 	IF Arg_Present(auto_text_color)  GT 0 THEN auto_text_color  =  self.auto_text_color	
+	IF Arg_Present(font)             GT 0 THEN font             =  self.font
 	IF Arg_Present(label)            GT 0 THEN label            =  self.label
 	IF Arg_Present(sample_color)     GT 0 THEN sample_color     = *self.sample_color
 	IF Arg_Present(sym_color)        GT 0 THEN sym_color        = *self.sym_color
@@ -358,6 +361,7 @@ END
 ;-
 PRO MrLegend_Item::SetProperty, $
 AUTO_TEXT_COLOR=auto_text_color, $
+FONT=font, $
 LABEL=label, $
 SAMPLE_ANGLE=sample_angle, $
 SAMPLE_COLOR=sample_color, $
@@ -378,7 +382,8 @@ TEXT_THICK=text_thick
 	On_Error, 2
 	
 	;Set Properties
-	IF N_Elements(auto_text_color)  GT 0 THEN  self.auto_text_color  = Keyword_Set(auto_text_color)	
+	IF N_Elements(auto_text_color)  GT 0 THEN  self.auto_text_color  = Keyword_Set(auto_text_color)
+	IF N_Elements(font)             GT 0 THEN  self.font             = font
 	IF N_Elements(label)            GT 0 THEN  self.label            = label
 	IF N_Elements(sample_color)     GT 0 THEN *self.sample_color     = sample_color
 	IF N_Elements(sym_color)        GT 0 THEN *self.sym_color        = sym_color
@@ -475,6 +480,7 @@ END
 ;-
 FUNCTION MrLegend_Item::Init, $
 AUTO_TEXT_COLOR=auto_text_color, $
+FONT=font, $
 LABEL=label, $
 SAMPLE_ANGLE=sample_angle, $
 SAMPLE_COLOR=sample_color, $
@@ -523,6 +529,7 @@ TEXT_THICK=text_thick
 	sample_color = MrDefaultColor(sample_color, NCOLORS=1, DEFAULT=text_color)
 	sym_color    = MrDefaultColor(sym_color,    NCOLORS=1, DEFAULT=text_color)
 	IF N_Elements(label)            EQ 0 THEN label            = 'Legend Item'
+	IF N_Elements(font)             EQ 0 THEN font             = -1
 	IF N_Elements(sample_angle)     EQ 0 THEN sample_angle     = 0.0
 	IF N_Elements(sample_linestyle) EQ 0 THEN sample_linestyle = 'Solid_Line'
 	IF N_Elements(sample_magnitude) EQ 0 THEN sample_magnitude = 5
@@ -545,6 +552,7 @@ TEXT_THICK=text_thick
 	;Set Object Properties
 	self -> SetProperty, AUTO_TEXT_COLOR  = auto_text_color, $
 	                     LABEL            = label, $
+	                     FONT             = font, $
 	                     TEXT_COLOR       = text_color, $
 	                     TEXT_SIZE        = text_size, $
 	                     TEXT_THICK       = text_thick, $
@@ -594,6 +602,7 @@ PRO MrLegend_Item__Define, class
 
 	class = { MrLegend_Item, $
 	          auto_text_color:  0B, $
+	          font:             0S, $
 	          label:            '', $
 	          text_color:       Ptr_New(), $
 	          text_size:        0.0, $
@@ -665,6 +674,7 @@ END
 ;-
 PRO MrLegend::Add, $
 AUTO_TEXT_COLOR=auto_text_color, $
+FONT=font, $
 LABEL=label, $
 TEXT_COLOR=text_color, $
 TEXT_SIZE=text_size, $
@@ -687,6 +697,7 @@ SYM_THICK=sym_thick
 	;Create the legend item.
 	item = Obj_New('MrLegend_Item', $
 	               AUTO_TEXT_COLOR  = auto_text_color, $
+	               FONT             = font, $
 	               LABEL            = label, $
 	               SAMPLE_ANGLE     = sample_angle, $
 	               SAMPLE_COLOR     = sample_color, $
@@ -901,7 +912,7 @@ NOERASE=noerase
 	;Fill the background?
 	;   - cgColor does not like when FILL_COLOR is the empty string.
 	IF ~(MrIsA(*self.fill_color, 'STRING') && *self.fill_color EQ '') THEN BEGIN
-        fill_color = cgColor(*self.fill_color)
+		fill_color = cgColor(*self.fill_color)
 		cgColorFill, POSITION=self.bx_pos, COLOR=fill_color
 	ENDIF
 
@@ -1024,7 +1035,7 @@ LABEL=label
 	
 	;Return the item's container position or its label?
 	IF Arg_Present(position) THEN void = self.items -> IsContained(the_item, POSITION=position)
-    IF Arg_Present(label)    THEN the_item -> GetProperty, LABEL=label
+	IF Arg_Present(label)    THEN the_item -> GetProperty, LABEL=label
 	
 	RETURN, the_item
 END    
@@ -1158,6 +1169,7 @@ HORIZONTAL_ALIGNMENT=horizontal_alignment, $
 HORIZONTAL_SPACING=horizontal_spacing, $
 LINESTYLE=linestyle, $
 MARGINS=margins, $
+N_ITEMS=n_items, $
 NORMAL=normal, $
 ORIENTATION=orientation, $
 POSITION=position, $
@@ -1167,40 +1179,39 @@ TT_FONT=tt_font, $
 VERTICAL_ALIGNMENT=vertical_alignment, $
 VERTICAL_SPACING=vertical_spacing, $
 _REF_EXTRA=extra
-    Compile_Opt idl2
-    
-    Catch, theError
-    IF theError NE 0 THEN BEGIN
-        Catch, /Cancel
-        void = cgErrorMsg()
-        RETURN
-    ENDIF
+	Compile_Opt idl2
 
-    ;Get an item's properties
+	Catch, theError
+	IF theError NE 0 THEN BEGIN
+		Catch, /Cancel
+		void = cgErrorMsg()
+		RETURN
+	ENDIF
+
+	;Get an item's properties
 	IF N_Elements(item) GT 0 THEN BEGIN
 		oItem = self -> GetItem(item)
 		oItem -> GetProperty, _STRICT_EXTRA=extra
 		RETURN
 	ENDIF
 
-    ;Get legend properties
+	;Get legend properties
 	IF Arg_Present(alignment)            THEN alignment            =  self.alignment
 	IF Arg_Present(bx_pos)               THEN bx_pos               =  self.bx_pos
 	IF Arg_Present(color)                THEN color                = *self.color
+	IF Arg_Present(data)                 THEN data                 =  self.data
+	IF Arg_Present(device)               THEN device               =  self.device
 	IF Arg_Present(fill_color)           THEN fill_color           = *self.fill_color
-	IF Arg_Present(hardware)             THEN hardware             =  self.hardware
 	IF Arg_Present(horizontal_alignment) THEN horizontal_alignment = *self.horizontal_alignment
 	IF Arg_Present(horizontal_spacing)   THEN horizontal_spacing   =  self.horizontal_spacing
 	IF Arg_Present(linestyles)           THEN linestyles           = *self.linestyles
 	IF Arg_Present(margins)              THEN margins              =  self.margins
-	IF Arg_Present(position)             THEN position             =  self.position
-	IF Arg_Present(orientation)          THEN orientation          =  self.orientation
-	IF Arg_Present(thick)                THEN thick                =  self.thick
-	IF Arg_Present(tt_font)              THEN tt_font              = *self.tt_font
-	IF Arg_Present(data)                 THEN data                 =  self.data
-	IF Arg_Present(device)               THEN device               =  self.device
+	IF Arg_Present(n_items)              THEN n_items              =  self.items -> Count()
 	IF Arg_Present(normal)               THEN normal               =  self.normal
+	IF Arg_Present(orientation)          THEN orientation          =  self.orientation
+	IF Arg_Present(position)             THEN position             =  self.position
 	IF Arg_Present(relative)             THEN relative             =  self.relative
+	IF Arg_Present(thick)                THEN thick                =  self.thick
 	IF Arg_Present(vertical_alignment)   THEN vertical_alignment   = *self.vertical_alignment
 	IF Arg_Present(vertical_spacing)     THEN vertical_spacing     =  self.vertical_spacing
 
@@ -1363,6 +1374,7 @@ AUTO_TEXT_COLOR=auto_text_color, $
 COLOR=color, $
 DATA=data, $
 DEVICE=device, $
+FONT=font, $
 FILL_COLOR=fill_color, $
 HARDWARE=hardware, $
 HORIZONTAL_ALIGNMENT=horizontal_alignment, $
@@ -1409,6 +1421,7 @@ _REF_EXTRA=extra
 	IF N_Elements(item) GT 0 THEN BEGIN
 		oItem = self -> GetItem(item)
 		oItem -> SetProperty, AUTO_TEXT_COLOR  = auto_text_color, $
+		                      FONT             = font, $
 		                      LABEL            = label, $
 		                      TEXT_COLOR       = text_color, $
 		                      TEXT_SIZE        = text_size, $
@@ -1607,7 +1620,6 @@ PRO MrLegend::CLEANUP
 	Ptr_Free, self.fill_color
 	Ptr_Free, self.horizontal_alignment
 	Ptr_Free, self.linestyle
-	Ptr_Free, self.tt_font
 	Ptr_Free, self.vertical_alignment
 	Ptr_Free, self.width
 
@@ -1746,6 +1758,7 @@ SYM_THICK=sym_thick, $
 AUTO_TEXT_COLOR=auto_text_color, $
 HARDWARE=hardware, $
 LABEL=label, $
+FONT=font, $
 TEXT_COLOR=text_color, $
 TEXT_SIZE=text_size, $
 TEXT_THICK=text_thick, $
@@ -1850,7 +1863,6 @@ _REF_EXTRA=extra
 	self.fill_color           = Ptr_New(/ALLOCATE_HEAP)
 	self.horizontal_alignment = Ptr_New(/ALLOCATE_HEAP)
 	self.linestyle            = Ptr_New(/ALLOCATE_HEAP)
-	self.tt_font              = Ptr_New(/ALLOCATE_HEAP)
 	self.vertical_alignment   = Ptr_New(/ALLOCATE_HEAP)
 	self.width                = Ptr_New(/ALLOCATE_HEAP)
 
@@ -1867,6 +1879,7 @@ _REF_EXTRA=extra
 	
 		;Add a legend item for each label given.
 		self -> Add, AUTO_TEXT_COLOR  = auto_text_color, $
+		             FONT             = font, $
 		             LABEL            = temp_label, $
 		             TEXT_COLOR       = text_color[i], $
 		             TEXT_SIZE        = text_size, $
@@ -1971,10 +1984,6 @@ PRO MrLegend__Define, class
 	          linestyle:            Ptr_New(), $
 	          thick:                0.0, $
 	          fill_color:           Ptr_New(), $
-	          width:                Ptr_New(), $
-	          
-	          ;Legend Text
-	          hardware:             0B, $
-	          tt_font:              Ptr_New() $
+	          width:                Ptr_New()  $
 	        }
 END

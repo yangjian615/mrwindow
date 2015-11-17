@@ -121,10 +121,26 @@ NOERASE=noerase
     ;Restore the target's coordinates
     self.target -> RestoreCoords
 
+;    self.target -> GetProperty, XRANGE=xrange, YRANGE=yrange, ZRANGE=zrange
+;    case self.direction of
+;        0: *self.xrange = xrange
+;        1: *self.yrange = yrange
+;        2: *self.zrange = zrange
+;        else: message, 'Invalid axis DIRECTION property value.'
+;    endcase
+    
     ;Draw the axis and save its coordinate space
     self -> doAxis
     self -> SaveCoords
 
+    ;Restore the old coordinate space
+;    IF self.save EQ 0 THEN BEGIN
+;        !X = x_sysvar
+;        !Y = y_sysvar
+;        !Z = z_sysvar
+;        !P = p_sysvar
+;    ENDIF
+    
     ;Reset the color state
     cgSetColorState, currentState
 
@@ -165,11 +181,15 @@ NOERASE=noerase
     if !d.name eq 'PS' then begin
         charsize  = MrPS_Rescale( self.charsize,  /CHARSIZE)
         charthick = MrPS_Rescale(*self.charthick, /CHARTHICK)
-        thick     = MrPS_Rescale(*self.thick,     /THICK)
+        xthick    = MrPS_Rescale(*self.xthick,    /THICK)
+        ythick    = MrPS_Rescale(*self.ythick,    /THICK)
+        zthick    = MrPS_Rescale(*self.zthick,    /THICK)
     endif else begin
         charsize  =  self.charsize
         charthick = *self.charthick
-        thick     = *self.thick
+        xthick    = *self.xthick
+        ythick    = *self.ythick
+        zthick    = *self.zthick
     endelse
 
     ;Create the color
@@ -184,40 +204,31 @@ NOERASE=noerase
                  YLOG    =  self.ylog, $
                  YNOZERO =  self.ynozero, $
                  ZAXIS   = *self.zaxis, $
-;                 ZLOG    =  self.zlog, $                    ; !!!!!!!!!!!!!
+                 ZLOG    =  self.zlog, $
                  
-                 ;cgGraphicsKeywords
-                 AM_PM         = *self.am_pm, $              ; !!!!!!!!!!!!!
-;                AXISCOLOR     = *self.axiscolor, $
-;                BACKGROUND    = *self.background, $
+                 ;Direct Graphics Keywords
+;                 AM_PM         = *self.am_pm, $
                  CHARSIZE      =       charsize, $
                  CHARTHICK     =       charthick, $
-;                CLIP          = *self.clip, $
                  COLOR         =       color, $
                  DATA          =  self.data, $
-                 DAYS_OF_WEEK  = *self.days_of_week, $       ; !!!!!!!!!!!!!!
+;                 DAYS_OF_WEEK  = *self.days_of_week, $
                  DEVICE        =  self.device, $
                  NORMAL        =  self.normal, $
                  FONT          = *self.font, $
-                 MONTHS        = *self.months, $             ; !!!!!!!!!!!!!!
-;                NOCLIP        = *self.noclip, $
+;                 MONTHS        = *self.months, $
                  NODATA        = *self.nodata, $
                  NOERASE       = *self.noerase, $
-;                POSITION      = *self.position, $
-;                PSYM          = *self.psym, $
                  SUBTITLE      = *self.subtitle, $
-;                SYMSIZE       = *self.symsize, $
                  T3D           = *self.t3d, $
-;                THICK         = *self.thick, $
                  TICKLEN       = *self.ticklen, $
-;                 TITLE         = *self.title, $             ; !!!!!!!!!!!!!
                  XCHARSIZE     = *self.xcharsize, $
                  XGRIDSTYLE    = *self.xgridstyle, $
                  XMARGIN       = *self.xmargin, $
                  XMINOR        = *self.xminor, $
                  XRANGE        = *self.xrange, $
                  XSTYLE        = *self.xstyle, $
-                 XTHICK        = *self.xthick, $
+                 XTHICK        =       xthick, $
                  XTICK_GET     = *self.xtick_get, $
                  XTICKFORMAT   = *self.xtickformat, $
                  XTICKINTERVAL = *self.xtickinterval, $
@@ -234,7 +245,7 @@ NOERASE=noerase
                  YMINOR        = *self.yminor, $
                  YRANGE        = *self.yrange, $
                  YSTYLE        = *self.ystyle, $
-                 YTHICK        = *self.ythick, $
+                 YTHICK        =       ythick, $
                  YTICK_GET     = *self.ytick_get, $
                  YTICKFORMAT   = *self.ytickformat, $
                  YTICKINTERVAL = *self.ytickinterval, $
@@ -251,7 +262,7 @@ NOERASE=noerase
                  ZMINOR        = *self.zminor, $
                  ZRANGE        = *self.zrange, $
                  ZSTYLE        = *self.zstyle, $
-                 ZTHICK        = *self.zthick, $
+                 ZTHICK        =       zthick, $
                  ZTICK_GET     = *self.ztick_get, $
                  ZTICKFORMAT   = *self.ztickformat, $
                  ZTICKINTERVAL = *self.ztickinterval, $
@@ -276,13 +287,16 @@ NOERASE=noerase
                  ZLOG    =  self.zlog, $
                  
                  ;cgGraphicsKeywords
+;                 AM_PM         = *self.am_pm, $
                  CHARSIZE      =       charsize, $
                  CHARTHICK     =       charthick, $
                  COLOR         =       color, $
                  DATA          =  self.data, $
+;                 DAYS_OF_WEEK  = *self.days_of_week, $
                  DEVICE        =  self.device, $
                  NORMAL        =  self.normal, $
                  FONT          = *self.font, $
+;                 MONTHS        = *self.months, $
                  NODATA        = *self.nodata, $
                  NOERASE       = *self.noerase, $
                  SUBTITLE      = *self.subtitle, $
@@ -294,7 +308,7 @@ NOERASE=noerase
                  XMINOR        = *self.xminor, $
                  XRANGE        = *self.xrange, $
                  XSTYLE        = *self.xstyle, $
-                 XTHICK        = *self.xthick, $
+                 XTHICK        =       xthick, $
                  XTICK_GET     = *self.xtick_get, $
                  XTICKFORMAT   = *self.xtickformat, $
                  XTICKINTERVAL = *self.xtickinterval, $
@@ -311,7 +325,7 @@ NOERASE=noerase
                  YMINOR        = *self.yminor, $
                  YRANGE        = *self.yrange, $
                  YSTYLE        = *self.ystyle, $
-                 YTHICK        = *self.ythick, $
+                 YTHICK        =       ythick, $
                  YTICK_GET     = *self.ytick_get, $
                  YTICKFORMAT   = *self.ytickformat, $
                  YTICKINTERVAL = *self.ytickinterval, $
@@ -328,7 +342,7 @@ NOERASE=noerase
                  ZMINOR        = *self.zminor, $
                  ZRANGE        = *self.zrange, $
                  ZSTYLE        = *self.zstyle, $
-                 ZTHICK        = *self.zthick, $
+                 ZTHICK        =       zthick, $
                  ZTICK_GET     = *self.ztick_get, $
                  ZTICKFORMAT   = *self.ztickformat, $
                  ZTICKINTERVAL = *self.ztickinterval, $
@@ -352,13 +366,16 @@ NOERASE=noerase
                  ZLOG    =  self.zlog, $
                  
                  ;cgGraphicsKeywords
+;                 AM_PM         = *self.am_pm, $
                  CHARSIZE      =       charsize, $
                  CHARTHICK     =       charthick, $
                  COLOR         =       color, $
                  DATA          =  self.data, $
+;                 DAYS_OF_WEEK  = *self.days_of_week, $
                  DEVICE        =  self.device, $
                  NORMAL        =  self.normal, $
                  FONT          = *self.font, $
+;                 MONTHS        = *self.months, $
                  NODATA        = *self.nodata, $
                  NOERASE       = *self.noerase, $
                  SUBTITLE      = *self.subtitle, $
@@ -370,7 +387,7 @@ NOERASE=noerase
                  XMINOR        = *self.xminor, $
                  XRANGE        = *self.xrange, $
                  XSTYLE        = *self.xstyle, $
-                 XTHICK        = *self.xthick, $
+                 XTHICK        =       xthick, $
                  XTICK_GET     = *self.xtick_get, $
                  XTICKFORMAT   = *self.xtickformat, $
                  XTICKINTERVAL = *self.xtickinterval, $
@@ -387,7 +404,7 @@ NOERASE=noerase
                  YMINOR        = *self.yminor, $
                  YRANGE        = *self.yrange, $
                  YSTYLE        = *self.ystyle, $
-                 YTHICK        = *self.ythick, $
+                 YTHICK        =       ythick, $
                  YTICK_GET     = *self.ytick_get, $
                  YTICKFORMAT   = *self.ytickformat, $
                  YTICKINTERVAL = *self.ytickinterval, $
@@ -404,7 +421,7 @@ NOERASE=noerase
                  ZMINOR        = *self.zminor, $
                  ZRANGE        = *self.zrange, $
                  ZSTYLE        = *self.zstyle, $
-                 ZTHICK        = *self.zthick, $
+                 ZTHICK        =       zthick, $
                  ZTICK_GET     = *self.ztick_get, $
                  ZTICKFORMAT   = *self.ztickformat, $
                  ZTICKINTERVAL = *self.ztickinterval, $
@@ -428,13 +445,16 @@ NOERASE=noerase
                  ZLOG    =  self.zlog, $
                
                  ;cgGraphicsKeywords
+;                 AM_PM         = *self.am_pm, $
                  CHARSIZE      =       charsize, $
                  CHARTHICK     =       charthick, $
                  COLOR         =       color, $
                  DATA          = *self.data, $
+;                 DAYS_OF_WEEK  = *self.days_of_week, $
                  DEVICE        = *self.device, $
                  NORMAL        = *self.normal, $
                  FONT          = *self.font, $
+;                 MONTHS        = *self.months, $
                  NODATA        = *self.nodata, $
                  NOERASE       = *self.noerase, $
                  SUBTITLE      = *self.subtitle, $
@@ -446,7 +466,7 @@ NOERASE=noerase
                  XMINOR        = *self.xminor, $
                  XRANGE        = *self.xrange, $
                  XSTYLE        = *self.xstyle, $
-                 XTHICK        = *self.xthick, $
+                 XTHICK        =       xthick, $
                  XTICK_GET     = *self.xtick_get, $
                  XTICKFORMAT   = *self.xtickformat, $
                  XTICKINTERVAL = *self.xtickinterval, $
@@ -463,7 +483,7 @@ NOERASE=noerase
                  YMINOR        = *self.yminor, $
                  YRANGE        = *self.yrange, $
                  YSTYLE        = *self.ystyle, $
-                 YTHICK        = *self.ythick, $
+                 YTHICK        =       ythick, $
                  YTICK_GET     = *self.ytick_get, $
                  YTICKFORMAT   = *self.ytickformat, $
                  YTICKINTERVAL = *self.ytickinterval, $
@@ -480,7 +500,7 @@ NOERASE=noerase
                  ZMINOR        = *self.zminor, $
                  ZRANGE        = *self.zrange, $
                  ZSTYLE        = *self.zstyle, $
-                 ZTHICK        = *self.zthick, $
+                 ZTHICK        =       zthick, $
                  ZTICK_GET     = *self.ztick_get, $
                  ZTICKFORMAT   = *self.ztickformat, $
                  ZTICKINTERVAL = *self.ztickinterval, $
@@ -791,6 +811,10 @@ PRO MrAxis::SetLocation, location
 ;String Location /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     IF MrIsA(location, 'STRING') THEN BEGIN
+        ;Character size
+        IF !d.name eq 'PS' $
+            THEN charsize = MrPS_Rescale( self.charsize, /CHARSIZE) $
+            ELSE charsize = self.charsize
 
         ;If a target was given, restore its coordinate system
         IF Obj_Valid(self.target) THEN self.target -> RestoreCoords
@@ -799,8 +823,8 @@ PRO MrAxis::SetLocation, location
         refPos = [!X.Window[0], !Y.Window[0], !X.Window[1], !Y.Window[1]]
 
         ;Get the character sizes    
-        xchsize = Double(!D.X_CH_Size) / Double(!D.X_Size) * (self.charsize)
-        ychsize = Double(!D.Y_CH_Size) / Double(!D.Y_Size) * (self.charsize)
+        xchsize = Double(!D.X_CH_Size) / Double(!D.X_Size) * charsize
+        ychsize = Double(!D.Y_CH_Size) / Double(!D.Y_Size) * charsize
 
     ;---------------------------------------------------------------------
     ;X-Axis //////////////////////////////////////////////////////////////

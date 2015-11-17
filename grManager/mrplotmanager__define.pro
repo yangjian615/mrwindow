@@ -1229,16 +1229,32 @@ ZTITLE = ztitle
 ; ColorBars //////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
         endif else if oClass eq 'MRCOLORBAR' then begin
-            allObjs[i] -> SetProperty, RANGE=range, CHARSIZE=charsize, $
-                                       CHARTHICK=charthick, TCHARSIZE=charsize, $
-                                       THICK=thick
+            allObjs[i] -> SetProperty, CHARSIZE  = charsize, $
+                                       CHARTHICK = charthick, $
+                                       FONT      = font, $
+                                       RANGE     = range, $
+                                       TCHARSIZE = charsize, $
+                                       THICK     = thick
+
+;---------------------------------------------------------------------
+; Legend /////////////////////////////////////////////////////////////
+;---------------------------------------------------------------------
+        endif else if oClass eq 'MRLEGEND' then begin
+            allObjs[i] -> GetProperty, N_ITEMS=n_items
+            for j = 0, n_items - 1 do begin
+                allObjs[i] -> SetProperty, j, $
+                                           CHARSIZE  = charsize, $
+                                           CHARTHICK = charthick, $
+                                           FONT      = font
+            endfor
     
 ;---------------------------------------------------------------------
-;Other Annotation Objects ////////////////////////////////////////////
+; Text ///////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-        endif else if MrIsMember(['MRTEXT', 'WELEGENDITEM'], oClass) then begin
-            allObjs[i] -> SetProperty, CHARSIZE = charsize, $
-                                       CHARTHICK = charthick
+        endif else if oClass eq 'MRTEXT' then begin
+            allObjs[i] -> SetProperty, CHARSIZE  = charsize, $
+                                       CHARTHICK = charthick, $
+                                       FONT      = font
         endif
     endfor
         

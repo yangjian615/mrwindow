@@ -163,15 +163,22 @@ PRO MrColorbar::CreateBar
 	Compile_Opt StrictArr
 	on_error, 2
 	
-	;Get the number of colors
-	self.palette -> GetProperty, NCOLORS=ncolors
+	;
+	; TODO: Take colors from the PALETTE object property.
+	;
 	
+	;Get the number of colors
+	;   - The PALETTE object has exactly the number of colors we need.
+	;   - The color indices start at 0 and ends at NCOLORS-1
+	;   - There should be no need to manipulate the color arrangement
+	self.palette -> GetProperty, NCOLORS=ncolors
+
 	;Create the colorbar
 	;   - Vertical   bars must be short in first dimension
 	;   - Horizontal bars must be short in second dimension
-	if self.orientation $
-		then bar = rebin(bindgen(1, 20B), ncolors, 20) $
-		else bar = rebin(bindgen(20B), 20, ncolors)
+	IF self.orientation $
+		THEN bar = Rebin(BIndGen(1, ncolors), 20, ncolors) $
+		ELSE bar = Rebin(BIndGen(ncolors), ncolors, 20)
 
 	; Scale the color bar.
 	IF N_Elements(*self.clamp) NE 0 THEN BEGIN
@@ -196,17 +203,10 @@ PRO MrColorbar::CreateBar
 		;Color values above the maximum
 		i = Where(tempbar GT byterange[1], count)
 		IF count GT 0 THEN bar[i] = neutralTop
-	ENDIF ELSE BEGIN
-		bar = BytScl(bar, TOP=(ncolors-1) < 255)
-	ENDELSE
-
-	;Reverse the bar
-	IF Keyword_Set(reverse) THEN BEGIN
-		IF self.orientation EQ 1 THEN bar = Reverse(bar,2) ELSE bar = Reverse(bar,1)
 	ENDIF
 	
 	;Save the colorbar
-	*self.bar = bar
+	*self.bar = temporary(bar)
 END
 
 
@@ -1192,6 +1192,50 @@ END
 ;   details.
 ;    
 ; :Keywords:
+;       BORDER:             in, optional, type=boolean, default=0
+;                           If set, draw a border around the colorbar. The default is
+;                               to draw the colorbar and one axis.
+;       CLAMP:              in, optional
+;                           
+;       DISCRETE:           in, optional, type=boolean, default=0
+;                           If set, create discrete color blocks in the colorbar. Works
+;                               best with a handful of colors (e.g. 8-15).
+;       NAME:               in, optional, type=string, default='MRCOLORBAR'
+;                           Name of the colorbar. Used to retrieve the graphic from
+;                               the parent window object.
+;       NEUTRAL_INDEX:      in, optional
+;                           
+;       OFFSET:             in, optional, type=float, default=1.5
+;                           Offset of the colorbar from the edge of its `TARGET`, in
+;                               character units. Used only when `POSITION` is determined
+;                               automatically.
+;       OOB_FACTOR:         in, optional
+;                           
+;       OOB_HIGH:           in, optional
+;                           
+;       OOB_LOW:            in, optional
+;                           
+;       ORIENTATION:        in, optional, type=integer, default=1
+;                           Orientation of the colorbar. Choices are::
+;                               0  -  Horizontal
+;                               1  -  Vertical
+;       LOCATION:           in, optional, type=string
+;                           Location of the colorbar with respect to its `TARGET` when
+;                               `POSITION` is undefined. Choices are::
+;                                   'TOP'     -  Above the parent (horizontal colorbar)
+;                                   'BOTTOM'  -  Below the parent (horizontal colorbar)
+;                                   'LEFT'    -  To the right of the parent (vertical colorbar)
+;                                   'RIGHT'   -  To the left  of the parent (vertical colorbar)
+;                               'TOP' ('RIGHT') is the default for horizontal (vertical)
+;                               colorbars.
+;       POSITION:           in, optional, type=4x1 fltarr, default=fltarr(4)
+;                           Position vector [x0, y0, x1, y1] specifying the location of
+;                               lower left and upper-right corners of the colorbar. If all
+;                               elements are 0.0, then the position is determined
+;                               automatically from the `ORIENTATION`, `LOCATION`, `OFFSET`,
+;                               and `WIDTH` keywords.
+;
+;
 ;    annotatecolor: in, optional, type=string, default="opposite"
 ;       The name of the "annotation color" to use. The names are those for
 ;       cgCOLOR. If this keyword is used, the annotation color is loaded after
@@ -1458,7 +1502,6 @@ _REF_EXTRA=extra
 		target -> GetProperty, PALETTE=tpal
 		tpal   -> GetProperty, NCOLORS=ncolors
 	ENDELSE
-		
 
 ;-----------------------------------------------------
 ;TARGET And CBLOCATION \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
