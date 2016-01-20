@@ -117,7 +117,7 @@ NOERASE=noerase
 ;---------------------------------------------------------------------
 ; Single Polygon /////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    IF N_Elements(*self.connectivity) EQ 0 THEN BEGIN    
+    IF N_Elements(*self.connectivity) EQ 0 THEN BEGIN
         ;Draw the polygon
         ;   - Draw the lines and symbols on top of the filled region.
         self -> doPolyFill, xcoords, ycoords, zcoords

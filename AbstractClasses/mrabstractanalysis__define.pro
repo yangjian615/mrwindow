@@ -1248,6 +1248,39 @@ end
 
 
 ;+
+;   A method for turning off all zoom options and effects.
+;
+; :Params:
+;       AMODE:      in, optional, type=int/intarr(3)
+;                   The analsysi mode. Set to 0 to reset everything.
+;-
+pro MrAbstractAnalysis::SetProperty, $
+AMODE=amode
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		MrPrintF, 'LogErr'
+		return
+	endif
+	
+	n = n_elements(amode)
+	if n gt 0 then begin
+		if n eq 1 && amode eq 0 then begin
+			self.amode = [0,0,0]
+			if ptr_valid(self.intervals) then ptr_free, self.intervals
+			if ptr_valid(self.tmatrix)   then ptr_free, self.tmatrix
+		endif else begin
+			self.amode = amode
+		endelse
+	endif
+end
+
+
+
+;+
 ;   Calculate the deHoffmann-Teller Velocity over a given interval.
 ;
 ;   Instructions::
