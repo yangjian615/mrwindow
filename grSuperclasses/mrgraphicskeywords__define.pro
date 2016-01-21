@@ -73,7 +73,7 @@ FUNCTION MrGraphicsKeywords::_OverloadPrint
     
     Catch, theError
     IF theError NE 0 THEN BEGIN
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
 
@@ -389,7 +389,7 @@ FUNCTION MrGraphicsKeywords::INIT, $
     
     Catch, theError
     IF theError NE 0 THEN BEGIN
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
     
@@ -747,7 +747,7 @@ PRO MrGraphicsKeywords::GetProperty, $
     ; Error handling.
     Catch, theError
     IF theError NE 0 THEN BEGIN
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -918,7 +918,7 @@ PRO MrGraphicsKeywords::SetProperty, $
     ; Error handling.
     Catch, theError
     IF theError NE 0 THEN BEGIN
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     

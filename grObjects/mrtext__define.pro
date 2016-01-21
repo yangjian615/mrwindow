@@ -93,7 +93,7 @@ FUNCTION MrText::_OverloadPrint
     Catch, the_error
     IF the_error NE 0 THEN BEGIN
         Catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, "''"
     ENDIF
     
@@ -214,7 +214,7 @@ FUNCTION MrText::GetCorners
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, !Null
     ENDIF
     
@@ -262,7 +262,7 @@ NORMAL = normal
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
         if !Except eq 0 then !Except = 1
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
     
@@ -332,7 +332,7 @@ WIDTH=width
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         self.hide = 0
         IF n_elements(refresh_in) GT 0 THEN self.window -> Refresh, DISABLE=~refresh_in
         RETURN
@@ -398,7 +398,7 @@ NOERASE=noerase
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
         IF color_state EQ 0 then cgSetColorState, 0
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -539,7 +539,7 @@ WIDTH=width
             WDelete, pixID
             WSet, currentID
         ENDIF
-        void = cgErrorMSG()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
 
@@ -752,7 +752,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -934,7 +934,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -1161,7 +1161,7 @@ PRO MrText::cleanup
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -1295,7 +1295,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
 

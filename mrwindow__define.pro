@@ -245,7 +245,7 @@ function MrWindow::_OverloadPrint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, ''
     endif
     
@@ -282,7 +282,7 @@ UNSELECT=unselect
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -349,7 +349,7 @@ YSIZE = ysize
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -443,7 +443,7 @@ ERASE=erase
     if the_error ne 0 then begin
         catch, /cancel
         if n_elements(thisDevice) gt 0 then set_plot, thisDevice
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -558,7 +558,7 @@ pro MrWindow::Draw_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -711,7 +711,7 @@ pro MrWindow::Error_Handler, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -738,7 +738,7 @@ pro MrWindow::File_Menu_Events, event
         catch, /cancel
         self._refresh = refresh_in
         if obj_valid(oViewer) then obj_destroy, oViewer
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -799,7 +799,7 @@ pro MrWindow::Focus, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -873,7 +873,7 @@ function MrWindow::GetName
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, ''
     endif
     
@@ -933,7 +933,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1031,7 +1031,7 @@ COUNT=count
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, obj_new()
     endif
     
@@ -1073,7 +1073,7 @@ function MrWindow::IsSelected, object
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, obj_new()
     endif
     
@@ -1100,7 +1100,7 @@ function MrWindow::IsZoomable
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
 
@@ -1128,7 +1128,7 @@ pro MrWindow::Notify_Realize, id
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1170,7 +1170,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1216,7 +1216,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1288,7 +1288,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1339,7 +1339,7 @@ pro MrWindow::Resize, xsize, ysize
     if the_error ne 0 then begin
         catch, /cancel
         if n_elements(thisDevice) gt 0 then set_plot, thisDevice
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1431,7 +1431,7 @@ pro MrWindow::Save, filename
         catch, /cancel
         self._refresh = thisRefresh
         if n_elements(thisDevice) gt 0 then set_plot, thisDevice
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1482,7 +1482,7 @@ pro MrWindow::SetCurrent
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1519,7 +1519,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1673,7 +1673,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1795,7 +1795,7 @@ ICONIFY=iconify
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1818,7 +1818,7 @@ pro MrWindow::ShowBuffer
     if the_error ne 0 then begin
         catch, /cancel
         set_plot, thisDevice
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1856,7 +1856,7 @@ pro MrWindow::SysVAdd, object
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1888,7 +1888,7 @@ function MrWindow::SysVExists
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     
@@ -1911,7 +1911,7 @@ pro MrWindow::SysVRemove, object
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1944,7 +1944,7 @@ pro MrWindow::TLB_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -2002,7 +2002,7 @@ pro MrWindow::Turn_Everything_Off, tlb
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -2043,7 +2043,7 @@ pro MrWindow::Wheel_Zoom, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Refresh, DISABLE=~refreshIn
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -2090,7 +2090,7 @@ pro MrWindow::whichDataObjects, outText
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
         
@@ -2153,7 +2153,7 @@ pro MrWindow::whichAnnotateObjects, text
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
      
@@ -2207,7 +2207,7 @@ pro MrWindow::whichObjects
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
         
@@ -2236,7 +2236,7 @@ pro MrWindow_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -2286,7 +2286,7 @@ pro MrWindow::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -2390,7 +2390,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     

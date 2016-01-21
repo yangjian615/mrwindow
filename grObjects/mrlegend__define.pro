@@ -502,7 +502,7 @@ TEXT_THICK=text_thick
 	Catch, the_error
 	IF the_error NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMSG()
+		MrPrintF, 'LogErr'
 		RETURN, 0
 	ENDIF
 	
@@ -738,7 +738,7 @@ PRO MrLegend::CalculateBoxSize
 			WSet, currentID
 		ENDIF
 		IF N_Elements(currentState) NE 0 THEN cgSetColorState, currentState
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -885,7 +885,7 @@ NOERASE=noerase
 		self.bx_pos = FltArr(4)
 		IF N_Elements(thisFont) NE 0 THEN !P.Font = thisFont
 		IF N_Elements(incomingColorState) THEN cgSetColorState, incomingColorState
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 	
@@ -1053,7 +1053,7 @@ FUNCTION MrLegend::GetPosition
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, [0,0]
     ENDIF
     
@@ -1184,7 +1184,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /Cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -1248,7 +1248,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, [0,0]
     ENDIF
     
@@ -1411,7 +1411,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /Cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -1771,7 +1771,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /Cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN, 0
 	ENDIF
 

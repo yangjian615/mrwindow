@@ -158,7 +158,7 @@ VALUE = value
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -212,7 +212,7 @@ pro MrCursor::Cursor_Menu_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -287,7 +287,7 @@ pro MrCursor::Cross_Hairs, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -326,7 +326,7 @@ pro MrCursor::Draw_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -361,7 +361,7 @@ pro MrCursor::Error_Handler
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -384,7 +384,7 @@ pro MrCursor::Get_Point, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -412,7 +412,7 @@ CMODE = cmode
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -437,7 +437,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -486,7 +486,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -533,7 +533,7 @@ CMODE = cmode
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -556,7 +556,7 @@ pro MrCursor::Show_XY, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -585,7 +585,7 @@ pro MrCursor::Turn_Everything_Off, tlb
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -640,7 +640,7 @@ CMODE = cmode
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     

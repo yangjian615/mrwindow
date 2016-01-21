@@ -139,7 +139,7 @@ pro MrAbstractAnalysis::Analysis_Menu_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -309,7 +309,7 @@ QUIET = quiet
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -409,7 +409,7 @@ AHT = aHT
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -495,7 +495,7 @@ IRANGE = iRange
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, !Null
     endif
     
@@ -558,7 +558,7 @@ pro MrAbstractAnalysis::Draw_Events, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -595,7 +595,7 @@ pro MrAbstractAnalysis::Error_Handler
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -623,7 +623,7 @@ pro MrAbstractAnalysis::Get_Interval, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -721,7 +721,7 @@ pro MrAbstractAnalysis::Get_Data_Point, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -768,7 +768,7 @@ pro MrAbstractAnalysis::Interval, xrange, yrange
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -828,7 +828,7 @@ TAIL=tail
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -931,7 +931,7 @@ pro MrAbstractAnalysis::MVA_Cross, xrange, average
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1038,7 +1038,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1086,7 +1086,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1148,7 +1148,7 @@ INVERSE = inverse
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1208,7 +1208,7 @@ pro MrAbstractAnalysis::Turn_Everything_Off, tlb
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1309,7 +1309,7 @@ pro MrAbstractAnalysis::VerticalCut, xrange, yrange
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1410,7 +1410,7 @@ ACCELERATED=accelerated
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1538,7 +1538,7 @@ function MrAbstractAnalysis::init
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     

@@ -69,7 +69,7 @@ FUNCTION MrColorbar::CalcPosition
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN, FltArr(4)
 	ENDIF
 
@@ -221,7 +221,7 @@ NOERASE=noerase
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
 		IF n_elements(table_in) GT 0 THEN tvlct, table_in
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -894,7 +894,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -1027,7 +1027,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 	
@@ -1163,7 +1163,7 @@ PRO MrColorbar::cleanup
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -1448,7 +1448,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN, 0
 	ENDIF
 
