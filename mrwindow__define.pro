@@ -1742,8 +1742,8 @@ _REF_EXTRA = extra
 ;CURSOR PROPERTIES ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
     if nExtra gt 0 then begin
-        void = MrIsMember(['CMODE'], extra, $
-                         iCursor, COUNT=nMatches, COMPLEMENT=iExtra, $
+        void = MrIsMember(['CMODE'], extra, iCursor, $
+                         COUNT=nMatches, COMPLEMENT=iExtra, $
                          NCOMPLEMENT=nExtra, /FOLD_CASE)
         
         if nMatches gt 0 then self -> MrCursor::SetProperty, _STRICT_EXTRA=extra[iCursor]
@@ -1765,6 +1765,7 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ;LAYOUT PROPERTIES ///////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+
     if nExtra gt 0 then begin
         ;Recalculate the plot positions when layout changes.
         self -> MrGrLayout::SetProperty, _STRICT_EXTRA=extra

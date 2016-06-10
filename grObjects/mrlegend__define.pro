@@ -1318,7 +1318,8 @@ END
 ;                           If set, `POSITION` is provided in device coordinates.
 ;       FILL_COLOR:         in, optional, type=string/integer/bytarr(3)
 ;                           Name, index, 24-bit number, or RGB-triple of the color with
-;                               which to fill the background of the legend.
+;                               which to fill the background of the legend.  If FILL_COLOR
+;                               is the empty string (''), then the bounding box not filled.
 ;       HARDWARE:           in, optional, type=boolean, default=0
 ;                           If set, hardware fonts will be used.
 ;       HORIZONTAL_ALIGNMENT:   in, optional, type=float/string
@@ -1329,7 +1330,7 @@ END
 ;                               Spacing between legend items when `ORIENTATION`=0, in
 ;                                   units of character size.
 ;       LINESTYLE:          in, optional, type=float
-;                           Style with with to draw the line. Choices are::
+;                           Style with with to draw the bounding box. Choices are::
 ;                               0   '-'     "Solid
 ;                               1   '.'     "Dot"
 ;                               2   '--'    "Dash"
