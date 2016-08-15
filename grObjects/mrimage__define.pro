@@ -2199,7 +2199,7 @@ _REF_EXTRA = extra
 	if n_elements(missing_color) eq 0 then missing_color = background
 	if n_elements(missing_index) eq 0 then missing_index = !d.table_size - 1
 	if n_elements(top)           eq 0 then top           = !d.table_size - 1
-	if n_elements(rgb_table)     eq 0 then rgb_table     = 13
+	if n_elements(rgb_table)     eq 0 then rgb_table     = 25
 
 	;Set the rgb_table
 	;   - Do not set the SCALE property before now.

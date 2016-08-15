@@ -247,6 +247,15 @@ NOERASE=noerase
         charthick = *self.charthick
         thick     = *self.thick
     endelse
+    
+    linestyle = n_elements(*self.linestyle) eq 0 ? 0 : MrLineStyle(*self.linestyle)
+    psym      = n_elements(*self.psym)      eq 0 ? 0 : cgSymCat(*self.psym)
+    if linestyle eq 6 then begin
+        void = temporary(linestyle)
+        psym = abs(psym)
+    endif else begin
+        psym = -abs(psym)
+    endelse
 
     ;Draw the plot.
     MraPlot, *self.indep, *self.dep, $
@@ -280,11 +289,11 @@ NOERASE=noerase
              DEVICE        =  self.device, $
              NORMAL        =  self.normal, $
              FONT          = *self.font, $
-             LINESTYLE     = *self.linestyle, $
+             LINESTYLE     =       linestyle, $
              NOCLIP        = *self.noclip, $
              NODATA        = *self.nodata, $
              NOERASE       =       noerase, $
-             PSYM          = *self.psym, $
+             PSYM          =       psym, $
              SUBTITLE      = *self.subtitle, $
              SYMSIZE       = *self.symsize, $
              T3D           = *self.t3d, $
@@ -374,6 +383,15 @@ pro MrPlot::doOverplot
         charthick = *self.charthick
         thick     = *self.thick
     endelse
+    
+    linestyle = n_elements(*self.linestyle) eq 0 ? 0 : MrLineStyle(*self.linestyle)
+    psym      = n_elements(*self.psym)      eq 0 ? 0 : cgSymCat(*self.psym)
+    if linestyle eq 6 then begin
+        void = temporary(linestyle)
+        psym = abs(psym)
+    endif else begin
+        psym = -abs(psym)
+    endelse
 
     ;Get the dimensions of the independent variable.
     MraOPlot, *self.indep, *self.dep, $
@@ -382,8 +400,8 @@ pro MrPlot::doOverplot
               CHARSIZE  =       charsize, $
               COLOR     = *self.color, $
               DIMENSION =  self.dimension, $
-              LINESTYLE = *self.linestyle, $
-              PSYM      = *self.psym, $
+              LINESTYLE =       linestyle, $
+              PSYM      =       psym, $
               SYMCOLOR  = *self.symcolor, $
               SYMSIZE   = *self.symsize, $
               THICK     =       thick, $
@@ -881,20 +899,20 @@ _REF_EXTRA = extra
     SetDefaultValue, color, d_color
 
     ;Set the object properties
-    self -> SetProperty, CHARSIZE = charsize, $
-                         COLOR = color, $
+    self -> SetProperty, CHARSIZE  = charsize, $
+                         COLOR     = color, $
                          DIMENSION = dimension, $
-                         LABEL = label, $
+                         LABEL     = label, $
                          MAX_VALUE = max_value, $
                          MIN_VALUE = min_value, $
-                         NSUM = nsum, $
-                         POLAR = polar, $
-                         SYMCOLOR = symcolor, $
-                         XLOG = xlog, $
-                         XRANGE = xrange, $
-                         YLOG = ylog, $
-                         YNOZERO = ynozero, $
-                         YRANGE = yrange
+                         NSUM      = nsum, $
+                         POLAR     = polar, $
+                         SYMCOLOR  = symcolor, $
+                         XLOG      = xlog, $
+                         XRANGE    = xrange, $
+                         YLOG      = ylog, $
+                         YNOZERO   = ynozero, $
+                         YRANGE    = yrange
 
     ;Make sure the x- and y-style keywords have the 2^0 bit set to force
     ;exact axis ranges.    
