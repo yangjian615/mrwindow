@@ -54,10 +54,10 @@
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
-;       Morse Hall, Room 113
+;       Morse Hall, Room 348
 ;       8 College Rd.
 ;       Durham, NH, 03824
-;       matthew.argall@wildcats.unh.edu
+;       matthew.argall@unh.edu
 ;
 ; :History:
 ;   Modification History::
@@ -71,6 +71,8 @@
 ;                           Missing color is loaded at time of draw. - MRA
 ;       2015/02/23  -   Determine polar ranges better. Do not draw axes if OVERPLOT is set. - MRA
 ;       2015/07/06  -   Check RANGE keyword when /LOG is set to prevent infinite range. - MRA
+;       2016/08/29  -   Set PAINT if X or Y are 2D. - MRA
+;       2016/08/30  -   Set SCALE if the data range would result in a single color. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -1404,7 +1406,7 @@ YLOG=ylog
     ;   - SetData will set PAINT=1 if more than just X and Y were given. Leave as is.
     ;   - If only X and Y were given, we need to decide if the image needs to be pained.
     if n_params() eq 2 then begin
-        if xlog + ylog + center + self.polar gt 0 $
+        if (xlog + ylog + center + self.polar gt 0) || size(x, /N_DIMENSIONS) eq 2 || size(y, /N_DIMENSIONS) eq 2 $
             then self.paint = 1 $
             else self.paint = 0
     endif
@@ -1542,6 +1544,7 @@ TV=tv
             self -> ClearData, /ALL
             
             ;Store the data
+            ;   - X and/or Y may define the location of each pixel.
             *self.image = theImage
             *self.indep = x
             *self.dep   = y
@@ -1701,7 +1704,7 @@ TV=tv
 	endelse
 
 	;SCALE
-	if imMin lt 0 || imMax gt 255 then scale = 1B
+	if imMin lt 0 || imMax gt 255 || abs(imMax - imMin) lt 1 then scale = 1B
 
 	;Set Properties
 	;   - NAN and SCALE will cause ::PrepImage to be called.
