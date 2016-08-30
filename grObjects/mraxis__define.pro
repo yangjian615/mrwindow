@@ -1205,7 +1205,7 @@ DEVICE=device, $
 FONT=font, $
 GRIDSTYLE=gridstyle, $
 LOG=log, $
-MAJFOR=major, $
+MAJOR=major, $
 MINOR=minor, $
 NODATA=noData, $
 NORMAL=normal, $
@@ -1562,8 +1562,6 @@ ZCHARSIZE=zcharsize, $
 ZMARGIN=zmargin, $
 ZVALUE=zvalue, $
 _REF_EXTRA=extra
-
-
 
 ;ANTIALIAS
 ;CLIP

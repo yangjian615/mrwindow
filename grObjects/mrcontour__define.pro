@@ -1674,11 +1674,11 @@ _REF_EXTRA=extra
 		
 		;Choose the contour levels properly
 		endif else begin
-			levels = cgConLevels(*self.data, NLEVELS=nlevels)
+			levels = cgConLevels(*self.c_data, NLEVELS=nlevels)
 		endelse
 		
 		self.nLevels = nlevels
-		*self.levels  = levels
+		*self.levels = levels
 	endif
 	
 ;---------------------------------------------------------------------

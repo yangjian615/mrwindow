@@ -1464,7 +1464,7 @@ RESET=reset
 		IF N_Elements(ps_charsize)          EQ 0 THEN ps_charsize          = 0.0
 		IF N_Elements(ps_encapsulated)      EQ 0 THEN ps_encapsulated      = 0
 		IF N_Elements(ps_font)              EQ 0 THEN ps_font              = 0
-		IF N_Elements(ps_decomposed)        EQ 0 THEN ps_decomposed        = 0 ; Index mode by default.
+		IF N_Elements(ps_decomposed)        EQ 0 THEN ps_decomposed        = 1 ; Index mode by default.
 		IF N_Elements(ps_delete)            EQ 0 THEN ps_delete            = 1
 		IF N_Elements(ps_metric)            EQ 0 THEN ps_metric            = 0
 		IF N_Elements(ps_pagetype)          EQ 0 THEN ps_pagetype          = 'LETTER'
@@ -2024,13 +2024,15 @@ _REF_EXTRA=extra
 		ENDIF
 	ENDIF
 
-
-;	self.ps_config -> SetProperty, DECOMPOSED   = ps_decomposed, $
-;	                               ENCAPSULATED = ps_encapsulated, $
-;	                               FONTTYPE     = ps_font, $
-;	                               METRIC       = ps_metric, $
-;	                               PAGETYPE     = ps_pagetype, $
-;	                              _STRICT_EXTRA = extra
+	;If DECOMPOSED is not set here, PS_Open will call 
+	;    keywords = cgPS_Config(...)
+	;and DECOMPOSED will be 0.
+	self.ps_config -> SetProperty, DECOMPOSED   = ps_decomposed, $
+	                               ENCAPSULATED = ps_encapsulated, $
+	                               FONTTYPE     = ps_font, $
+	                               METRIC       = ps_metric, $
+	                               PAGETYPE     = ps_pagetype, $
+	                              _STRICT_EXTRA = extra
 END
 
 

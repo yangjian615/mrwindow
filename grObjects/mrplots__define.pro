@@ -150,9 +150,11 @@ NOERASE=noerase
         else thick = self.thick
     
     ;If LINESTYLE is "None", then do not draw the lines.
+    ;   - cgSymCat always returns a positive value
+    ;   - If PSYM > 0, no connecting lines are drawn
     psym      = cgSymCat(self.psym)
     linestyle = MrLineStyle(*self.linestyle)
-    if linestyle eq 6 then psym = abs(psym)
+    if linestyle ne 6 then psym = -psym
 
     ;cgPlotS
     case nparams of
@@ -211,20 +213,33 @@ end
 
 
 ;+
+;   Get the vertex coordinates.
+;
+; :Params:
+;       X:          out, required, type=numeric
+;                   X-coordinates of the points to be drawn.
+;       Y:          out, required, type=numeric
+;                   Y-coordinates of the points to be drawn.
+;       Z:          out, optional, type=numeric
+;                   Z-coordinates of the points to be drawn.
+;-
+pro MrPlotS::GetData, x, y, z
+	compile_opt idl2
+	on_error, 2
+	
+	;Get the data
+	switch n_params() of
+		3: z = *self.zcoords
+		2: y = *self.ycoords
+		1: x = *self.xcoords
+	endswitch
+end
+
+
+;+
 ;   The purpose of this method is to retrieve object properties
 ;
 ; :Keywords:
-;       XCOORDS:        out, required, type=numeric
-;                       A vector or scalar argument providing the X components of the
-;                           points to be connected. If only one argument is specified,
-;                           X must be an array of either two or three vectors
-;                           (i.e., (2,*) or (3,*)). In this special case, X[0,*] are
-;                           taken as the X values, X[1,*] are taken as the `Y` values,
-;                           and X[2,*] are taken as the `Z` values.
-;       YCOORDS:        out, optional, type=numeric
-;                       Y coordinate(s) of the points to be connected.
-;       ZCOORDS:        out, optional, type=numeric
-;                       Z coordinate(s) of the points to be connected.
 ;       CLIP:           out, optional, type=fltarr(4)
 ;                       The coordinates of a rectangle used to clip the graphics output.
 ;                           Coordinates are specified in data units unless `NORMAL` or
@@ -556,6 +571,44 @@ end
 
 
 ;+
+;   Set the vertex coordinates.
+;
+; :Params:
+;       X:          in, required, type=numeric
+;                   X-coordinates of the points to be drawn.
+;       Y:          in, required, type=numeric
+;                   Y-coordinates of the points to be drawn.
+;       Z:          in, optional, type=numeric
+;                   Z-coordinates of the points to be drawn.
+;
+; :Keywords:
+;       NO_COPY:    in, optional, type=boolean, default=0
+;                   If set, coordinates will be copied directly to the obect and
+;                       input parameters will be left undefined.
+;-
+pro MrPlotS::SetData, x, y, z, $
+NO_COPY=no_copy
+	compile_opt idl2
+	on_error, 2
+	
+	no_copy = keyword_set(no_copy)
+	
+	;Number of defined parameters
+	nparams = n_elements(x) eq 0 ? 0 : $
+	              n_elements(y) eq 0 ? 1 : $
+	              n_elements(z) eq 0 ? 2 : $
+	              3
+	if nparams lt 2 || nparams gt 3 then message, 'Incorrect number of defined parameters.'
+	
+	;Set the x- and y-coordinates
+	*self.xcoords = no_copy ? temporary(x) : x
+	*self.ycoords = no_copy ? temporary(y) : y
+	if nparams eq 3 then *self.zcoords = no_copy ? temporary(z) : z
+end
+
+
+
+;+
 ;   Clean up after the object is destroyed -- destroy pointers and object references.
 ;-
 pro MrPlotS::cleanup
@@ -724,11 +777,11 @@ _REF_EXTRA=extra
 ;Set Object Properties ///////////////////////////////////////////////
 ;---------------------------------------------------------------------
     
+    ;Set coordinates
+    self -> SetData, xcoords, ycoords, zcoords
+    
     ;Set the object properties
-    self -> setProperty, XCOORDS    = xcoords, $
-                         YCOORDS    = ycoords, $
-                         ZCOORDS    = zcoords, $
-                         ;cgPlotS Properties
+    self -> setProperty, $;cgPlotS Properties
                          COLOR      = color, $
                          MAP_OBJECT = map_object, $
                          PSYM       = psym, $
@@ -749,9 +802,10 @@ _REF_EXTRA=extra
                          _EXTRA     = extra
 
     ;Draw?
-    if n_elements(target) eq 0 $
-        then self -> Refresh $
-        else if winRefresh then self -> Refresh
+    ;   - TODO: If no TARGET is not supplied, should REFRESH be
+    ;           triggered automatically (like in the case of a
+    ;           new window)?
+    if winRefresh then self -> Refresh
 
     return, 1
 end

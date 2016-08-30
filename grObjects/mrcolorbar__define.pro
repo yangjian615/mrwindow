@@ -764,7 +764,6 @@ PRO MrColorbar::doColorbar, position
 		cgSetColorState, 1 
 
 	ENDIF ELSE BEGIN
-
 		bar = CONGRID(*self.bar, CEIL(xsize*!D.X_VSize), CEIL(ysize*!D.Y_VSize))
 
 		; Display the color bar.
@@ -1126,7 +1125,7 @@ _REF_EXTRA=extra
 	ENDIF
 	
 	;NEUTRAL INDEX
-	IF N_Elements(neutral_index)  NE 0 THEN BEGIN
+	IF N_Elements(neutral_index) NE 0 THEN BEGIN
 		self.palette -> GetProperty, NCOLORS
 		if self.neutral_index gt ncolors-1 $
 			then self.neutral_index = neutral_index $
@@ -1561,6 +1560,7 @@ _REF_EXTRA=extra
 	setDefaultValue, tcharsize,     charsize
 	setDefaultValue, textthick,     1.0
 	setDefaultValue, width,         1.5
+	if n_elements(style) eq 0 then style = 1 else style = style + ((style and 1) eq 0)
 
 	; Default to right (vertical) or top (horizontal)
 	IF N_Elements(textpos) EQ 0 THEN textpos = 1
