@@ -1284,11 +1284,7 @@ _REF_EXTRA = extra
 	if arg_present(BOTTOM)         then bottom        =  self.bottom
 	if arg_present(RANGE)          then range         =  self.range
 	if arg_present(MISSING_COLOR)  then missing_color =  self.missing_color
-<<<<<<< HEAD
-	if arg_present(MISSING_INDEX)  then missing_index =  self.missing_index
-=======
 	if arg_present(missing_index)  then missing_index =  self.missing_index
->>>>>>> 2c7880eca901bbf0d2a7366e42ec4f80c792b849
 	if arg_present(rgb_table)      then self.palette ->  GetProperty, RGB_TABLE=rgb_table
 	if arg_present(NAN)            then nan           =  self.nan
 	if arg_present(SCALE)          then scale         =  self.scale
@@ -1890,7 +1886,6 @@ _REF_EXTRA = extra
 	endif
 
 	;PALETTE
-<<<<<<< HEAD
 	nMissColor = n_elements(missing_color)
 	nMissIndex = n_elements(missing_index)
 	nRGBTable  = n_elements(rgb_table)
@@ -1899,10 +1894,6 @@ _REF_EXTRA = extra
 		if nMissColor gt 0 then self.missing_color = cgColor(missing_color)
 		if nMissIndex gt 0 then self.missing_index = missing_index
 	
-=======
-	;   - Should set MISSING_VALUE, MISSING_COLOR and MISSING_INDEX first.
-	if n_elements(rgb_table) gt 0 then begin
->>>>>>> 2c7880eca901bbf0d2a7366e42ec4f80c792b849
 		;Get the number of colors
 		self.palette -> GetProperty, NCOLORS=n_old
 		
