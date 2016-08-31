@@ -69,7 +69,7 @@ FUNCTION MrColorbar::CalcPosition
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN, FltArr(4)
 	ENDIF
 
@@ -221,7 +221,7 @@ NOERASE=noerase
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
 		IF n_elements(table_in) GT 0 THEN tvlct, table_in
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -893,7 +893,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -1026,7 +1026,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 	
@@ -1162,7 +1162,7 @@ PRO MrColorbar::cleanup
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -1447,12 +1447,12 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN, 0
 	ENDIF
 
 ;-----------------------------------------------------
-;Target \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+; Target \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
 	;If a target was not given, a palette must be given.
 	if n_elements(rgb_table) eq 0 then begin
@@ -1463,14 +1463,14 @@ _REF_EXTRA=extra
 	endif
 
 ;-----------------------------------------------------
-;Superclasses \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+; Superclasses \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
 	;Superclass. Use the target's window. If no target was given, get the current window.
 	success = self -> MrGrAtom::INIT(TARGET=target, /CURRENT, NAME=name, HIDE=hide, WINREFRESH=refreshIn)
 	if success eq 0 then message, 'Unable to initialize MrGrAtom'
 
 ;-----------------------------------------------------
-;Validate Pointers \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+; Validate Pointers \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
 	self.bar           = Ptr_New(/ALLOCATE_HEAP)
 	self.clamp         = Ptr_New(/ALLOCATE_HEAP)
@@ -1503,7 +1503,7 @@ _REF_EXTRA=extra
 	ENDELSE
 
 ;-----------------------------------------------------
-;TARGET And CBLOCATION \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+; TARGET And LOCATION \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
 	;
 	;If an object is provided, then its RANGE, CTINDEX, and PALETTE will
@@ -1531,7 +1531,7 @@ _REF_EXTRA=extra
 	ENDIF
 
 ;-----------------------------------------------------
-;Defaults \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+; Defaults \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
 	border        = Keyword_Set(border)
 	discrete      = Keyword_Set(discrete)
@@ -1554,6 +1554,7 @@ _REF_EXTRA=extra
 	setDefaultValue, offset,        1.5
 	setDefaultValue, position,      [0.0, 0.0, 0.0, 0.0]
 	setDefaultValue, range,         [0, nColors]
+	setDefaultValue, style,         1
 	setDefaultValue, text_color,    color
 	setDefaultValue, title,         ''
 	setDefaultValue, ticklen,       0.25
@@ -1589,7 +1590,7 @@ _REF_EXTRA=extra
 	IF N_Elements(tickinterval) NE 0 THEN divisions = 0
 
 ;-----------------------------------------------------
-;Set Properties \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+; Set Properties \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
 	;Will cause the BAR property to be created
 	self -> SetProperty, BORDER        = border, $

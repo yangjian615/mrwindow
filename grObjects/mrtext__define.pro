@@ -82,6 +82,7 @@
 ;       2013/11/20  -   Inherit MrGrAtom. Rename GRAPHIC to TARGET. - MRA
 ;       2014/02/03  -   Renamed from weText to MrText. Added the Place method. - MRA
 ;       2014/08/29  -   Added the RELATIVE property. - MRA
+;       2016/08/16  -   Scale RELATIVE correctly with logarithmic axes. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -93,7 +94,7 @@ FUNCTION MrText::_OverloadPrint
     Catch, the_error
     IF the_error NE 0 THEN BEGIN
         Catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, "''"
     ENDIF
     
@@ -214,7 +215,7 @@ FUNCTION MrText::GetCorners
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, !Null
     ENDIF
     
@@ -262,7 +263,7 @@ NORMAL = normal
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
         if !Except eq 0 then !Except = 1
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
     
@@ -332,7 +333,7 @@ WIDTH=width
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         self.hide = 0
         IF n_elements(refresh_in) GT 0 THEN self.window -> Refresh, DISABLE=~refresh_in
         RETURN
@@ -398,7 +399,7 @@ NOERASE=noerase
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
         IF color_state EQ 0 then cgSetColorState, 0
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -440,22 +441,40 @@ NOERASE=noerase
             self.target -> RestoreCoords
         
             ;X Position
-            IF !x.crange[0] LT !x.crange[1] $
-                THEN xloc = (!x.crange[1] - !x.crange[0]) *        *self.xloc  + !x.crange[0] $
-                ELSE xloc = (!x.crange[0] - !x.crange[1]) * (1.0 - *self.xloc) + !x.crange[1]
+            IF !x.crange[0] LT !x.crange[1] THEN BEGIN
+                IF !x.type $
+                    THEN xloc = 10.0^( (!x.crange[1] - !x.crange[0]) *        *self.xloc  + !x.crange[0] ) $
+                    ELSE xloc = (!x.crange[1] - !x.crange[0]) *        *self.xloc  + !x.crange[0]
+            ENDIF ELSE BEGIN
+                IF !x.type $
+                    THEN xloc = 10.0^( (!x.crange[0] - !x.crange[1]) * (1.0 - *self.xloc) + !x.crange[1] ) $
+                    ELSE xloc = (!x.crange[0] - !x.crange[1]) * (1.0 - *self.xloc) + !x.crange[1]
+            ENDELSE
         
             ;Y Position
-            IF !y.crange[0] LT !y.crange[1] $
-                THEN yloc = (!y.crange[1] - !y.crange[0]) *        *self.yloc  + !y.crange[0] $
-                ELSE yloc = (!y.crange[0] - !y.crange[1]) * (1.0 - *self.yloc) + !y.crange[1]
+            IF !y.crange[0] LT !y.crange[1] THEN BEGIN
+                IF !y.type $
+                    THEN yloc = 10.0^( (!y.crange[1] - !y.crange[0]) *        *self.yloc  + !y.crange[0] ) $
+                    ELSE yloc = (!y.crange[1] - !y.crange[0]) *        *self.yloc  + !y.crange[0]
+            ENDIF ELSE BEGIN
+                IF !y.type $
+                    THEN yloc = 10.0^( (!y.crange[0] - !y.crange[1]) * (1.0 - *self.yloc) + !y.crange[1] ) $
+                    ELSE yloc = (!y.crange[0] - !y.crange[1]) * (1.0 - *self.yloc) + !y.crange[1]
+            ENDELSE
         
             ;Draw in 3D? -- Determine position of text in normal coordinates
             IF is3D THEN BEGIN
                 ;Z Position
-                IF !z.crange[0] LT !z.crange[1] $
-                    THEN zloc = (!z.crange[1] - !y.crange[0]) *        *self.zloc  + !z.crange[0] $
-                    ELSE zloc = (!z.crange[0] - !y.crange[1]) * (1.0 - *self.zloc) + !z.crange[1]
-                
+                IF !z.crange[0] LT !z.crange[1] THEN BEGIN
+                    IF !z.type $
+                        THEN zloc = 10.0^( (!z.crange[1] - !z.crange[0]) *        *self.zloc  + !z.crange[0] ) $
+                        ELSE zloc = (!z.crange[1] - !z.crange[0]) *        *self.zloc  + !z.crange[0]
+                ENDIF ELSE BEGIN
+                    IF !z.type $
+                        THEN zloc = 10.0^( (!z.crange[0] - !z.crange[1]) * (1.0 - *self.zloc) + !z.crange[1] ) $
+                        ELSE zloc = (!z.crange[0] - !z.crange[1]) * (1.0 - *self.zloc) + !z.crange[1]
+                ENDELSE
+                    
                 ;Convert to normal coordinates
                 pos = self.target -> ConvertCoord(xloc, yloc, zloc, /DATA, /TO_NORMAL)
             ENDIF ELSE BEGIN
@@ -539,7 +558,7 @@ WIDTH=width
             WDelete, pixID
             WSet, currentID
         ENDIF
-        void = cgErrorMSG()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
 
@@ -752,7 +771,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -934,7 +953,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -1161,7 +1180,7 @@ PRO MrText::cleanup
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -1295,7 +1314,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
 

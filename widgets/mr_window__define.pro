@@ -68,7 +68,7 @@ pro MrWindow::_SysVAdd, object
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -100,7 +100,7 @@ function MrWindow::_SysVExists
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     
@@ -123,7 +123,7 @@ pro MrWindow::_SysVRemove, object
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -163,7 +163,7 @@ YSIZE = ysize
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -267,7 +267,7 @@ pro Mr_Window::Copy, window_id, $
     if the_error ne 0 then begin
         catch, /cancel
         wset, currentWin
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -322,7 +322,7 @@ pro Mr_Window::Copy_Pixmap, window_id, $
     if the_error ne 0 then begin
         catch, /cancel
         wset, currentWin
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -392,7 +392,7 @@ _EXTRA=extraKeywords
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -453,7 +453,7 @@ pro Mr_Window::Event_Handler, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -605,7 +605,7 @@ _REF_EXTRA=extra
     if the_error ne 0 then begin
         catch, /cancel
         if currentWin ne -1 then wset, currentWin
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -710,7 +710,7 @@ _EXTRA=extraKeywords
     catch, the_error
         if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -764,7 +764,7 @@ DISABLE=disable
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -794,7 +794,7 @@ pro Mr_Window::Save, filename
     if the_error ne 0 then begin
         catch, /cancel
         self._refresh = thisRefresh
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -831,7 +831,7 @@ pro Mr_Window::SetCurrent
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -978,7 +978,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1064,7 +1064,7 @@ pro Mr_Window::TLB_Resize, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1115,7 +1115,7 @@ pro Mr_Window::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1360,7 +1360,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
 

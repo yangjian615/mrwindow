@@ -52,11 +52,11 @@
 ;
 ; :Author:
 ;       Matthew Argall::
-;		University of New Hampshire
-;		Morse Hall, Room 113
+;       University of New Hampshire
+;       Morse Hall, Room 348
 ;       8 College Rd.
-;		Durham, NH, 03824
-;       matthew.argall@wildcats.unh.edu
+;       Durham, NH, 03824
+;       matthew.argall@unh.edu
 ;
 ; :History:
 ;   Modification History::
@@ -68,59 +68,68 @@ function GetMrWindows, winID, $
 CURRENT=current, $
 NAMES=names, $
 PRINT=print
-    compile_opt strictarr
-    on_error, 2
+	compile_opt strictarr
+	on_error, 2
 
-    ;Make sure the array of windows exists
-    defsysv, '!MR_WINDOWS', EXISTS=exists
-    if exists eq 0 then return, obj_new()
-    
-    ;How many windows are there?
-    nWin = !MR_WINDOWS -> Count()
-    if nWin eq 0 then begin
-        if keyword_set(print) then print, 'No windows are currently open.'
-        return, obj_new()
-    endif
+	;Make sure the array of windows exists
+	defsysv, '!MR_WINDOWS', EXISTS=exists
+	if exists eq 0 then return, obj_new()
 
-;-----------------------------------------------------
-;Print \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-;-----------------------------------------------------
-    if keyword_set(print) then begin
-        !MR_WINDOWS -> PrintInfo
-        result = obj_new()
+	;How many windows are there?
+	nWin = !MR_WINDOWS -> Count()
+	if nWin eq 0 then begin
+		if keyword_set(print) then print, 'No windows are currently open.'
+		return, obj_new()
+	endif
 
 ;-----------------------------------------------------
-;Current Window \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+; Print \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
-    endif else if keyword_set(current) then begin
-        result = !MR_WINDOWS -> Get()
-        name   = result -> GetName()
+	if keyword_set(print) then begin
+		!MR_WINDOWS -> PrintInfo
+		result = obj_new()
 
 ;-----------------------------------------------------
-;By Name \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+; Current Window \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
-    endif else if MrIsA(winID, 'STRING') then begin
-        result = !MR_WINDOWS -> FindByName(winID, COUNT=count)
-        if count gt 1 then result = result[0]
+	endif else if keyword_set(current) then begin
+		result = !MR_WINDOWS -> Get()
+		names  = result -> GetName()
 
 ;-----------------------------------------------------
-;By Index \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+; By Name \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
-    endif else if MrIsA(winID, /INTEGER) then begin
-        result = !MR_WINDOWS -> Get(POSITION=winID, COUNT=count)
-        if count gt 1 then result = result[0]
-        
-;-----------------------------------------------------
-;All Windows \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-;-----------------------------------------------------
-    endif else begin
-        result = !MR_WINDOWS -> Get(/ALL)
-        if arg_present(names) then begin
-            winID = strarr(nWin)
-            for i = 0, nWin - 1 do winID[i] = result[i] -> GetName()
-        endif
-    endelse
+	endif else if MrIsA(winID, 'STRING') then begin
+		result = !MR_WINDOWS -> FindByName(winID, COUNT=count)
+		if count gt 1 then result = result[0]
+		names = winID
 
-    return, result
+;-----------------------------------------------------
+; By Index \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
+	endif else if MrIsA(winID, /INTEGER) then begin
+		;Obtain the windows
+		result = !MR_WINDOWS -> Get(POSITION=winID, COUNT=count)
+		if count gt 1 then result = result[0]
+	
+		;Get the window names
+		names = strarr(count)
+		for i = 0, count-1 do names[i] = result[i] -> GetName()
+	
+;-----------------------------------------------------
+; All Windows \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+;-----------------------------------------------------
+	endif else begin
+		;Retrieve all windows
+		result = !MR_WINDOWS -> Get(/ALL, COUNT=count)
+		
+		;Get their names
+		if arg_present(names) then begin
+			names = strarr(count)
+			for i = 0, count - 1 do names[i] = result[i] -> GetName()
+		endif
+	endelse
+
+	return, result
 end
 

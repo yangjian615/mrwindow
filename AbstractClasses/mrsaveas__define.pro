@@ -139,7 +139,7 @@ PRO MrSaveAs_SaveAs_Events, event
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -215,7 +215,7 @@ VALUE=value
 	catch, theError
 	IF theError NE 0 THEN BEGIN
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -518,7 +518,7 @@ WINDOW=theWindow
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -1067,7 +1067,7 @@ WIDTH=width
 		Catch, /CANCEL
 
 		; Issue an error message, unless messages are turned off.
-		IF ~Keyword_Set(nomessage) THEN void = cgErrorMsg()
+		IF ~Keyword_Set(nomessage) THEN MrPrintF, 'LogErr'
 
 		; Clean up.
 		IF self._ps_restore_device NE "" THEN Set_Plot, self._ps_restore_device
@@ -1551,7 +1551,7 @@ RESIZE=resize
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 
 		; Close the PostScript file.
 		self -> PS_Close, /NOFIX, /NOMESSAGE
@@ -1653,7 +1653,7 @@ PRO MrSaveAs::SaveAsEvents, event
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
 		if n_elements(thisIM) gt 0 then self.im_raster = thisIM
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -1707,7 +1707,7 @@ DIRECTORY=directory
 	catch, theError
 	if theError ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -1965,7 +1965,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -2152,7 +2152,7 @@ _REF_EXTRA=extra
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return, 0
 	endif
  

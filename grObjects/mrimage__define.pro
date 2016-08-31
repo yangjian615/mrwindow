@@ -54,10 +54,10 @@
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
-;       Morse Hall, Room 113
+;       Morse Hall, Room 348
 ;       8 College Rd.
 ;       Durham, NH, 03824
-;       matthew.argall@wildcats.unh.edu
+;       matthew.argall@unh.edu
 ;
 ; :History:
 ;   Modification History::
@@ -71,6 +71,8 @@
 ;                           Missing color is loaded at time of draw. - MRA
 ;       2015/02/23  -   Determine polar ranges better. Do not draw axes if OVERPLOT is set. - MRA
 ;       2015/07/06  -   Check RANGE keyword when /LOG is set to prevent infinite range. - MRA
+;       2016/08/29  -   Set PAINT if X or Y are 2D. - MRA
+;       2016/08/30  -   Set SCALE if the data range would result in a single color. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -84,7 +86,7 @@ function MrImage::_OverloadPrint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, "''"
     endif
     
@@ -180,7 +182,7 @@ function MrImage::_OverloadImpliedPrint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, "''"
     endif
     
@@ -219,7 +221,7 @@ YMIN=ymin
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -323,7 +325,7 @@ NOERASE=noerase
 		if n_elements(p_current)   gt 0 then !P = p_current
 		if n_elements(x_current)   gt 0 then !X = x_current
 		if n_elements(y_current)   gt 0 then !Y = y_current
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -357,7 +359,7 @@ NOERASE=noerase
 	tvlct, rgb_table
 
 	;Load the missing color
-	if n_elements(*self.missing_value) gt 0 $
+	if self.nan || n_elements(*self.missing_value) gt 0 $
 		then tvlct, transpose(self.missing_color), self.missing_index
 
 	;Now display the image
@@ -1090,7 +1092,7 @@ pro MrImage::GetData, image, x, y, x0, y0, x1, y1
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1244,7 +1246,7 @@ _REF_EXTRA = extra
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -1282,7 +1284,11 @@ _REF_EXTRA = extra
 	if arg_present(BOTTOM)         then bottom        =  self.bottom
 	if arg_present(RANGE)          then range         =  self.range
 	if arg_present(MISSING_COLOR)  then missing_color =  self.missing_color
+<<<<<<< HEAD
 	if arg_present(MISSING_INDEX)  then missing_index =  self.missing_index
+=======
+	if arg_present(missing_index)  then missing_index =  self.missing_index
+>>>>>>> 2c7880eca901bbf0d2a7366e42ec4f80c792b849
 	if arg_present(rgb_table)      then self.palette ->  GetProperty, RGB_TABLE=rgb_table
 	if arg_present(NAN)            then nan           =  self.nan
 	if arg_present(SCALE)          then scale         =  self.scale
@@ -1312,7 +1318,7 @@ pro MrImage::PrepImage
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1431,7 +1437,7 @@ YLOG=ylog
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
  
@@ -1452,7 +1458,7 @@ YLOG=ylog
     ;   - SetData will set PAINT=1 if more than just X and Y were given. Leave as is.
     ;   - If only X and Y were given, we need to decide if the image needs to be pained.
     if n_params() eq 2 then begin
-        if xlog + ylog + center + self.polar gt 0 $
+        if (xlog + ylog + center + self.polar gt 0) || size(x, /N_DIMENSIONS) eq 2 || size(y, /N_DIMENSIONS) eq 2 $
             then self.paint = 1 $
             else self.paint = 0
     endif
@@ -1526,7 +1532,7 @@ TV=tv
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1590,6 +1596,7 @@ TV=tv
             self -> ClearData, /ALL
             
             ;Store the data
+            ;   - X and/or Y may define the location of each pixel.
             *self.image = theImage
             *self.indep = x
             *self.dep   = y
@@ -1749,7 +1756,7 @@ TV=tv
 	endelse
 
 	;SCALE
-	if imMin lt 0 || imMax gt 255 then scale = 1B
+	if imMin lt 0 || imMax gt 255 || abs(imMax - imMin) lt 1 then scale = 1B
 
 	;Set Properties
 	;   - NAN and SCALE will cause ::PrepImage to be called.
@@ -1852,7 +1859,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1865,6 +1872,7 @@ _REF_EXTRA = extra
 	;mraImage.pro Properties
 	if n_elements(axes)           gt 0 then  self.axes           = keyword_set(axes)
 	if n_elements(data_pos)       gt 0 then *self.data_pos       = data_pos
+	if n_elements(missing_color)  gt 0 then  self.missing_color  = cgColor(missing_color, /TRIPLE)
 	if n_elements(noclip)         ne 0 then *self.noclip         = keyword_set(noclip)
 	if n_elements(pol_axstyle)    gt 0 then  self.pol_axstyle    = pol_axstyle
 	if n_elements(pol_thick)      gt 0 then  self.pol_thick      = pol_thick
@@ -1872,8 +1880,17 @@ _REF_EXTRA = extra
 	if n_elements(pol_rlinestyle) gt 0 then  self.pol_rlinestyle = pol_rlinestyle
 	if n_elements(pol_tcolor)     gt 0 then  self.pol_tcolor     = cgColor(pol_tcolor, /TRIPLE)
 	if n_elements(pol_tlinestyle) gt 0 then  self.pol_tlinestyle = pol_tlinestyle
+	
+	;MISSING INDEX
+	if n_elements(missing_index) gt 0 then begin
+		self.palette -> GetProperty, NCOLORS=ncolors
+		if missing_index ge ncolors $
+			then message, 'MISSING_INDEX does not fit in the color table.', /INFORMATIONAL $
+			else self.missing_index = missing_index
+	endif
 
 	;PALETTE
+<<<<<<< HEAD
 	nMissColor = n_elements(missing_color)
 	nMissIndex = n_elements(missing_index)
 	nRGBTable  = n_elements(rgb_table)
@@ -1882,6 +1899,10 @@ _REF_EXTRA = extra
 		if nMissColor gt 0 then self.missing_color = cgColor(missing_color)
 		if nMissIndex gt 0 then self.missing_index = missing_index
 	
+=======
+	;   - Should set MISSING_VALUE, MISSING_COLOR and MISSING_INDEX first.
+	if n_elements(rgb_table) gt 0 then begin
+>>>>>>> 2c7880eca901bbf0d2a7366e42ec4f80c792b849
 		;Get the number of colors
 		self.palette -> GetProperty, NCOLORS=n_old
 		
@@ -1895,14 +1916,6 @@ _REF_EXTRA = extra
 		;Add a missing color
 		if n_elements(*self.missing_value) gt 0 $
 			then self.palette -> SetRGB, self.missing_index, self.missing_color
-	endif
-	
-	;MISSING INDEX
-	if n_elements(missing_index) gt 0 then begin
-		self.palette -> GetProperty, NCOLORS=ncolors
-		if missing_index ge ncolors $
-			then message, 'MISSING_INDEX does not fit in the color table.', /INFORMATIONAL $
-			else self.missing_index = missing_index
 	endif
 
 	;RANGE
@@ -1984,7 +1997,7 @@ pro MrImage::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -2164,7 +2177,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
 
@@ -2235,8 +2248,8 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ; Color Palette //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    
-    ;Colors
+
+	;Colors
 	;   - Foreground, Background, and Missing Index.
 	;   - Default to putting the missing value at the top of the color table.
 	;   - Use as much of the color table as possible.
@@ -2248,10 +2261,10 @@ _REF_EXTRA = extra
 	if n_elements(pol_rcolor)    eq 0 then pol_rcolor    = color
 	if n_elements(pol_tcolor)    eq 0 then pol_tcolor    = color
 	if n_elements(background)    eq 0 then background    = 'white'
-	if n_elements(missing_color) eq 0 then missing_color = ''
+	if n_elements(missing_color) eq 0 then missing_color = background
 	if n_elements(missing_index) eq 0 then missing_index = !d.table_size - 1
 	if n_elements(top)           eq 0 then top           = !d.table_size - 1
-	if n_elements(rgb_table)     eq 0 then rgb_table     = 13
+	if n_elements(rgb_table)     eq 0 then rgb_table     = 25
 
 	;Set the rgb_table
 	;   - Do not set the SCALE property before now.
@@ -2307,6 +2320,8 @@ _REF_EXTRA = extra
                          IDISPLAY       = iDisplay, $
                          MAX_VALUE      = max_value, $
                          MIN_VALUE      = min_value, $
+                         MISSING_COLOR  = missing_color, $
+                         MISSING_INDEX  = missing_index, $
                          NAN            = nan, $
                          NOCLIP         = noclip, $
                          NORMAL         = normal, $

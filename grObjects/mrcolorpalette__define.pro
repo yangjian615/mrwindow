@@ -69,7 +69,7 @@ ROW=row
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -357,7 +357,7 @@ ROW=row
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -601,7 +601,7 @@ SILENT=silent
 	if theerror ne 0 then begin
 		catch, /cancel
 		if n_elements(rr) gt 0 then tvlct, rr, gg, bb
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return, 0
 	endif
 

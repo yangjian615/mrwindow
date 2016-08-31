@@ -77,7 +77,7 @@ NOERASE=noerase
         IF N_Elements(y_orig) GT 0 THEN !Y = y_orig
         IF N_Elements(z_orig) GT 0 THEN !Z = z_orig
         
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -124,7 +124,7 @@ PRO weOverplot::doOverplot
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -215,7 +215,7 @@ _REF_EXTRA = extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF      
     
@@ -315,7 +315,7 @@ _REF_EXTRA = extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF      
     
@@ -369,7 +369,7 @@ PRO weOverplot::Cleanup
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -465,7 +465,7 @@ _REF_EXTRA = extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
     

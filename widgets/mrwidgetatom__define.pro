@@ -94,7 +94,7 @@ STATUS=status
     if the_error ne 0 then begin
         catch, /cancel
         status = -1
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -162,7 +162,7 @@ STATUS=status
     if the_error ne 0 then begin
         catch, /cancel
         status = -1
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     
@@ -230,7 +230,7 @@ function MrWidgetAtom_Func_Get_Value, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     
@@ -268,7 +268,7 @@ pro MrWidgetAtom_Kill_Notify, id
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -303,7 +303,7 @@ pro MrWidgetAtom_Notify_Realize, id
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -335,7 +335,7 @@ pro MrWidgetAtom_Pro_Set_Value, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -361,7 +361,7 @@ pro MrWidgetAtom::Destroy
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -424,7 +424,7 @@ function MrWidgetAtom::Func_Get_Value, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     
@@ -457,7 +457,7 @@ function MrWidgetAtom::Find_By_UName, uname
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     
@@ -653,7 +653,7 @@ pro MrWidgetAtom::GetProperty, $
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -746,7 +746,7 @@ pro MrWidgetAtom::Kill_Notify, id
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -809,7 +809,7 @@ pro MrWidgetAtom::Realize
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -979,7 +979,7 @@ pro MrWidgetAtom::SetProperty, $
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1150,7 +1150,7 @@ pro MrWidgetAtom::Cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1258,7 +1258,7 @@ function MrWidgetAtom::init, parent, $
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     

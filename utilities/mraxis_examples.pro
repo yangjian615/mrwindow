@@ -65,7 +65,7 @@ function MrAxis_Examples, example
     if the_error ne 0 then begin
         catch, /CANCEL
         if obj_valid(gWin) then gWin -> Close
-        void = cgErrorMSG()
+        MrPrintF, 'LogErr'
         return, obj_new()
     endif
     

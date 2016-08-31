@@ -66,7 +66,7 @@ function MrText_Examples, example
 		catch, /CANCEL
 		if obj_valid(win) then obj_destroy, win
 		if obj_valid(p1)  then p1 -> Close
-		void = cgErrorMSG()
+		MrPrintF, 'LogErr'
 		return, obj_new()
 	endif
 
