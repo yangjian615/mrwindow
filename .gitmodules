@@ -1,7 +1,0 @@
-[submodule "MrIDLlib"]
-	path = MrIDLlib
-	url = https://github.com/argallmr/MrIDLlib.git
-[submodule "coyote"]
-	path = coyote
-	url = https://github.com/argallmr/coyote.git
-	branch = myVersion
