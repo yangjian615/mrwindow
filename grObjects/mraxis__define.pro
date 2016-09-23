@@ -1563,8 +1563,6 @@ ZMARGIN=zmargin, $
 ZVALUE=zvalue, $
 _REF_EXTRA=extra
 
-
-
 ;ANTIALIAS
 ;CLIP
 ;COORD_TRANSFORM

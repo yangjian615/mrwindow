@@ -606,8 +606,8 @@ pro MrPlot::SetData, x, y
     *self.dep   = temporary(dep)
 
     ;Set ranges
-    *self.xrange = [min(*self.indep, MAX=xmax), xmax]
-    *self.yrange = [min(*self.dep,   MAX=ymax), ymax]
+    *self.xrange = [min(*self.indep, MAX=xmax, /NAN), xmax]
+    *self.yrange = [min(*self.dep,   MAX=ymax, /NAN), ymax]
 
     ;Refresh the graphics window
     self.window -> Draw
