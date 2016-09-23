@@ -672,6 +672,52 @@ end
 
 
 ;+
+;   The purpose of this method is to find windows based on the name they were given.
+;
+; :Params:
+;       NAME:           in, required, type=string
+;                       Name of a MrWindow graphics window to be retrieved
+;
+; :Keywords:
+;       COUNT:          out, optional, type=integer
+;                       Number of windows found with name `NAME`.
+;
+; :Returns:
+;       RESULT:         All windows with name `NAME`. If `COUNT`=0, an invalid object
+;                           reference is returned.
+;-
+function MrPlotManager::FindByName, name, $
+COUNT=count
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		MrPrintF, 'LogErr'
+		Count = 0
+		return, obj_new()
+	endif
+
+	;Get all of the objects in the container
+	allWins = self -> Get(/ALL, COUNT=count)
+	if count eq 0 then return, obj_new()
+
+	;Get the names of every window
+	allNames = strarr(count)
+	for i = 0, count - 1 do allNames[i] = allWins[i] -> GetName()
+
+	;Find a match
+	iMatch = where(allNames eq name, count)
+	if count eq 0 then return, obj_new()
+	if count eq 1 then iMatch = iMatch[0]
+
+	;Return the matching objects
+	return, allWins[iMatch]
+end
+
+
+;+
 ;   Find a graphic by its [col,row] location.
 ;
 ; :Params:
