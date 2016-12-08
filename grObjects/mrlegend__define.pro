@@ -1220,7 +1220,8 @@ NOERASE=noerase
 	cgSetColorState, 1, Current=incomingColorState
 
 	;Convert properties
-	color     = cgColor(*self.color)
+	if ~( MrIsA(*self.color, 'STRING') && *self.color eq '' ) $
+		then color = cgColor(*self.color)
 	linestyle = MrLinestyle(*self.linestyle)
 
 ;-----------------------------------------------------
@@ -1229,7 +1230,7 @@ NOERASE=noerase
 
 	;Fill the background?
 	;   - cgColor does not like when FILL_COLOR is the empty string.
-	IF ~(MrIsA(*self.fill_color, 'STRING') && *self.fill_color EQ '') THEN BEGIN
+	IF ~( MrIsA(*self.fill_color, 'STRING') && *self.fill_color EQ '' ) THEN BEGIN
 		fill_color = cgColor(*self.fill_color)
 		cgColorFill, POSITION=self.bx_pos, COLOR=fill_color
 	ENDIF
@@ -1320,6 +1321,8 @@ END
 ;                           returned.
 ;
 ; :Keywords:
+;       COUNT:          out, optional, type=integer
+;                       Number of legend items returned.
 ;       LABEL:          out, optional, type=string
 ;                       Label of the legend item.
 ;       POSITION:       out, optional, type=integer
@@ -1327,17 +1330,18 @@ END
 ;-
 FUNCTION MrLegend::GetItem, item, $
 POSITION=position, $
-LABEL=label
+LABEL=label, $
+COUNT=count
 	Compile_Opt idl2
 	On_Error, 2
 
 	;All items
 	IF N_Elements(item) EQ 0 THEN BEGIN
-		the_item = self.items -> Get(/ALL)
+		the_item = self.items -> Get(/ALL, COUNT=count)
 		
 	;Position in container
 	ENDIF ELSE IF MrIsA(item, /NUMBER) THEN BEGIN
-		the_item = self.items -> Get(POSITION=item)
+		the_item = self.items -> Get(POSITION=item, COUNT=count)
 	
 	;Label
 	ENDIF ELSE IF Size(item, /TNAME) EQ 'STRING' THEN BEGIN
@@ -2217,8 +2221,8 @@ _REF_EXTRA=extra
 	nLabels = N_Elements(label)
 	FOR i = 0, nLegends - 1 DO BEGIN
 		IF nLabels GT 0 THEN temp_label = label[i]
-		IF i GE nTargets $
-			THEN void        = Temporary(temp_target) $
+		IF nTargets EQ 1 $
+			THEN temp_target = target[0] $
 			ELSE temp_target = target[i]
 	
 		;Add a legend item for each label given.

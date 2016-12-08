@@ -684,6 +684,10 @@ _REF_EXTRA = extra
         return
     endif
     
+    ;Layout
+    if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
+    if n_elements(charsize) gt 0 then self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
+    
     ;MrPlot Properties
     if n_elements(DIMENSION)   ne 0 then  self.dimension = dimension
     if n_elements(LABEL)       ne 0 then  self.label     = label
@@ -702,8 +706,49 @@ _REF_EXTRA = extra
     if n_elements(xstyle)    ne 0 then *self.xstyle    = ~(xstyle and 1) + xstyle
     if n_elements(ystyle)    ne 0 then *self.ystyle    = ~(ystyle and 1) + ystyle
     
-    if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
-    if n_elements(charsize) gt 0 then self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
+    ;XLOG: Prevent infinite data range
+    if n_elements(xlog) gt 0 then begin
+        tf_xlog = keyword_set(xlog)
+        
+        ;Proceed only setting XLOG and only if property changes
+        if tf_xlog && tf_xlog ne self.xlog then begin
+            ;Find data <= 0
+            iGT0 = where(*self.indep gt 0, nGT0, NCOMPLEMENT=nLE0)
+            if nGT0 eq 0 then begin
+                MrPrintF, 'LogWarn', 'XLOG: No data values > 0.'
+            
+            ;Reset xrange if it is <= 0
+            endif else begin
+                if (*self.xrange)[0] le 0 || (*self.xrange)[1] le 0 $
+                    then *self.xrange = [min( (*self.indep)[iGT0], MAX=xmax ), xmax]
+            endelse
+        endif
+        
+        ;Set property
+        self.xlog = tf_xlog
+    endif
+    
+    ;YLOG: Prevent infinite data range
+    if n_elements(ylog) gt 0 then begin
+        tf_ylog = keyword_set(ylog)
+        
+        ;Proceed only setting YLOG and only if property changes
+        if keyword_set(ylog) ne self.ylog then begin
+            ;Find data <= 0
+            iGT0 = where(*self.dep gt 0, nGT0, NCOMPLEMENT=nLE0)
+            if nGT0 eq 0 then begin
+                MrPrintF, 'LogWarn', 'YLOG: No data values > 0.'
+            
+            ;Reset yrange if it is <= 0
+            endif else begin
+                if (*self.yrange)[0] le 0 || (*self.yrange)[1] le 0 $
+                    then *self.yrange = [min( (*self.dep)[iGT0], MAX=ymax ), ymax]
+            endelse
+        endif
+        
+        ;Set property
+        self.ylog = tf_ylog
+    endif
 
 ;---------------------------------------------------------------------
 ;Superclass Properties ///////////////////////////////////////////////
@@ -862,6 +907,8 @@ _REF_EXTRA = extra
     self.ynozero = keyword_set(ynozero)
     if n_elements(dimension) eq 0 then dimension = 0
     if n_elements(nSum)      eq 0 then nSum      = 0
+    if n_elements(xstyle)    eq 0 then xstyle    = 1
+    if n_elements(ystyle)    eq 0 then ystyle    = 1
 
     ;Allocate Heap
     self.indep     = ptr_new(/ALLOCATE_HEAP)
@@ -914,19 +961,9 @@ _REF_EXTRA = extra
                          YNOZERO   = ynozero, $
                          YRANGE    = yrange
 
-    ;Make sure the x- and y-style keywords have the 2^0 bit set to force
-    ;exact axis ranges.    
-    if n_elements(*self.xstyle) eq 0 $
-        then *self.xstyle = 1 $
-        else *self.xstyle += ~(*self.xstyle and 1)
-        
-    if n_elements(*self.ystyle) eq 0 $
-        then *self.ystyle = 1 $
-        else *self.ystyle += ~(*self.ystyle and 1)
-
     ;Set the initial ranges
-    self.init_xrange = [min(*self.indep, MAX=xmax), xmax]
-    self.init_yrange = [min(*self.dep,   MAX=ymax), ymax]
+    self.init_xrange = *self.xrange
+    self.init_yrange = *self.yrange
 
     ;Refresh the graphics?
     if refresh then self -> Refresh
