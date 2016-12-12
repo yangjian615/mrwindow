@@ -68,7 +68,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -100,7 +100,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -183,7 +183,7 @@ YSIZE=ysize
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     

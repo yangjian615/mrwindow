@@ -71,7 +71,7 @@ function MrGrAtom::_OverloadPrint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, "''"
     endif
     
@@ -119,7 +119,7 @@ COUNT=count
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, obj_new()
     endif
     
@@ -185,7 +185,7 @@ WINDOW_TITLE=window_title
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, obj_new()
     endif
 
@@ -222,7 +222,7 @@ pro MrGrAtom::_SetWindow, theWindow
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -281,7 +281,7 @@ WINDOW=window
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -333,7 +333,7 @@ POLYY=polyY
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
 
@@ -402,7 +402,7 @@ SEND_TO_BACK=send_to_back
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -446,7 +446,7 @@ DISABLE=disable
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -472,7 +472,7 @@ pro MrGrAtom::Save, filename
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -514,7 +514,7 @@ RESET=reset
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -554,7 +554,7 @@ UNSELECT=unselect
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
 
@@ -583,7 +583,7 @@ NAME=name
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -613,7 +613,7 @@ DESTROY=destroy
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -685,7 +685,7 @@ WINDOW_TITLE=window_title
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     

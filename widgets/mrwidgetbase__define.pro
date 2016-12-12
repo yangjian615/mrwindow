@@ -78,7 +78,7 @@ STATUS=status
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -137,7 +137,7 @@ STATUS=status
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     
@@ -234,7 +234,7 @@ YOFFSET=yoffset
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -304,7 +304,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -362,7 +362,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -402,7 +402,7 @@ pro MrWidgetBase::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -503,7 +503,7 @@ function MrWidgetBase::init, parent, $
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     

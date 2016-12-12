@@ -119,7 +119,7 @@ NOERASE=noerase
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -181,7 +181,7 @@ PATH_XY=path_xy
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -792,7 +792,7 @@ pro MrContour::GetData, z, x, y
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -844,7 +844,7 @@ PATH_FILENAME=path_filename
     if the_error ne 0 then begin
         catch, /cancel
         if windowavailable(tempPix) then wdelete, tempPix
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1065,7 +1065,7 @@ _REF_EXTRA=extra
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -1131,7 +1131,7 @@ pro MrContour::PrepContour
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -1240,7 +1240,7 @@ RESOLUTION=resolution
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -1592,7 +1592,7 @@ _REF_EXTRA=extra
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -1674,11 +1674,11 @@ _REF_EXTRA=extra
 		
 		;Choose the contour levels properly
 		endif else begin
-			levels = cgConLevels(*self.data, NLEVELS=nlevels)
+			levels = cgConLevels(*self.c_data, NLEVELS=nlevels)
 		endelse
 		
 		self.nLevels = nlevels
-		*self.levels  = levels
+		*self.levels = levels
 	endif
 	
 ;---------------------------------------------------------------------
@@ -1755,7 +1755,7 @@ pro MrContour::cleanup
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -2031,7 +2031,7 @@ _REF_EXTRA=extra
 	if theerror ne 0 then begin
 		catch, /cancel
 		if n_elements(r) gt 0 then tvlct, r, g, b
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return, 0
 	endif
 

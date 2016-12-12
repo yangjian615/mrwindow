@@ -95,7 +95,7 @@ FUNCTION weOverPlot, x, y, $
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         IF N_Elements(currentState) NE 0 THEN SetDecomposedState, currentState
         RETURN, 0
     ENDIF

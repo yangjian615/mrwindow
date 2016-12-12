@@ -134,7 +134,7 @@ function weLegendItem::calcLegendLocation
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, -1
     ENDIF
     
@@ -188,7 +188,7 @@ YOFFSET = yoffset
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, [0,0]
     ENDIF
     
@@ -218,7 +218,7 @@ NOERASE=noerase
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         IF N_Elements(thisFont) NE 0 THEN !P.Font = thisFont
         RETURN
     ENDIF
@@ -296,7 +296,7 @@ FUNCTION weLegendItem::GetPosition
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, [0,0]
     ENDIF
     
@@ -390,7 +390,7 @@ PRO weLegendItem::GetProperty, $
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
 
@@ -453,7 +453,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, [0,0]
     ENDIF
     
@@ -541,7 +541,7 @@ PRO weLegendItem::SetProperty, $
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
 
@@ -669,7 +669,7 @@ FUNCTION weLegendItem::INIT, $
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
 

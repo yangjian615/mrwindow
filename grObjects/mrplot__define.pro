@@ -115,7 +115,7 @@ function MrPlot::_OverloadPrint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, "''"
     endif
     
@@ -171,7 +171,7 @@ function MrPlot::_OverloadImpliedPrint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, "''"
     endif
     
@@ -192,7 +192,7 @@ NOERASE = noerase
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -231,7 +231,7 @@ NOERASE=noerase
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -246,6 +246,15 @@ NOERASE=noerase
     endif else begin
         charthick = *self.charthick
         thick     = *self.thick
+    endelse
+    
+    linestyle = n_elements(*self.linestyle) eq 0 ? 0 : MrLineStyle(*self.linestyle)
+    psym      = n_elements(*self.psym)      eq 0 ? 0 : cgSymCat(*self.psym)
+    if linestyle eq 6 then begin
+        void = temporary(linestyle)
+        psym = abs(psym)
+    endif else begin
+        psym = -abs(psym)
     endelse
 
     ;Draw the plot.
@@ -280,11 +289,11 @@ NOERASE=noerase
              DEVICE        =  self.device, $
              NORMAL        =  self.normal, $
              FONT          = *self.font, $
-             LINESTYLE     = *self.linestyle, $
+             LINESTYLE     =       linestyle, $
              NOCLIP        = *self.noclip, $
              NODATA        = *self.nodata, $
              NOERASE       =       noerase, $
-             PSYM          = *self.psym, $
+             PSYM          =       psym, $
              SUBTITLE      = *self.subtitle, $
              SYMSIZE       = *self.symsize, $
              T3D           = *self.t3d, $
@@ -355,7 +364,7 @@ pro MrPlot::doOverplot
     catch, theerror
     if theerror ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -374,6 +383,15 @@ pro MrPlot::doOverplot
         charthick = *self.charthick
         thick     = *self.thick
     endelse
+    
+    linestyle = n_elements(*self.linestyle) eq 0 ? 0 : MrLineStyle(*self.linestyle)
+    psym      = n_elements(*self.psym)      eq 0 ? 0 : cgSymCat(*self.psym)
+    if linestyle eq 6 then begin
+        void = temporary(linestyle)
+        psym = abs(psym)
+    endif else begin
+        psym = -abs(psym)
+    endelse
 
     ;Get the dimensions of the independent variable.
     MraOPlot, *self.indep, *self.dep, $
@@ -382,8 +400,8 @@ pro MrPlot::doOverplot
               CHARSIZE  =       charsize, $
               COLOR     = *self.color, $
               DIMENSION =  self.dimension, $
-              LINESTYLE = *self.linestyle, $
-              PSYM      = *self.psym, $
+              LINESTYLE =       linestyle, $
+              PSYM      =       psym, $
               SYMCOLOR  = *self.symcolor, $
               SYMSIZE   = *self.symsize, $
               THICK     =       thick, $
@@ -420,7 +438,7 @@ pro MrPlot::GetData, x, y
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -485,7 +503,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -530,7 +548,7 @@ pro MrPlot::SetData, x, y
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -588,8 +606,8 @@ pro MrPlot::SetData, x, y
     *self.dep   = temporary(dep)
 
     ;Set ranges
-    *self.xrange = [min(*self.indep, MAX=xmax), xmax]
-    *self.yrange = [min(*self.dep,   MAX=ymax), ymax]
+    *self.xrange = [min(*self.indep, MAX=xmax, /NAN), xmax]
+    *self.yrange = [min(*self.dep,   MAX=ymax, /NAN), ymax]
 
     ;Refresh the graphics window
     self.window -> Draw
@@ -662,9 +680,13 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
+    
+    ;Layout
+    if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
+    if n_elements(charsize) gt 0 then self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
     
     ;MrPlot Properties
     if n_elements(DIMENSION)   ne 0 then  self.dimension = dimension
@@ -684,8 +706,49 @@ _REF_EXTRA = extra
     if n_elements(xstyle)    ne 0 then *self.xstyle    = ~(xstyle and 1) + xstyle
     if n_elements(ystyle)    ne 0 then *self.ystyle    = ~(ystyle and 1) + ystyle
     
-    if n_elements(position) gt 0 then self -> SetLayout, POSITION=position
-    if n_elements(charsize) gt 0 then self -> SetLayout, CHARSIZE=charsize, UPDATE_LAYOUT=0
+    ;XLOG: Prevent infinite data range
+    if n_elements(xlog) gt 0 then begin
+        tf_xlog = keyword_set(xlog)
+        
+        ;Proceed only setting XLOG and only if property changes
+        if tf_xlog && tf_xlog ne self.xlog then begin
+            ;Find data <= 0
+            iGT0 = where(*self.indep gt 0, nGT0, NCOMPLEMENT=nLE0)
+            if nGT0 eq 0 then begin
+                MrPrintF, 'LogWarn', 'XLOG: No data values > 0.'
+            
+            ;Reset xrange if it is <= 0
+            endif else begin
+                if (*self.xrange)[0] le 0 || (*self.xrange)[1] le 0 $
+                    then *self.xrange = [min( (*self.indep)[iGT0], MAX=xmax ), xmax]
+            endelse
+        endif
+        
+        ;Set property
+        self.xlog = tf_xlog
+    endif
+    
+    ;YLOG: Prevent infinite data range
+    if n_elements(ylog) gt 0 then begin
+        tf_ylog = keyword_set(ylog)
+        
+        ;Proceed only setting YLOG and only if property changes
+        if keyword_set(ylog) ne self.ylog then begin
+            ;Find data <= 0
+            iGT0 = where(*self.dep gt 0, nGT0, NCOMPLEMENT=nLE0)
+            if nGT0 eq 0 then begin
+                MrPrintF, 'LogWarn', 'YLOG: No data values > 0.'
+            
+            ;Reset yrange if it is <= 0
+            endif else begin
+                if (*self.yrange)[0] le 0 || (*self.yrange)[1] le 0 $
+                    then *self.yrange = [min( (*self.dep)[iGT0], MAX=ymax ), ymax]
+            endelse
+        endif
+        
+        ;Set property
+        self.ylog = tf_ylog
+    endif
 
 ;---------------------------------------------------------------------
 ;Superclass Properties ///////////////////////////////////////////////
@@ -707,7 +770,7 @@ pro MrPlot::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -821,7 +884,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
 
@@ -844,6 +907,8 @@ _REF_EXTRA = extra
     self.ynozero = keyword_set(ynozero)
     if n_elements(dimension) eq 0 then dimension = 0
     if n_elements(nSum)      eq 0 then nSum      = 0
+    if n_elements(xstyle)    eq 0 then xstyle    = 1
+    if n_elements(ystyle)    eq 0 then ystyle    = 1
 
     ;Allocate Heap
     self.indep     = ptr_new(/ALLOCATE_HEAP)
@@ -881,34 +946,24 @@ _REF_EXTRA = extra
     SetDefaultValue, color, d_color
 
     ;Set the object properties
-    self -> SetProperty, CHARSIZE = charsize, $
-                         COLOR = color, $
+    self -> SetProperty, CHARSIZE  = charsize, $
+                         COLOR     = color, $
                          DIMENSION = dimension, $
-                         LABEL = label, $
+                         LABEL     = label, $
                          MAX_VALUE = max_value, $
                          MIN_VALUE = min_value, $
-                         NSUM = nsum, $
-                         POLAR = polar, $
-                         SYMCOLOR = symcolor, $
-                         XLOG = xlog, $
-                         XRANGE = xrange, $
-                         YLOG = ylog, $
-                         YNOZERO = ynozero, $
-                         YRANGE = yrange
-
-    ;Make sure the x- and y-style keywords have the 2^0 bit set to force
-    ;exact axis ranges.    
-    if n_elements(*self.xstyle) eq 0 $
-        then *self.xstyle = 1 $
-        else *self.xstyle += ~(*self.xstyle and 1)
-        
-    if n_elements(*self.ystyle) eq 0 $
-        then *self.ystyle = 1 $
-        else *self.ystyle += ~(*self.ystyle and 1)
+                         NSUM      = nsum, $
+                         POLAR     = polar, $
+                         SYMCOLOR  = symcolor, $
+                         XLOG      = xlog, $
+                         XRANGE    = xrange, $
+                         YLOG      = ylog, $
+                         YNOZERO   = ynozero, $
+                         YRANGE    = yrange
 
     ;Set the initial ranges
-    self.init_xrange = [min(*self.indep, MAX=xmax), xmax]
-    self.init_yrange = [min(*self.dep,   MAX=ymax), ymax]
+    self.init_xrange = *self.xrange
+    self.init_yrange = *self.yrange
 
     ;Refresh the graphics?
     if refresh then self -> Refresh

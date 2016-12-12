@@ -134,7 +134,7 @@ REPLACE = replace
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -218,7 +218,7 @@ pro MrAbstractText::Adjust_Text, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -308,7 +308,7 @@ pro MrAbstractText::Create_Text_Menu, parent
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -333,7 +333,7 @@ pro MrAbstractText::Draw
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -378,7 +378,7 @@ pro MrAbstractText::Draw_Events, event
     if the_error ne 0 then begin
         catch, /cancel
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -430,7 +430,7 @@ pro MrAbstractText::Error_Handler
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -460,7 +460,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -505,7 +505,7 @@ OFF = off
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -550,7 +550,7 @@ pro MrAbstractText::Place_Text, event
         catch, /cancel
         if ptr_valid(pText) then ptr_free, pText
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -610,7 +610,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -646,7 +646,7 @@ pro MrAbstractText::Text_Menu_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -750,7 +750,7 @@ SYSTEM = system
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, -1
     endif
     
@@ -817,7 +817,7 @@ pro MrAbstractText::Remove_Text, event
         catch, /cancel
         if ptr_valid(pText) then ptr_free, pText
         self -> Error_Handler
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -855,7 +855,7 @@ PRO MrAbstractText::whichText
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -901,7 +901,7 @@ function MrAbstractText::init
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     

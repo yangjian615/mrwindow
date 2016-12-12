@@ -156,7 +156,7 @@ pro MrPlotManager::AdjustLayout_Property, event
     if the_error ne 0 then begin
         catch, /cancel
         if ptr_valid(new_layout) then ptr_free, new_layout
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -198,7 +198,7 @@ pro MrPlotManager::AdjustLayout_Move, event
     if the_error ne 0 then begin
         catch, /cancel
         if ptr_valid(colrow) then ptr_free, colrow
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -229,7 +229,7 @@ pro MrPlotManager::AdjustLayout_Remove, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -264,7 +264,7 @@ function MrPlotManager::_OverloadBracketsRightSide, isRange, subscript1
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, obj_new()
     endif
 
@@ -340,7 +340,7 @@ QUIET = quiet
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -480,7 +480,7 @@ pro MrPlotManager::ApplyPositions
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
         
@@ -542,7 +542,7 @@ DRAW=draw
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
         
@@ -656,7 +656,7 @@ COUNT=count
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         Count = 0
         return, obj_new()
     endif
@@ -668,6 +668,52 @@ COUNT=count
     object = self -> FindByPIndex(pIndex, COUNT=count)
 
     return, object
+end
+
+
+;+
+;   The purpose of this method is to find windows based on the name they were given.
+;
+; :Params:
+;       NAME:           in, required, type=string
+;                       Name of a MrWindow graphics window to be retrieved
+;
+; :Keywords:
+;       COUNT:          out, optional, type=integer
+;                       Number of windows found with name `NAME`.
+;
+; :Returns:
+;       RESULT:         All windows with name `NAME`. If `COUNT`=0, an invalid object
+;                           reference is returned.
+;-
+function MrPlotManager::FindByName, name, $
+COUNT=count
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		MrPrintF, 'LogErr'
+		Count = 0
+		return, obj_new()
+	endif
+
+	;Get all of the objects in the container
+	allWins = self -> Get(/ALL, COUNT=count)
+	if count eq 0 then return, obj_new()
+
+	;Get the names of every window
+	allNames = strarr(count)
+	for i = 0, count - 1 do allNames[i] = allWins[i] -> GetName()
+
+	;Find a match
+	iMatch = where(allNames eq name, count)
+	if count eq 0 then return, obj_new()
+	if count eq 1 then iMatch = iMatch[0]
+
+	;Return the matching objects
+	return, allWins[iMatch]
 end
 
 
@@ -690,7 +736,7 @@ COUNT=count
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         Count = 0
         return, obj_new()
     endif
@@ -757,7 +803,7 @@ TYPE = type
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -915,7 +961,7 @@ TOFIXED = toFixed
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1051,7 +1097,7 @@ ZTITLE = ztitle
     if the_error ne 0 then begin
         catch, /cancel
         self -> Refresh, DISABLE=~refresh_in
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1277,7 +1323,7 @@ pro MrPlotManager::ShiftPlots, pIndex
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1351,7 +1397,7 @@ DRAW = draw
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
         
@@ -1390,7 +1436,7 @@ function MrPlotManager::WhatAmI, objRef
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, ''
     endif
     
@@ -1430,7 +1476,7 @@ pro MrPlotManager::Config
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1491,7 +1537,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
 

@@ -84,7 +84,7 @@ NVERTICES=nVertices
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, -1
     ENDIF
     
@@ -242,7 +242,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -310,7 +310,7 @@ POSITION=position
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -422,7 +422,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -524,7 +524,7 @@ pro MrCircle::cleanup
     catch, theerror
     if theerror ne 0 then begin
         catch, /CANCEL
-        void = cgerrormsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -697,7 +697,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
     

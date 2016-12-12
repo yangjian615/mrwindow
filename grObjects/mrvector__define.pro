@@ -65,7 +65,7 @@ function MrVector::_OverloadPrint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, "''"
     endif
     
@@ -136,7 +136,7 @@ function MrVector::_OverloadImpliedPrint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, "''"
     endif
     
@@ -157,7 +157,7 @@ NOERASE = noerase
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -410,7 +410,7 @@ pro MrVector::GetData, velx, vely, posx, posy
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -541,7 +541,7 @@ _REF_EXTRA=extra
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 	
@@ -855,7 +855,7 @@ pro MrVector::SetData, vx, vy, x, y
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -1063,7 +1063,7 @@ _REF_EXTRA=extra
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 	
@@ -1186,7 +1186,7 @@ pro MrVector::cleanup
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -1364,7 +1364,7 @@ _REF_EXTRA=extra
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return, 0
 	endif
 

@@ -54,10 +54,10 @@
 ; :Author:
 ;   Matthew Argall::
 ;       University of New Hampshire
-;       Morse Hall, Room 113
+;       Morse Hall, Room 348
 ;       8 College Rd.
 ;       Durham, NH, 03824
-;       matthew.argall@wildcats.unh.edu
+;       matthew.argall@unh.edu
 ;
 ; :History:
 ;   Modification History::
@@ -71,6 +71,8 @@
 ;                           Missing color is loaded at time of draw. - MRA
 ;       2015/02/23  -   Determine polar ranges better. Do not draw axes if OVERPLOT is set. - MRA
 ;       2015/07/06  -   Check RANGE keyword when /LOG is set to prevent infinite range. - MRA
+;       2016/08/29  -   Set PAINT if X or Y are 2D. - MRA
+;       2016/08/30  -   Set SCALE if the data range would result in a single color. - MRA
 ;-
 ;*****************************************************************************************
 ;+
@@ -84,7 +86,7 @@ function MrImage::_OverloadPrint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, "''"
     endif
     
@@ -180,7 +182,7 @@ function MrImage::_OverloadImpliedPrint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, "''"
     endif
     
@@ -219,7 +221,7 @@ YMIN=ymin
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -323,7 +325,7 @@ NOERASE=noerase
 		if n_elements(p_current)   gt 0 then !P = p_current
 		if n_elements(x_current)   gt 0 then !X = x_current
 		if n_elements(y_current)   gt 0 then !Y = y_current
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -350,14 +352,14 @@ NOERASE=noerase
 
 	;Erase?
 	if n_elements(noerase)  eq 0 then noerase = self.noerase
-	if keyword_set(noerase) eq 0 then cgErase, self.background
+	if keyword_set(noerase) eq 0 then cgErase, *self.background
 
 	;Load the rgb_table
 	self.palette -> GetProperty, RGB_TABLE=rgb_table
 	tvlct, rgb_table
 
 	;Load the missing color
-	if n_elements(*self.missing_value) gt 0 $
+	if self.nan || n_elements(*self.missing_value) gt 0 $
 		then tvlct, transpose(self.missing_color), self.missing_index
 
 	;Now display the image
@@ -632,8 +634,8 @@ YRANGE=yrange
     inds = where(*x1 gt xrange[0] and $
                  *x0 lt xrange[1] and $
                  *y1 gt yrange[0] and $
-                 *y0 lt yrange[1], nInds)
-             
+                 *y0 lt yrange[1], nInds, COMPLEMENT=iOut, NCOMPLEMENT=nOut)
+
     ;If no points exist within the range, then return
     if nInds eq 0 then return
 
@@ -680,64 +682,102 @@ YRANGE=yrange
     ;---------------------------------------------------------------------
     ; XRANGE /////////////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
-        ;Left-Half Plane
-        if (xr[0] ge 0.0) && (xr[1] ge 0.0) then begin
-            case 1 of
-                ;One plane if
-                ;   - YRANGE[0] in  I and YRANGE[1] in  I and YRANGE[1] ccw from YRANGE[0]
-                ;   - YRANGE[0] in IV and YRANGE[1] in IV and YRANGE[1] ccw from YRANGE[0]
-                ;   - YRANGE[0] in IV and YRANGE[1] in  I
-                ( (yrange[0] le 0.5*!pi) && ( (yrange[1] le 0.5*!pi) && (yrange[1] ge yrange[0]) ) ): pa_range_x = [0.5*!pi, 0.0]
-                ( (yrange[0] ge 1.5*!pi) && ( (yrange[1] ge 1.5*!pi) && (yrange[1] ge yrange[1]) ) ): pa_range_x = [0.5*!pi, 0.0]
-                ( (yrange[0] ge 1.5*!pi) &&   (yrange[1] le 0.5*!pi) ):                               pa_range_x = [0.5*!pi, 0.0]
-                else: pa_range_x = [!pi, 0.0]
-            endcase
+        quadrant = [0, !pi/2.0, !pi, 3.0*!pi/2.0]
+        qx       = value_locate(quadrant, yrange) + 1
         
-        ;Right-Half Plane
-        endif else if (xr[0] le 0) && (xr[1] le 0) then begin
-            case 1 of
-                ;One plane if
-                ;   - YRANGE[0] in II or III and
-                ;     YRANGE[1] in II or III and YRANGE[1] ccw from YRANGE[0]
-                ( (yrange[0] ge 0.5*!pi) && (yrange[0] le 1.5*!pi) ) && $
-                ( (yrange[1] ge 0.5*!pi) && (yrange[1] ge 1.5*!pi) && (yrange[1] ge yrange[1]) ): pa_range_x = [!pi, 0.5*!pi]
-                else: pa_range_x = [!pi, 0.0]
+        ;I
+        if qx[0] eq 1 then begin
+            case qx[1] of
+                1: pa_range_x = yrange[1] gt yrange[0] ? [!pi/2.0, 0.0] : [!pi, 0.0]
+                2: pa_range_x = [!pi, 0.0]
+                3: pa_range_x = [!pi, 0.0]
+                4: pa_range_x = [!pi, 0.0]
+                else: message, 'Bad YRANGE.'
             endcase
-        
-        ;Left- and Right-Half planes
+            
+        ;II
+        endif else if qx[0] eq 2 then begin
+            case qx[1] of
+                1: pa_range_x = [!pi, 0.0]
+                2: pa_range_x = yrange[1] gt yrange[0] ? [!pi, !pi/2.0] : [!pi, 0.0]
+                3: pa_range_x = [!pi, !pi/2.0]
+                4: pa_range_x = [!pi, 0.0]
+                else: message, 'Bad YRANGE.'
+            endcase
+            
+        ;III
+        endif else if qx[0] eq 3 then begin
+            case qx[1] of
+                1: pa_range_x = [!pi, 0.0]
+                2: pa_range_x = [!pi, 0.0]
+                3: pa_range_x = yrange[1] gt yrange[0] ? [!pi, !pi/2.0] : [!pi, 0.0]
+                4: pa_range_x = [!pi, 0.0]
+                else: message, 'Bad YRANGE.'
+            endcase
+            
+        ;IV
+        endif else if qx[0] eq 3 then begin
+            case qx[1] of
+                1: pa_range_x = [!pi/2.0, 0.0]
+                2: pa_range_x = [!pi, 0.0]
+                3: pa_range_x = [!pi, 0.0]
+                4: pa_range_x = yrange[1] gt yrange[0] ? [!pi/2.0, 0.0] : [!pi, 0.0]
+                else: message, 'Bad YRANGE.'
+            endcase
         endif else begin
-            pa_range_x = [!pi, 0.0]
+            message, 'Bad YRANGE.'
         endelse
 
     ;---------------------------------------------------------------------
     ; YRANGE /////////////////////////////////////////////////////////////
     ;---------------------------------------------------------------------
-        ;Upper-Half Plane
-        if (yr[0] ge 0.0) && (yr[1] ge 0.0) then begin
-            ;One plane if
-            ;   - YRANGE[0] in I or II and
-            ;     YRANGE[1] in I or II and YRANGE[1] ccw from YRANGE[0]
-            if (yrange[0] le !pi) && ( (yrange[1] le 0.5*!pi) && (yrange[1] ge yrange[0]) ) $
-                then pa_range_y = [0.0,     0.5*!pi] $
-                else pa_range_y = [1.5*!pi, 0.5*!pi]
         
-        ;Lower-Half Plane
-        endif else if (xr[0] le 0) && (xr[1] le 0) then begin
-            ;One plane if
-            ;   - YRANGE[0] in III or IV and
-            ;     YRANGE[1] in III or IV and YRANGE[1] ccw from YRANGE[0]
-            if (yrange[0] ge !pi) && ( (yrange[1] ge !pi) && (yrange[1] ge yrange[0]) ) $
-                then pa_range_y = [1.5*!pi,     !pi] $
-                else pa_range_y = [1.5*!pi, 0.5*!pi]
-        
-        ;Left- and Right-Half planes
+        ;I
+        if qx[0] eq 1 then begin
+            case qx[1] of
+                1: pa_range_y = yrange[1] gt yrange[0] ? [0.0, !pi/2.0] : [3.0*!pi/2.0, !pi/2.0]
+                2: pa_range_y = [0.0, !pi/2.0]
+                3: pa_range_y = [3.0*!pi/2.0, !pi/2.0]
+                4: pa_range_y = [3.0*!pi/2.0, !pi/2.0]
+                else: message, 'Bad YRANGE.'
+            endcase
+            
+        ;II
+        endif else if qx[0] eq 2 then begin
+            case qx[1] of
+                1: pa_range_y = [3.0*!pi/2.0, !pi/2.0]
+                2: pa_range_y = yrange[1] gt yrange[0] ? [0.0, !pi/2.0] : [3.0*!pi/2.0, !pi/2.0]
+                3: pa_range_y = [3.0*!pi/2.0, !pi/2.0]
+                4: pa_range_y = [3.0*!pi/2.0, !pi/2.0]
+                else: message, 'Bad YRANGE.'
+            endcase
+            
+        ;III
+        endif else if qx[0] eq 3 then begin
+            case qx[1] of
+                1: pa_range_y = [3.0*!pi/2.0, !pi/2.0]
+                2: pa_range_y = [3.0*!pi/2.0, !pi/2.0]
+                3: pa_range_y = yrange[1] gt yrange[0] ? [0.0, 3.0*!pi/2.0] : [3.0*!pi/2.0, !pi/2.0]
+                4: pa_range_y = [0.0, 3.0*!pi/2.0]
+                else: message, 'Bad YRANGE.'
+            endcase
+            
+        ;IV
+        endif else if qx[0] eq 3 then begin
+            case qx[1] of
+                1: pa_range_y = [3.0*!pi/2.0, !pi/2.0]
+                2: pa_range_y = [3.0*!pi/2.0, !pi/2.0]
+                3: pa_range_y = [3.0*!pi/2.0, !pi/2.0]
+                4: pa_range_y = yrange[1] gt yrange[0] ? [0.0, 3.0*!pi/2.0] : [3.0*!pi/2.0, !pi/2.0]
+                else: message, 'Bad YRANGE.'
+            endcase
         endif else begin
-            pa_range_y = [1.5*!pi, 0.5*!pi]
+            message, 'Bad YRANGE.'
         endelse
 
         ;Convert from polar to cartesian
-        yrange = xrange[1] * sin(pa_range_y)
         xrange = xrange[1] * cos(pa_range_x)
+        yrange = xrange[1] * sin(pa_range_y)
     endif
 
 ;---------------------------------------------------------------------
@@ -785,16 +825,20 @@ YRANGE=yrange
         
         ;Clip pixels that straddle the axis range
         if *self.noclip eq 0 then begin
-            if (xpoly[0] lt xrange[0]) && (xpoly[1] gt xrange[0]) then xpoly[[0,3,4]] = xrange[0]
-            if (xpoly[0] lt xrange[1]) && (xpoly[1] gt xrange[1]) then xpoly[[1,2]]   = xrange[1]
-            if (ypoly[0] lt yrange[0]) && (ypoly[1] gt yrange[0]) then ypoly[[0,1,4]] = yrange[0]
-            if (ypoly[0] lt yrange[1]) && (ypoly[1] gt yrange[1]) then ypoly[[2,3]]   = yrange[1]
-
             ;Skip pixels that are outside of the axis range.
             ;   - Must do this after converting to cartesian coordinates.
-            if (xpoly[0] lt xrange[0]) || (xpoly[1] gt xrange[1]) || $
-               (ypoly[0] lt yrange[0]) || (ypoly[1] gt yrange[1]) $
-            then continue
+;            if (xpoly[0] lt xrange[0]) || (xpoly[1] gt xrange[1]) || $
+;               (ypoly[0] lt yrange[0]) || (ypoly[1] gt yrange[1]) $
+;            then continue
+            
+            xpoly >= xrange[0]
+            xpoly <= xrange[1]
+            ypoly >= yrange[0]
+            ypoly <= yrange[1]
+;            if (xpoly[0] lt xrange[0]) && (xpoly[1] gt xrange[0]) then xpoly[[0,3,4]] = xrange[0]
+;            if (xpoly[0] lt xrange[1]) && (xpoly[1] gt xrange[1]) then xpoly[[1,2]]   = xrange[1]
+;            if (ypoly[0] lt yrange[0]) && (ypoly[1] gt yrange[0]) then ypoly[[0,1,4]] = yrange[0]
+;            if (ypoly[0] lt yrange[1]) && (ypoly[1] gt yrange[1]) then ypoly[[2,3]]   = yrange[1]
         endif
 
         ;Paint the image
@@ -898,94 +942,100 @@ YRANGE=yrange
 ;---------------------------------------------------------------------
 ; Concentric Circles /////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    ;Minimum and maximum radius and polar angle
-    _xrange = [min(*self.x0, /NAN), max(*self.x0, /NAN)]
-    _yrange = [min(*self.y0, /NAN), max(*self.y1, /NAN)]
-    if self.xlog then _xrange = MrLog(_xrange) > 1e-3
-    
-    ;Create a circle of unit radius
-    xcenter = 0
-    ycenter = 0
-    radius  = 1.0
-    points  = linspace(_yrange[0], _yrange[1], 100)
-    x = xcenter + radius * cos(points)
-    y = ycenter + radius * sin(points)
-    
-    ;Draw concentric circles
-    ring_loc = n_elements(*self.xtickv) gt 0 ? *self.xtickv : xtick_get
-    nRings   = n_elements(ring_loc)
-    for i = 0, nRings - 1 do begin
-        plots, x*ring_loc[i], y*ring_loc[i], $
-               /DATA, $
-               COLOR     = cgColor(self.pol_rcolor), $
-               LINESTYLE = self.pol_rlinestyle, $
-               THICK     = self.pol_thick
-;               NOCLIP    =  noclip, $
-;               PSYM      =  psym, $
-;               SYMSIZE   =  symsize, $
-;               Z         =  zvalue
-    endfor
-    
+    ;Draw the circles?
+    pol_rlinestyle = MrLineStyle(self.pol_rlinestyle)
+    if pol_rlinestyle ne 6 then begin
+        ;Minimum and maximum radius and polar angle
+        _xrange = [min(*self.x0, /NAN), max(*self.x0, /NAN)]
+        _yrange = [min(*self.y0, /NAN), max(*self.y1, /NAN)]
+        if self.xlog then _xrange = MrLog(_xrange) > 1e-3
+        
+        ;Create a circle of unit radius
+        xcenter = 0
+        ycenter = 0
+        radius  = 1.0
+        points  = linspace(_yrange[0], _yrange[1], 100)
+        x = xcenter + radius * cos(points)
+        y = ycenter + radius * sin(points)
+        
+        ;Draw concentric circles
+        ring_loc = n_elements(*self.xtickv) gt 0 ? *self.xtickv : xtick_get
+        nRings   = n_elements(ring_loc)
+        for i = 0, nRings - 1 do begin
+            plots, x*ring_loc[i], y*ring_loc[i], $
+                   /DATA, $
+                   COLOR     = cgColor(self.pol_rcolor), $
+                   LINESTYLE = self.pol_rlinestyle, $
+                   THICK     = self.pol_thick
+;                   NOCLIP    =  noclip, $
+;                   PSYM      =  psym, $
+;                   SYMSIZE   =  symsize, $
+;                   Z         =  zvalue
+        endfor
+    endif
 ;---------------------------------------------------------------------
 ; Radial Lines ///////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
+    pol_tlinestyle = MrLineStyle(self.pol_rlinestyle)
+    if pol_tlinestyle ne 6 then begin
 
-    ;If no tick information is given, create something.
-    if n_elements(*self.ytickv) + n_elements(*self.yticks) + n_elements(*self.ytickinterval) eq 0 then begin
-        _yint = (_yrange[1] - _yrange[0]) * !radeg
-        case 1 of
-            _yint ge 90: ytickinterval = 45 * !dtor
-            _yint ge 45: ytickinterval = 15 * !dtor
-            _yint ge 20: ytickinterval = 10 * !dtor
-            _yint ge 10: ytickinterval =  5 * !dtor
-            _yint ge  4: ytickinterval =  2 * !dtor
-            _yint ge  2: ytickinterval =  1 * !dtor
-            else: ;Do nothing
-        endcase
-    endif else begin
-        ytickinterval = *self.ytickinterval
-    endelse
+        ;If no tick information is given, create something.
+        if n_elements(*self.ytickv) + n_elements(*self.yticks) + n_elements(*self.ytickinterval) eq 0 then begin
+            _yint = (_yrange[1] - _yrange[0]) * !radeg
+            case 1 of
+                _yint ge 90: ytickinterval = 45 * !dtor
+                _yint ge 45: ytickinterval = 15 * !dtor
+                _yint ge 20: ytickinterval = 10 * !dtor
+                _yint ge 10: ytickinterval =  5 * !dtor
+                _yint ge  4: ytickinterval =  2 * !dtor
+                _yint ge  2: ytickinterval =  1 * !dtor
+                else: ;Do nothing
+            endcase
+        endif else begin
+            ytickinterval = *self.ytickinterval
+        endelse
 
-    ;Let IDL determine the best tickmarks by creating an invisible axis.
-    axis, YAXIS         =  0, $
-          YRANGE        =  yrange, $
-          YSTYLE        =  5, $
-          YTICK_GET     = *self.ytick_get, $
-          YTICKV        = *self.ytickv, $
-          YTICKS        = *self.yticks, $
-          YTICKINTERVAL =  ytickinterval
+        ;Let IDL determine the best tickmarks by creating an invisible axis.
+        axis, YAXIS         =  0, $
+              YRANGE        =  yrange, $
+              YSTYLE        =  5, $
+              YTICK_GET     = *self.ytick_get, $
+              YTICKV        = *self.ytickv, $
+              YTICKS        = *self.yticks, $
+              YTICKINTERVAL =  ytickinterval
           
-    ;Get the tickmarks
-    if n_elements(*self.ytickv) gt 0 $
-        then ytickmarks = *self.ytickv $
-        else ytickmarks = *self.ytick_get
-    nmarks = n_elements(ytickmarks)
+        ;Get the tickmarks
+        if n_elements(*self.ytickv) gt 0 $
+            then ytickmarks = *self.ytickv $
+            else ytickmarks = *self.ytick_get
+        nmarks = n_elements(ytickmarks)
 
-    ;Draw the radial marks
-    for i = 0, nmarks - 1 do begin
-        ;Location of the tickmark on the outer circle
-        x1 = _xrange[1]*cos(ytickmarks[i])
-        y1 = _xrange[1]*sin(ytickmarks[i])
+        ;Draw the radial marks
+        for i = 0, nmarks - 1 do begin
+            ;Location of the tickmark on the outer circle
+            x1 = _xrange[1]*cos(ytickmarks[i])
+            y1 = _xrange[1]*sin(ytickmarks[i])
         
-        ;Extend to box-axis
-        x = xrange[1]
-        y = (y1/x1)*x
-        if y gt yrange[1] || y lt yrange[0] then begin
-            y = yrange[1]
-            x = (x1/y1)*y
-        endif
+            ;Extend to box-axis
+            x = xrange[1]
+            y = (y1/x1)*x
+            if y gt yrange[1] || y lt yrange[0] then begin
+                y = yrange[1]
+                x = (x1/y1)*y
+            endif
     
-        ;Draw the radial lines
-        plots, [0, x], [0, y] , $
-               /DATA, $
-               COLOR     = cgColor(self.pol_tcolor), $
-               LINESTYLE = self.pol_tlinestyle, $
-               THICK     = self.pol_thick
-;               NOCLIP    =  noclip, $
-;               PSYM      =  psym, $
-;               SYMSIZE   =  symsize, $
-;               Z         =  zvalue
-    endfor
+            ;Draw the radial lines
+            plots, [0, x], [0, y] , $
+                   /DATA, $
+                   COLOR     = cgColor(self.pol_tcolor), $
+                   LINESTYLE = self.pol_tlinestyle, $
+                   THICK     = self.pol_thick
+;                   NOCLIP    =  noclip, $
+;                   PSYM      =  psym, $
+;                   SYMSIZE   =  symsize, $
+;                   Z         =  zvalue
+        endfor
+    endif
     
 end
 
@@ -1042,7 +1092,7 @@ pro MrImage::GetData, image, x, y, x0, y0, x1, y1
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1174,6 +1224,7 @@ DATA_POS = data_pos, $
 LOG = log, $
 MISSING_VALUE = missing_value, $
 MISSING_COLOR = missing_color, $
+MISSING_INDEX = missing_index, $
 NAN = nan, $
 NOCLIP = noclip, $
 PAINT = paint, $
@@ -1195,7 +1246,7 @@ _REF_EXTRA = extra
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -1233,6 +1284,7 @@ _REF_EXTRA = extra
 	if arg_present(BOTTOM)         then bottom        =  self.bottom
 	if arg_present(RANGE)          then range         =  self.range
 	if arg_present(MISSING_COLOR)  then missing_color =  self.missing_color
+	if arg_present(missing_index)  then missing_index =  self.missing_index
 	if arg_present(rgb_table)      then self.palette ->  GetProperty, RGB_TABLE=rgb_table
 	if arg_present(NAN)            then nan           =  self.nan
 	if arg_present(SCALE)          then scale         =  self.scale
@@ -1262,7 +1314,7 @@ pro MrImage::PrepImage
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1327,9 +1379,9 @@ pro MrImage::PrepImage
 
 ;---------------------------------------------------------------------
 ; Scale the Image ////////////////////////////////////////////////////
-;---------------------------------------------------------------------	
+;---------------------------------------------------------------------
 	if self.scale then begin
-	    range = self.log ? MrLog(self.range) : self.range
+		range = self.log ? MrLog(self.range) : self.range
 
 		;Get the number of colors in the color table
 		self.palette -> GetProperty, NCOLORS=ncolors
@@ -1381,7 +1433,7 @@ YLOG=ylog
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
  
@@ -1402,7 +1454,7 @@ YLOG=ylog
     ;   - SetData will set PAINT=1 if more than just X and Y were given. Leave as is.
     ;   - If only X and Y were given, we need to decide if the image needs to be pained.
     if n_params() eq 2 then begin
-        if xlog + ylog + center + self.polar gt 0 $
+        if (xlog + ylog + center + self.polar gt 0) || size(x, /N_DIMENSIONS) eq 2 || size(y, /N_DIMENSIONS) eq 2 $
             then self.paint = 1 $
             else self.paint = 0
     endif
@@ -1476,7 +1528,7 @@ TV=tv
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1540,6 +1592,7 @@ TV=tv
             self -> ClearData, /ALL
             
             ;Store the data
+            ;   - X and/or Y may define the location of each pixel.
             *self.image = theImage
             *self.indep = x
             *self.dep   = y
@@ -1674,7 +1727,7 @@ TV=tv
 	;   - If LOG is set, avoid values <= 0
 	;
 	nKeep = n_elements(*self.image)
-	iKeep = indgen(nKeep)
+	iKeep = lindgen(nKeep)
 
 	;Missing Value
 	if n_elements(*self.missing_value) gt 0 $
@@ -1699,7 +1752,7 @@ TV=tv
 	endelse
 
 	;SCALE
-	if imMin lt 0 || imMax gt 255 then scale = 1B
+	if imMin lt 0 || imMax gt 255 || abs(imMax - imMin) lt 1 then scale = 1B
 
 	;Set Properties
 	;   - NAN and SCALE will cause ::PrepImage to be called.
@@ -1774,8 +1827,9 @@ AXES = axes, $
 CENTER = center, $
 DATA_POS = data_pos, $
 LOG = log, $
-MISSING_VALUE = missing_value, $
+MISSING_COLOR = missing_color, $
 MISSING_INDEX = missing_index, $
+MISSING_VALUE = missing_value, $
 NAN = nan, $
 NOCLIP = noclip, $
 RANGE = range, $
@@ -1801,7 +1855,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1814,6 +1868,7 @@ _REF_EXTRA = extra
 	;mraImage.pro Properties
 	if n_elements(axes)           gt 0 then  self.axes           = keyword_set(axes)
 	if n_elements(data_pos)       gt 0 then *self.data_pos       = data_pos
+	if n_elements(missing_color)  gt 0 then  self.missing_color  = cgColor(missing_color, /TRIPLE)
 	if n_elements(noclip)         ne 0 then *self.noclip         = keyword_set(noclip)
 	if n_elements(pol_axstyle)    gt 0 then  self.pol_axstyle    = pol_axstyle
 	if n_elements(pol_thick)      gt 0 then  self.pol_thick      = pol_thick
@@ -1821,23 +1876,6 @@ _REF_EXTRA = extra
 	if n_elements(pol_rlinestyle) gt 0 then  self.pol_rlinestyle = pol_rlinestyle
 	if n_elements(pol_tcolor)     gt 0 then  self.pol_tcolor     = cgColor(pol_tcolor, /TRIPLE)
 	if n_elements(pol_tlinestyle) gt 0 then  self.pol_tlinestyle = pol_tlinestyle
-
-	;PALETTE
-	if n_elements(rgb_table) gt 0 then begin
-		;Get the number of colors
-		self.palette -> GetProperty, N_COLORS=n_old
-		
-		;Set the color palette
-		self.palette -> SetProperty, RGB_TABLE=the_table
-		
-		;If the number of colors changed, adjust the missing index
-		self.palette -> GetProperty, N_COLORS=n_new
-		if n_new ne n_old && self.missing_index gt n_new-1 then self.missing_index = n_new - 1
-		
-		;Add a missing color
-		if n_elements(*self.missing_value) gt 0 $
-			then self.palette -> SetRGB, self.missing_index, self.missing_color
-	endif
 	
 	;MISSING INDEX
 	if n_elements(missing_index) gt 0 then begin
@@ -1845,6 +1883,30 @@ _REF_EXTRA = extra
 		if missing_index ge ncolors $
 			then message, 'MISSING_INDEX does not fit in the color table.', /INFORMATIONAL $
 			else self.missing_index = missing_index
+	endif
+
+	;PALETTE
+	nMissColor = n_elements(missing_color)
+	nMissIndex = n_elements(missing_index)
+	nRGBTable  = n_elements(rgb_table)
+	if nMissColor + nMissIndex + nRGBTable gt 0 then begin
+		;Missing color and index
+		if nMissColor gt 0 then self.missing_color = cgColor(missing_color)
+		if nMissIndex gt 0 then self.missing_index = missing_index
+	
+		;Get the number of colors
+		self.palette -> GetProperty, NCOLORS=n_old
+		
+		;Set the color palette
+		self.palette -> SetProperty, RGB_TABLE=rgb_table
+		
+		;If the number of colors changed, adjust the missing index
+		self.palette -> GetProperty, NCOLORS=n_new
+		if n_new ne n_old && self.missing_index gt n_new-1 then self.missing_index = n_new - 1
+		
+		;Add a missing color
+		if n_elements(*self.missing_value) gt 0 $
+			then self.palette -> SetRGB, self.missing_index, self.missing_color
 	endif
 
 	;RANGE
@@ -1926,7 +1988,7 @@ pro MrImage::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -2077,7 +2139,6 @@ AXES = axes, $
 AXISCOLOR = axiscolor, $
 BOTTOM = bottom, $
 CENTER = center, $
-CTINDEX = ctindex, $
 DATA_POS = data_pos, $
 LOG = log, $
 MISSING_VALUE = missing_value, $
@@ -2107,7 +2168,7 @@ _REF_EXTRA = extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
 
@@ -2178,8 +2239,8 @@ _REF_EXTRA = extra
 ;---------------------------------------------------------------------
 ; Color Palette //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
-    
-    ;Colors
+
+	;Colors
 	;   - Foreground, Background, and Missing Index.
 	;   - Default to putting the missing value at the top of the color table.
 	;   - Use as much of the color table as possible.
@@ -2191,10 +2252,10 @@ _REF_EXTRA = extra
 	if n_elements(pol_rcolor)    eq 0 then pol_rcolor    = color
 	if n_elements(pol_tcolor)    eq 0 then pol_tcolor    = color
 	if n_elements(background)    eq 0 then background    = 'white'
-	if n_elements(missing_color) eq 0 then missing_color = ''
+	if n_elements(missing_color) eq 0 then missing_color = background
 	if n_elements(missing_index) eq 0 then missing_index = !d.table_size - 1
 	if n_elements(top)           eq 0 then top           = !d.table_size - 1
-	if n_elements(rgb_table)     eq 0 then rgb_table     = 13
+	if n_elements(rgb_table)     eq 0 then rgb_table     = 25
 
 	;Set the rgb_table
 	;   - Do not set the SCALE property before now.
@@ -2250,6 +2311,8 @@ _REF_EXTRA = extra
                          IDISPLAY       = iDisplay, $
                          MAX_VALUE      = max_value, $
                          MIN_VALUE      = min_value, $
+                         MISSING_COLOR  = missing_color, $
+                         MISSING_INDEX  = missing_index, $
                          NAN            = nan, $
                          NOCLIP         = noclip, $
                          NORMAL         = normal, $

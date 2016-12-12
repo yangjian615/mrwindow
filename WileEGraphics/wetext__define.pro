@@ -102,7 +102,7 @@ FUNCTION weText::GetCorners
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, !Null
     ENDIF
     
@@ -150,7 +150,7 @@ NORMAL = normal
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
         if !Except eq 0 then !Except = 1
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
     
@@ -208,7 +208,7 @@ WIDTH=width
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -391,7 +391,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -537,7 +537,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -586,7 +586,7 @@ PRO weText::cleanup
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -714,7 +714,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
     

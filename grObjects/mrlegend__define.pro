@@ -55,6 +55,107 @@
 ;-
 ;*****************************************************************************************
 ;+
+;   The purpose of this method is to print information about the object's properties
+;   when the PRINT procedure is used.
+;-
+function MrLegend_Item::_OverloadPrint
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /CANCEL
+		MrPrintF, 'LogErr'
+		return, "''"
+	endif
+
+	undefined = '<undefined>'
+	undefObj  = '<NullObject>'
+	default   = '<IDL_Default>'
+	joinStr   = '   '
+
+	;Color
+	case n_elements(*self.text_color) of
+		0: text_color = default
+		1: text_color = size(*self.text_color, /TNAME) eq 'STRING' ? *self.text_color : string(*self.text_color, FORMAT='(i0)')
+		3: text_color = '[' + strjoin(string(*self.text_color, FORMAT='(i3)'), ', ') + ']'
+	endcase
+
+	;Sym Color
+	case size(*self.symbol, /TNAME) of
+		'UNDEFINED': psym = default
+		'STRING':    psym = *self.symbol
+		else:        psym = string(*self.symbol, FORMAT='(i0)')
+	endcase
+
+	;Sym Color
+	case n_elements(*self.sym_color) of
+		0: sym_color = default
+		1: sym_color = size(*self.sym_color, /TNAME) eq 'STRING' ? *self.sym_color : string(*self.sym_color, FORMAT='(i0)')
+		3: sym_color = '[' + strjoin(string(*self.sym_color, FORMAT='(i3)'), ', ') + ']'
+	endcase
+
+	;Sample Color
+	case n_elements(*self.sample_color) of
+		0: sample_color = default
+		1: sample_color = size(*self.sample_color, /TNAME) eq 'STRING' ? *self.sample_color : string(*self.sample_color, FORMAT='(i0)')
+		3: sample_color = '[' + strjoin(string(*self.sample_color, FORMAT='(i3)'), ', ') + ']'
+	endcase
+	
+	;Linstyle
+	if size(*self.sample_linestyle, /TNAME) eq 'STRING' $
+		then sample_linestyle = *self.sample_linestyle $
+		else sample_linestyle = string(*self.sample_linestyle, FORMAT='(i0)')
+
+	;Class Properties
+	auto_text_color  = string('Auto_Text_Color           =', self.auto_text_color,  FORMAT='(%"%s %i")')
+	font             = string('Font                      =', self.font,             FORMAT='(%"%s %i")')
+	label            = string('Label                     =', self.label,            FORMAT='(%"%s %s")')
+	text_color       = string('Text_Color                =',      text_color,       FORMAT='(%"%s %s")')
+	text_size        = string('Text_Size                 =', self.text_size,        FORMAT='(%"%s %f")')
+	text_thick       = string('Text_Thick                =', self.text_thick,       FORMAT='(%"%s %f")')
+	sample_angle     = string('Sample_Angle              =', self.sample_angle,     FORMAT='(%"%s %f")')
+	sample_color     = string('Sample_Color              =',      sample_color,     FORMAT='(%"%s %s")')
+	sample_linestyle = string('Sample_Linestyle          =',      sample_linestyle, FORMAT='(%"%s %s")')
+	sample_magnitude = string('Sample_Magnitude          =', self.sample_magnitude, FORMAT='(%"%s %f")')
+	sample_thick     = string('Sample_Thick              =', self.sample_thick,     FORMAT='(%"%s %f")')
+	sample_width     = string('Sample_Width              =', self.sample_width,     FORMAT='(%"%s %f")')
+	psym             = string('Symbol                    =',      psym,             FORMAT='(%"%s %s")')
+	sym_center       = string('Sym_Center                =', self.sym_center,       FORMAT='(%"%s %i")')
+	sym_color        = string('Sym_Color                 =',      sym_color,        FORMAT='(%"%s %s")')
+	sym_size         = string('Sym_Size                  =', self.sym_size,         FORMAT='(%"%s %f")')
+	sym_thick        = string('Sym_Thick                 =', self.sym_thick,        FORMAT='(%"%s %f")')
+
+	;Put MrLegend properties together
+	selfStr = obj_class(self) + '  <' + strtrim(obj_valid(self, /GET_HEAP_IDENTIFIER), 2) + '>'
+	itemKeys = [ [ auto_text_color      ], $
+	             [ font             ], $
+	             [ label            ], $
+	             [ text_color       ], $
+	             [ text_size        ], $
+	             [ text_thick       ], $
+	             [ sample_angle     ], $
+	             [ sample_color     ], $
+	             [ sample_linestyle ], $
+	             [ sample_magnitude ], $
+	             [ sample_thick     ], $
+	             [ sample_width     ], $
+	             [ psym             ], $
+	             [ sym_center       ], $
+	             [ sym_color        ], $
+	             [ sym_size         ], $
+	             [ sym_thick        ] $
+	           ]
+
+	;Group everything in alphabetical order
+	result = '  ' + itemKeys
+	result = [[selfStr],  [result[0, sort(result)]]]
+
+	return, result
+end
+
+
+;+
 ;   Draw the legend item.
 ;
 ; :Params:
@@ -502,7 +603,7 @@ TEXT_THICK=text_thick
 	Catch, the_error
 	IF the_error NE 0 THEN BEGIN
 		Catch, /CANCEL
-		void = cgErrorMSG()
+		MrPrintF, 'LogErr'
 		RETURN, 0
 	ENDIF
 	
@@ -601,6 +702,7 @@ END
 PRO MrLegend_Item__Define, class
 
 	class = { MrLegend_Item, $
+	          Inherits IDL_Object, $
 	          auto_text_color:  0B, $
 	          font:             0S, $
 	          label:            '', $
@@ -621,6 +723,222 @@ PRO MrLegend_Item__Define, class
 	          sym_thick:        0.0 $
 	        }
 END
+
+
+;+
+;   Allow square-bracket array indexing from the right side of an operator.
+;
+; :Params:
+;       ISRANGE:            in, required, type=intarr
+;                           A vector that has one element for each Subscript argument
+;                               supplied by the user; each element contains a zero if the
+;                               corresponding input argument was a scalar index value or
+;                               array of indices, or a one if the corresponding input
+;                               argument was a subscript range.
+;       I1:                 in, required, type=integer/string
+;                           The name or index of the legend item to retrieve.
+;
+; :Returns:
+;       RESULT:             out, required, type=objref
+;                           The legend item requested.
+;-
+function MrLegend::_OverloadBracketsRightSide, isRange, i1
+	compile_opt idl2
+	on_error, 2
+
+	;Number of subscripts given
+	nSubscripts = n_elements(isRange)
+	if nSubscripts    gt 1 then message, 'Only one subscript allowed.'
+	if isRange[0]     eq 1 then message, 'Index cannot be a range.'
+	if n_elements(i1) gt 1 then message, 'Only one index allowed.'
+	
+	;LABEL
+	if IsA(i1, 'STRING') then begin
+		theItem = self -> FindByLabel(i1)
+	
+	;INDEX
+	endif else if MrIsA(i1, /INTEGER) then begin
+		;0   returns the object
+		;[0] returns a legend item
+		if i1 eq 0 && MrIsA(i1, /SCALAR) $
+			then theItem = self $
+			else theItem = self.items -> Get(POSITION=i1)
+	
+	endif else begin
+		message, 'The index must be a scalar string or integer.'
+	endelse
+	
+	return, theItem
+end
+
+
+;+
+;   Allow for iteration through legend items via the FOREACH operator.
+;
+; :Params:
+;       VALUE:              in, out, required, type=object
+;                           The current object.
+;       KEY:                in, out, required, type=int/string
+;                           The index of the current object.
+;
+; :Returns:
+;       RESULT:             1 if there is a current element to retrieve, 0 if there are
+;                               no more elements.
+;-
+function MrLegend::_OverloadForeach, value, key
+	compile_opt idl2
+	on_error, 2
+	
+	;Get all of the legend items
+	items = self -> GetItem(LABEL=labels)
+
+	;First object
+	if n_elements(key) eq 0 then begin
+		key   = labels[0]
+		value = items[0]
+		return, 1
+	endif
+
+	;Number of items.
+	count = self.items -> Count()
+	
+	;Index of the previous iteration
+	;   - Return if the variable was removed or if it was the last.
+	idx = where(labels eq key, n)
+	if n   eq 0       then return, 0
+	if idx eq count-1 then return, 0
+	
+	;Obtain the next key and value
+	key   = labels[idx[0]+1]
+	value = items[idx[0]+1]
+	return, 1
+end
+
+
+;+
+;   The purpose of this method is to print information about the object's properties
+;   when the PRINT procedure is used.
+;-
+function MrLegend::_OverloadPrint
+	compile_opt strictarr
+
+	;Error handling
+	catch, the_error
+	if the_error ne 0 then begin
+		catch, /cancel
+		MrPrintF, 'LogErr'
+		return, "''"
+	endif
+
+	undefined = '<undefined>'
+	undefObj  = '<NullObject>'
+	default   = '<IDL_Default>'
+	joinStr   = '   '
+
+	;First, get the results from the superclasses
+	atomKeys = self -> MrGrAtom::_OverloadPrint()
+
+	;Color
+	case n_elements(*self.color) of
+		0: color = default
+		1: color = size(*self.color, /TNAME) eq 'STRING' ? *self.color : string(*self.color, FORMAT='(i0)')
+		3: color = '[' + strjoin(string(*self.color, FORMAT='(i3)'), ', ') + ']'
+	endcase
+
+	;Fill Color
+	case n_elements(*self.fill_color) of
+		0: fill_color = default
+		1: fill_color = size(*self.fill_color, /TNAME) eq 'STRING' ? *self.fill_color : string(*self.fill_color, FORMAT='(i0)')
+		3: fill_color = '[' + strjoin(string(*self.fill_color, FORMAT='(i3)'), ', ') + ']'
+	endcase
+	
+	;Linstyle
+	if size(*self.linestyle, /TNAME) eq 'STRING' $
+		then linestyle = *self.linestyle $
+		else linestyle = string(*self.linestyle, FORMAT='(i0)')
+	
+	;Number of items
+	count = self.items -> Count()
+
+	;Class Properties
+	nItems      = string('nItems                    =',      count,              FORMAT='(%"%s %i")')
+	data        = string('Data                      =', self.data,               FORMAT='(%"%s %i")')
+	normal      = string('Normal                    =', self.normal,             FORMAT='(%"%s %i")')
+	relative    = string('Relative                  =', self.relative,           FORMAT='(%"%s %i")')
+	dev         = string('Device                    =', self.device,             FORMAT='(%"%s %i")')
+	align_vert  = string('Vertical_Alignment        =', self.align_vertical,     FORMAT='(%"%s %f")')
+	align_horz  = string('Horizontal_Alignment      =', self.align_horizontal,   FORMAT='(%"%s %f")')
+	margins     = string('Margins                   =', self.margins,            FORMAT='(%"%s [%f, %f, %f, %f]")')
+	orientation = string('Orientation               =', self.orientation,        FORMAT='(%"%s %i")')
+	position    = string('Position                  =', self.position,           FORMAT='(%"%s [%f, %f]")')
+	space_vert  = string('Vertical_Spacing          =', self.vertical_spacing,   FORMAT='(%"%s %f")')
+	space_horz  = string('Horizontal_Spacing        =', self.horizontal_spacing, FORMAT='(%"%s %f")')
+	color       = string('Color                     =', color,                   FORMAT='(%"%s %s")')
+	linestyle   = string('Linestyle                 =', linestyle,               FORMAT='(%"%s %i")')
+	thick       = string('Thick                     =', self.thick,              FORMAT='(%"%s %i")')
+	fill_color  = string('Fill_Color                =', fill_color,              FORMAT='(%"%s %i")')
+
+	;Put MrLegend properties together
+	selfStr = obj_class(self) + '  <' + strtrim(obj_valid(self, /GET_HEAP_IDENTIFIER), 2) + '>'
+	lgdKeys = [ [ nItems      ], $
+	            [ data        ], $
+	            [ normal      ], $
+	            [ relative    ], $
+	            [ dev         ], $
+	            [ align_vert  ], $
+	            [ align_horz  ], $
+	            [ margins     ], $
+	            [ orientation ], $
+	            [ position    ], $
+	            [ space_vert  ], $
+	            [ space_horz  ], $
+	            [ color       ], $
+	            [ linestyle   ], $
+	            [ thick       ], $
+	            [ fill_color  ] $
+	          ]
+	
+	;Items
+	items      = self -> GetItem(LABEL=labels)
+	itemStr    = strarr(1, count+1)
+	itemStr[0] = 'ITEM   LABEL'
+	for i = 0, count - 1 do itemStr[i+1] = string(i, labels[i], FORMAT='(1x, i3, 3x, a0)')
+
+	;Group everything in alphabetical order
+	result = [[atomKeys], ['  ' + lgdKeys]]
+	result = [[selfStr],  [result[0, sort(result)]], [itemStr]]
+
+	return, result
+end
+
+
+;+
+;   The purpose of this method is to obtain the results of IDL's Size() function when
+;   applied to the applicit array.
+;
+; :Returns:
+;       RESULT:             Results of the Size() function on the implicit array
+;-
+;function MrLegend::_OverloadSize
+;	compile_opt idl2
+;	on_error, 2
+;	
+;	;Elements of size array
+;	;   0:       Number of dimensions, NDIMS
+;	;   1-NDIMS: Size of each dimension
+;	;   NDIMS+1: Type code
+;	;   NDIMS+2: Total number of elements
+;	count = self.items -> Count()
+;	nDims = 1
+;	dims  = count
+;	tcode = 11
+;	sz    = [nDims, dims, tcode, count]
+;
+;	;Return the dimensions of the array. The Size and N_Elements functions
+;	;will know what to do with them.
+;	return, sz
+;end
+
 
 ;+
 ;   Add an item to the legend.
@@ -738,7 +1056,7 @@ PRO MrLegend::CalculateBoxSize
 			WSet, currentID
 		ENDIF
 		IF N_Elements(currentState) NE 0 THEN cgSetColorState, currentState
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -885,7 +1203,7 @@ NOERASE=noerase
 		self.bx_pos = FltArr(4)
 		IF N_Elements(thisFont) NE 0 THEN !P.Font = thisFont
 		IF N_Elements(incomingColorState) THEN cgSetColorState, incomingColorState
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 	
@@ -902,7 +1220,8 @@ NOERASE=noerase
 	cgSetColorState, 1, Current=incomingColorState
 
 	;Convert properties
-	color     = cgColor(*self.color)
+	if ~( MrIsA(*self.color, 'STRING') && *self.color eq '' ) $
+		then color = cgColor(*self.color)
 	linestyle = MrLinestyle(*self.linestyle)
 
 ;-----------------------------------------------------
@@ -911,7 +1230,7 @@ NOERASE=noerase
 
 	;Fill the background?
 	;   - cgColor does not like when FILL_COLOR is the empty string.
-	IF ~(MrIsA(*self.fill_color, 'STRING') && *self.fill_color EQ '') THEN BEGIN
+	IF ~( MrIsA(*self.fill_color, 'STRING') && *self.fill_color EQ '' ) THEN BEGIN
 		fill_color = cgColor(*self.fill_color)
 		cgColorFill, POSITION=self.bx_pos, COLOR=fill_color
 	ENDIF
@@ -996,11 +1315,14 @@ END
 ;   Get a legend item object, its position, and/or its label.
 ;
 ; :Params:
-;       ITEM:           in, required, type=objref/integer/string
+;       ITEM:           in, optional, type=objref/integer/string
 ;                       The object reference, container position, or label of the legend
-;                           item to be retrieved.
+;                           item to be retrieved. If not provided, all legend items are
+;                           returned.
 ;
 ; :Keywords:
+;       COUNT:          out, optional, type=integer
+;                       Number of legend items returned.
 ;       LABEL:          out, optional, type=string
 ;                       Label of the legend item.
 ;       POSITION:       out, optional, type=integer
@@ -1008,13 +1330,18 @@ END
 ;-
 FUNCTION MrLegend::GetItem, item, $
 POSITION=position, $
-LABEL=label
+LABEL=label, $
+COUNT=count
 	Compile_Opt idl2
 	On_Error, 2
 
+	;All items
+	IF N_Elements(item) EQ 0 THEN BEGIN
+		the_item = self.items -> Get(/ALL, COUNT=count)
+		
 	;Position in container
-	IF MrIsA(item, /NUMBER) THEN BEGIN
-		the_item = self.items -> Get(POSITION=item)
+	ENDIF ELSE IF MrIsA(item, /NUMBER) THEN BEGIN
+		the_item = self.items -> Get(POSITION=item, COUNT=count)
 	
 	;Label
 	ENDIF ELSE IF Size(item, /TNAME) EQ 'STRING' THEN BEGIN
@@ -1033,12 +1360,21 @@ LABEL=label
 		Message, 'ITEM must be a container position, label, or legend item object.'
 	ENDELSE
 	
-	;Return the item's container position or its label?
+	;Get Container index
 	IF Arg_Present(position) THEN void = self.items -> IsContained(the_item, POSITION=position)
-	IF Arg_Present(label)    THEN the_item -> GetProperty, LABEL=label
+	
+	;Get the labels
+	IF Arg_Present(label) THEN BEGIN
+		nLabels = n_elements(the_item)
+		label   = strarr(nLabels)
+		FOR i = 0, nLabels - 1 DO BEGIN
+			the_item[i] -> GetProperty, LABEL=temp
+			label[i]     = temp
+		ENDFOR
+	ENDIF
 	
 	RETURN, the_item
-END    
+END
 
 
 ;+
@@ -1053,7 +1389,7 @@ FUNCTION MrLegend::GetPosition
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, [0,0]
     ENDIF
     
@@ -1184,7 +1520,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /Cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -1248,7 +1584,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /Cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, [0,0]
     ENDIF
     
@@ -1318,7 +1654,8 @@ END
 ;                           If set, `POSITION` is provided in device coordinates.
 ;       FILL_COLOR:         in, optional, type=string/integer/bytarr(3)
 ;                           Name, index, 24-bit number, or RGB-triple of the color with
-;                               which to fill the background of the legend.
+;                               which to fill the background of the legend.  If FILL_COLOR
+;                               is the empty string (''), then the bounding box not filled.
 ;       HARDWARE:           in, optional, type=boolean, default=0
 ;                           If set, hardware fonts will be used.
 ;       HORIZONTAL_ALIGNMENT:   in, optional, type=float/string
@@ -1329,7 +1666,7 @@ END
 ;                               Spacing between legend items when `ORIENTATION`=0, in
 ;                                   units of character size.
 ;       LINESTYLE:          in, optional, type=float
-;                           Style with with to draw the line. Choices are::
+;                           Style with with to draw the bounding box. Choices are::
 ;                               0   '-'     "Solid
 ;                               1   '.'     "Dot"
 ;                               2   '--'    "Dash"
@@ -1411,7 +1748,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /Cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN
 	ENDIF
 
@@ -1771,7 +2108,7 @@ _REF_EXTRA=extra
 	Catch, theError
 	IF theError NE 0 THEN BEGIN
 		Catch, /Cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		RETURN, 0
 	ENDIF
 
@@ -1827,13 +2164,24 @@ _REF_EXTRA=extra
 	IF N_Elements(psym)             EQ 1 THEN psym             = Replicate(psym,             nLegends)
 	
 	;Position
+	;   - If a target was given, position just outside its upper-right corner
+	;   - If no target, place the legend in the upper-right corner of the window.
 	if n_elements(position) eq 0 then begin
-		position  = [0.9, 0.9]
-		alignment = 'NE'
-		normal    = 1
-		data      = 0
-		device    = 0
-		relative  = 0
+		if n_elements(nTargets) eq 0 then begin
+			position  = [0.95, 0.9]
+			alignment = 'NE'
+			normal    = 1
+			data      = 0
+			device    = 0
+			relative  = 0
+		endif else begin
+			position  = [1.0, 1.0]
+			alignment = 'NW'
+			normal    = 0
+			data      = 0
+			device    = 0
+			relative  = 1
+		endelse
 	endif
 	
 	;Other defaults
@@ -1850,11 +2198,11 @@ _REF_EXTRA=extra
 ;Window //////////////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
 
-    ;Superclass
-    ;   - Takes the window from the target, but does not set the target.
-    success = self -> MrGrAtom::INIT(HIDE=hide, TARGET=target, WINREFRESH=refreshIn, _STRICT_EXTRA=extra)
-    if success eq 0 then message, 'Unable to initialize MrGrAtom'
-    
+	;Superclass
+	;   - Takes the window from the target, but does not set the target.
+	success = self -> MrGrAtom::INIT(HIDE=hide, TARGET=target, WINREFRESH=refreshIn, _STRICT_EXTRA=extra)
+	if success eq 0 then message, 'Unable to initialize MrGrAtom'
+
 ;---------------------------------------------------------------------
 ; Allocate Heap //////////////////////////////////////////////////////
 ;---------------------------------------------------------------------
@@ -1873,8 +2221,8 @@ _REF_EXTRA=extra
 	nLabels = N_Elements(label)
 	FOR i = 0, nLegends - 1 DO BEGIN
 		IF nLabels GT 0 THEN temp_label = label[i]
-		IF i GE nTargets $
-			THEN void        = Temporary(temp_target) $
+		IF nTargets EQ 1 $
+			THEN temp_target = target[0] $
 			ELSE temp_target = target[i]
 	
 		;Add a legend item for each label given.

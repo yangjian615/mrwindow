@@ -106,7 +106,7 @@ FUNCTION weColorBar::CalcColorbarPosition
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, FltArr(4)
     ENDIF
 
@@ -192,7 +192,7 @@ NOERASE=noerase
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -366,7 +366,7 @@ PRO weColorBar::cleanup
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -444,7 +444,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -566,7 +566,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -912,7 +912,7 @@ _REF_EXTRA = extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
 

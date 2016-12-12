@@ -72,7 +72,7 @@ pro MrDrawWidget_Drag_Notify, destination, source, x, y, modifiers, default
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -107,7 +107,7 @@ pro MrDrawWidget_Event_Pro, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -251,7 +251,7 @@ function MrDrawWidget_Event_Func, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
     
@@ -443,7 +443,7 @@ _EXTRA=extraKeywords
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -493,7 +493,7 @@ pro MrDrawWidget::Drop_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -533,7 +533,7 @@ WINDOW_TITLE=window_title
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -581,7 +581,7 @@ pro MrDrawWidget::Copy, window_id, $
     if the_error ne 0 then begin
         catch, /cancel
         wset, currentWin
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -624,7 +624,7 @@ pro MrDrawWidget::Erase, color
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -653,7 +653,7 @@ pro MrDrawWidget::Notify_Realize, id
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -712,7 +712,7 @@ _EXTRA=extraKeywords
     catch, the_error
         if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -766,7 +766,7 @@ DISABLE=disable
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -795,7 +795,7 @@ pro MrDrawWidget::TLB_Resize_Events, event
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -951,7 +951,7 @@ _REF_EXTRA=extra
     if the_error ne 0 then begin
         catch, /cancel
         if currentWin ne -1 then wset, currentWin
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1157,7 +1157,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1255,7 +1255,7 @@ pro MrDrawWidget::cleanup
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
 
@@ -1483,7 +1483,7 @@ _REF_EXTRA=extra
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
 

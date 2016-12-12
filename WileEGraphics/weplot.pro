@@ -151,7 +151,7 @@ _REF_EXTRA = extra
     Catch, the_error
     IF the_error NE 0 THEN BEGIN
         Catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
 

@@ -77,7 +77,7 @@ NOERASE=noerase
         ENDIF
         
         IF N_Elements(current_state) GT 0 THEN cgSetColorState, current_state
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -192,7 +192,7 @@ POLYNUM=polynum
         Catch, /CANCEL
         ;Restore color table.
         if n_elements(r) gt 0 then tvlct, r, g, b
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -295,7 +295,7 @@ POLYNUM=polynum
         Catch, /CANCEL
         ;Restore the color table
         IF N_Elements(r) GT 0 THEN tvlct, r, g, b
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -538,7 +538,7 @@ FILLED=filled
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, -1
     ENDIF
     
@@ -690,7 +690,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -765,7 +765,7 @@ POSITION=position
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -926,7 +926,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN
     ENDIF
     
@@ -1043,7 +1043,7 @@ pro MrPolygon::cleanup
     catch, theerror
     if theerror ne 0 then begin
         catch, /cancel
-        void = cgerrormsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -1235,7 +1235,7 @@ _REF_EXTRA=extra
     Catch, theError
     IF theError NE 0 THEN BEGIN
         Catch, /CANCEL
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         RETURN, 0
     ENDIF
     

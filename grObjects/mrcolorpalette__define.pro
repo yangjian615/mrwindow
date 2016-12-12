@@ -69,7 +69,7 @@ ROW=row
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
@@ -357,14 +357,14 @@ ROW=row
 	catch, the_error
 	if the_error ne 0 then begin
 		catch, /cancel
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return
 	endif
 
 ;-------------------------------------------------------
 ; Check RGB Table //////////////////////////////////////
 ;-------------------------------------------------------
-	;RGB_TABLE can be one of three thigns
+	;RGB_TABLE can be one of three things
 	if n_elements(rgb_table) gt 0 then begin
 		;What was given?
 		;   - Scalar color table index
@@ -372,7 +372,7 @@ ROW=row
 		;   - 3xN or Nx3 array of color triples
 		sz = size(rgb_table)
 		case 1 of
-			sz[0] eq 0 && sz[2] eq 1:                 ctidnex   = rgb_table
+			sz[0] eq 0 && sz[2] eq 1:                 ctindex   = rgb_table
 			sz[sz[0]+2] eq 7:                         the_table = cgColor(rgb_table, /TRIPLE)
 			sz[0] eq 2 && (sz[1] eq 3 || sz[2] eq 3): the_table = rgb_table
 			else: message, 'RGB_TABLE must be a colot table index, color names, or array of color triples.'
@@ -470,7 +470,7 @@ pro MrColorPalette::SetRGB, index, color, g, b
 		b      = (temporary(colors))[*,2]
 	
 	;Nx3 or 3xN array
-	endif else if sz[0] eq 2 then begin
+	endif else if (sz[0] eq 2) || (sz[0] eq 1 && sz[sz[0]+2] eq 3) then begin
 		if sz[2] eq 3 then begin
 			r = color[*,0]
 			g = color[*,1]
@@ -601,7 +601,7 @@ SILENT=silent
 	if theerror ne 0 then begin
 		catch, /cancel
 		if n_elements(rr) gt 0 then tvlct, rr, gg, bb
-		void = cgErrorMsg()
+		MrPrintF, 'LogErr'
 		return, 0
 	endif
 
@@ -629,7 +629,7 @@ SILENT=silent
 		1:    if MrIsA(rgb, /INTEGER, /SCALAR) then ctindex = rgb else rgb_table = rgb
 		else: r = rgb
 	endcase
-	
+
 	;Allocate heap to the color table
 	self.rgb_table = ptr_new(/ALLOCATE_HEAP)
 	

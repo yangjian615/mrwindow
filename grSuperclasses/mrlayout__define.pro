@@ -72,7 +72,7 @@ function MrLayout::_OverloadPrint
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, fltarr(4)
     endif
     
@@ -162,7 +162,7 @@ function MrLayout::CalcPosition
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, fltarr(4)
     endif
     
@@ -299,7 +299,7 @@ Y_WINDOW=y_window
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -394,7 +394,7 @@ YGAP=ygap
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return
     endif
     
@@ -526,7 +526,7 @@ YGAP=ygap
     catch, the_error
     if the_error ne 0 then begin
         catch, /cancel
-        void = cgErrorMsg()
+        MrPrintF, 'LogErr'
         return, 0
     endif
 
