@@ -972,6 +972,7 @@ _REF_EXTRA=extra
 ; Configure PostScript Device \\\\\\\\\\\\\\\\\\\\\\\\
 ;-----------------------------------------------------
 	cancelled = 0
+	Device, GET_DECOMPOSED=decomposed
 	IF tf_match THEN BEGIN
 		;Try landscape if the window is wider than it is tall.
 		IF !D.X_Size GT !D.Y_Size THEN landscape = 1 ELSE landscape = 0
@@ -981,27 +982,29 @@ _REF_EXTRA=extra
 		sizes = cgPSWindow(_Extra=extra, LANDSCAPE=landscape, /SANE_OFFSETS)
 		
 		;Obtain a set of keywords for configuring the PS device
-		keywords = cgPS_Config( _Strict_Extra=extra, $
-		                        INCHES       = sizes.inches, $
-		                        XSIZE        = sizes.xsize, $
-		                        YSIZE        = sizes.ysize, $
-		                        XOFFSET      = sizes.xoffset, $
-		                        YOFFSET      = sizes.yoffset, $
-		                        CANCEL       = cancelled, $
-		                        NOGUI        = (~gui), $
-		                        LANDSCAPE    = sizes.landscape, $
-		                        ENCAPSULATED = encapsulated, $
-		                        FILENAME     = file_basename(ps_filename), $
-		                        DIRECTORY    = directory)
+		keywords = cgPS_Config( _Strict_Extra = extra, $
+		                        CANCEL        = cancelled, $
+		                        DECOMPOSED    = decomposed, $
+		                        DIRECTORY     = directory, $
+		                        FILENAME      = file_basename(ps_filename), $
+		                        ENCAPSULATED  = encapsulated, $
+		                        INCHES        = sizes.inches, $
+		                        LANDSCAPE     = sizes.landscape, $
+		                        NOGUI         = (~gui), $
+		                        XSIZE         = sizes.xsize, $
+		                        XOFFSET       = sizes.xoffset, $
+		                        YOFFSET       = sizes.yoffset, $
+		                        YSIZE         = sizes.ysize )
 
 	ENDIF ELSE BEGIN
-		keywords = cgPS_Config(_Strict_Extra = extra, $
-		                       ENCAPSULATED  = encapsulated, $
-		                       LANDSCAPE     = landscape, $
-		                       CANCEL        = cancelled, $
-		                       NOGUI         = (~gui), $
-		                       FILENAME      = file_basename(ps_filename), $
-		                       DIRECTORY     = directory)
+		keywords = cgPS_Config( _Strict_Extra = extra, $
+		                        CANCEL        = cancelled, $
+		                        DECOMPOSED    = decomposed, $
+		                        DIRECTORY     = directory, $
+		                        ENCAPSULATED  = encapsulated, $
+		                        FILENAME      = file_basename(ps_filename), $
+		                        LANDSCAPE     = landscape, $
+		                        NOGUI         = (~gui) )
 	ENDELSE
 	IF cancelled THEN BEGIN
 		self -> PS_Close, /NOFIX, /NOMESSAGE

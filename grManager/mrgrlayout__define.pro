@@ -461,7 +461,7 @@ TO_COLROW=to_colrow
     if the_error ne 0 then begin
         catch, /cancel
         MrPrintF, 'LogErr'
-        return, MrNull(-1)
+        return, -1
     endif
 
 ;---------------------------------------------------------------------
@@ -493,7 +493,7 @@ TO_COLROW=to_colrow
     ;Make sure the location exists
     exists = self -> PlotExists(location, layout, PINDEX=pIndex, AINDEX=aIndex)
     if max(exists) eq 0 then if arg_present(exists) $
-        then return, MrNull(-1) $
+        then return, -1 $
         else message, 'Location does not exist within layout. Cannot convert.'
 
     ;How many locations were given?
@@ -900,7 +900,7 @@ PINDEX = pIndex
     if the_error ne 0 then begin
         catch, /cancel
         MrPrintF, 'LogErr'
-        return, MrNull(-1)
+        return, -1
     endif
     
     ;Defaults
@@ -979,7 +979,7 @@ function MrGrLayout::MakeFixedLocation
     if the_error ne 0 then begin
         catch, /cancel
         MrPrintF, 'LogErr'
-        return, MrNull(-1)
+        return, -1
     endif
     
     ;Get a new location
@@ -1178,7 +1178,7 @@ PINDEX = pIndex
     if the_error ne 0 then begin
         catch, /cancel
         MrPrintF, 'LogErr'
-        return, MrNull(0)
+        return, 0
     endif
     
     ;Default to current layout
@@ -1471,7 +1471,7 @@ function MrGrLayout::RePosition, old_layout, new_layout, pIndex
         ;If no plot index was given, then there *should* be nothing to convert.
         if n_elements(plot_index) eq 0 then $
             if n_elements(*self.posIsTaken) eq 0 $
-                then return, MrNull(-1) $
+                then return, -1 $
                 else message, 'OLD_LAYOUT did not match posIsTaken. Report bug.'
     
         if self -> PlotExists(pIndex, new_layout) $
@@ -1573,7 +1573,7 @@ _REF_EXTRA = extra
 
             ;Resposition all of the existing plots        
             *self.posIsTaken = self -> RePosition(self.GrLayout, layout)
-            if MrIsNull(*self.posIsTaken, 'POINTER') then *self.posIsTaken = bytarr(layout[0]*layout[1])
+            if ~ptr_valid(self.posIsTaken) then *self.posIsTaken = bytarr(layout[0]*layout[1])
 
             ;Change the layout
             self.GrLayout = layout
